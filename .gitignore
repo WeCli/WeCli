@@ -1,0 +1,70 @@
+# 虚拟环境
+.venv/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 环境变量配置（含密钥）
+config/.env
+
+test/*
+!test/chat.py
+!test/view_history.py
+
+# 但 .env.example 模板需要上传
+!config/.env.example
+
+# 用户密码配置（含哈希）
+config/users.json
+!config/users.json.example
+
+# 但 requirements.txt 需要上传
+!config/requirements.txt
+
+# 运行时数据（用户文件、数据库等）
+data/*
+!data/prompts/
+!data/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+
+# pyright 配置
+pyrightconfig.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# cloudflared / bark-server 二进制
+bin/
+
+# Bark 推送运行时数据
+data/bark/
+
+# 打包产物
+build/
+dist/
+node_modules/
+*.spec
+MiniTimeBot.exe
+*.dmg
+
+
+chatbot/logs/
+chatbot/botpy.log
+
+# 运行日志
+logs/
+!logs/.gitkeep
+
+# PID 文件
+.mini_timebot.pid
+
+# 重启信号文件
+.restart_flag
+
+.tunnel.pid

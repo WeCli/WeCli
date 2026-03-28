@@ -1,0 +1,1431 @@
+#!/usr/bin/env python3
+"""
+OpenClaw 自动探测与配置工具。
+
+检测本地 OpenClaw 安装状态，自动探测 gateway 端口、sessions 文件路径、
+API token 等配置，并写入 TeamClaw 的 config/.env。
+
+用法:
+    python selfskill/scripts/configure_openclaw.py --auto-detect       # 自动探测并配置（含 workspace 初始化）
+    python selfskill/scripts/configure_openclaw.py --status            # 仅显示检测状态
+    python selfskill/scripts/configure_openclaw.py --install-guide     # 输出 OpenClaw 安装/初始化流程
+    python selfskill/scripts/configure_openclaw.py --repair-health     # 检查并修复轻量健康问题
+    python selfskill/scripts/configure_openclaw.py --init-workspace    # 仅初始化 workspace 默认模板
+"""
+
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+
+# 复用 configure.py 的配置写入逻辑
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
+ENV_PATH = os.path.join(PROJECT_ROOT, "config", ".env")
+OPENCLAW_HOME = os.path.expanduser(os.getenv("OPENCLAW_HOME", "~/.openclaw"))
+OPENCLAW_CONFIG_PATH = os.path.join(OPENCLAW_HOME, "openclaw.json")
+DEFAULT_GATEWAY_PORT = 18789
+DEFAULT_WORKSPACE_PATH = os.path.join(OPENCLAW_HOME, "workspace")
+DEFAULT_SESSIONS_FILE = os.path.join(
+    OPENCLAW_HOME, "agents", "main", "sessions", "sessions.json"
+)
+
+
+def resolve_openclaw_command():
+    """Resolve the most reliable OpenClaw CLI entrypoint for this OS."""
+    candidates = ["openclaw"]
+    if os.name == "nt":
+        candidates = ["openclaw.cmd", "openclaw"]
+
+    for name in candidates:
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
+
+# 添加到 sys.path 以便复用 configure.py
+sys.path.insert(0, SCRIPT_DIR)
+try:
+    from configure import set_env_with_validation, read_env
+except ImportError:
+    # Fallback: 直接实现最小版本
+    def read_env():
+        if not os.path.exists(ENV_PATH):
+            return [], {}
+        with open(ENV_PATH, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        kvs = {}
+        for line in lines:
+            s = line.strip()
+            if s and not s.startswith("#") and "=" in s:
+                k, v = s.split("=", 1)
+                kvs[k.strip()] = v.strip()
+        return lines, kvs
+
+    def set_env_with_validation(key, value):
+        lines, _ = read_env()
+        key_found = False
+        new_lines = []
+        for line in lines:
+            s = line.strip()
+            if s.startswith(f"{key}=") or s.startswith(f"# {key}="):
+                new_lines.append(f"{key}={value}\n")
+                key_found = True
+            else:
+                new_lines.append(line)
+        if not key_found:
+            if new_lines and not new_lines[-1].endswith("\n"):
+                new_lines.append("\n")
+            new_lines.append(f"{key}={value}\n")
+        os.makedirs(os.path.dirname(ENV_PATH), exist_ok=True)
+        with open(ENV_PATH, "w", encoding="utf-8") as f:
+            f.writelines(new_lines)
+        print(f"✅ {key}={value[:20]}{'...' if len(value) > 20 else ''}")
+        return True
+
+
+def run_cmd(cmd, timeout=15):
+    """运行命令并返回 (returncode, stdout, stderr)"""
+    if cmd and cmd[0] == "openclaw":
+        resolved = resolve_openclaw_command()
+        if resolved:
+            cmd = [resolved, *cmd[1:]]
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout
+        )
+        return result.returncode, result.stdout.strip(), result.stderr.strip()
+    except FileNotFoundError:
+        return -1, "", "command not found"
+    except subprocess.TimeoutExpired:
+        return -2, "", "timeout"
+    except Exception as e:
+        return -3, "", str(e)
+
+
+def mask_secret(value):
+    """掩码显示敏感信息。"""
+    if not value:
+        return "****"
+    if len(value) <= 8:
+        return "****"
+    return value[:4] + "****" + value[-4:]
+
+
+def load_openclaw_config():
+    """读取 ~/.openclaw/openclaw.json。"""
+    if not os.path.isfile(OPENCLAW_CONFIG_PATH):
+        return {}
+
+    try:
+        with open(OPENCLAW_CONFIG_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def get_config_value(*path):
+    """从 openclaw.json 中读取嵌套配置。"""
+    data = load_openclaw_config()
+    current = data
+    for key in path:
+        if not isinstance(current, dict) or key not in current:
+            return None
+        current = current[key]
+    return current
+
+
+def parse_non_banner_value(raw):
+    """过滤 CLI banner / 噪声，只取有效值。"""
+    if not raw:
+        return None
+
+    for line in raw.splitlines():
+        value = line.strip()
+        if not value:
+            continue
+        if value.startswith("openclaw") or value.startswith("🦞"):
+            continue
+        if value.startswith("=") or value.startswith("Docs:"):
+            continue
+        return value
+    return None
+
+
+def parse_json_output(raw):
+    """解析命令输出中的 JSON。"""
+    if not raw:
+        return None
+
+    text = raw.strip()
+    if not text:
+        return None
+
+    for candidate in (text, text[text.find("{") :] if "{" in text else ""):
+        if not candidate:
+            continue
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def print_install_guide():
+    """输出推荐的 OpenClaw 安装与初始化流程。"""
+    is_windows = os.name == "nt"
+    sync_cmd = (
+        r"powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 check-openclaw"
+        if is_windows
+        else "bash selfskill/scripts/run.sh check-openclaw"
+    )
+    print("OpenClaw 安装流程（本地推荐）:")
+    print("  1. 确保 Node.js >= 22")
+    print("  2. 安装 CLI: npm install -g openclaw@latest --ignore-scripts")
+    if is_windows:
+        print("  3. Windows / 自动化场景优先使用非交互 onboarding:")
+        print("     openclaw onboard --non-interactive --accept-risk --install-daemon")
+        print("     如需复用 TeamClaw 的 OpenAI key，可追加:")
+        print("     openclaw onboard --non-interactive --accept-risk --install-daemon --openai-api-key <LLM_API_KEY>")
+    else:
+        print("  3. 本地交互模式: openclaw onboard --install-daemon")
+        print("     自动化 / 无交互模式: openclaw onboard --non-interactive --accept-risk --install-daemon")
+    print("  4. 确认 openclaw 已在 PATH 中；必要时补全 npm 全局 bin 路径")
+    print("  5. 启用 HTTP Chat Completions: openclaw config set gateway.http.endpoints.chatCompletions.enabled true")
+    print("  6. 重启 Gateway: openclaw gateway restart")
+    print(f"  7. 完成后执行: {sync_cmd}")
+    print("     这一步会自动同步 TeamClaw .env，并清理缺失 transcript 的 session 坏索引")
+    print("  8. 如果 TeamClaw 已在运行，再执行一次 stop -> start，让 OASIS 重新加载 openclaw CLI")
+    if is_windows:
+        print("")
+        print("Windows 本地控制台若提示 'gateway token missing'，有两种做法：")
+        print("  A. 保持 token 模式：把 OPENCLAW_GATEWAY_TOKEN 粘贴到 Control UI settings")
+        print("  B. 仅本机 loopback 调试：")
+        print("     openclaw config set gateway.auth.mode none")
+        print("     openclaw config unset gateway.auth.token")
+        print("     openclaw gateway restart")
+        print("")
+        print("Windows + 微信插件注意事项：")
+        print("  - PowerShell 里 bare 'openclaw' 可能命中 openclaw.ps1，并被执行策略拦截；优先用 openclaw.cmd")
+        print("  - 官方微信安装器")
+        print("    npx -y @tencent-weixin/openclaw-weixin-cli@latest install")
+        print("    在 Windows 上可能失败，因为它内部调用了 'which openclaw'")
+        print("  - 失败时请改用手动安装：")
+        print('    openclaw.cmd plugins install "@tencent-weixin/openclaw-weixin"')
+        print("    openclaw.cmd config set plugins.entries.openclaw-weixin.enabled true")
+        print("    openclaw.cmd channels login --channel openclaw-weixin")
+        print("    openclaw.cmd channels list --json")
+        print("    openclaw.cmd gateway restart")
+        print("  - 如果 openclaw status 显示 openclaw-weixin = ON / SETUP / no token，说明插件已装好但还没扫码完成")
+    print("")
+    print("自动化安装时，可使用最小本地模式：")
+    print("  TOKEN=$(python - <<'PY'")
+    print("import secrets")
+    print("print(secrets.token_hex(24))")
+    print("PY")
+    print("  )")
+    print(
+        "  openclaw onboard --non-interactive --accept-risk --mode local "
+        "--auth-choice skip --gateway-auth token --gateway-bind loopback "
+        f"--gateway-port {DEFAULT_GATEWAY_PORT} --gateway-token \"$TOKEN\" "
+        "--skip-channels --skip-search --skip-skills --skip-ui --skip-health "
+        f"--skip-daemon --workspace {DEFAULT_WORKSPACE_PATH} --json"
+    )
+    print("")
+    print("若需要 HTTP 回退链路常驻运行，再执行:")
+    print("  openclaw gateway install --force")
+    print("  openclaw gateway start")
+
+
+def detect_gateway_runtime():
+    """检测 gateway 运行状态。"""
+    rc, out, err = run_cmd(["openclaw", "gateway", "status"], timeout=20)
+    text = "\n".join(part for part in (out, err) if part)
+    if "Runtime: running" in text:
+        return "running"
+    if "Runtime: stopped" in text or "Gateway not running" in text:
+        return "stopped"
+    port = detect_gateway_port() or DEFAULT_GATEWAY_PORT
+    try:
+        with socket.create_connection(("127.0.0.1", int(port)), timeout=2):
+            return "running"
+    except OSError:
+        if rc == 0 and not text:
+            return None
+        return "stopped"
+    if rc == 0 and not text:
+        return None
+    return None
+
+
+def detect_linger_status():
+    """检测 systemd linger 状态。"""
+    username = os.getenv("USER") or os.getenv("LOGNAME")
+    if not username:
+        return None
+
+    rc, out, _ = run_cmd(
+        ["loginctl", "show-user", username, "--property=Linger", "--value"],
+        timeout=10,
+    )
+    if rc != 0:
+        return None
+
+    value = parse_non_banner_value(out) or out.strip()
+    if value in {"yes", "no"}:
+        return value
+    return None
+
+
+def is_chat_completions_enabled():
+    """检测 OpenAI Chat Completions 兼容端点是否开启。"""
+    enabled = get_config_value(
+        "gateway", "http", "endpoints", "chatCompletions", "enabled"
+    )
+    if isinstance(enabled, bool):
+        return enabled
+    if isinstance(enabled, str):
+        return enabled.lower() == "true"
+    return False
+
+
+def enable_chat_completions_endpoint():
+    """开启 Gateway 的 /v1/chat/completions 兼容端点。"""
+    if is_chat_completions_enabled():
+        return True, False
+
+    rc, out, err = run_cmd(
+        [
+            "openclaw",
+            "config",
+            "set",
+            "gateway.http.endpoints.chatCompletions.enabled",
+            "true",
+        ],
+        timeout=20,
+    )
+    if rc != 0:
+        return False, False
+
+    runtime = detect_gateway_runtime()
+    if runtime == "running":
+        run_cmd(["openclaw", "gateway", "restart"], timeout=30)
+
+    return True, True
+
+
+def detect_openclaw_bin():
+    """检测 openclaw 可执行文件路径"""
+    oc_bin = resolve_openclaw_command()
+    if oc_bin:
+        return oc_bin
+
+    # 尝试通过 npm bin -g 找到全局安装路径
+    try:
+        result = subprocess.run(
+            ["npm", "bin", "-g"], capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            npm_bin = result.stdout.strip()
+            candidate = os.path.join(npm_bin, "openclaw")
+            if os.path.isfile(candidate):
+                return candidate
+    except Exception:
+        pass
+
+    # 尝试通过 npm prefix -g 找到全局安装路径
+    try:
+        result = subprocess.run(
+            ["npm", "prefix", "-g"], capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            npm_prefix = result.stdout.strip()
+            candidate = os.path.join(npm_prefix, "bin", "openclaw")
+            if os.path.isfile(candidate):
+                return candidate
+    except Exception:
+        pass
+
+    # 常见位置
+    common_paths = [
+        os.path.expanduser("~/.local/bin/openclaw"),
+        os.path.expanduser("~/.npm/node_modules/bin/openclaw"),
+        os.path.expanduser("~/.npm-global/bin/openclaw"),
+        "/usr/local/bin/openclaw",
+    ]
+    if os.name == "nt":
+        common_paths = [
+            os.path.expanduser(r"~\AppData\Local\Microsoft\WinGet\Packages\OpenJS.NodeJS.LTS_Microsoft.Winget.Source_8wekyb3d8bbwe\node-v24.14.0-win-x64\openclaw.cmd"),
+            os.path.expanduser(r"~\AppData\Roaming\npm\openclaw.cmd"),
+            *common_paths,
+        ]
+    for path in common_paths:
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def detect_gateway_port():
+    """探测 OpenClaw gateway 端口"""
+    port = get_config_value("gateway", "port")
+    if isinstance(port, int):
+        return port
+    if isinstance(port, str) and port.isdigit():
+        return int(port)
+
+    rc, out, err = run_cmd(["openclaw", "config", "get", "gateway.port"])
+    if rc == 0:
+        for line in out.splitlines():
+            port = line.strip()
+            if port.isdigit():
+                return int(port)
+    return None
+
+
+def detect_gateway_auth_mode():
+    """探测 OpenClaw gateway.auth.mode。"""
+    mode = get_config_value("gateway", "auth", "mode")
+    if isinstance(mode, str) and mode.strip():
+        return mode.strip().lower()
+
+    rc, out, _ = run_cmd(["openclaw", "config", "get", "gateway.auth.mode"])
+    if rc == 0 and out.strip():
+        value = parse_non_banner_value(out)
+        if value:
+            return value.strip().lower()
+    return None
+
+
+def detect_gateway_token():
+    """探测 OpenClaw gateway token"""
+    token = get_config_value("gateway", "auth", "token")
+    if isinstance(token, str) and token and token != "__OPENCLAW_REDACTED__":
+        return token
+
+    rc, out, err = run_cmd(["openclaw", "config", "get", "gateway.auth.token"])
+    if rc == 0 and out.strip():
+        token = parse_non_banner_value(out)
+        if token and token != "__OPENCLAW_REDACTED__":
+            return token
+    return None
+
+
+def detect_workspace_path():
+    """探测 OpenClaw workspace 路径"""
+    workspace = get_config_value("agents", "defaults", "workspace")
+    if isinstance(workspace, str) and workspace.strip():
+        return workspace.strip()
+
+    rc, out, err = run_cmd(["openclaw", "config", "get", "agents.defaults.workspace"])
+    if rc == 0 and out.strip():
+        workspace = parse_non_banner_value(out)
+        if workspace and os.path.sep in workspace:
+            return workspace
+
+    # 默认路径
+    default_ws = DEFAULT_WORKSPACE_PATH
+    if os.path.isdir(default_ws):
+        return default_ws
+
+    return None
+
+
+def detect_sessions_file():
+    """探测 OpenClaw sessions.json 文件路径"""
+    home = os.path.expanduser("~")
+    candidates = [
+        DEFAULT_SESSIONS_FILE,
+        os.path.join(home, ".moltbot", "agents", "main", "sessions", "sessions.json"),
+        "/projects/.moltbot/agents/main/sessions/sessions.json",
+        "/projects/.openclaw/agents/main/sessions/sessions.json",
+    ]
+
+    workspace = detect_workspace_path()
+    if workspace:
+        parent = os.path.dirname(workspace)
+        candidates.insert(
+            0, os.path.join(parent, "agents", "main", "sessions", "sessions.json")
+        )
+
+    unique_candidates = []
+    seen = set()
+    for path in candidates:
+        if path in seen:
+            continue
+        seen.add(path)
+        unique_candidates.append(path)
+
+    for path in unique_candidates:
+        if os.path.isfile(path):
+            return path
+
+    for path in unique_candidates:
+        if os.path.isdir(os.path.dirname(path)):
+            return path
+
+    return None
+
+
+def inspect_sessions_health(store_path):
+    """检查 sessions 索引健康状态。"""
+    if not store_path or not os.path.isfile(store_path):
+        return None
+
+    rc, out, _ = run_cmd(
+        [
+            "openclaw",
+            "sessions",
+            "cleanup",
+            "--store",
+            store_path,
+            "--dry-run",
+            "--fix-missing",
+            "--json",
+        ],
+        timeout=20,
+    )
+    if rc != 0:
+        return None
+    data = parse_json_output(out)
+    return data if isinstance(data, dict) else None
+
+
+def repair_sessions_health(store_path):
+    """清理缺失 transcript 的 sessions 坏索引。"""
+    report = inspect_sessions_health(store_path)
+    if not isinstance(report, dict):
+        return None
+
+    missing = int(report.get("missing", 0) or 0)
+    would_mutate = bool(report.get("wouldMutate"))
+    result = {
+        "checked": True,
+        "missing": missing,
+        "wouldMutate": would_mutate,
+        "repaired": False,
+        "storePath": store_path,
+    }
+
+    if missing <= 0 or not would_mutate:
+        return result
+
+    rc, out, err = run_cmd(
+        [
+            "openclaw",
+            "sessions",
+            "cleanup",
+            "--store",
+            store_path,
+            "--enforce",
+            "--fix-missing",
+            "--json",
+        ],
+        timeout=20,
+    )
+    if rc != 0:
+        result["error"] = err or out or "unknown error"
+        return result
+
+    applied = parse_json_output(out)
+    if isinstance(applied, dict):
+        result["repaired"] = bool(applied.get("applied"))
+        result["afterCount"] = applied.get("afterCount")
+        result["appliedCount"] = applied.get("appliedCount")
+    return result
+
+
+def print_health_status(sessions_file=None, repair=False):
+    """输出轻量健康状态；可选自动修复 sessions 坏索引。"""
+    print("\n🔍 检查 OpenClaw 轻量健康状态...")
+
+    linger = detect_linger_status()
+    if linger == "yes":
+        print("   ✅ systemd linger 已开启")
+    elif linger == "no":
+        print("   ⚠️ systemd linger 未开启，登出后 Gateway 可能停止")
+        print("   可执行: loginctl enable-linger $(whoami)")
+    else:
+        print("   ℹ️ 未能检测 systemd linger 状态")
+
+    if not sessions_file or not os.path.isfile(sessions_file):
+        print("   ℹ️ sessions.json 尚未落盘，跳过索引体检")
+        return
+
+    report = repair_sessions_health(sessions_file) if repair else inspect_sessions_health(sessions_file)
+    if not isinstance(report, dict):
+        print("   ℹ️ 未能读取 sessions 索引健康状态")
+        return
+
+    missing = int(report.get("missing", 0) or 0)
+    if missing <= 0:
+        print("   ✅ Sessions 索引健康")
+        return
+
+    if repair and report.get("repaired"):
+        print(f"   ✅ 已清理 {missing} 条缺失 transcript 的会话索引")
+        return
+
+    print(f"   ⚠️ Sessions 索引存在 {missing} 条缺失 transcript 的坏索引")
+    print("   可执行:")
+    print(f"   openclaw sessions cleanup --store {sessions_file} --enforce --fix-missing")
+
+
+def detect_llm_config_from_openclaw():
+    """从 OpenClaw 配置中探测 LLM 相关参数（API Key / Base URL / Model / Provider）。
+
+    读取 openclaw.json 中的 models.providers 和 agents.defaults.model，
+    返回 dict 形如:
+        {"LLM_API_KEY": "...", "LLM_BASE_URL": "...", "LLM_MODEL": "...", "LLM_PROVIDER": "..."}
+    仅包含成功探测到的字段。
+    """
+    result = {}
+    config = load_openclaw_config()
+    if not config:
+        return result
+
+    # 1. 从 agents.defaults.model.primary 获取默认模型（格式: provider/model）
+    default_model = get_config_value("agents", "defaults", "model", "primary")
+    provider_id = None
+    model_id = None
+    if isinstance(default_model, str) and "/" in default_model:
+        provider_id, model_id = default_model.split("/", 1)
+
+    # 2. 如果没有从 defaults 获取到，尝试直接从 env.OPENAI_API_KEY 推断
+    providers = get_config_value("models", "providers") or {}
+
+    # 3. 从 provider 配置中获取 apiKey 和 baseUrl
+    if provider_id and provider_id in providers:
+        provider_cfg = providers[provider_id]
+    elif providers:
+        # 选第一个非 openai 的 provider（openai 通常是 env fallback）
+        provider_id = next(
+            (k for k in providers if k != "openai"),
+            next(iter(providers), None),
+        )
+        provider_cfg = providers.get(provider_id, {}) if provider_id else {}
+    else:
+        provider_cfg = {}
+
+    api_key = provider_cfg.get("apiKey") or ""
+    if not api_key:
+        # fallback: 从 openclaw.json env 段取 OPENAI_API_KEY
+        api_key = (config.get("env") or {}).get("OPENAI_API_KEY", "")
+
+    base_url = provider_cfg.get("baseUrl") or ""
+    # OpenClaw baseUrl 通常带 /v1，TeamClaw 的 LLM_BASE_URL 不带
+    if base_url:
+        stripped = base_url.rstrip("/")
+        if stripped.endswith("/v1"):
+            stripped = stripped[:-3]
+        result["LLM_BASE_URL"] = stripped
+
+    if api_key:
+        result["LLM_API_KEY"] = api_key
+
+    if model_id:
+        result["LLM_MODEL"] = model_id
+
+    if provider_id:
+        result["LLM_PROVIDER"] = provider_id
+
+    return result
+
+
+def sync_llm_config_from_openclaw():
+    """从 OpenClaw 同步 LLM 配置到 TeamClaw .env。
+
+    仅同步未设置或仍为占位符的字段，不覆盖用户已显式设置的值。
+    返回成功同步的字段数量。
+    """
+    detected = detect_llm_config_from_openclaw()
+    if not detected:
+        return 0
+
+    _, kvs = read_env()
+    synced = 0
+    placeholder_values = {"your_api_key_here", ""}
+
+    print("\n🔍 从 OpenClaw 同步 LLM 配置...")
+    for key in ("LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_PROVIDER"):
+        new_val = detected.get(key)
+        if not new_val:
+            continue
+        existing = kvs.get(key, "").strip()
+        if existing and existing not in placeholder_values:
+            # 用户已显式设置且不是占位符，跳过
+            display = mask_secret(existing) if key in {"LLM_API_KEY"} else existing
+            print(f"   ⏭️  {key} 已设置 ({display})，保留不变")
+            continue
+        set_env_with_validation(key, new_val)
+        synced += 1
+
+    if synced > 0:
+        print(f"   ✅ 从 OpenClaw 同步了 {synced} 项 LLM 配置")
+    else:
+        print("   ℹ️ LLM 配置已是最新，无需同步")
+
+    return synced
+
+
+def auto_detect_and_configure():
+    """自动探测 OpenClaw 配置并写入 .env"""
+    oc_bin = detect_openclaw_bin()
+    if not oc_bin:
+        print("❌ OpenClaw 未安装，无法自动配置")
+        print("")
+        print_install_guide()
+        return False
+
+    print(f"📍 OpenClaw 路径: {oc_bin}")
+
+    # 获取版本信息
+    rc, out, _ = run_cmd([oc_bin, "--version"])
+    if rc == 0:
+        print(f"📌 版本: {out.splitlines()[0] if out else 'unknown'}")
+    if os.path.isfile(OPENCLAW_CONFIG_PATH):
+        print(f"📁 配置: {OPENCLAW_CONFIG_PATH}")
+
+    changes = 0
+
+    # 0. 从 OpenClaw 同步 LLM 配置（API Key / Base URL / Model / Provider）
+    llm_synced = sync_llm_config_from_openclaw()
+    changes += llm_synced
+
+    print("\n🔍 检查 OpenAI Chat Completions 兼容端点...")
+    enabled, changed = enable_chat_completions_endpoint()
+    if enabled:
+        if changed:
+            print("   ✅ 已启用 gateway.http.endpoints.chatCompletions.enabled=true")
+            print("   ℹ️ TeamClaw 的 HTTP 回退链路现在可使用 /v1/chat/completions")
+        else:
+            print("   ✅ /v1/chat/completions 兼容端点已开启")
+    else:
+        print("   ⚠️ 无法自动开启 /v1/chat/completions 兼容端点")
+        print("   请手动执行:")
+        print("   openclaw config set gateway.http.endpoints.chatCompletions.enabled true")
+        print("   openclaw gateway restart")
+
+    auth_mode = detect_gateway_auth_mode()
+    print("\n🔍 探测 Gateway 认证模式...")
+    if auth_mode:
+        print(f"   Gateway Auth: {auth_mode}")
+        if auth_mode == "none":
+            print("   ℹ️ 当前为 loopback + 无认证控制台，浏览器访问无需再粘贴 token")
+    else:
+        print("   ℹ️ 未能探测 gateway.auth.mode，后续按 token 模式兼容处理")
+
+    # 1. 探测 gateway 端口 → OPENCLAW_API_URL
+    print("\n🔍 探测 Gateway 端口...")
+    port = detect_gateway_port()
+    if port:
+        api_url = f"http://127.0.0.1:{port}/v1/chat/completions"
+        print(f"   Gateway 端口: {port}")
+        set_env_with_validation("OPENCLAW_API_URL", api_url)
+        changes += 1
+    else:
+        # 检查 .env 是否已有配置
+        _, kvs = read_env()
+        if "OPENCLAW_API_URL" in kvs:
+            print(f"   ⚠️ 无法自动探测 gateway 端口，保留现有配置: {kvs['OPENCLAW_API_URL']}")
+        else:
+            print("   ⚠️ 无法自动探测 gateway 端口")
+            print("   提示: 确保 OpenClaw gateway 正在运行 (openclaw gateway)")
+            print("   或手动配置: bash selfskill/scripts/run.sh configure OPENCLAW_API_URL http://127.0.0.1:18789/v1/chat/completions")
+
+    # 2. 探测 gateway token → OPENCLAW_GATEWAY_TOKEN
+    print("\n🔍 探测 Gateway Token...")
+    token = detect_gateway_token()
+    if token:
+        print(f"   Token: {mask_secret(token)}")
+        set_env_with_validation("OPENCLAW_GATEWAY_TOKEN", token)
+        changes += 1
+    else:
+        _, kvs = read_env()
+        if auth_mode == "none":
+            if "OPENCLAW_GATEWAY_TOKEN" in kvs and kvs["OPENCLAW_GATEWAY_TOKEN"]:
+                print("   ℹ️ Gateway 当前为 auth=none；保留 .env 中已有 token 供兼容调用使用")
+            else:
+                print("   ℹ️ Gateway 当前为 auth=none；无需额外 token")
+        elif "OPENCLAW_GATEWAY_TOKEN" in kvs:
+            print("   ⚠️ 无法自动探测 token，保留现有配置")
+        else:
+            if auth_mode and auth_mode != "token":
+                print(f"   ℹ️ 当前 auth={auth_mode}；未检测到 gateway token")
+            else:
+                print("   ℹ️ 未检测到 gateway token（CLI 模式下通常不需要）")
+
+    # 3. 探测 sessions 文件 → OPENCLAW_SESSIONS_FILE
+    print("\n🔍 探测 Sessions 文件...")
+    sessions_file = detect_sessions_file()
+    if sessions_file:
+        print(f"   Sessions: {sessions_file}")
+        set_env_with_validation("OPENCLAW_SESSIONS_FILE", sessions_file)
+        changes += 1
+        if not os.path.isfile(sessions_file):
+            print("   ℹ️ sessions.json 尚未生成；首次创建/运行 agent session 后会落盘")
+    else:
+        _, kvs = read_env()
+        if "OPENCLAW_SESSIONS_FILE" in kvs:
+            print(f"   ⚠️ 未找到 sessions.json，保留现有配置: {kvs['OPENCLAW_SESSIONS_FILE']}")
+        else:
+            print("   ⚠️ 未找到 sessions.json 文件")
+            print("   提示: 首次创建/运行 OpenClaw agent session 后会自动创建")
+
+    print_health_status(sessions_file=sessions_file, repair=True)
+
+    runtime = detect_gateway_runtime()
+    if runtime == "running":
+        print("\n✅ Gateway 运行中：HTTP 回退链路可直接使用")
+    elif runtime == "stopped":
+        print("\n⚠️ Gateway 当前未运行：CLI 集成可用，HTTP 回退链路暂不可用")
+        print("   如需启用 HTTP 回退链路，请执行:")
+        print("   openclaw gateway start")
+    else:
+        print("\nℹ️ 未能确认 Gateway 运行状态")
+
+    # 总结
+    print(f"\n{'=' * 50}")
+    if changes > 0:
+        print(f"✅ 已自动配置 {changes} 项 OpenClaw 集成参数")
+        print(f"📁 配置已写入: {ENV_PATH}")
+    else:
+        print("ℹ️ 未检测到新的配置变更")
+
+    print("\n💡 OpenClaw 集成要点：")
+    print("   • OpenClaw Agent 优先通过 CLI 调用（无需额外配置）")
+    if auth_mode == "none":
+        print("   • HTTP 回退模式至少需要 OPENCLAW_API_URL；auth=none 时 token 可留空")
+    else:
+        print("   • HTTP 回退模式通常需要 OPENCLAW_API_URL + OPENCLAW_GATEWAY_TOKEN")
+    print("   • 前端画布需要 OPENCLAW_SESSIONS_FILE 来加载 Agent sessions")
+
+    # 4. 初始化 workspace 默认模板
+    init_workspace_templates()
+
+    return True
+
+
+# --------------- Workspace 模板初始化 ---------------
+
+# OpenClaw 8 个核心文件的默认模板
+_WORKSPACE_TEMPLATES = {
+    "BOOTSTRAP.md": """\
+# BOOTSTRAP
+
+This is the first run of the agent.
+
+Your task is to learn who you are and who the user is.
+
+## Steps
+
+1. Ask the user their preferred name.
+2. Ask what kind of assistant you should be (coding, research, general, etc.).
+3. Ask their timezone and primary goals.
+4. Write the answers to:
+   - IDENTITY.md (your name, role, traits)
+   - USER.md (user profile and preferences)
+   - SOUL.md (update behavior rules based on user needs)
+
+## Guidelines
+
+- Ask one question at a time.
+- Keep the conversation natural and concise.
+- Do not overwhelm the user.
+- Respect existing file content — merge, don't overwrite.
+
+Once finished, you may remove this file or leave it as a record.
+""",
+    "SOUL.md": """\
+# SOUL — Who You Are
+
+You are a practical, efficient AI assistant.
+
+## Core Principles
+
+1. **Start with the answer.** Give the result first, then explain if needed.
+2. **Be helpful, not verbose.** Respect the user's time.
+3. **Prefer action over explanation.** If you can do it, do it.
+4. **Admit uncertainty.** Say "I don't know" rather than guessing.
+
+## Communication Style
+
+- Clear and direct
+- Structured with headings and lists when helpful
+- Professional but friendly
+- No filler phrases ("Great question!", "I'd be happy to help", "Certainly!")
+
+## Thinking Rules
+
+Before answering:
+
+1. Read USER.md for user context and preferences.
+2. Check MEMORY.md for relevant past interactions.
+3. Determine if tools are needed before writing code.
+
+## Safety Rules
+
+Never execute destructive commands without explicit confirmation:
+
+- Deleting files or directories
+- Running unknown shell scripts
+- Modifying system configurations
+- Force-pushing to git remotes
+- Operations that cannot be undone
+
+Always ask for confirmation first.
+
+## Decision Making
+
+When multiple solutions exist:
+
+1. Choose the simplest approach that works.
+2. Briefly mention alternatives if they have significant trade-offs.
+3. Prefer well-tested, standard solutions over clever hacks.
+
+## Collaboration
+
+This agent may be orchestrated by TeamClaw (multi-agent workflow system).
+When receiving tasks from TeamClaw:
+
+- Follow the task instructions precisely.
+- Return structured results when possible.
+- Use `[oasis reply start]` and `[oasis reply end]` tags when requested.
+""",
+    "IDENTITY.md": """\
+# IDENTITY
+
+Name: Atlas
+
+Type: Personal AI Assistant
+
+Role: A technical AI assistant that helps the user with coding,
+research, automation, and problem-solving.
+
+Traits:
+
+- Analytical — breaks problems into clear steps
+- Pragmatic — favors working solutions over perfect ones
+- Efficient — minimizes unnecessary output
+- Curious — explores context before jumping to conclusions
+
+Emoji: 🦞
+""",
+    "AGENTS.md": """\
+# AGENTS
+
+This workspace supports multi-agent collaboration.
+
+## Primary Agent
+
+**main** (default)
+- Role: General-purpose assistant
+- Handles: coding, research, automation, Q&A
+
+## TeamClaw Integration
+
+This agent can be orchestrated by TeamClaw for multi-agent workflows.
+TeamClaw communicates via CLI (`openclaw agent --agent main --message ...`)
+or HTTP gateway as fallback.
+
+When working within a TeamClaw workflow:
+
+- You may receive tasks from an orchestrator agent.
+- Follow instructions precisely and return structured output.
+- Use `[oasis reply start]...[oasis reply end]` tags when the caller expects them.
+
+## Adding More Agents
+
+Use the OpenClaw CLI to add specialized agents:
+
+```
+openclaw agents add <name> --workspace <path> --non-interactive
+```
+
+Or use TeamClaw's frontend to create and manage agents visually.
+""",
+    "TOOLS.md": """\
+# TOOLS
+
+You may use tools when needed. Choose the simplest tool for the task.
+
+## Available Tools
+
+**shell**
+Run safe local commands (ls, cat, grep, git, etc.).
+Avoid destructive operations without confirmation.
+
+**python**
+Use for calculations, data processing, or scripting.
+
+**file_ops**
+Read, write, and manage files in the workspace.
+
+**web_search**
+Use when information may be outdated or unknown.
+
+## Rules
+
+1. Choose the simplest tool that solves the problem.
+2. Briefly explain why a tool is being used if not obvious.
+3. Never run dangerous commands (rm -rf, format, etc.) without asking.
+4. Prefer reading files before modifying them.
+5. When writing code, include error handling.
+
+## Tool Selection Priority
+
+1. Direct answer from knowledge → no tool needed
+2. File operation → file_ops
+3. Computation or data → python
+4. System task → shell
+5. Unknown or outdated info → web_search
+""",
+    "USER.md": """\
+# USER
+
+Name: User
+
+Timezone: Asia/Shanghai
+
+## Preferences
+
+- Concise, actionable answers
+- Technical depth when needed
+- Code examples over lengthy explanations
+- Chinese (简体中文) for conversation when preferred
+
+## Interests
+
+- AI agents and multi-agent systems
+- Software development and automation
+- Machine learning and model training
+- DevOps and infrastructure
+
+## Notes
+
+- This file is updated during BOOTSTRAP or manually.
+- The agent should adapt behavior based on these preferences.
+""",
+    "HEARTBEAT.md": """\
+# HEARTBEAT
+
+Scheduled and recurring tasks.
+
+## After Each Conversation
+
+- Update MEMORY.md with important decisions or preferences.
+- Note any unfinished tasks.
+
+## Daily
+
+- Summarize key interactions if the day was active.
+- Check for pending tasks in MEMORY.md.
+
+## Weekly
+
+- Review recurring patterns and suggest optimizations.
+- Clean up outdated entries in MEMORY.md.
+
+## Priority
+
+Always prioritize user commands over background tasks.
+Never interrupt active work for scheduled tasks.
+""",
+    "MEMORY.md": """\
+# MEMORY
+
+Long-term memory for this workspace.
+
+## What to Remember
+
+- User preferences and working style
+- Important decisions and their rationale
+- Recurring workflows and shortcuts
+- Project-specific context
+
+## Current Notes
+
+- Initial setup via TeamClaw auto-configuration.
+- Workspace initialized with default templates.
+
+---
+
+*Update this file as you learn more about the user and their workflow.*
+""",
+}
+
+TEAMCLAW_WORKSPACE_SKILL = "TeamClaw"
+TEAMCLAW_BLOCK_START = "<!-- TEAMCLAW AUTO START -->"
+TEAMCLAW_BLOCK_END = "<!-- TEAMCLAW AUTO END -->"
+
+
+def _teamclaw_run_prefix():
+    """返回当前平台的 TeamClaw 运维脚本前缀。"""
+    if os.name == "nt":
+        return "powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1"
+    return "bash selfskill/scripts/run.sh"
+
+
+def _teamclaw_openclaw_cmd():
+    """返回当前平台更稳妥的 OpenClaw 命令。"""
+    if os.name == "nt":
+        return "openclaw.cmd"
+    return "openclaw"
+
+
+def _teamclaw_skill_templates():
+    """生成 TeamClaw workspace skill 文件。"""
+    run_prefix = _teamclaw_run_prefix()
+    openclaw_cmd = _teamclaw_openclaw_cmd()
+    skill_root = os.path.join("skills", TEAMCLAW_WORKSPACE_SKILL)
+
+    return {
+        os.path.join(skill_root, "SKILL.md"): f"""\
+---
+name: TeamClaw
+description: Operate the local TeamClaw repository and services from this OpenClaw workspace. Use when the user asks to install, configure, start, stop, debug, or modify TeamClaw, or to manage TeamClaw's OpenClaw integration, teams, workflows, channels, or CLI.
+metadata:
+  short-description: Control the local TeamClaw repo
+---
+
+# TeamClaw
+
+Use this skill when the user wants you to control TeamClaw in `{PROJECT_ROOT}`.
+
+## First Read
+
+1. Read the operator entrypoint: `{os.path.join(PROJECT_ROOT, "SKILL.md")}`
+2. Use the doc router: `{os.path.join(PROJECT_ROOT, "docs", "index.md")}`
+3. Before code changes, read: `{os.path.join(PROJECT_ROOT, "docs", "repo-index.md")}`
+4. For OpenClaw integration, read: `{os.path.join(PROJECT_ROOT, "docs", "openclaw-commands.md")}`
+5. For command details, read [CLI Cheat Sheet](./references/cli.md) first, then `{os.path.join(PROJECT_ROOT, "docs", "cli.md")}` when you need full flags.
+
+## Working Rules
+
+- Run TeamClaw commands from `{PROJECT_ROOT}`.
+- Prefer `run.sh` / `run.ps1` and `uv run scripts/cli.py` over ad-hoc edits.
+- If OpenClaw was installed or reconfigured, run `{run_prefix} check-openclaw`.
+- Do not enable optional integrations, public exposure, or password users unless the user explicitly asks.
+- Before touching code, inspect only the files routed by `{os.path.join(PROJECT_ROOT, "docs", "repo-index.md")}` instead of scanning the whole repo.
+- When the user asks to operate TeamClaw, assume they want action, not just documentation.
+
+## Quick Entry Points
+
+- Service lifecycle and environment: [CLI Cheat Sheet](./references/cli.md)
+- Full TeamClaw command reference: `{os.path.join(PROJECT_ROOT, "docs", "cli.md")}`
+- OpenClaw install / binding / repair notes: `{os.path.join(PROJECT_ROOT, "docs", "openclaw-commands.md")}`
+""",
+        os.path.join(skill_root, "references", "cli.md"): f"""\
+# TeamClaw CLI Cheat Sheet
+
+Repository root: `{PROJECT_ROOT}`
+
+Run these commands from the TeamClaw repo root.
+
+## Service lifecycle
+
+- `{run_prefix} status`
+- `{run_prefix} start`
+- `{run_prefix} start-foreground`
+- `{run_prefix} stop`
+- `{run_prefix} restart`
+
+## Configuration
+
+- `{run_prefix} configure --init`
+- `{run_prefix} configure KEY VALUE`
+- `{run_prefix} auto-model`
+
+## OpenClaw sync and checks
+
+- `{run_prefix} check-openclaw`
+- `{run_prefix} check-openclaw-weixin`
+- `{run_prefix} bind-openclaw-channel main openclaw-weixin:<account_id>`
+- `{openclaw_cmd} gateway status`
+- `{openclaw_cmd} channels list --json`
+- `{openclaw_cmd} skills list --json`
+
+## TeamClaw repo-local CLI
+
+- `uv run scripts/cli.py status`
+- `uv run scripts/cli.py openclaw`
+- `uv run scripts/cli.py openclaw detail --name main`
+- `uv run scripts/cli.py openclaw channels`
+- `uv run scripts/cli.py openclaw bindings --agent main`
+- `uv run scripts/cli.py teams`
+- `uv run scripts/cli.py visual`
+
+## Reading order
+
+1. `{os.path.join(PROJECT_ROOT, "SKILL.md")}`
+2. `{os.path.join(PROJECT_ROOT, "docs", "index.md")}`
+3. `{os.path.join(PROJECT_ROOT, "docs", "repo-index.md")}` before code
+4. `{os.path.join(PROJECT_ROOT, "docs", "cli.md")}` for full flag details
+""",
+    }
+
+
+def _teamclaw_workspace_blocks():
+    """生成注入到 OpenClaw 核心 workspace 文件中的 TeamClaw 引导块。"""
+    run_prefix = _teamclaw_run_prefix()
+    skill_path = os.path.join("skills", TEAMCLAW_WORKSPACE_SKILL, "SKILL.md")
+    repo_skill = os.path.join(PROJECT_ROOT, "SKILL.md")
+    repo_index = os.path.join(PROJECT_ROOT, "docs", "repo-index.md")
+    repo_cli = os.path.join(PROJECT_ROOT, "docs", "cli.md")
+
+    return {
+        "BOOTSTRAP.md": f"""\
+## TeamClaw Bootstrap
+
+This workspace is paired with TeamClaw at `{PROJECT_ROOT}`.
+
+If the user wants you to operate TeamClaw, read `{skill_path}` and `{repo_skill}` after the basic identity bootstrap. Use them to learn the TeamClaw command surface before taking action.
+""",
+        "AGENTS.md": f"""\
+## TeamClaw Control
+
+This OpenClaw workspace is connected to TeamClaw at `{PROJECT_ROOT}`.
+
+When the user asks about TeamClaw, load the workspace skill `{TEAMCLAW_WORKSPACE_SKILL}` first. Then use `{repo_skill}` as the repo's own task router and `{repo_index}` before code changes.
+""",
+        "TOOLS.md": f"""\
+## TeamClaw CLI
+
+For TeamClaw tasks, run commands from `{PROJECT_ROOT}` and prefer the project wrappers over ad-hoc operations.
+
+- `{run_prefix} status`
+- `{run_prefix} start`
+- `{run_prefix} stop`
+- `{run_prefix} check-openclaw`
+- `uv run scripts/cli.py openclaw channels`
+- `uv run scripts/cli.py openclaw bindings --agent main`
+- Read `{repo_cli}` when you need full CLI flags.
+""",
+    }
+
+
+def _upsert_managed_block(filepath: str, block: str):
+    """向 Markdown 文件中写入可重复更新的自动管理块。"""
+    managed = (
+        f"{TEAMCLAW_BLOCK_START}\n"
+        f"{block.strip()}\n"
+        f"{TEAMCLAW_BLOCK_END}"
+    )
+
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            current = f.read()
+    else:
+        current = ""
+
+    if TEAMCLAW_BLOCK_START in current and TEAMCLAW_BLOCK_END in current:
+        start = current.find(TEAMCLAW_BLOCK_START)
+        end = current.find(TEAMCLAW_BLOCK_END, start)
+        if end < 0:
+            updated = current.rstrip()
+            updated = f"{updated}\n\n{managed}\n" if updated else f"{managed}\n"
+        else:
+            end += len(TEAMCLAW_BLOCK_END)
+            prefix = current[:start].rstrip()
+            suffix = current[end:].lstrip("\n")
+            parts = []
+            if prefix:
+                parts.append(prefix)
+            parts.append(managed)
+            if suffix:
+                parts.append(suffix.rstrip())
+            updated = "\n\n".join(parts) + "\n"
+    else:
+        base = current.rstrip()
+        updated = f"{base}\n\n{managed}\n" if base else f"{managed}\n"
+
+    if updated == current:
+        return False
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(updated)
+    return True
+
+
+def init_workspace_templates(workspace_path: str | None = None):
+    """初始化 OpenClaw workspace 默认模板文件。
+
+    默认模板和 TeamClaw skill 只在文件不存在时创建；
+    TeamClaw 引导块会以可重复更新的方式注入到核心 workspace 文件。
+    """
+    if workspace_path is None:
+        workspace_path = detect_workspace_path()
+
+    if not workspace_path:
+        workspace_path = DEFAULT_WORKSPACE_PATH
+
+    # 确保目录存在
+    os.makedirs(workspace_path, exist_ok=True)
+
+    created = []
+    skipped = []
+    updated = []
+
+    for filename, content in _WORKSPACE_TEMPLATES.items():
+        filepath = os.path.join(workspace_path, filename)
+        if os.path.exists(filepath):
+            skipped.append(filename)
+        else:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+            created.append(filename)
+
+    for relpath, content in _teamclaw_skill_templates().items():
+        filepath = os.path.join(workspace_path, relpath)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        if os.path.exists(filepath):
+            skipped.append(relpath)
+        else:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content)
+            created.append(relpath)
+
+    for filename, block in _teamclaw_workspace_blocks().items():
+        filepath = os.path.join(workspace_path, filename)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        if _upsert_managed_block(filepath, block):
+            updated.append(filename)
+
+    # 输出结果
+    print(f"\n🏠 Workspace 模板初始化: {workspace_path}")
+    if created:
+        print(f"   ✅ 新建 {len(created)} 个文件: {', '.join(created)}")
+    if updated:
+        print(f"   ♻️  更新 {len(updated)} 个文件: {', '.join(updated)}")
+    if skipped:
+        print(f"   ⏭️  跳过 {len(skipped)} 个已存在文件: {', '.join(skipped)}")
+    if not created and not skipped and not updated:
+        print("   ℹ️ 无需初始化")
+
+    return workspace_path
+
+
+def show_status():
+    """显示 OpenClaw 检测状态"""
+    oc_bin = detect_openclaw_bin()
+    print("=== OpenClaw 集成状态 ===")
+    print()
+
+    if not oc_bin:
+        print("❌ OpenClaw: 未安装")
+        print("")
+        print_install_guide()
+        return
+
+    rc, out, _ = run_cmd([oc_bin, "--version"])
+    version = out.splitlines()[0] if out and rc == 0 else "unknown"
+    print(f"✅ OpenClaw: {version}")
+    print(f"   路径: {oc_bin}")
+    if os.path.isfile(OPENCLAW_CONFIG_PATH):
+        print(f"   配置: {OPENCLAW_CONFIG_PATH}")
+
+    port = detect_gateway_port()
+    if port:
+        print(f"✅ Gateway 端口: {port}")
+    else:
+        print("⚠️ Gateway 端口: 未检测到（gateway 可能未运行）")
+
+    if is_chat_completions_enabled():
+        print("✅ HTTP Chat Completions: 已开启")
+    else:
+        print("⚠️ HTTP Chat Completions: 未开启")
+
+    auth_mode = detect_gateway_auth_mode()
+    if auth_mode:
+        if auth_mode == "none":
+            print("✅ Gateway Auth: none（loopback 下控制台无需 token）")
+        else:
+            print(f"✅ Gateway Auth: {auth_mode}")
+    else:
+        print("ℹ️ Gateway Auth: 未知")
+
+    token = detect_gateway_token()
+    if auth_mode == "none":
+        if token:
+            print(f"ℹ️ Gateway Token: {mask_secret(token)}（当前 auth=none，可选）")
+        else:
+            print("ℹ️ Gateway Token: 当前 auth=none，不需要")
+    elif token:
+        print(f"✅ Gateway Token: {mask_secret(token)}")
+    else:
+        print("ℹ️ Gateway Token: 未配置（CLI 模式不需要）")
+
+    sessions = detect_sessions_file()
+    if sessions:
+        label = "✅ Sessions 文件" if os.path.isfile(sessions) else "ℹ️ Sessions 文件（预期路径）"
+        print(f"{label}: {sessions}")
+    else:
+        print("⚠️ Sessions 文件: 未找到")
+
+    linger = detect_linger_status()
+    if linger == "yes":
+        print("✅ Systemd linger: 已开启")
+    elif linger == "no":
+        print("⚠️ Systemd linger: 未开启")
+    else:
+        print("ℹ️ Systemd linger: 未知")
+
+    if sessions and os.path.isfile(sessions):
+        health = inspect_sessions_health(sessions)
+        if isinstance(health, dict):
+            missing = int(health.get("missing", 0) or 0)
+            if missing > 0:
+                print(f"⚠️ Sessions 索引: {missing} 条缺失 transcript，可用 --repair-health 清理")
+            else:
+                print("✅ Sessions 索引: 正常")
+        else:
+            print("ℹ️ Sessions 索引: 未知")
+
+    runtime = detect_gateway_runtime()
+    if runtime == "running":
+        print("✅ Gateway 状态: 运行中")
+    elif runtime == "stopped":
+        print("⚠️ Gateway 状态: 未运行")
+    else:
+        print("ℹ️ Gateway 状态: 未知")
+
+    # 检查 .env 中的配置
+    _, kvs = read_env()
+    print()
+    print("--- TeamClaw .env 中的 OpenClaw 配置 ---")
+    for key in ["OPENCLAW_API_URL", "OPENCLAW_GATEWAY_TOKEN", "OPENCLAW_SESSIONS_FILE"]:
+        val = kvs.get(key, "（未配置）")
+        if key == "OPENCLAW_GATEWAY_TOKEN" and val and val != "（未配置）":
+            val = val[:4] + "****" + val[-4:] if len(val) > 8 else "****"
+        print(f"  {key} = {val}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+    cmd = sys.argv[1]
+
+    if cmd == "--auto-detect":
+        auto_detect_and_configure()
+    elif cmd == "--status":
+        show_status()
+    elif cmd == "--install-guide":
+        print_install_guide()
+    elif cmd == "--repair-health":
+        sessions_file = detect_sessions_file()
+        print_health_status(sessions_file=sessions_file, repair=True)
+    elif cmd == "--init-workspace":
+        ws = sys.argv[2] if len(sys.argv) > 2 else None
+        init_workspace_templates(ws)
+    else:
+        print(f"未知参数: {cmd}", file=sys.stderr)
+        print(__doc__, file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
