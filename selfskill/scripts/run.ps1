@@ -1,0 +1,919 @@
+[CmdletBinding()]
+param(
+    [Parameter(Position = 0)]
+    [string]$Command = "help",
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Rest
+)
+
+$ErrorActionPreference = "Stop"
+$projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+. (Join-Path $projectRoot "scripts\common.ps1")
+
+Set-TeamClawUtf8
+
+$pidFile = Join-Path $projectRoot ".mini_timebot.pid"
+$tunnelPidFile = Join-Path $projectRoot ".tunnel.pid"
+$envPath = Join-Path $projectRoot "config\.env"
+
+function Invoke-TeamClawPython {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $python = Ensure-VenvPython -ProjectRoot $projectRoot
+    Push-Location $projectRoot
+    try {
+        & $python @Arguments
+        return $LASTEXITCODE
+    } finally {
+        Pop-Location
+    }
+}
+
+function Get-EnvValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Key,
+        [string]$DefaultValue = ""
+    )
+
+    $envValues = Read-TeamClawEnvFile -Path $envPath
+    if ($envValues.ContainsKey($Key) -and -not [string]::IsNullOrWhiteSpace($envValues[$Key])) {
+        return $envValues[$Key]
+    }
+
+    return $DefaultValue
+}
+
+function Get-OpenClawCommand {
+    foreach ($name in @("openclaw.cmd", "openclaw")) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($cmd) {
+            return $cmd.Source
+        }
+    }
+
+    $whereResult = & where.exe openclaw 2>$null | Select-Object -First 1
+    if ($whereResult) {
+        return $whereResult
+    }
+
+    return $null
+}
+
+function Invoke-OpenClawCommand {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $openclaw = Get-OpenClawCommand
+    if (-not $openclaw) {
+        throw "OpenClaw CLI was not found. Run check-openclaw first."
+    }
+
+    $result = Invoke-OpenClawAndCapture -OpenClawPath $openclaw -Arguments $Arguments
+    if ($result.StdOut) {
+        $result.StdOut -split "`r?`n" | Where-Object { $_ -ne "" } | ForEach-Object { Write-Host $_ }
+    }
+    if ($result.ExitCode -ne 0 -and $result.StdErr) {
+        $result.StdErr -split "`r?`n" | Where-Object { $_ -ne "" } | ForEach-Object { Write-Host $_ }
+    }
+
+    return $result.ExitCode
+}
+
+function Invoke-OpenClawAndCapture {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$OpenClawPath,
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments
+    )
+
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+
+    try {
+        $process = Start-Process `
+            -FilePath $OpenClawPath `
+            -ArgumentList $Arguments `
+            -Wait `
+            -PassThru `
+            -NoNewWindow `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath
+
+        return [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            StdOut = if (Test-Path $stdoutPath) { Get-Content $stdoutPath -Raw -ErrorAction SilentlyContinue } else { "" }
+            StdErr = if (Test-Path $stderrPath) { Get-Content $stderrPath -Raw -ErrorAction SilentlyContinue } else { "" }
+        }
+    } finally {
+        Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue
+        Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-OpenClawChannels {
+    $openclaw = Get-OpenClawCommand
+    if (-not $openclaw) {
+        return @()
+    }
+
+    $result = Invoke-OpenClawAndCapture -OpenClawPath $openclaw -Arguments @("channels", "list", "--json")
+    $raw = $result.StdOut.Trim()
+    if ($result.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        return @()
+    }
+
+    $jsonStart = $raw.IndexOf("{")
+    if ($jsonStart -lt 0) {
+        return @()
+    }
+
+    try {
+        $data = $raw.Substring($jsonStart) | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        return @()
+    }
+
+    $channels = @()
+    if (-not $data.chat) {
+        return $channels
+    }
+
+    foreach ($prop in $data.chat.PSObject.Properties) {
+        $channelName = $prop.Name
+        $accounts = $prop.Value
+        if ($accounts -is [System.Array]) {
+            foreach ($account in $accounts) {
+                $bindKey = if ($account -eq "default") { $channelName } else { "$channelName`:$account" }
+                $channels += [pscustomobject]@{
+                    Channel = $channelName
+                    Account = [string]$account
+                    BindKey = $bindKey
+                }
+            }
+        } elseif ($accounts) {
+            $bindKey = if ($accounts -eq "default") { $channelName } else { "$channelName`:$accounts" }
+            $channels += [pscustomobject]@{
+                Channel = $channelName
+                Account = [string]$accounts
+                BindKey = $bindKey
+            }
+        }
+    }
+
+    return $channels
+}
+
+function Get-OpenClawAgentBindings {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AgentName
+    )
+
+    $openclaw = Get-OpenClawCommand
+    if (-not $openclaw) {
+        return @()
+    }
+
+    $result = Invoke-OpenClawAndCapture -OpenClawPath $openclaw -Arguments @("agents", "list", "--bindings", "--json")
+    $raw = $result.StdOut.Trim()
+    if ($result.ExitCode -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+        return @()
+    }
+
+    $jsonStart = $raw.IndexOf("[")
+    if ($jsonStart -lt 0) {
+        $jsonStart = $raw.IndexOf("{")
+    }
+    if ($jsonStart -lt 0) {
+        return @()
+    }
+
+    try {
+        $data = $raw.Substring($jsonStart) | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        return @()
+    }
+
+    $agents = @($data)
+    foreach ($agent in $agents) {
+        if ($agent.id -eq $AgentName -or $agent.name -eq $AgentName) {
+            return @($agent.bindingDetails)
+        }
+    }
+
+    return @()
+}
+
+function Show-Help {
+    Write-Host "TeamClaw Windows PowerShell entry point"
+    Write-Host ""
+    Write-Host "Usage:"
+    Write-Host "  powershell -ExecutionPolicy Bypass -File selfskill\scripts\run.ps1 <command> [args]"
+    Write-Host ""
+    Write-Host "Commands:"
+    Write-Host "  setup                          Install or update Python dependencies"
+    Write-Host "  start                          Start services in the background"
+    Write-Host "  start-foreground               Start services in the foreground (best for managed terminals / CI / agent runners)"
+    Write-Host "  stop                           Stop services"
+    Write-Host "  status                         Show current service status"
+    Write-Host "  add-user <name> <password>     Create or update a password user"
+    Write-Host "  configure ...                  Run selfskill/scripts/configure.py"
+    Write-Host "  auto-model                     Query available models from the configured API"
+    Write-Host "  cli ...                        Run scripts/cli.py"
+    Write-Host "  check-openclaw                 Detect or install OpenClaw"
+    Write-Host "  check-openclaw-weixin          Install or inspect the OpenClaw Weixin plugin"
+    Write-Host "  bind-openclaw-channel <agent> <bind_key>  Bind an OpenClaw channel account to an agent"
+    Write-Host "  start-tunnel                   Start Cloudflare Tunnel in the background"
+    Write-Host "  stop-tunnel                    Stop Cloudflare Tunnel"
+    Write-Host "  tunnel-status                  Show Cloudflare Tunnel status"
+    Write-Host "  help                           Show this help"
+    Write-Host ""
+    Write-Host "Docs (read before creating/managing Teams):"
+    Write-Host "  docs/build_team.md       - Create/configure Team (members, personas, JSON)"
+    Write-Host "  docs/create_workflow.md  - Create OASIS workflow YAML (graph, persona types, examples)"
+    Write-Host "  docs/cli.md              - Complete CLI command reference and examples"
+    Write-Host "  docs/example_team.md     - Example Team file structure and content"
+    Write-Host "  docs/openclaw-commands.md - OpenClaw agent integration commands"
+    Write-Host ""
+    Write-Host "Tip: Use 'uv run scripts/cli.py <command> --help' for detailed usage and docs"
+}
+
+function Show-PortChecks {
+    param(
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Checks,
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Ports
+    )
+
+    foreach ($entry in $Ports.GetEnumerator()) {
+        $check = $Checks[$entry.Key]
+        if ($check.Available) {
+            Write-Host "  $($entry.Key)=$($entry.Value) is available"
+        } else {
+            Write-Host "  $($entry.Key)=$($entry.Value) is blocked: $([string]::Join('; ', $check.Reasons))"
+        }
+    }
+}
+
+function Prepare-TeamClawPorts {
+    $resolution = Resolve-TeamClawPortConfiguration -EnvPath $envPath
+
+    if ($resolution.AutoUpdated) {
+        Write-Host "The default TeamClaw ports are blocked on this Windows machine."
+        Write-Host "Updated config/.env to use a safe local port set:"
+        foreach ($entry in $resolution.NewPorts.GetEnumerator()) {
+            Write-Host "  $($entry.Key): $($resolution.CurrentPorts[$entry.Key]) -> $($entry.Value)"
+        }
+    } elseif ($resolution.RequiresManualUpdate) {
+        Write-Host "The configured TeamClaw ports are blocked and were not auto-changed because they are custom values."
+        Show-PortChecks -Checks $resolution.Checks -Ports $resolution.CurrentPorts
+        Write-Host "Update PORT_AGENT / PORT_SCHEDULER / PORT_OASIS / PORT_FRONTEND in config/.env, then try again."
+        return $null
+    }
+
+    return Get-TeamClawPortMap -EnvPath $envPath
+}
+
+function Show-StartupFailureDiagnostics {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$StdOutLog,
+        [Parameter(Mandatory = $true)]
+        [string]$StdErrLog
+    )
+
+    $stderrTail = Get-TeamClawLogTail -Path $StdErrLog -LineCount 25
+    if ($stderrTail.Count -gt 0) {
+        Write-Host ""
+        Write-Host "Last stderr lines:"
+        foreach ($line in $stderrTail) {
+            Write-Host "  $line"
+        }
+    }
+
+    $stdoutTail = Get-TeamClawLogTail -Path $StdOutLog -LineCount 15
+    if ($stdoutTail.Count -gt 0) {
+        Write-Host ""
+        Write-Host "Last stdout lines:"
+        foreach ($line in $stdoutTail) {
+            Write-Host "  $line"
+        }
+    }
+}
+
+function Get-TeamClawServiceProcesses {
+    $scriptPatterns = @(
+        "scripts[\\/]+launcher\.py",
+        "src[\\/]+time\.py",
+        "oasis[\\/]+server\.py",
+        "src[\\/]+mainagent\.py",
+        "src[\\/]+front\.py"
+    )
+
+    $candidatePids = New-Object System.Collections.Generic.List[int]
+    $trackedPid = Get-TrackedProcessId -PidFile $pidFile
+    if ($trackedPid) {
+        $candidatePids.Add([int]$trackedPid)
+    }
+
+    if (Test-Path $envPath) {
+        $ports = Get-TeamClawPortMap -EnvPath $envPath
+        foreach ($port in $ports.Values) {
+            $listener = Get-ListeningPortInfo -Port $port
+            if ($listener) {
+                $candidatePids.Add([int]$listener.OwningProcess)
+            }
+        }
+    }
+
+    $matched = New-Object System.Collections.Generic.List[object]
+    foreach ($pidValue in ($candidatePids | Sort-Object -Unique)) {
+        $proc = Get-CimInstance Win32_Process -Filter "ProcessId = $pidValue" -ErrorAction SilentlyContinue
+        if (-not $proc) {
+            continue
+        }
+
+        if ($proc.Name -notin @("python.exe", "pythonw.exe")) {
+            continue
+        }
+
+        $commandLine = $proc.CommandLine
+        if (-not $commandLine) {
+            continue
+        }
+
+        if ($scriptPatterns | Where-Object { $commandLine -match $_ }) {
+            $matched.Add($proc)
+        }
+    }
+
+    return @($matched | Sort-Object ProcessId -Unique)
+}
+
+function Stop-TeamClawServiceProcesses {
+    $serviceProcesses = @(Get-TeamClawServiceProcesses)
+    if ($serviceProcesses.Count -eq 0) {
+        return $false
+    }
+
+    Write-Host "Found existing TeamClaw service processes. Stopping them first..."
+    foreach ($proc in $serviceProcesses) {
+        Write-Host "  PID $($proc.ProcessId): $($proc.CommandLine)"
+        Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
+    }
+
+    Start-Sleep -Seconds 1
+    return $true
+}
+
+# ---- uv 环境自检 & 自动配置 ----
+Push-Location $projectRoot
+try {
+    # 确保 uv 可用（未安装则自动安装）
+    $uv = Ensure-UvInstalled
+
+    # 确保虚拟环境存在
+    $venvPython = Get-VenvPython -ProjectRoot $projectRoot
+    if (-not $venvPython) {
+        Write-Host "Creating .venv with Python 3.11 ..."
+        & $uv venv .venv --python 3.11
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "uv venv failed. Trying to install Python 3.11 via uv ..."
+            & $uv python install 3.11
+            if ($LASTEXITCODE -ne 0) {
+                throw "uv python install failed. Verify your network connection or install Python manually."
+            }
+            & $uv venv .venv --python 3.11
+            if ($LASTEXITCODE -ne 0) {
+                throw "Failed to create .venv."
+            }
+        }
+        $venvPython = Get-VenvPython -ProjectRoot $projectRoot
+        Write-Host "Created virtual environment: $venvPython"
+    }
+
+    # 确保依赖已安装（通过尝试 import fastapi 判断）
+    $importCheck = & $venvPython -c "import fastapi" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Installing Python dependencies (config/requirements.txt) ..."
+        & $uv pip install -r config\requirements.txt --python $venvPython
+        if ($LASTEXITCODE -ne 0) {
+            throw "Dependency installation failed."
+        }
+        Write-Host "Dependencies installed."
+    }
+} finally {
+    Pop-Location
+}
+
+switch ($Command) {
+    "setup" {
+        & (Join-Path $projectRoot "scripts\setup_env.ps1")
+        exit $LASTEXITCODE
+    }
+
+    "start" {
+        # Auto-create .env if missing
+        if (-not (Test-Path $envPath)) {
+            Write-Host "config/.env is missing, auto-initializing from template..."
+            Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
+        }
+
+        # NOTE: OpenClaw / Antigravity detection is now handled by the
+        # frontend first-login Setup Wizard, not silently at start time.
+        # Users can click import buttons in the wizard interactively.
+
+        Stop-TeamClawServiceProcesses | Out-Null
+        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+
+        $ports = Prepare-TeamClawPorts
+        if (-not $ports) {
+            exit 1
+        }
+
+        if (Test-TrackedProcessRunning -PidFile $pidFile) {
+            $oldPid = Get-TrackedProcessId -PidFile $pidFile
+            Write-Host "Found an existing instance (PID: $oldPid). Stopping it first..."
+            Stop-TrackedProcess -PidFile $pidFile | Out-Null
+        } else {
+            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+        }
+
+        $python = Ensure-VenvPython -ProjectRoot $projectRoot
+        $env:MINI_TIMEBOT_HEADLESS = "1"
+        $stdoutLog = Join-Path $projectRoot "logs\launcher.out.log"
+        $stderrLog = Join-Path $projectRoot "logs\launcher.err.log"
+        $process = Start-BackgroundPythonProcess `
+            -ProjectRoot $projectRoot `
+            -PythonPath $python `
+            -Arguments @("scripts\launcher.py") `
+            -StdOutLog $stdoutLog `
+            -StdErrLog $stderrLog
+
+        Set-Content -Path $pidFile -Value $process.Id -Encoding UTF8
+        $agentPort = [int]$ports["PORT_AGENT"]
+        $frontendPort = [int]$ports["PORT_FRONTEND"]
+
+        Write-Host "Service started. PID: $($process.Id)"
+        Write-Host "Logs:"
+        Write-Host "  stdout: $stdoutLog"
+        Write-Host "  stderr: $stderrLog"
+        Write-Host "If your terminal / CI / agent runner reaps child processes after the command exits, use:"
+        Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 start-foreground"
+        Write-Host "Waiting for http://127.0.0.1:$agentPort/v1/models ..."
+
+        if (Wait-HttpEndpoint -Url "http://127.0.0.1:$agentPort/v1/models") {
+            Write-Host "Service is ready."
+            Write-Host "Web UI: http://127.0.0.1:$frontendPort"
+            Write-Host ""
+            Write-Host "==================================================="
+            Invoke-TeamClawPython -Arguments @("scripts\cli.py", "status") | Out-Null
+            Write-Host ""
+        } else {
+            Start-Sleep -Seconds 1
+            if (-not (Test-TrackedProcessRunning -PidFile $pidFile)) {
+                Write-Host "Service exited during startup."
+                Show-StartupFailureDiagnostics -StdOutLog $stdoutLog -StdErrLog $stderrLog
+                exit 1
+            }
+            Write-Host "Service is still starting. Check status or logs if it does not become ready soon."
+            Write-Host "Web UI (when ready): http://127.0.0.1:$frontendPort"
+            Write-Host ""
+            Write-Host "==================================================="
+            Invoke-TeamClawPython -Arguments @("scripts\cli.py", "status") | Out-Null
+            Write-Host ""
+        }
+
+        # Auto-start Cloudflare Tunnel for mobile remote access
+        if (Test-TrackedProcessRunning -PidFile $tunnelPidFile) {
+            Write-Host "Tunnel is already running."
+            $envContent = Get-Content $envPath -ErrorAction SilentlyContinue | Out-String
+            if ($envContent -match 'PUBLIC_DOMAIN=(\S+)') {
+                $publicDomain = $matches[1]
+                if ($publicDomain -and $publicDomain -ne "wait to set") {
+                    Write-Host "Mobile access: $publicDomain/mobile_group_chat"
+                }
+            }
+        } else {
+            Write-Host "Starting Cloudflare Tunnel for mobile remote access..."
+            $python = Ensure-VenvPython -ProjectRoot $projectRoot
+            $tunnelStdoutLog = Join-Path $projectRoot "logs\tunnel.out.log"
+            $tunnelStderrLog = Join-Path $projectRoot "logs\tunnel.err.log"
+            $tunnelProcess = Start-BackgroundPythonProcess `
+                -ProjectRoot $projectRoot `
+                -PythonPath $python `
+                -Arguments @("scripts\tunnel.py") `
+                -StdOutLog $tunnelStdoutLog `
+                -StdErrLog $tunnelStderrLog
+            Set-Content -Path $tunnelPidFile -Value $tunnelProcess.Id -Encoding UTF8
+            Write-Host "Tunnel started. PID: $($tunnelProcess.Id)"
+
+            # Wait for PUBLIC_DOMAIN to appear
+            $tunnelReady = $false
+            for ($i = 0; $i -lt 20; $i++) {
+                Start-Sleep -Seconds 2
+                $envContent = Get-Content $envPath -ErrorAction SilentlyContinue | Out-String
+                if ($envContent -match 'PUBLIC_DOMAIN=(https://\S+trycloudflare\.com\S*)') {
+                    $publicDomain = $matches[1]
+                    Write-Host "Mobile access: $publicDomain/mobile_group_chat"
+                    $tunnelReady = $true
+                    break
+                }
+            }
+            if (-not $tunnelReady) {
+                Write-Host "Tunnel is still starting. Check later: powershell -File selfskill\scripts\run.ps1 tunnel-status"
+            }
+        }
+
+        Write-Host ""
+        Write-Host "Docs (read before creating/managing Teams):"
+        Write-Host "  docs/build_team.md       - Create/configure Team (members, personas, JSON)"
+        Write-Host "  docs/create_workflow.md  - Create OASIS workflow YAML (graph, persona types, examples)"
+        Write-Host "  docs/cli.md              - Complete CLI command reference and examples"
+        Write-Host "  docs/example_team.md     - Example Team file structure and content"
+        Write-Host "  docs/openclaw-commands.md - OpenClaw agent integration commands"
+        Write-Host ""
+        Write-Host "Tip: Use 'uv run scripts/cli.py <command> --help' for detailed usage"
+        exit 0
+    }
+
+    "start-foreground" {
+        # Auto-create .env if missing
+        if (-not (Test-Path $envPath)) {
+            Write-Host "config/.env is missing, auto-initializing from template..."
+            Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
+        }
+
+        Stop-TeamClawServiceProcesses | Out-Null
+        Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+
+        $ports = Prepare-TeamClawPorts
+        if (-not $ports) {
+            exit 1
+        }
+
+        $python = Ensure-VenvPython -ProjectRoot $projectRoot
+        $env:MINI_TIMEBOT_HEADLESS = "1"
+        Write-Host "Starting TeamClaw in the foreground (headless) ..."
+        Write-Host "This session stays attached. Press Ctrl+C to stop all services."
+
+        Push-Location $projectRoot
+        try {
+            & $python "scripts\launcher.py"
+            exit $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+    }
+
+    "stop" {
+        $stoppedTracked = Stop-TrackedProcess -PidFile $pidFile
+        $stoppedChildren = Stop-TeamClawServiceProcesses
+        if ($stoppedTracked -or $stoppedChildren) {
+            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+            Write-Host "Service stopped."
+        } else {
+            Write-Host "Service is not running."
+        }
+        exit 0
+    }
+
+    "status" {
+        $ports = Get-TeamClawPortMap -EnvPath $envPath
+        $trackedRunning = Test-TrackedProcessRunning -PidFile $pidFile
+        $serviceProcesses = @(Get-TeamClawServiceProcesses)
+
+        if (-not $trackedRunning -and $serviceProcesses.Count -eq 0) {
+            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+            Write-Host "Service is not running."
+            if (Test-Path $envPath) {
+                $checks = @{}
+                foreach ($entry in $ports.GetEnumerator()) {
+                    $checks[$entry.Key] = Test-TeamClawPortAvailability -Port $entry.Value
+                }
+                Show-PortChecks -Checks $checks -Ports $ports
+            }
+            exit 1
+        }
+
+        if ($trackedRunning) {
+            $pidValue = Get-TrackedProcessId -PidFile $pidFile
+            Write-Host "Service is running. PID: $pidValue"
+        } else {
+            Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+            Write-Host "Service processes are running, but the tracked launcher PID is unavailable."
+            Write-Host "This usually happens after a foreground launch or when an external process manager owns the launcher."
+            foreach ($proc in $serviceProcesses) {
+                Write-Host "  PID $($proc.ProcessId): $($proc.CommandLine)"
+            }
+        }
+
+        foreach ($entry in $ports.GetEnumerator()) {
+            $listener = Get-ListeningPortInfo -Port $entry.Value
+            if ($listener) {
+                Write-Host "  $($entry.Key)=$($entry.Value) is listening (PID $($listener.OwningProcess))"
+            } else {
+                $check = Test-TeamClawPortAvailability -Port $entry.Value
+                if ($check.Available) {
+                    Write-Host "  $($entry.Key)=$($entry.Value) is not listening yet"
+                } else {
+                    Write-Host "  $($entry.Key)=$($entry.Value) is blocked: $([string]::Join('; ', $check.Reasons))"
+                }
+            }
+        }
+
+        Write-Host ""
+        Write-Host "Docs (read before creating/managing Teams):"
+        Write-Host "  docs/build_team.md       - Create/configure Team (members, personas, JSON)"
+        Write-Host "  docs/create_workflow.md  - Create OASIS workflow YAML (graph, persona types, examples)"
+        Write-Host "  docs/cli.md              - Complete CLI command reference and examples"
+        Write-Host "  docs/example_team.md     - Example Team file structure and content"
+        Write-Host "  docs/openclaw-commands.md - OpenClaw agent integration commands"
+        Write-Host ""
+        Write-Host "Tip: Use 'uv run scripts/cli.py <command> --help' for detailed usage"
+
+        exit 0
+    }
+
+    "add-user" {
+        if ($Rest.Count -lt 2) {
+            Write-Host "Usage: run.ps1 add-user <username> <password>"
+            exit 1
+        }
+
+        $code = Invoke-TeamClawPython -Arguments @("selfskill\scripts\adduser.py", $Rest[0], $Rest[1])
+        exit $code
+    }
+
+    "configure" {
+        if ($Rest.Count -eq 0) {
+            Write-Host "Usage: run.ps1 configure <KEY> <VALUE> | --init | --show | --batch ..."
+            exit 1
+        }
+
+        $code = Invoke-TeamClawPython -Arguments (@("selfskill\scripts\configure.py") + $Rest)
+        exit $code
+    }
+
+    "auto-model" {
+        $code = Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--auto-model")
+        exit $code
+    }
+
+    "cli" {
+        if ($Rest.Count -eq 0) {
+            Write-Host "Usage: run.ps1 cli <command> [args]"
+            exit 1
+        }
+
+        $code = Invoke-TeamClawPython -Arguments (@("scripts\cli.py") + $Rest)
+        exit $code
+    }
+
+    "check-openclaw" {
+        $python = Ensure-VenvPython -ProjectRoot $projectRoot
+        $openclaw = Get-OpenClawCommand
+        if ($openclaw) {
+            Write-Host "OpenClaw detected at: $openclaw"
+            Push-Location $projectRoot
+            try {
+                & $python "selfskill\scripts\configure_openclaw.py" "--auto-detect"
+                $code = $LASTEXITCODE
+            } finally {
+                Pop-Location
+            }
+            if ($code -eq 0 -and ((Test-TrackedProcessRunning -PidFile $pidFile) -or @(Get-TeamClawServiceProcesses).Count -gt 0)) {
+                Write-Host ""
+                Write-Host "If TeamClaw was already running before OpenClaw was installed or reconfigured,"
+                Write-Host "restart TeamClaw so OASIS reloads the openclaw CLI and gateway settings:"
+                Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 stop"
+                Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 start"
+            }
+            exit $code
+        }
+
+        $node = Get-Command node -ErrorAction SilentlyContinue
+        $npm = Get-Command npm -ErrorAction SilentlyContinue
+        if (-not $node -or -not $npm) {
+            Write-Host "node/npm were not found."
+            Write-Host "On native Windows, install Node.js 22+ first, or use the WSL flow documented in SKILL.md."
+            exit 1
+        }
+
+        $nodeVersion = (& $node.Source --version).Trim()
+        $nodeMajor = [int]($nodeVersion.TrimStart("v").Split(".")[0])
+        if ($nodeMajor -lt 22) {
+            Write-Host "Node.js is too old: $nodeVersion"
+            Write-Host "Please upgrade to Node.js 22+ or use the WSL flow."
+            exit 1
+        }
+
+        $shouldInstall = $env:OPENCLAW_AUTO_INSTALL -eq "1"
+        if (-not $shouldInstall) {
+            $reply = Read-Host "OpenClaw is missing. Install it now? [y/N]"
+            $shouldInstall = $reply -match "^[Yy]"
+        }
+
+        if (-not $shouldInstall) {
+            Write-Host "Skipped OpenClaw installation."
+            exit 0
+        }
+
+        & $npm.Source install -g openclaw@latest --ignore-scripts
+        if ($LASTEXITCODE -ne 0) {
+            throw "OpenClaw installation failed. Check npm and your network connection."
+        }
+
+        & $python "selfskill\scripts\configure_openclaw.py" "--init-workspace"
+        if ($LASTEXITCODE -ne 0) {
+            throw "OpenClaw workspace initialization failed."
+        }
+
+        Write-Host "OpenClaw has been installed."
+        Write-Host "Next, run:"
+        Write-Host "  openclaw onboard --non-interactive --accept-risk --install-daemon"
+        Write-Host "Optional if you want OpenClaw to reuse your existing OpenAI key:"
+        Write-Host "  openclaw onboard --non-interactive --accept-risk --install-daemon --openai-api-key <LLM_API_KEY>"
+        Write-Host "Then run:"
+        Write-Host "  openclaw config set gateway.http.endpoints.chatCompletions.enabled true"
+        Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 check-openclaw"
+        Write-Host ""
+        Write-Host "If the dashboard later says 'gateway token missing', either paste OPENCLAW_GATEWAY_TOKEN"
+        Write-Host "into Control UI settings, or for loopback-only local use run:"
+        Write-Host "  openclaw config set gateway.auth.mode none"
+        Write-Host "  openclaw config unset gateway.auth.token"
+        Write-Host "  openclaw gateway restart"
+        exit 0
+    }
+
+    "check-openclaw-weixin" {
+        $openclaw = Get-OpenClawCommand
+        if (-not $openclaw) {
+            Write-Host "OpenClaw is missing. Install or configure it first:"
+            Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 check-openclaw"
+            exit 1
+        }
+
+        Write-Host "Using OpenClaw CLI: $openclaw"
+        if ($openclaw -like "*.cmd") {
+            Write-Host "Windows note: using openclaw.cmd avoids PowerShell execution-policy issues from openclaw.ps1."
+        }
+        Write-Host "If the official npx installer says it cannot find openclaw on Windows,"
+        Write-Host "this helper uses the manual plugin flow instead."
+
+        $pluginEntry = Join-Path $env:USERPROFILE ".openclaw\extensions\openclaw-weixin\index.ts"
+        $pluginInstalledNow = $false
+        if (-not (Test-Path $pluginEntry)) {
+            Write-Host ""
+            Write-Host "Installing @tencent-weixin/openclaw-weixin ..."
+            $code = Invoke-OpenClawCommand -Arguments @("plugins", "install", "@tencent-weixin/openclaw-weixin")
+            if ($code -ne 0) {
+                throw "OpenClaw Weixin plugin installation failed."
+            }
+            $pluginInstalledNow = $true
+        } else {
+            Write-Host ""
+            Write-Host "Weixin plugin is already installed."
+        }
+
+        $code = Invoke-OpenClawCommand -Arguments @("config", "set", "plugins.entries.openclaw-weixin.enabled", "true")
+        if ($code -ne 0) {
+            throw "Failed to enable the OpenClaw Weixin plugin."
+        }
+
+        if ($pluginInstalledNow) {
+            $code = Invoke-OpenClawCommand -Arguments @("gateway", "restart")
+            if ($code -ne 0) {
+                Write-Host "OpenClaw gateway restart reported an issue. Continue by checking 'openclaw status'."
+            }
+        }
+
+        $channels = @(Get-OpenClawChannels | Where-Object { $_.Channel -eq "openclaw-weixin" })
+        Write-Host ""
+        if ($channels.Count -eq 0) {
+            Write-Host "The plugin is installed but no Weixin account is logged in yet."
+            Write-Host "Next step:"
+            Write-Host "  $openclaw channels login --channel openclaw-weixin"
+            Write-Host ""
+            Write-Host "After you scan the QR code, verify with:"
+            Write-Host "  $openclaw channels list --json"
+            Write-Host "Then bind the account to an agent:"
+            Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 bind-openclaw-channel main openclaw-weixin:<account_id>"
+            exit 0
+        }
+
+        Write-Host "Detected Weixin channel accounts:"
+        foreach ($channel in $channels) {
+            Write-Host "  $($channel.BindKey)"
+        }
+
+        Write-Host ""
+        Write-Host "Bind an account to an OpenClaw agent with:"
+        foreach ($channel in $channels) {
+            Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 bind-openclaw-channel main $($channel.BindKey)"
+        }
+        exit 0
+    }
+
+    "bind-openclaw-channel" {
+        if ($Rest.Count -lt 2) {
+            Write-Host "Usage: run.ps1 bind-openclaw-channel <agent> <bind_key>"
+            Write-Host "Example:"
+            Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 bind-openclaw-channel main openclaw-weixin:account-id"
+            exit 1
+        }
+
+        $agentName = $Rest[0]
+        $bindKey = $Rest[1]
+
+        $code = Invoke-OpenClawCommand -Arguments @("agents", "bind", "--agent", $agentName, "--bind", $bindKey)
+        if ($code -ne 0) {
+            throw "OpenClaw channel binding failed."
+        }
+
+        Write-Host ""
+        Write-Host "Current bindings for '$agentName':"
+        $bindings = @(Get-OpenClawAgentBindings -AgentName $agentName)
+        if ($bindings.Count -eq 0) {
+            Write-Host "  (No bindings detected yet. Refresh OpenClaw / TeamClaw and try again.)"
+        } else {
+            foreach ($binding in $bindings) {
+                Write-Host "  $binding"
+            }
+        }
+
+        Write-Host ""
+        Write-Host "Refresh TeamClaw's OpenClaw Channels tab or run:"
+        Write-Host "  uv run scripts/cli.py openclaw bindings --agent $agentName"
+        exit 0
+    }
+
+    "start-tunnel" {
+        if (Test-TrackedProcessRunning -PidFile $tunnelPidFile) {
+            $existingPid = Get-TrackedProcessId -PidFile $tunnelPidFile
+            Write-Host "Tunnel is already running. PID: $existingPid"
+            exit 0
+        }
+
+        $python = Ensure-VenvPython -ProjectRoot $projectRoot
+        $stdoutLog = Join-Path $projectRoot "logs\tunnel.out.log"
+        $stderrLog = Join-Path $projectRoot "logs\tunnel.err.log"
+        $process = Start-BackgroundPythonProcess `
+            -ProjectRoot $projectRoot `
+            -PythonPath $python `
+            -Arguments @("scripts\tunnel.py") `
+            -StdOutLog $stdoutLog `
+            -StdErrLog $stderrLog
+
+        Set-Content -Path $tunnelPidFile -Value $process.Id -Encoding UTF8
+        Write-Host "Tunnel started. PID: $($process.Id)"
+        Write-Host "Logs:"
+        Write-Host "  stdout: $stdoutLog"
+        Write-Host "  stderr: $stderrLog"
+        exit 0
+    }
+
+    "stop-tunnel" {
+        if (Stop-TrackedProcess -PidFile $tunnelPidFile) {
+            Write-Host "Tunnel stopped."
+        } else {
+            Write-Host "Tunnel is not running."
+        }
+        exit 0
+    }
+
+    "tunnel-status" {
+        if (-not (Test-TrackedProcessRunning -PidFile $tunnelPidFile)) {
+            Write-Host "Tunnel is not running."
+            exit 1
+        }
+
+        $pidValue = Get-TrackedProcessId -PidFile $tunnelPidFile
+        Write-Host "Tunnel is running. PID: $pidValue"
+
+        $envValues = Read-TeamClawEnvFile -Path $envPath
+        if ($envValues.ContainsKey("PUBLIC_DOMAIN") -and -not [string]::IsNullOrWhiteSpace($envValues["PUBLIC_DOMAIN"])) {
+            Write-Host "Public URL: $($envValues["PUBLIC_DOMAIN"])"
+        }
+
+        exit 0
+    }
+
+    "help" { Show-Help; exit 0 }
+    "--help" { Show-Help; exit 0 }
+    "-h" { Show-Help; exit 0 }
+
+    default {
+        Write-Host "Unknown command: $Command"
+        Show-Help
+        exit 1
+    }
+}

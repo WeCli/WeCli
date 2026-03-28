@@ -1,0 +1,15 @@
+{
+  "name": "teamclaw-frontend-tools",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "build:oasis-town": "node tools/build_oasis_town.mjs"
+  },
+  "dependencies": {
+    "easystarjs": "^0.4.4",
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.3"
+  }
+}
