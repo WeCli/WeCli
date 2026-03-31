@@ -4,6 +4,7 @@ import json
 import copy
 import asyncio
 import sys
+import logging
 from typing import Annotated, TypedDict, Optional
 
 # LangGraph related
@@ -55,7 +56,6 @@ SESSION_INJECTED_TOOLS = {
     "send_internal_message": "source_session",
     "send_to_group": "source_session",
 }
-
 
 # --- State definition ---
 class AgentState(TypedDict):
@@ -259,6 +259,181 @@ class TeamAgent:
             skill_lines.append("如需添加技能，请在技能清单文件中添加技能信息。")
 
         return "\n".join(skill_lines)
+
+    def _find_internal_session_meta(self, user_id: str, session_id: str) -> dict | None:
+        """Resolve an internal agent session to its stored meta and owning team.
+
+        Returns {"team", "name", "tag"} or None if the session is not registered
+        in any internal_agents.json file.
+        """
+        if not user_id or not session_id:
+            return None
+
+        user_files_dir = self._prompts.get("_user_files_dir", "")
+        if not user_files_dir:
+            return None
+
+        user_root = os.path.join(user_files_dir, user_id)
+        candidates: list[tuple[str, str]] = []
+
+        teams_dir = os.path.join(user_root, "teams")
+        if os.path.isdir(teams_dir):
+            for team_name in sorted(os.listdir(teams_dir)):
+                team_root = os.path.join(teams_dir, team_name)
+                if os.path.isdir(team_root):
+                    candidates.append((team_name, os.path.join(team_root, "internal_agents.json")))
+
+        candidates.append(("", os.path.join(user_root, "internal_agents.json")))
+
+        for team_name, path in candidates:
+            if not os.path.isfile(path):
+                continue
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+
+            if not isinstance(data, list):
+                continue
+
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("session", "") != session_id:
+                    continue
+                return {
+                    "team": team_name,
+                    "name": (item.get("name") or "").strip(),
+                    "tag": (item.get("tag") or "").strip(),
+                }
+        return None
+
+    @staticmethod
+    def _load_json_list(path: str) -> list[dict]:
+        """Best-effort JSON list loader used by persona resolution."""
+        if not os.path.isfile(path):
+            return []
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, list) else []
+        except (OSError, json.JSONDecodeError):
+            return []
+
+    @staticmethod
+    def _load_agency_prompt_body(prompt_file: str) -> str:
+        """Load rich agency persona prompt body without importing oasis.experts."""
+        if not prompt_file:
+            return ""
+        agency_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "data",
+            "prompts",
+            "agency_agents",
+        )
+        path = os.path.join(agency_dir, prompt_file)
+        if not os.path.isfile(path):
+            return ""
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except OSError:
+            return ""
+        frontmatter = re.match(r'^---\s*\n.*?\n---\s*\n', content, re.DOTALL)
+        body = content[frontmatter.end():] if frontmatter else content
+        return body.strip()
+
+    def _find_internal_session_expert_config(self, user_id: str, team: str, tag: str) -> dict | None:
+        """Resolve tag -> expert config locally, avoiding cross-package imports.
+
+        Lookup order mirrors the important runtime sources:
+        team experts -> public experts -> agency experts -> user custom experts.
+        """
+        if not user_id or not tag:
+            return None
+
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        data_dir = os.path.join(project_root, "data")
+        user_files_dir = self._prompts.get("_user_files_dir", "")
+
+        candidates: list[dict] = []
+
+        if team and user_files_dir:
+            candidates.extend(
+                self._load_json_list(
+                    os.path.join(user_files_dir, user_id, "teams", team, "oasis_experts.json")
+                )
+            )
+
+        candidates.extend(
+            self._load_json_list(os.path.join(data_dir, "prompts", "oasis_experts.json"))
+        )
+
+        for item in self._load_json_list(os.path.join(data_dir, "prompts", "agency_experts.json")):
+            if not isinstance(item, dict):
+                continue
+            item = dict(item)
+            if not item.get("persona"):
+                item["persona"] = self._load_agency_prompt_body(item.get("prompt_file", ""))
+            candidates.append(item)
+
+        safe_user_id = user_id.replace("/", "_").replace("\\", "_").replace("..", "_")
+        candidates.extend(
+            self._load_json_list(os.path.join(data_dir, "oasis_user_experts", f"{safe_user_id}.json"))
+        )
+
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            if (item.get("tag") or "").strip() != tag:
+                continue
+            return item
+        return None
+
+    def _get_internal_session_persona_prompt(self, user_id: str, session_id: str) -> str:
+        """Build a stable identity prompt for internal sessions with a stored tag.
+
+        This lifts tag -> persona resolution into TeamAgent runtime so group chat
+        and OASIS regular session invocations share the same session identity.
+        """
+        meta = self._find_internal_session_meta(user_id, session_id)
+        if not meta:
+            return ""
+
+        tag = meta.get("tag", "")
+        if not tag:
+            return ""
+
+        expert_cfg = self._find_internal_session_expert_config(
+            user_id,
+            meta.get("team", ""),
+            tag,
+        )
+        if not expert_cfg:
+            return ""
+
+        persona = (expert_cfg.get("persona") or "").strip()
+        if not persona:
+            return ""
+
+        display_name = (meta.get("name") or expert_cfg.get("name") or tag or session_id).strip()
+        is_rich_persona = "## " in persona or "# " in persona
+        if is_rich_persona:
+            return (
+                "【当前会话身份设定】\n"
+                f"你当前会话的唯一身份/角色是「{display_name}」，tag 为 \"{tag}\"。\n"
+                "从现在开始，你必须始终以该身份思考、说话和行动。\n"
+                "除非用户明确要求你切换角色，否则不得退回通用助手口吻，不得否认自己的身份，不得自称只是普通 AI 助手。\n"
+                "当用户询问“你是谁”“你的身份是什么”“你在扮演谁”这类问题时，必须优先依据本身份设定回答。\n\n"
+                f"以下是你必须遵守的完整身份与行为指南：\n\n{persona}\n"
+            )
+        return (
+            "【当前会话身份设定】\n"
+            f"你当前会话的唯一身份/角色是「{display_name}」，tag 为 \"{tag}\"。"
+            "从现在开始，你必须始终按这个身份回应；除非用户明确要求切换，否则不得退回默认通用助手身份。"
+            f"{persona}\n"
+        )
 
     def _build_chat_rules(self, state: AgentState) -> str:
         """根据消息上下文动态组装聊天行为规则。
@@ -513,9 +688,16 @@ class TeamAgent:
         # Detect tool state change
         current_enabled = frozenset(enabled_names) if enabled_names is not None else frozenset(all_names)
         user_id = state.get("user_id", "__global__")
+        session_persona_prompt = self._get_internal_session_persona_prompt(
+            user_id,
+            session_id or "",
+        ) if (not is_subagent and user_id and session_id) else ""
 
         # 仅主 agent 会话注入用户画像和技能列表
         if not is_subagent:
+            if session_persona_prompt:
+                base_prompt += f"\n{session_persona_prompt}\n"
+
             # 注入用户专属画像
             user_profile = self._get_user_profile(user_id)
             if user_profile:

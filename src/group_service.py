@@ -5,6 +5,7 @@ import os
 import re
 import secrets
 import shutil
+import threading
 import time
 from typing import Any, Callable, Literal
 
@@ -35,22 +36,48 @@ from group_repository import (
 from group_models import Attachment, GroupCreateRequest, GroupAddMemberRequest, GroupMessageRequest, GroupUpdateRequest
 from logging_utils import get_logger
 from session_summary import first_human_title
+from acpx_adapter import AcpxError, get_acpx_adapter
 
 logger = get_logger("group_service")
 
 # Known ACP-compatible tool binaries (must match CLI status platforms list)
 _ACP_KNOWN_TOOLS: frozenset = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
+_ACP_AGENT_TAGS: frozenset = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
+_HTTP_AGENT_TAGS: frozenset = frozenset()
+_DEFAULT_ACP_SESSION_SUFFIX = "teamclawchat"
+_AGENT_MODEL_RE = re.compile(r"^agent:[^:]+(?::(.+))?$")
 
-# ACP long-lived connection support
-try:
-    from acp import PROTOCOL_VERSION, Client, connect_to_agent, text_block, image_block, audio_block
-    from acp.schema import ClientCapabilities, Implementation, AgentMessageChunk
-    _ACP_AVAILABLE = True
-except ImportError:
-    _ACP_AVAILABLE = False
+# ACPX-backed ACP support
+_ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # Project root for team-scoped paths
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+
+# ── Temporary ACP lifecycle trace (群聊): logger [ACP_TRACE] + logs/acp_group_trace.jsonl
+_ACP_TRACE_PATH = os.path.join(_PROJECT_ROOT, "logs", "acp_group_trace.jsonl")
+_acp_trace_file_lock = threading.Lock()
+
+
+def _acp_group_trace(event: str, **fields: Any) -> None:
+    """Temporarily disabled ACP trace output for group chat."""
+    return
+
+
+def _select_external_transport(tag: str) -> Literal["acp", "http", "drop"]:
+    tag_lower = (tag or "").lower()
+    if tag_lower in _ACP_AGENT_TAGS:
+        return "acp"
+    if tag_lower in _HTTP_AGENT_TAGS:
+        return "http"
+    return "drop"
+
+
+def _resolve_external_session_suffix(model: str) -> str:
+    m = _AGENT_MODEL_RE.match((model or "").strip())
+    if m and m.group(1):
+        return m.group(1)
+    return _DEFAULT_ACP_SESSION_SUFFIX
+
 
 # ── Text MIME helpers (shared with system_service) ──
 _TEXT_MIME_PREFIXES = ("text/",)
@@ -87,6 +114,27 @@ def _decode_att_text(att_data: str, max_chars: int = 50000) -> str | None:
         return text
     except Exception:
         return None
+
+
+def _compose_acpx_prompt(message: str, attachments: list[Attachment] | None = None) -> str:
+    """Compose one plain-text prompt for acpx-backed ACP call."""
+    parts: list[str] = [message]
+    for att in attachments or []:
+        if att.type == "image":
+            parts.append(f"[附件: {att.name} ({att.mime_type}), image bytes(base64) omitted]")
+            continue
+        if att.type == "audio":
+            parts.append(f"[附件: {att.name} ({att.mime_type}), audio bytes(base64) omitted]")
+            continue
+        if _is_text_mime(att.mime_type):
+            decoded = _decode_att_text(att.data)
+            if decoded is not None:
+                parts.append(f"\n📄 附件「{att.name}」内容:\n```\n{decoded}\n```")
+            else:
+                parts.append(f"[附件: {att.name} ({att.mime_type}), 解码失败]")
+        else:
+            parts.append(f"[附件: {att.name} ({att.mime_type}), 二进制文件无法展示]")
+    return "\n\n".join(p for p in parts if p)
 
 
 def _load_team_internal_agents(user_id: str, team: str) -> list[dict]:
@@ -172,41 +220,6 @@ async def init_group_db(group_db_path: str) -> None:
     await init_group_db_repo(group_db_path)
 
 
-# ACP connection cache: key = (user_id, team, agent_name), value = ACP connection info
-_acp_connections: dict[tuple, dict] = {}
-
-
-if _ACP_AVAILABLE:
-    class _SecureStreamReader(asyncio.StreamReader):
-        """Wraps subprocess stdout, only passing JSON-RPC lines."""
-        def __init__(self, real_reader, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self._real_reader = real_reader
-
-        async def readline(self):
-            while True:
-                line = await self._real_reader.readline()
-                if not line:
-                    return b""
-                if line.strip().startswith(b'{'):
-                    return line
-                continue
-
-    class _ACPClient(Client):
-        """ACP protocol callback handler — collects streaming text chunks."""
-        def __init__(self):
-            self.chunks: list[str] = []
-
-        async def session_update(self, session_id, update, **kwargs):
-            if isinstance(update, AgentMessageChunk) and hasattr(update.content, 'text'):
-                self.chunks.append(update.content.text)
-
-        def get_and_clear_text(self) -> str:
-            text = "".join(self.chunks)
-            self.chunks = []
-            return text
-
-
 class GroupService:
     def __init__(
         self,
@@ -270,110 +283,72 @@ class GroupService:
         message: str,
         attachments: list[Attachment] | None = None,
         metadata: dict | None = None,
+        *,
+        _retry_dead: bool = False,
     ) -> str | None:
-        """Send message to external agent via ACP protocol.
-
-        Args:
-            agent_info: {"global_name", "tag", "api_url", "api_key", "model", ...}
-            message: The message to send (already contains teamclaw_type instruction in prompt)
-            attachments: Optional list of Attachment objects (images/audio/files)
-            metadata: Optional dict for ACP _meta field control (e.g., resetSession)
-
-        Returns:
-            Agent response text, or None if failed.
-        """
+        """Send message to external agent via acpx-backed ACP session."""
         if not _ACP_AVAILABLE:
-            logger.warning("ACP not available, falling back to HTTP for %s", agent_info.get("name"))
-            return await self._send_to_http_agent(agent_info, message, attachments=attachments)
+            logger.warning("acpx not available for %s", agent_info.get("name"))
+            return None
 
         tag = agent_info.get("tag", "").lower()
         global_name = agent_info.get("global_name", "")
         if not global_name:
             logger.warning("No global_name for external agent %s", agent_info.get("name"))
             return None
+        if tag not in _ACP_KNOWN_TOOLS:
+            logger.warning("Unsupported ACP tool '%s' for %s", tag, global_name)
+            return None
 
-        # Determine ACP tool binary from tag
-        acp_tool = tag if tag in _ACP_KNOWN_TOOLS else "openclaw"
-        acp_bin = shutil.which(acp_tool)
-        if not acp_bin:
-            logger.warning("ACP binary '%s' not found, falling back to HTTP", acp_tool)
-            return await self._send_to_http_agent(agent_info, message, attachments=attachments)
-
-        # Build ACP session arg
-        acp_session = f"agent:{global_name}:group_chat"
-
+        session_suffix = _resolve_external_session_suffix(str(agent_info.get("model", "")))
+        acp_session = f"agent:{global_name}:{session_suffix}"
+        t0 = time.time()
+        prompt_text = _compose_acpx_prompt(message, attachments)
+        acpx_session = ""
+        _acp_group_trace(
+            "acp_ephemeral_start",
+            phase="acpx_prompt",
+            agent_global_name=global_name,
+            tag=tag,
+            cli_session_arg=acp_session,
+            attachment_count=len(attachments or []),
+        )
         try:
-            cmd = [acp_bin, "acp", "--session", acp_session, "--no-prefix-cwd"]
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            adapter = get_acpx_adapter(cwd=_PROJECT_ROOT)
+            acpx_session = adapter.to_acpx_session_name(tool=tag, session_key=acp_session)
+            await adapter.ensure_session(tool=tag, session_key=acp_session, acpx_session=acpx_session)
+            reply = await adapter.prompt(
+                tool=tag,
+                session_key=acp_session,
+                prompt_text=prompt_text,
+                timeout_sec=180,
+                reset_session=bool(metadata and metadata.get("resetSession")),
             )
-
-            safe_stdout = _SecureStreamReader(proc.stdout)
-            client = _ACPClient()
-            conn = connect_to_agent(client, proc.stdin, safe_stdout)
-
-            # ACP handshake
-            await conn.initialize(
-                protocol_version=PROTOCOL_VERSION,
-                client_capabilities=ClientCapabilities(),
-                client_info=Implementation(name="teamclaw-group", version="1.0"),
+            _acp_group_trace(
+                "acp_prompt_complete",
+                agent_global_name=global_name,
+                cli_session_arg=acp_session,
+                reply_chars=len(reply or ""),
+                attachment_count=len(attachments or []),
+                elapsed_ms=round((time.time() - t0) * 1000),
+                cached=True,
+                backend="acpx",
+                acpx_session=acpx_session,
             )
-
-            # Support resetSession via _meta field
-            session = await conn.new_session(
-                mcp_servers=[],
-                cwd=os.getcwd(),
-                metadata=metadata
+            return reply or None
+        except AcpxError as e:
+            _acp_group_trace(
+                "acp_error",
+                agent_global_name=global_name,
+                cli_session_arg=acp_session,
+                error_type=type(e).__name__,
+                error=str(e),
+                elapsed_ms=round((time.time() - t0) * 1000),
+                backend="acpx",
+                acpx_session=acpx_session,
             )
-
-            # Build prompt blocks: text + optional multimodal attachments
-            prompt_blocks = [text_block(message)]
-            if attachments:
-                for att in attachments:
-                    if att.type == "image":
-                        prompt_blocks.append(image_block(att.data, att.mime_type))
-                    elif att.type == "audio":
-                        prompt_blocks.append(audio_block(att.data, att.mime_type))
-                    else:
-                        # file type: try to decode text content, fallback to description
-                        if _is_text_mime(att.mime_type):
-                            decoded = _decode_att_text(att.data)
-                            if decoded is not None:
-                                prompt_blocks.append(text_block(
-                                    f"\n📄 附件「{att.name}」内容:\n```\n{decoded}\n```"
-                                ))
-                            else:
-                                prompt_blocks.append(text_block(f"[附件: {att.name} ({att.mime_type}), 解码失败]"))
-                        else:
-                            prompt_blocks.append(text_block(f"[附件: {att.name} ({att.mime_type}), 二进制文件无法展示]"))
-
-            await conn.prompt(
-                session_id=session.session_id,
-                prompt=prompt_blocks,
-                metadata=metadata,
-            )
-
-            reply = client.get_and_clear_text()
-
-            # Cleanup
-            proc.stdout.feed_eof()
-            if proc.stdin:
-                proc.stdin.close()
-            proc.terminate()
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=0.5)
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.wait()
-
-            return reply if reply else None
-
-        except Exception as e:
-            logger.warning("ACP send failed for %s: %s", global_name, e)
-            return await self._send_to_http_agent(agent_info, message, attachments=attachments)
+            logger.warning("acpx send failed for %s: %s", global_name, e)
+            return None
 
     async def _send_to_http_agent(
         self,
@@ -388,6 +363,12 @@ class GroupService:
         """
         api_url = agent_info.get("api_url", "")
         api_key = agent_info.get("api_key", "")
+        tag = str(agent_info.get("tag", "")).lower()
+        global_name = str(agent_info.get("global_name", "")).strip()
+        if tag == "openclaw":
+            # OpenClaw endpoint is device-dependent: prefer runtime env over saved config.
+            api_url = os.getenv("OPENCLAW_API_URL", "") or api_url
+            api_key = os.getenv("OPENCLAW_GATEWAY_TOKEN", "") or api_key
         model = agent_info.get("model", "gpt-3.5-turbo")
 
         if not api_url:
@@ -404,6 +385,9 @@ class GroupService:
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+        if tag == "openclaw" and global_name:
+            session_suffix = _resolve_external_session_suffix(str(agent_info.get("model", "")))
+            headers["x-openclaw-session-key"] = f"agent:{global_name}:{session_suffix}"
 
         # Build message content (multimodal if attachments present)
         if attachments:
@@ -477,8 +461,19 @@ class GroupService:
         ACP response is NOT automatically posted to group.
         Agent should use CLI tool `groups send` to send messages if needed.
         """
-        # Send message (no type instruction - agent decides based on prompt)
-        reply = await self._send_to_acp_agent(agent_info, message, attachments=attachments)
+        # Select transport explicitly by tag; no ACP->HTTP fallback.
+        transport = _select_external_transport(str(agent_info.get("tag", "")))
+        if transport == "drop":
+            logger.warning(
+                "Drop external agent %s due to unknown tag '%s'",
+                agent_name,
+                agent_info.get("tag", ""),
+            )
+            return
+        if transport == "acp":
+            reply = await self._send_to_acp_agent(agent_info, message, attachments=attachments)
+        else:
+            reply = await self._send_to_http_agent(agent_info, message, attachments=attachments)
         if not reply:
             logger.info("External agent %s did not reply", agent_name)
             return
@@ -509,6 +504,10 @@ class GroupService:
         members = await list_group_member_targets(self.group_db_path, group_id)
         member_count = len(members)
         is_private_chat = member_count <= 2  # owner + 1 agent = 私聊
+        owner_uid = user_id or await get_group_owner(self.group_db_path, group_id) or ""
+        human_user_hint = (
+            f"当前群主 owner=\"{owner_uid}\"。当前人类用户是「{owner_uid}」。"
+        )
 
         # Build external agent config map by global_id (need api_url etc. for ACP/HTTP)
         # We need to load external agent configs from the owner's team files
@@ -549,6 +548,7 @@ class GroupService:
                 # 私聊：不需要群聊标记，直接告知是私信
                 msg_prefix = f"[私聊] {sender} 说:\n"
                 msg_suffix = (f"\n\n{agent_identity}，这是用户发给你的私信，请认真回复。\n"
+                              f"{human_user_hint}\n"
                               "请先 cd 到项目目录，然后使用 CLI 工具发送消息：\n"
                               f"{cli_hint}\n"
                               "注意：不要在 ACP 响应中直接输出内容，系统不会自动发布你的回复。\n"
@@ -556,6 +556,7 @@ class GroupService:
             elif mentions and global_id in mentions:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} @你 说:\n"
                 msg_suffix = (f"\n\n⚠️ 这是专门 @你 的消息，你必须回复！{agent_identity}。\n"
+                              f"{human_user_hint}\n"
                               "请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
                               f"{cli_hint}\n"
                               "注意：不要在 ACP 响应中直接输出群聊内容，系统不会自动发布你的回复。\n"
@@ -563,6 +564,7 @@ class GroupService:
             else:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} 说:\n"
                 msg_suffix = (f"\n\n{agent_identity}，仅当消息与你直接相关时才回复。\n"
+                              f"{human_user_hint}\n"
                               "💡 尽量等待人类用户发起讨论或提出问题后再参与，不要主动发起新话题。\n"
                               "如果需要回复，请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
                               f"{cli_hint}\n"
@@ -598,6 +600,7 @@ class GroupService:
                 trigger_url = f"http://127.0.0.1:{os.getenv('PORT_AGENT', '51200')}/system_trigger"
 
                 trigger_suffix = ("\n\n如果需要回复，请使用 send_to_group 工具发送消息到群里：\n"
+                                  f"  当前群主 owner=\"{owner_uid}\"；当前人类用户是「{owner_uid}」\n"
                                   f"  send_to_group(group_id=\"{group_id}\", content=\"你的回复内容\")\n"
                                   "注意：username 和 source_session 会自动注入，不要手动设置。\n"
                                   "系统不会自动发布你的回复，必须调用 send_to_group 工具。\n"

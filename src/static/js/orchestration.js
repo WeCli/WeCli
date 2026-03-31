@@ -252,10 +252,7 @@ async function orchHandleSnapshotUpload(event) {
     formData.append('file', file);
     formData.append('team', teamName);
     try {
-        const resp = await fetch('/teams/snapshot/upload', {
-            method: 'POST',
-            body: formData
-        });
+        const resp = await teamSnapshotUploadZipWithProgress(file, formData);
         const data = await resp.json();
         if (data.success) {
             orchToast(t('orch_toast_snapshot_uploaded') || 'Snapshot uploaded and agents restored');

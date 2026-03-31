@@ -451,6 +451,15 @@ case "${1:-help}" in
     configure)
         shift
         python selfskill/scripts/configure.py "$@"
+        CONFIG_EXIT_CODE=$?
+        if [ $CONFIG_EXIT_CODE -ne 0 ]; then
+            exit $CONFIG_EXIT_CODE
+        fi
+        if [ "${1:-}" = "--init" ]; then
+            echo ""
+            echo "=== init 完成，自动触发 OpenClaw 检测 ==="
+            bash "$0" check-openclaw
+        fi
         exit 0
         ;;
 

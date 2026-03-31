@@ -157,8 +157,8 @@ For external ACP agents (tag = `openclaw`, `codex`, etc.), additional fields are
 **关键配置要求：**
 - **expert字段**：必须使用`tag#ext#id`格式（tag可以是openclaw、codex等）
 - **model字段**：支持两种形式：
-  - `agent:<name>` - 默认使用团队名称作为session
-  - `agent:<name>:<session>` - 显式指定session名称
+  - `agent:<name>` - 默认 session 后缀为 `teamclawchat`（与群聊 ACP 一致，跨 team 共用同一外部 agent 上下文）
+  - `agent:<name>:<session>` - 显式指定 session 后缀
 
 **Session控制说明：**
 - 相同session共享上下文，不同session保持独立

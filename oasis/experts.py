@@ -19,7 +19,7 @@ Three expert backends:
     the tag is an ACP-capable tool (openclaw, codex, etc), prefers ACP persistent
     connection; falls back to HTTP API if ACP is unavailable and api_url is set.
     The tag determines which CLI binary is used for the ACP subprocess.
-    Session defaults to team name if not specified in the model string.
+    Session suffix defaults to ``teamclawchat`` (aligned with group chat ACP) if omitted in the model string.
 
 Expert pool is built from schedule_yaml or schedule_file (YAML-only mode).
 schedule_file takes priority if both provided.
@@ -36,28 +36,39 @@ which is injected into the expert's prompt to guide their focus.
 
 import asyncio
 import json
+import logging
 import os
 import re
 import shlex
 import shutil
 import sys
+import threading
+import time
+from typing import Any
 
 import httpx
 from langchain_core.messages import HumanMessage
 
-# ACP long-lived connection support (from acptest4)
-try:
-    from acp import PROTOCOL_VERSION, Client, connect_to_agent, text_block
-    from acp.schema import ClientCapabilities, Implementation, AgentMessageChunk
-    _ACP_AVAILABLE = True
-except ImportError:
-    _ACP_AVAILABLE = False
+# ACPX-backed ACP support
+_ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # 确保 src/ 在 import 路径中，以便导入 llm_factory
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
+from acpx_adapter import AcpxError, get_acpx_adapter
 from llm_factory import create_chat_model, extract_text
 
 from oasis.forum import DiscussionForum
+
+# OASIS ACP 调试：logger [ACP_TRACE] + logs/acp_oasis_trace.jsonl（与群聊 acp_group_trace 同风格）
+_TEAMCLAW_ROOT = os.path.dirname(os.path.dirname(__file__))
+_OASIS_ACP_TRACE_PATH = os.path.join(_TEAMCLAW_ROOT, "logs", "acp_oasis_trace.jsonl")
+_oasis_acp_trace_file_lock = threading.Lock()
+_oasis_acp_trace_log = logging.getLogger("oasis.acp_trace")
+
+
+def _acp_oasis_trace(event: str, **fields: Any) -> None:
+    """Temporarily disabled ACP trace output for OASIS."""
+    return
 
 
 # --- 加载 prompt 和专家配置（模块级别，导入时执行一次） ---
@@ -491,8 +502,10 @@ def _build_discuss_callback_prompt(
         p for p in [
             identity,
             "你正在通过 ACP 长连接被 OASIS 调度。",
-            "公开发言/投票/选择必须由你主动调用 CLI 回传到 OASIS，系统不会解析你的 ACP 文本并代发。",
-            "如果你决定本轮不发言，可以只返回一句很短的确认，不要提交 callback。",
+            "公开发言/投票/选择必须由你主动调用 CLI callback 回传到 OASIS，系统不会解析你的 ACP 文本并代发。",
+            "换句话说：如果你没有执行 callback 命令/工具，哪怕你在 ACP 正文里写了完整答案，也会被视为本轮没有回复。",
+            "每一轮都必须至少调用一次 callback/工具回传；即使本轮无新观点、无票可投，也要通过工具提交合规单行 JSON"
+            "（例如 content 写「本轮无补充」，votes 为 []），不得以纯 ACP 正文代替工具回传。",
             "**重要行为规则：**\n"
             "0. **子 Agent 身份**：你是被上级调度系统（OASIS 工作流引擎）调用的子 Agent，只负责当前轮次的思考与回传\n"
             "1. **禁止自动开启子工作流**：除非明确点名，否则不得自行开启任何子讨论或子工作流\n"
@@ -503,12 +516,13 @@ def _build_discuss_callback_prompt(
     user_parts = [
         f"讨论主题: {question}",
         f"\n当前论坛内容:\n{posts_text}",
-        "\n如果你要公开发言、投票或做分支选择，请主动执行以下命令回传：",
+        "\n如果你要公开发言、投票或做分支选择，你必须主动执行以下命令回传：",
         callback_hint,
         "\n回传 JSON 格式示例：",
         '{"teamclaw_type": "oasis reply", "reply_to": 2, "content": "你的观点（200字以内，观点鲜明）", "votes": [{"post_id": 1, "direction": "up"}]}',
         '{"teamclaw_type": "oasis choose", "choose": {"option": "A", "reason": "理由"}, "content": "补充说明"}',
-        "\n注意：不要把最终 JSON 直接放在 ACP 回复正文里，ACP 回复正文只用于简短确认。",
+        "\n注意：不要把最终 JSON 直接放在 ACP 回复正文里；正式内容必须以工具/callback 的返回为准。",
+        "⚠️ 只有 callback 命令/工具提交到 OASIS 的内容才算正式回复；纯文本正文不算。无实质内容时也要走工具回传上述最小 JSON。",
     ]
     if instruction:
         user_parts.append(f"\n📋 本轮你的专项指令：{instruction}\n请在 callback 的内容里体现这个指令。")
@@ -544,12 +558,16 @@ def _build_execute_callback_prompt(
     if prior_posts_text:
         label = "前序 agent 的执行结果" if first_turn else "其他 agent 的新结果"
         parts.append(f"\n{label}:\n{prior_posts_text}")
-    parts.append("\n如果你产出了执行结果，请不要把最终 JSON 直接写在 ACP 回复正文里。")
-    parts.append("请主动执行以下命令，把结构化结果回传到 OASIS：")
+    parts.append("\n请不要把最终 JSON 直接写在 ACP 回复正文里；结构化结果必须通过工具/callback 回传。")
+    parts.append("每一轮都必须主动执行以下命令至少一次，把合规单行 JSON 回传到 OASIS（系统以工具返回为准）：")
     parts.append(callback_hint)
     parts.append("\n回传 JSON 示例：")
     parts.append('{"teamclaw_type": "oasis reply", "reply_to": null, "content": "你的执行结果", "votes": []}')
-    parts.append("\n如果本轮没有新增结果，可以只返回一句很短的确认，不要提交 callback。")
+    parts.append("⚠️ 只有 callback 命令/工具回传的结果才会进入 OASIS；你在 ACP 正文里直接写结果不会被采纳。")
+    parts.append(
+        "\n即使本轮没有新的执行产出，也必须仍通过上述命令/工具回传一次合规 JSON"
+        "（例如 content 写「本轮无新增结果」、votes 为 []），禁止仅回复自然语言而省略 callback。"
+    )
     parts.append(_BEHAVIOR_RULES)
     return "\n".join(parts)
 
@@ -1132,40 +1150,10 @@ class SessionExpert:
 
 # ── ACP long-lived connection helpers (inline from acptest4.py) ──
 
-if _ACP_AVAILABLE:
-    class _SecureStreamReader(asyncio.StreamReader):
-        """Wraps subprocess stdout, only passing JSON-RPC lines (starts with '{').
-
-        CLI tools (e.g. openclaw/codex acp) may print decorative banners or logs to
-        stdout alongside JSON-RPC messages. This filter discards non-JSON lines
-        so the ACP protocol layer only sees valid messages.
-        """
-        def __init__(self, real_reader, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self._real_reader = real_reader
-
-        async def readline(self):
-            while True:
-                line = await self._real_reader.readline()
-                if not line:
-                    return b""
-                if line.strip().startswith(b'{'):
-                    return line
-                continue
-
-    class _ACPClient(Client):
-        """ACP protocol callback handler — collects streaming text chunks."""
-        def __init__(self):
-            self.chunks: list[str] = []
-
-        async def session_update(self, session_id, update, **kwargs):
-            if isinstance(update, AgentMessageChunk) and hasattr(update.content, 'text'):
-                self.chunks.append(update.content.text)
-
-        def get_and_clear_text(self) -> str:
-            text = "".join(self.chunks)
-            self.chunks = []
-            return text
+# ACP-capable CLI tags (keep in sync with src/group_service._ACP_KNOWN_TOOLS)
+_OASIS_ACP_KNOWN_TOOLS: frozenset[str] = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
+_OASIS_ACP_AGENT_TAGS: frozenset[str] = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
+_OASIS_HTTP_AGENT_TAGS: frozenset[str] = frozenset()
 
 
 class ExternalExpert:
@@ -1182,11 +1170,13 @@ class ExternalExpert:
     (binary not found or start failed), falls back to HTTP API when
     ``api_url`` is configured. The ``tag`` field (e.g. "openclaw", "codex")
     determines which CLI binary is used for the ACP subprocess. Session
-    defaults to the team name if not specified in the model string.
+    suffix defaults to ``teamclawchat`` if not specified in the model string (same as group/ops ACP).
 
-    The subprocess is started once during ``acp_start()``, messages are
-    sent via ``acp_send()``, and the process is cleaned up during
-    ``acp_stop()``.
+    ACP subprocesses are stored in a **process-global pool** (same cache key as
+    group chat: ``tool`` + ``agent:<global_name>:<suffix>``). ``acp_start()`` only
+    warms the pool entry; ``acp_stop()`` does **not** kill the process (other
+    features may reuse it). Messages are sent via ``acp_send()`` or the callback
+    dispatch path, both serialized with a per-connection ``prompt_lock``.
 
     Session management is handled by the ACP connection internally —
     users cannot and do not need to specify session IDs.
@@ -1198,7 +1188,7 @@ class ExternalExpert:
     No local message history is accumulated.
 
     Features:
-      - ACP agents: persistent long-lived connection (start/send/stop lifecycle)
+      - ACP agents: global pooled connection (shared with TeamClaw group ACP)
       - HTTP fallback: when ACP unavailable but api_url is configured
       - Non-agent externals: direct HTTP API call
       - Incremental context (first call = full, subsequent = delta only)
@@ -1212,7 +1202,7 @@ class ExternalExpert:
 
     # Regex to match ACP agent model format: agent:<agent_name> or agent:<agent_name>:<session>
     # Group 1 = agent_name (ignored — real name comes from global_name in JSON)
-    # Group 2 (optional) = session suffix (defaults to team name if omitted)
+    # Group 2 (optional) = session suffix (defaults to _DEFAULT_ACP_SESSION_SUFFIX if omitted)
     _AGENT_MODEL_RE = re.compile(r"^agent:([^:]+)(?::(.+))?$")
 
     # Oasis reply protocol: require agent to reply with JSON containing "teamclaw_type" field
@@ -1220,7 +1210,8 @@ class ExternalExpert:
     # Works in both discussion mode (JSON reply/vote) and execute mode
     _OASIS_REPLY_INSTRUCTION = (
         "\n\n⚠️ IMPORTANT — OASIS JSON reply protocol:\n"
-        "当你需要发布给其他 agent 或公开的信息时，必须在回复中包含一个 JSON 对象。\n"
+        "当你需要发布给其他 agent 或公开的信息时，必须通过 callback/工具提交一个 JSON 对象到 OASIS。\n"
+        "仅仅在当前回复正文里写 JSON 或自然语言答案，不算正式回传，系统不会自动代你发布。\n"
         "JSON 的 \"teamclaw_type\" 字段决定回复类型：\n\n"
         "1. 讨论发言（teamclaw_type=\"oasis reply\"）：\n"
         '{\n'
@@ -1239,7 +1230,11 @@ class ExternalExpert:
         "- 一轮只能回复一次 JSON，teamclaw_type 字段区分于其他协议的 type 字段\n"
         "- JSON 前后可以有其他文字，系统会自动提取 JSON 部分\n"
         "- ⚠️ JSON 必须是合法的单行 JSON：content 等字符串字段内不能有实际换行，请把所有内容写在同一行内（需要换行请用 \\n 转义）\n"
-        "- 没有合规 JSON 的回复不会被发布\n"
+        "- 没有通过 callback/工具提交的合规 JSON，回复不会被发布\n"
+        "- 【ACP / 外部 agent 强制】每一轮都必须至少调用一次工具（或等价 callback）把合规 JSON 交给 OASIS；"
+        "系统以工具返回为准。即使本轮没有新观点、无可投票项、或执行上「无事可做」，也必须仍走工具回传单行 JSON"
+        "（例如 teamclaw_type=\"oasis reply\"，content 写明「本轮无补充」或「无新增结果」，votes 用 []），"
+        "禁止仅用自然语言或 ACP 纯文本结束本轮而不触发工具回传。\n"
         "- 回复最后必须添加三行 end padding 防止传输截断：\n"
         "[end padding]\n"
         "[end padding]\n"
@@ -1247,9 +1242,12 @@ class ExternalExpert:
     )
     _OASIS_REPLY_MAX_RETRIES = 3
 
-    # Known ACP-capable tool tags: the tag in YAML (e.g. "openclaw", "codex")
-    # maps to the CLI binary name used for ACP subprocess.
-    _ACP_TOOL_TAGS = {"openclaw", "codex"}
+    # YAML tag must be in this set for engine to treat expert as ACP-capable.
+    _ACP_TOOL_TAGS = _OASIS_ACP_AGENT_TAGS
+
+    # Default CLI --session suffix when model has no agent:name:<suffix> third segment.
+    # Matches group/ops ACP usage so the same external agent shares one session across teams.
+    _DEFAULT_ACP_SESSION_SUFFIX = "teamclawchat"
 
     def __init__(
         self,
@@ -1274,38 +1272,39 @@ class ExternalExpert:
         self.model = model
         self._team = team
         self._extra_headers = extra_headers or {}
+        self._tag_lower = tag.lower()
+        self._http_global_name = oc_agent_name
+        self._drop_unknown_tag = (
+            self._tag_lower not in _OASIS_ACP_AGENT_TAGS
+            and self._tag_lower not in _OASIS_HTTP_AGENT_TAGS
+        )
 
-        # Detect ACP agent model pattern: agent:<name> or agent:<name>:<session>
-        # The tag (e.g. "openclaw", "codex") determines which CLI tool to use.
+        # ACP routing is decided by tag, not model format.
+        # If model matches agent:<name>:<session>, only the optional session suffix is used.
         m = self._AGENT_MODEL_RE.match(model)
-        if m:
+        self._session_suffix = m.group(2) if m and m.group(2) else self._DEFAULT_ACP_SESSION_SUFFIX
+        if self._tag_lower in _OASIS_ACP_AGENT_TAGS:
             self._is_acp_agent = True
             if not oc_agent_name:
                 raise ValueError(
-                    f"Agent model '{model}' requires a global_name in "
+                    f"ACP tag '{tag}' requires a global_name in "
                     f"external_agents.json, but none was found for '{name}'."
                 )
             self._oc_agent_name = oc_agent_name
 
-            # Session suffix: explicit from model > team name > "main"
-            self._acp_session_suffix = m.group(2) or team or "main"
+            # Session suffix: explicit from model's third segment if present, else teamclawchat.
+            self._acp_session_suffix = self._session_suffix
 
-            # Determine ACP tool binary from tag (openclaw, codex, etc.)
-            tag_lower = tag.lower()
-            if tag_lower in self._ACP_TOOL_TAGS:
-                self._acp_tool_name = tag_lower
+            # Determine ACP tool binary from tag (same rules as src/group_service)
+            if self._tag_lower in _OASIS_ACP_AGENT_TAGS:
+                self._acp_tool_name = self._tag_lower
             else:
-                # Default: use "openclaw" as the ACP tool
-                self._acp_tool_name = "openclaw"
-            self._acp_bin = shutil.which(self._acp_tool_name)
+                self._acp_tool_name = ""
+            self._acp_bin = shutil.which("acpx")
 
-            # ── ACP long-lived connection state (initialized later via acp_start) ──
-            self._acp_available = _ACP_AVAILABLE and bool(self._acp_bin)
-            self._acp_proc = None       # subprocess handle
-            self._acp_conn = None       # ACP connection
-            self._acp_session_id = None # ACP session_id
-            self._acp_client = None     # _ACPClient callback handler
-            self._acp_started = False   # True after successful acp_start()
+            # ── ACP via process-global pool (no per-expert subprocess) ──
+            self._acp_available = bool(self._acp_bin)
+            self._acp_started = False   # True after successful acp_start() warm-up
 
             status = "ACP ready" if self._acp_available else f"⚠️ {self._acp_tool_name} not found"
             print(f"  [OASIS] 🔌 ACP agent detected: name={self._oc_agent_name}"
@@ -1319,6 +1318,11 @@ class ExternalExpert:
             self._acp_bin = None
             self._acp_available = False
             self._acp_started = False
+
+        if self._tag_lower == "openclaw":
+            # OpenClaw endpoint varies by device: env has higher priority than YAML.
+            api_url = os.getenv("OPENCLAW_API_URL", "") or api_url
+            api_key = os.getenv("OPENCLAW_GATEWAY_TOKEN", "") or api_key
 
         # Normalize api_url: strip trailing slash, build full URL
         if api_url:
@@ -1339,129 +1343,98 @@ class ExternalExpert:
         h = {"Content-Type": "application/json"}
         if self._api_key:
             h["Authorization"] = f"Bearer {self._api_key}"
+        if self._tag_lower == "openclaw" and self._http_global_name:
+            h["x-openclaw-session-key"] = f"agent:{self._http_global_name}:{self._session_suffix}"
         h.update(self._extra_headers)
         return h
 
     # ── ACP long-lived connection lifecycle ──
 
     async def acp_start(self):
-        """Start ACP subprocess and establish persistent connection.
-
-        This should be called once during engine initialization (before any
-        participate() calls). The subprocess stays alive across multiple
-        send() calls, maintaining conversation context server-side.
-
-        Call order: acp_start() → [participate() * N] → acp_stop()
-        """
+        """Ensure acpx session exists for this expert (optional warm-up)."""
         if not self._acp_available or not self._is_acp_agent:
-            return  # Not an ACP agent, nothing to do
+            return
 
         if self._acp_started:
-            print(f"  [OASIS] ⚠️ ACP already started for {self.name}, skipping")
             return
 
         try:
-            # Build the ACP command: <tool> acp --session agent:<name>:<session>
-            acp_session_arg = f"agent:{self._oc_agent_name}:{self._acp_session_suffix}"
-            cmd = [self._acp_bin, "acp", "--session", acp_session_arg, "--no-prefix-cwd"]
-
-            print(f"  [OASIS] 🔌 Starting ACP connection for {self.name}: "
-                  f"{' '.join(cmd)}")
-
-            self._acp_proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,  # capture stderr to avoid noise
+            adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
+            acp_session = f"agent:{self._oc_agent_name}:{self._acp_session_suffix}"
+            acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=acp_session)
+            await adapter.ensure_session(
+                tool=self._acp_tool_name,
+                session_key=acp_session,
+                acpx_session=acpx_session,
             )
-
-            # Wrap stdout with filter that only passes JSON-RPC lines
-            safe_stdout = _SecureStreamReader(self._acp_proc.stdout)
-            self._acp_client = _ACPClient()
-            self._acp_conn = connect_to_agent(
-                self._acp_client, self._acp_proc.stdin, safe_stdout
-            )
-
-            # ACP handshake: exchange protocol version and capabilities
-            await self._acp_conn.initialize(
-                protocol_version=PROTOCOL_VERSION,
-                client_capabilities=ClientCapabilities(),
-                client_info=Implementation(
-                    name=f"oasis-expert-{self.ext_id}", version="1.0"
-                ),
-            )
-
-            # Create a new ACP session
-            session = await self._acp_conn.new_session(
-                mcp_servers=[], cwd=os.getcwd()
-            )
-            self._acp_session_id = session.session_id
             self._acp_started = True
-
-            print(f"  [OASIS] ✅ ACP connection established for {self.name} "
-                  f"(session_id={self._acp_session_id})")
-
+            print(f"  [OASIS] ✅ ACPX session warmed for {self.name}")
         except Exception as e:
-            print(f"  [OASIS] ❌ ACP start failed for {self.name} (tool={self._acp_tool_name}): {e}")
+            print(f"  [OASIS] ❌ ACPX warm failed for {self.name} (tool={self._acp_tool_name}): {e}")
             self._acp_started = False
-            self._acp_available = False  # Disable ACP for this instance
-            # Clean up partial state
-            await self._acp_cleanup_proc()
+
+    def _acp_pool_key(self) -> str:
+        return f"{self._acp_tool_name}\x1fagent:{self._oc_agent_name}:{self._acp_session_suffix}"
+
+    async def _acp_pooled_prompt(self, cli_message: str, *, _retry_dead: bool = False) -> str:
+        """One full acpx prompt on the named ACP session."""
+        t0 = time.time()
+        cli_session = f"agent:{self._oc_agent_name}:{self._acp_session_suffix}"
+        acpx_session = ""
+        try:
+            adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
+            acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=cli_session)
+            await adapter.ensure_session(
+                tool=self._acp_tool_name,
+                session_key=cli_session,
+                acpx_session=acpx_session,
+            )
+            reply = await adapter.prompt(
+                tool=self._acp_tool_name,
+                session_key=cli_session,
+                prompt_text=cli_message,
+                timeout_sec=180,
+                reset_session=False,
+            )
+            _acp_oasis_trace(
+                "acp_prompt_complete",
+                agent_global_name=self._oc_agent_name,
+                cli_session_arg=cli_session,
+                reply_chars=len(reply or ""),
+                attachment_count=0,
+                elapsed_ms=round((time.time() - t0) * 1000),
+                cached=True,
+                backend="acpx",
+                acpx_session=acpx_session,
+            )
+            return reply
+        except AcpxError as e:
+            _acp_oasis_trace(
+                "acp_error",
+                agent_global_name=self._oc_agent_name,
+                cli_session_arg=cli_session,
+                error_type=type(e).__name__,
+                error=str(e),
+                elapsed_ms=round((time.time() - t0) * 1000),
+                backend="acpx",
+                acpx_session=acpx_session,
+            )
+            if not _retry_dead:
+                return await self._acp_pooled_prompt(cli_message, _retry_dead=True)
+            raise RuntimeError(str(e)) from e
 
     async def acp_send(self, message: str) -> str:
-        """Send a message via the ACP persistent connection.
+        """Send a message via the global ACP pool and return assistant text."""
+        if not self._is_acp_agent or not self._acp_available:
+            raise RuntimeError(f"ACP not available for {self.name}")
 
-        Requires acp_start() to have been called successfully.
-        Returns the agent's response text.
-        """
-        if not self._acp_started or not self._acp_conn:
-            raise RuntimeError(f"ACP not started for {self.name}")
-
-        await self._acp_conn.prompt(
-            session_id=self._acp_session_id,
-            prompt=[text_block(message)],
-        )
-        return self._acp_client.get_and_clear_text()
+        reply = await self._acp_pooled_prompt(message)
+        self._acp_started = True
+        return reply
 
     async def acp_stop(self):
-        """Stop the ACP subprocess and release resources.
-
-        Should be called once after all participate() calls are done
-        (typically in engine cleanup / finally block).
-        Safe to call multiple times — subsequent calls are no-ops.
-        """
-        if not self._acp_started:
-            return
-
-        print(f"  [OASIS] 🔌 Stopping ACP connection for {self.name}")
+        """Clear local warm-up flag only; the global ACP pool stays alive for reuse."""
         self._acp_started = False
-        await self._acp_cleanup_proc()
-
-    async def _acp_cleanup_proc(self):
-        """Internal helper: forcefully clean up the ACP subprocess."""
-        proc = self._acp_proc
-        if proc is None or proc.returncode is not None:
-            return
-        try:
-            # Feed EOF to break the SecureStreamReader's read loop
-            proc.stdout.feed_eof()
-            # Close stdin
-            if proc.stdin:
-                proc.stdin.close()
-            # Terminate gracefully, then force-kill if needed
-            proc.terminate()
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=0.5)
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.wait()
-        except Exception as e:
-            print(f"  [OASIS] ⚠️ ACP cleanup error for {self.name}: {e}")
-        finally:
-            self._acp_proc = None
-            self._acp_conn = None
-            self._acp_session_id = None
-            self._acp_client = None
 
     async def _call_api(self, messages: list[dict], timeout_override: float | None = ...) -> str:
         """Send messages to external API and return the assistant response text.
@@ -1478,6 +1451,8 @@ class ExternalExpert:
                               ... (default sentinel) = use self.timeout.
         """
         effective_timeout = self.timeout if timeout_override is ... else timeout_override
+        if self._drop_unknown_tag:
+            raise RuntimeError(f"Unsupported external tag '{self.tag}' for {self.name}; dropped.")
 
         # ── ACP agent type: keep legacy user-only extraction for sync paths ──
         if self._is_acp_agent:
@@ -1489,22 +1464,17 @@ class ExternalExpert:
             if not cli_message:
                 cli_message = messages[-1].get("content", "") if messages else ""
 
-            if self._acp_started:
-                reply = await self.acp_send(cli_message)
+            if self._acp_available:
+                reply = await self._acp_pooled_prompt(cli_message)
                 print(f"  [OASIS] 🔌 ACP send success for {self.name} ({len(reply)} chars)")
+                self._acp_started = True
                 return reply
-            else:
-                # ACP not available — try HTTP fallback
-                if self._api_url:
-                    print(f"  [OASIS] ⚠️ ACP not started for {self.name}, falling back to HTTP API")
-                else:
-                    raise RuntimeError(
-                        f"ACP connection not started for agent {self.name} "
-                        f"(agent={self._oc_agent_name}, tool={self._acp_tool_name}) "
-                        f"and no api_url configured for HTTP fallback."
-                    )
+            raise RuntimeError(
+                f"ACP unavailable for agent {self.name} "
+                f"(agent={self._oc_agent_name}, tool={self._acp_tool_name})"
+            )
 
-        # ── HTTP API call (non-agent type, or ACP agent HTTP fallback) ──
+        # ── HTTP API call (non-ACP route) ──
         if not self._api_url:
             raise RuntimeError(f"No api_url configured for external expert {self.name}")
         body = {
@@ -1556,64 +1526,20 @@ class ExternalExpert:
                 parts.append(content)
         return "\n\n".join(parts).strip()
 
-    async def _run_ephemeral_acp_prompt(self, prompt_text: str) -> None:
-        """Dispatch one ACP prompt, then close immediately without waiting for reply."""
+    async def _run_pooled_acp_prompt(self, prompt_text: str) -> None:
+        """Run one full ACP prompt on the global pool (callback rounds; await until prompt completes)."""
         if not self._acp_available or not self._acp_bin:
-            raise RuntimeError(f"ACP unavailable for {self.name}")
-
-        proc = None
-        prompt_task: asyncio.Task | None = None
+            print(f"  [OASIS] ❌ ACP unavailable for pooled dispatch ({self.name})")
+            return
         try:
-            acp_session_arg = f"agent:{self._oc_agent_name}:{self._acp_session_suffix}"
-            cmd = [self._acp_bin, "acp", "--session", acp_session_arg, "--no-prefix-cwd"]
-            print(f"  [OASIS] 🚀 Dispatch ACP prompt for {self.name}: {' '.join(cmd)}")
-
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            safe_stdout = _SecureStreamReader(proc.stdout)
-            client = _ACPClient()
-            conn = connect_to_agent(client, proc.stdin, safe_stdout)
-            await conn.initialize(
-                protocol_version=PROTOCOL_VERSION,
-                client_capabilities=ClientCapabilities(),
-                client_info=Implementation(name=f"oasis-expert-{self.ext_id}", version="1.0"),
-            )
-            session = await conn.new_session(mcp_servers=[], cwd=os.getcwd())
-            prompt_task = asyncio.create_task(
-                conn.prompt(
-                    session_id=session.session_id,
-                    prompt=[text_block(prompt_text)],
-                )
-            )
-            # Give the protocol layer a brief chance to flush the outgoing prompt,
-            # then close the ACP process regardless of whether the agent replied.
-            await asyncio.sleep(0.15)
+            await self._acp_pooled_prompt(prompt_text)
+            self._acp_started = True
         except Exception as e:
-            print(f"  [OASIS] ❌ ACP dispatch failed for {self.name}: {e}")
-        finally:
-            if prompt_task and not prompt_task.done():
-                prompt_task.cancel()
-            if proc is not None and proc.returncode is None:
-                try:
-                    proc.stdout.feed_eof()
-                    if proc.stdin:
-                        proc.stdin.close()
-                    proc.terminate()
-                    try:
-                        await asyncio.wait_for(proc.wait(), timeout=0.5)
-                    except asyncio.TimeoutError:
-                        proc.kill()
-                        await proc.wait()
-                except Exception as cleanup_err:
-                    print(f"  [OASIS] ⚠️ ACP cleanup error for {self.name}: {cleanup_err}")
+            print(f"  [OASIS] ❌ ACP pooled dispatch failed for {self.name}: {e}")
 
     def _dispatch_acp_prompt(self, prompt_text: str) -> asyncio.Task:
-        """Start one transient ACP dispatch task and keep a reference until completion."""
-        task = asyncio.create_task(self._run_ephemeral_acp_prompt(prompt_text))
+        """Start one ACP prompt task on the shared pool; completion is independent of forum callback."""
+        task = asyncio.create_task(self._run_pooled_acp_prompt(prompt_text))
         self._acp_dispatch_tasks.add(task)
         task.add_done_callback(lambda t: self._acp_dispatch_tasks.discard(t))
         return task
@@ -1631,12 +1557,14 @@ class ExternalExpert:
         prompt_text = self._compose_acp_prompt(messages)
         dispatch_task = self._dispatch_acp_prompt(prompt_text)
         wait_timeout = effective_timeout if effective_timeout is not None else self.timeout
+        await forum.add_waiting_expert(self.name)
         callback_ok = await forum.wait_for_author_post(
             self.name,
             round_num=round_num,
             min_count=before_count + 1,
             timeout=max(float(wait_timeout or 0.0), 0.0),
         )
+        await forum.remove_waiting_expert(self.name)
 
         if callback_ok:
             print(f"  [OASIS] ✅ {self.name} callback applied for round {round_num}")
@@ -1899,7 +1827,10 @@ class ExternalExpert:
                 if new_posts:
                     posts_text = _format_posts(new_posts)
                 else:
-                    posts_text = "本轮没有新的帖子。如果你没有新的观点，可以跳过本轮 callback。"
+                    posts_text = (
+                        "本轮没有新的帖子。你仍必须通过 callback/工具回传一轮合规单行 JSON；"
+                        "若无新观点，可将 content 写为「本轮无补充」等，votes 用 []，不得以无新帖为由省略回传。"
+                    )
                 system_prompt, user_prompt = _build_discuss_callback_prompt(
                     self.title,
                     self.persona,

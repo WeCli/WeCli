@@ -27,6 +27,7 @@ mcp = FastMCP("OASIS Forum")
 
 OASIS_BASE_URL = os.getenv("OASIS_BASE_URL", "http://127.0.0.1:51202")
 _FALLBACK_USER = os.getenv("MCP_OASIS_USER", "agent_user")
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 _CONN_ERR = "❌ 无法连接 OASIS 论坛服务器。请确认 OASIS 服务已启动 (端口 51202)。"
 
@@ -453,21 +454,15 @@ async def post_to_oasis(
 
             # schedule_file takes priority over schedule_yaml
             if schedule_file:
-                # Auto-append .yaml if no extension
-                if not schedule_file.endswith((".yaml", ".yml")):
-                    schedule_file += ".yaml"
                 if not os.path.isabs(schedule_file):
-                    _proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    if team:
-                        yaml_dir = os.path.join(
-                            _proj, "data", "user_files", effective_user,
-                            "teams", team, "oasis", "yaml",
-                        )
-                    else:
-                        yaml_dir = os.path.join(
-                            _proj, "data", "user_files", effective_user, "oasis", "yaml",
-                        )
-                    schedule_file = os.path.join(yaml_dir, schedule_file)
+                    resolved_path, resolve_error = _resolve_workflow_path(
+                        effective_user,
+                        schedule_file,
+                        team,
+                    )
+                    if resolve_error:
+                        return f"❌ {resolve_error}"
+                    schedule_file = resolved_path or schedule_file
                 body["schedule_file"] = schedule_file
                 # Do NOT send schedule_yaml when file is provided
             elif schedule_yaml:
@@ -647,6 +642,56 @@ async def list_oasis_topics(username: str = "") -> str:
 # Workflow management
 # ======================================================================
 
+
+def _iter_workflow_dirs(user_id: str, team: str = "") -> list[tuple[str, str, str]]:
+    """Return workflow directories to inspect for a user.
+
+    Tuples are (scope, team_name, yaml_dir), where scope is "personal" or "team".
+    When team is omitted, include the personal workflow directory plus all teams.
+    """
+    if not user_id:
+        return []
+
+    user_root = os.path.join(_PROJECT_ROOT, "data", "user_files", user_id)
+    if team:
+        return [("team", team, os.path.join(user_root, "teams", team, "oasis", "yaml"))]
+
+    dirs: list[tuple[str, str, str]] = [
+        ("personal", "", os.path.join(user_root, "oasis", "yaml"))
+    ]
+    teams_root = os.path.join(user_root, "teams")
+    if os.path.isdir(teams_root):
+        for team_name in sorted(os.listdir(teams_root)):
+            team_dir = os.path.join(teams_root, team_name)
+            if os.path.isdir(team_dir):
+                dirs.append(("team", team_name, os.path.join(team_dir, "oasis", "yaml")))
+    return dirs
+
+
+def _resolve_workflow_path(user_id: str, schedule_file: str, team: str = "") -> tuple[str | None, str | None]:
+    """Resolve a workflow filename to an absolute path for MCP-triggered posts.
+
+    When team is omitted, search the personal workflow directory plus all teams.
+    If duplicates are found, require the caller to specify team explicitly.
+    """
+    if not schedule_file:
+        return None, "未提供 workflow 文件名"
+
+    target_name = schedule_file if schedule_file.endswith((".yaml", ".yml")) else f"{schedule_file}.yaml"
+    matches: list[tuple[str, str]] = []
+    for scope, team_name, yaml_dir in _iter_workflow_dirs(user_id, team):
+        path = os.path.join(yaml_dir, target_name)
+        if os.path.isfile(path):
+            label = f"team:{team_name}" if scope == "team" else "personal"
+            matches.append((label, path))
+
+    if not matches:
+        return None, f"未找到 workflow 文件: {target_name}"
+    if len(matches) > 1:
+        where = ", ".join(label for label, _ in matches)
+        return None, f"找到多个同名 workflow: {target_name}（{where}），请指定 team"
+    return matches[0][1], None
+
 @mcp.tool()
 async def set_oasis_workflow(
     username: str = "",
@@ -720,25 +765,42 @@ async def list_oasis_workflows(username: str = "", team: str = "") -> str:
     """
     effective_user = username or _FALLBACK_USER
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            params = {"user_id": effective_user}
-            if team:
-                params["team"] = team
-            resp = await client.get(f"{OASIS_BASE_URL}/workflows", params=params)
-            if resp.status_code != 200:
-                return f"❌ 查询失败: {resp.text}"
-            data = resp.json()
-            files = data.get("workflows", [])
-            if not files:
-                return "📭 暂无保存的 workflow"
-            lines = [f"📋 已保存的 OASIS Workflows — 共 {len(files)} 个\n"]
-            for it in files:
-                desc = it.get("description", "")
-                lines.append(f"  • {it.get('file')}" + (f"  — {desc}" if desc else ""))
-            lines.append(f"\n💡 使用: post_to_oasis(schedule_file=\"文件名\", ...)")
-            return "\n".join(lines)
-    except httpx.ConnectError:
-        return _CONN_ERR
+        items: list[dict] = []
+        for scope, team_name, yaml_dir in _iter_workflow_dirs(effective_user, team):
+            if not os.path.isdir(yaml_dir):
+                continue
+            files = sorted(f for f in os.listdir(yaml_dir) if f.endswith((".yaml", ".yml")))
+            for fname in files:
+                fpath = os.path.join(yaml_dir, fname)
+                desc = ""
+                try:
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        first = f.readline().strip()
+                        if first.startswith("#"):
+                            desc = first.lstrip("# ").strip()
+                except Exception:
+                    pass
+                items.append({
+                    "file": fname,
+                    "description": desc,
+                    "scope": scope,
+                    "team": team_name,
+                })
+
+        if not items:
+            return "📭 暂无保存的 workflow"
+
+        lines = [f"📋 已保存的 OASIS Workflows — 共 {len(items)} 个\n"]
+        for it in items:
+            location = f"[team:{it['team']}]" if it["scope"] == "team" else "[personal]"
+            desc = it.get("description", "")
+            lines.append(f"  • {location} {it.get('file')}" + (f"  — {desc}" if desc else ""))
+        if team:
+            lines.append(f"\n💡 当前只显示 team=\"{team}\" 下的 workflows。")
+        else:
+            lines.append("\n💡 未指定 team，已展示个人目录和全部 team 的 workflows。")
+        lines.append("💡 使用: post_to_oasis(schedule_file=\"文件名\", ...)")
+        return "\n".join(lines)
     except Exception as e:
         return f"❌ 查询失败: {e}"
 

@@ -1287,11 +1287,13 @@ def init_workspace_templates(workspace_path: str | None = None):
                 f.write(content)
             created.append(relpath)
 
-    for filename, block in _teamclaw_workspace_blocks().items():
-        filepath = os.path.join(workspace_path, filename)
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        if _upsert_managed_block(filepath, block):
-            updated.append(filename)
+    # 暂时禁用 TeamClaw 管理块注入（BOOTSTRAP.md / AGENTS.md / TOOLS.md）
+    # 如需恢复，取消注释以下逻辑。
+    # for filename, block in _teamclaw_workspace_blocks().items():
+    #     filepath = os.path.join(workspace_path, filename)
+    #     os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    #     if _upsert_managed_block(filepath, block):
+    #         updated.append(filename)
 
     # 输出结果
     print(f"\n🏠 Workspace 模板初始化: {workspace_path}")

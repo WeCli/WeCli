@@ -69,6 +69,14 @@ import secrets
 import hmac
 import hashlib
 import base64
+from logging_utils import get_logger
+from openclaw_restore_naming import (
+    openclaw_entries_ordered,
+    restore_agent_id,
+    restore_display_name,
+)
+
+_logger_oc_restore = get_logger("teamclaw.openclaw_restore")
 
 def generate_login_token(user_id: str, valid_hours: int = 24) -> str:
     """Generate HMAC-signed login token.
@@ -1362,12 +1370,9 @@ def team_openclaw_snapshot_sync_all():
 @app.route("/team_openclaw_snapshot/restore", methods=["POST"])
 def team_openclaw_snapshot_restore():
     """Restore an OpenClaw agent from the team snapshot.
-    Body: { "team": "...", "short_name": "...", "target_agent_name": "optional, defaults to team_name" }
-    Reads from external_agents.json and sends to oasis server's restore endpoint.
-    If target_agent_name is not provided, generates one as team + "_" + short_name
-    to avoid agent name collisions on a new device.
-    On success, updates the global_name field in external_agents.json.
-    Also restores cron jobs for this agent.
+    Body: { "team": "...", "short_name": "...", "target_agent_name": "optional ASCII id override" }
+    Default id: {team_slug}_{index} (a-z0-9 only); display_name: rich "{team}_{short_name}" for OpenClaw name.
+    On success, global_name stores the ASCII id (for delete/API).
     """
     user_id = session.get("user_id", "")
 
@@ -1388,23 +1393,34 @@ def team_openclaw_snapshot_restore():
     if not agent_snapshot:
         return jsonify({"ok": False, "error": f"No snapshot found for '{short_name}' in team '{team}'"}), 404
 
-    # Use target_agent_name from request, or generate from team + "_" + name
-    # to avoid agent name collisions on a new device.
+    oc_ordered = openclaw_entries_ordered(data)
     if not target_name:
-        target_name = team + "_" + short_name
+        target_name = restore_agent_id(team, agent_snapshot, oc_ordered)
+    display_oc_name = restore_display_name(team, short_name)
 
     # Send to oasis server restore endpoint
     try:
+        t_http = time.perf_counter()
         r = requests.post(
             f"{OASIS_BASE_URL}/sessions/openclaw/agent-restore",
             json={
                 "agent_name": target_name,
+                "display_name": display_oc_name,
                 "config": agent_snapshot.get("config", {}),
                 "workspace_files": agent_snapshot.get("workspace_files", {}),
             },
             timeout=60,
         )
+        client_http_ms = round((time.perf_counter() - t_http) * 1000, 2)
         result = r.json()
+        result["client_http_ms"] = client_http_ms
+        _logger_oc_restore.info(
+            "[teamclaw-restore] route=single agent=%s status=%s client_http_ms=%s oasis=%s",
+            target_name,
+            r.status_code,
+            client_http_ms,
+            result.get("restore_timing_ms"),
+        )
         # On success, persist the new session name back to external_agents.json
         if result.get("ok"):
             agent_snapshot["global_name"] = target_name
@@ -1413,11 +1429,19 @@ def team_openclaw_snapshot_restore():
             # Restore cron jobs for this agent using cron_utils
             cron_jobs = agent_snapshot.get("cron_jobs", [])
             if cron_jobs:
+                t_cron = time.perf_counter()
                 cron_restored, cron_errors = restore_cron_jobs(cron_jobs, target_name)
+                result["client_cron_ms"] = round((time.perf_counter() - t_cron) * 1000, 2)
                 result["cron_restored"] = cron_restored
                 result["cron_total"] = len(cron_jobs)
                 if cron_errors:
                     result["cron_errors"] = cron_errors
+                _logger_oc_restore.info(
+                    "[teamclaw-restore] route=single agent=%s client_cron_ms=%s cron_restored=%s",
+                    target_name,
+                    result["client_cron_ms"],
+                    cron_restored,
+                )
         
         return jsonify(result), r.status_code
     except Exception as e:
@@ -1504,9 +1528,7 @@ def team_openclaw_snapshot_export_all():
 def team_openclaw_snapshot_restore_all():
     """Restore ALL openclaw agents from the team's external_agents.json.
     Body: { "team": "..." }
-    For each openclaw agent in the JSON, generates a new global name as
-    team + "_" + agent_name to avoid collisions, then restores it.
-    On success, updates global_name fields in external_agents.json.
+    Each agent id: {team_slug}_{1,2,...} (ASCII); OpenClaw name: rich "{team}_{short_name}".
     """
     user_id = session.get("user_id", "")
 
@@ -1516,28 +1538,40 @@ def team_openclaw_snapshot_restore_all():
         return jsonify({"ok": False, "error": "team is required"}), 400
 
     data = _team_openclaw_agents_load(user_id, team)
-    openclaw_entries = [a for a in data if a.get("tag") == "openclaw"]
+    openclaw_entries = openclaw_entries_ordered(data)
     if not openclaw_entries:
         return jsonify({"ok": True, "restored": 0, "message": "No openclaw snapshots found"}), 200
 
     restored = 0
     errors = []
+    per_agent_restore = []
 
     for entry in openclaw_entries:
         short_name = entry.get("name", "")
-        # Generate new session from team + "_" + name to avoid collisions
-        target_name = team + "_" + short_name
+        target_name = restore_agent_id(team, entry, openclaw_entries)
+        display_oc_name = restore_display_name(team, short_name)
         try:
+            t_http = time.perf_counter()
             r = requests.post(
                 f"{OASIS_BASE_URL}/sessions/openclaw/agent-restore",
                 json={
                     "agent_name": target_name,
+                    "display_name": display_oc_name,
                     "config": entry.get("config", {}),
                     "workspace_files": entry.get("workspace_files", {}),
                 },
                 timeout=60,
             )
+            client_http_ms = round((time.perf_counter() - t_http) * 1000, 2)
             result = r.json()
+            row = {
+                "agent": target_name,
+                "ok": bool(result.get("ok")),
+                "client_http_ms": client_http_ms,
+                "oasis_timing_ms": result.get("restore_timing_ms"),
+                "errors": result.get("errors"),
+            }
+            cron_ms = None
             if result.get("ok"):
                 restored += 1
                 # Update global_name in JSON to reflect the new agent name
@@ -1546,21 +1580,38 @@ def team_openclaw_snapshot_restore_all():
                 # Restore cron jobs for this agent using cron_utils
                 cron_jobs = entry.get("cron_jobs", [])
                 if cron_jobs:
+                    t_cron = time.perf_counter()
                     cron_restored, cron_errors = restore_cron_jobs(cron_jobs, target_name)
+                    cron_ms = round((time.perf_counter() - t_cron) * 1000, 2)
                     result["cron_restored"] = cron_restored
                     result["cron_total"] = len(cron_jobs)
                     if cron_errors:
                         result["cron_errors"] = cron_errors
             else:
                 errors.append(f"{target_name}: {result.get('errors', result.get('error', 'failed'))}")
+            row["client_cron_ms"] = cron_ms
+            per_agent_restore.append(row)
+            _logger_oc_restore.info(
+                "[teamclaw-restore] route=restore_all agent=%s client_http_ms=%s client_cron_ms=%s oasis=%s ok=%s",
+                target_name,
+                client_http_ms,
+                cron_ms,
+                result.get("restore_timing_ms"),
+                result.get("ok"),
+            )
         except Exception as e:
             errors.append(f"{target_name}: {e}")
+            per_agent_restore.append({"agent": target_name, "ok": False, "exception": str(e)})
+            _logger_oc_restore.warning(
+                "[teamclaw-restore] route=restore_all agent=%s failed: %s", target_name, e
+            )
 
     # Persist updated global_names back to external_agents.json
     _team_openclaw_agents_save(user_id, team, data)
 
     return jsonify({
         "ok": True,
+        "openclaw_per_agent_restore": per_agent_restore,
         "restored": restored,
         "total": len(openclaw_entries),
         "errors": errors,
@@ -2345,6 +2396,42 @@ def create_team():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/teams/<team_name>", methods=["PATCH"])
+def rename_team(team_name):
+    """Rename the team directory only (folder name under teams/)."""
+    user_id = session.get("user_id", "")
+    body = request.get_json(force=True) or {}
+    new_name = (body.get("new_name") or "").strip()
+
+    if not new_name:
+        return jsonify({"error": "new_name is required"}), 400
+    if "/" in new_name or "\\" in new_name or new_name.startswith("."):
+        return jsonify({"error": "Invalid new team name"}), 400
+    if not team_name or "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+
+    teams_root = os.path.join(root_dir, "data", "user_files", user_id, "teams")
+    old_path = os.path.join(teams_root, team_name)
+    new_path = os.path.join(teams_root, new_name)
+
+    if not os.path.isdir(old_path):
+        return jsonify({"error": "Team not found"}), 404
+    if os.path.exists(new_path):
+        return jsonify({"error": "Target team name already exists"}), 400
+    if new_name == team_name:
+        return jsonify({"success": True, "team": new_name, "message": "unchanged"})
+
+    try:
+        os.rename(old_path, new_path)
+        return jsonify({
+            "success": True,
+            "team": new_name,
+            "message": f"Team folder renamed to '{new_name}'",
+        })
+    except OSError as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/teams/<team_name>", methods=["DELETE"])
 def delete_team(team_name):
     """Delete a team and all its internal agents, then remove the folder."""
@@ -2834,8 +2921,9 @@ def preview_team_snapshot():
             pass
     result["sections"]["personas"] = {"count": len(personas_info), "items": personas_info}
 
-    # --- 3. external agents (external_agents.json — openclaw agents) ---
+    # --- 3. external agents (external_agents.json) ---
     ext_path = os.path.join(team_dir, "external_agents.json")
+    external_agents_info = []
     openclaw_info = []
     ext_data = []
     if os.path.exists(ext_path):
@@ -2844,6 +2932,11 @@ def preview_team_snapshot():
                 ext_data = json.load(f)
             if isinstance(ext_data, list):
                 for entry in ext_data:
+                    external_agents_info.append({
+                        "name": entry.get("name", "?"),
+                        "tag": entry.get("tag", ""),
+                        "global_name": entry.get("global_name", ""),
+                    })
                     if entry.get("tag") == "openclaw":
                         openclaw_info.append({
                             "name": entry.get("name", "?"),
@@ -2851,6 +2944,7 @@ def preview_team_snapshot():
                         })
         except Exception:
             pass
+    result["sections"]["external_agents"] = {"count": len(external_agents_info), "items": external_agents_info}
 
     # --- 4. skills (workspace + managed) for openclaw agents ---
     skills_info = []
@@ -3010,8 +3104,8 @@ def download_team_snapshot():
             # Map file → section name for selective export
             json_file_section = {
                 "internal_agents.json": "agents",
+                "external_agents.json": "external_agents",
                 "oasis_experts.json": "personas",
-                "external_agents.json": "skills",  # external_agents always included when skills or cron are selected
             }
             json_files = list(json_file_section.keys())
             
@@ -3019,7 +3113,7 @@ def download_team_snapshot():
                 section = json_file_section[json_file]
                 # external_agents.json is needed when skills OR cron are exported
                 if json_file == "external_agents.json":
-                    if not (_inc("skills") or _inc("cron")):
+                    if not (_inc("external_agents") or _inc("skills") or _inc("cron")):
                         continue
                 elif not _inc(section):
                     continue
@@ -3247,7 +3341,7 @@ def upload_team_snapshot():
                 agents_list = []
 
             # Generate new session_id for each agent and build agents_data
-            import time, random
+            import random
             for agent_meta in agents_list:
                 if not isinstance(agent_meta, dict) or "name" not in agent_meta:
                     continue
@@ -3283,6 +3377,7 @@ def upload_team_snapshot():
         openclaw_agents_path = os.path.join(team_dir, "external_agents.json")
         openclaw_restored = 0
         openclaw_errors = []
+        openclaw_restore_details = []
         
         # Paths for extracted skill folders
         extracted_skills_dir = os.path.join(team_dir, "skills")
@@ -3294,24 +3389,29 @@ def upload_team_snapshot():
                     openclaw_data = json.load(f)
                 
                 if isinstance(openclaw_data, list) and openclaw_data:
+                    oc_ordered = openclaw_entries_ordered(openclaw_data)
                     for agent_entry in openclaw_data:
                         if agent_entry.get("tag") != "openclaw":
                             continue
                         short_name = agent_entry.get("name", "")
                         agent_snapshot = agent_entry
-                        # Generate new global_name from team + "_" + name
-                        target_name = team + "_" + short_name
+                        target_name = restore_agent_id(team, agent_entry, oc_ordered)
+                        display_oc_name = restore_display_name(team, short_name)
                         try:
+                            t_http = time.perf_counter()
                             r = requests.post(
                                 f"{OASIS_BASE_URL}/sessions/openclaw/agent-restore",
                                 json={
                                     "agent_name": target_name,
+                                    "display_name": display_oc_name,
                                     "config": agent_snapshot.get("config", {}),
                                     "workspace_files": agent_snapshot.get("workspace_files", {}),
                                 },
                                 timeout=60,
                             )
+                            client_http_ms = round((time.perf_counter() - t_http) * 1000, 2)
                             result = r.json()
+                            skills_ms = None
                             if result.get("ok"):
                                 openclaw_restored += 1
                                 # Update global_name in JSON to reflect the new agent name
@@ -3319,6 +3419,7 @@ def upload_team_snapshot():
                                 # --- Restore skill folders into agent workspace ---
                                 workspace = result.get("workspace", "")
                                 if workspace:
+                                    t_skills = time.perf_counter()
                                     ws_skills_target = os.path.join(os.path.expanduser(workspace), "skills")
                                     agent_skills_src = os.path.join(extracted_skills_dir, short_name)
 
@@ -3346,12 +3447,38 @@ def upload_team_snapshot():
                                                 shutil.copytree(src_item, dst_item)
                                             elif os.path.isdir(src_item):
                                                 shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
+                                    skills_ms = round((time.perf_counter() - t_skills) * 1000, 2)
                             else:
                                 openclaw_errors.append(
                                     f"{target_name}: {result.get('errors', result.get('error', 'failed'))}"
                                 )
+                            detail = {
+                                "agent": target_name,
+                                "ok": bool(result.get("ok")),
+                                "client_http_ms": client_http_ms,
+                                "skills_copy_ms": skills_ms,
+                                "oasis_timing_ms": result.get("restore_timing_ms"),
+                                "errors": result.get("errors"),
+                            }
+                            openclaw_restore_details.append(detail)
+                            _logger_oc_restore.info(
+                                "[teamclaw-restore] route=snapshot_upload agent=%s client_http_ms=%s skills_copy_ms=%s oasis=%s ok=%s",
+                                target_name,
+                                client_http_ms,
+                                skills_ms,
+                                result.get("restore_timing_ms"),
+                                result.get("ok"),
+                            )
                         except Exception as e:
                             openclaw_errors.append(f"{target_name}: {e}")
+                            openclaw_restore_details.append(
+                                {"agent": target_name, "ok": False, "exception": str(e)}
+                            )
+                            _logger_oc_restore.warning(
+                                "[teamclaw-restore] route=snapshot_upload agent=%s failed: %s",
+                                target_name,
+                                e,
+                            )
                     # Persist updated global_names back to external_agents.json
                     try:
                         with open(openclaw_agents_path, "w", encoding="utf-8") as f:
@@ -3404,6 +3531,7 @@ def upload_team_snapshot():
             "success": True,
             "message": ", ".join(msg_parts),
             "openclaw_errors": openclaw_errors if openclaw_errors else None,
+            "openclaw_restore_details": openclaw_restore_details if openclaw_restore_details else None,
             "cron_errors": cron_errors if cron_errors else None,
         })
     except zipfile.BadZipFile:

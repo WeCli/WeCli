@@ -9,9 +9,13 @@ import json
 import os
 import shutil
 import subprocess
+import time
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
+
+from src.logging_utils import get_logger
+from src.restore_timing_log import append_agent_restore_record
 
 from oasis.openclaw_cli import (
     build_agent_detail,
@@ -19,6 +23,10 @@ from oasis.openclaw_cli import (
     fetch_openclaw_full_config,
     get_openclaw_default_workspace,
     get_openclaw_workspace_path,
+    load_openclaw_root_config,
+    sanitize_openclaw_root_agents_tools_profiles,
+    sanitize_tools_dict,
+    save_openclaw_root_config,
 )
 
 router = APIRouter()
@@ -29,6 +37,8 @@ _get_env = None
 _openclaw_skills_cache: dict = {}
 _openclaw_managed_skills_dir: str = ""
 _openclaw_bundled_skills: list = []
+
+_logger_restore = get_logger("oasis.openclaw_restore")
 
 # --- 静态常量 ---
 _OPENCLAW_CORE_FILES = [
@@ -750,6 +760,7 @@ async def restore_openclaw_agent_snapshot(req: Request):
     agent_name = (body.get("agent_name") or "").strip()
     if not agent_name:
         return JSONResponse({"ok": False, "error": "agent_name is required"}, status_code=400)
+    display_name = (body.get("display_name") or "").strip() or agent_name
 
     snapshot_config = body.get("config", {})
     snapshot_files = body.get("workspace_files", {})
@@ -757,8 +768,33 @@ async def restore_openclaw_agent_snapshot(req: Request):
 
     errors = []
 
+    # 若盘上已有非法 tools.profile，CLI 会拒绝 agents add；先就地修复再恢复
+    _root_pre = load_openclaw_root_config()
+    if _root_pre:
+        _nfix = sanitize_openclaw_root_agents_tools_profiles(_root_pre)
+        if _nfix > 0:
+            if save_openclaw_root_config(_root_pre):
+                _logger_restore.info(
+                    "[openclaw-restore] sanitized tools.profile on %s agent(s) before restore",
+                    _nfix,
+                )
+            else:
+                _logger_restore.warning(
+                    "[openclaw-restore] could not save sanitized tools.profile; CLI may still reject config",
+                )
+    timing_ms: dict[str, float] = {}
+    t_wall = time.perf_counter()
+    t_start = t_wall
+
+    def _seg(label: str) -> None:
+        nonlocal t_wall
+        t1 = time.perf_counter()
+        timing_ms[label] = round((t1 - t_wall) * 1000, 2)
+        t_wall = t1
+
     # Step 1: 检查 agent 是否存在，不存在则创建
     existing = _get_agents_from_config() or []
+    _seg("step1_list_agents_fetch_config")
     agent_exists = any(a.get("name") == agent_name for a in existing)
     workspace = ""
 
@@ -785,69 +821,122 @@ async def restore_openclaw_agent_snapshot(req: Request):
                 workspace = new_workspace
         except Exception as e:
             errors.append(f"Create agent failed: {e}")
+        _seg("step1b_openclaw_agents_add")
     else:
         for a in existing:
             if a.get("name") == agent_name:
                 workspace = a.get("workspace", "")
                 break
+        _seg("step1b_existing_workspace_lookup")
 
-    # Step 2: 更新 skills/tools 配置
+    # Step 2: 更新 skills/tools（优先直接读写 openclaw.json，避免多次 config get/set CLI）
     if snapshot_config:
-        config = _fetch_config()
-        agent_list = config.get("list", []) if config else []
+        root_cfg = load_openclaw_root_config()
+        use_file = root_cfg is not None and isinstance(root_cfg.get("agents"), dict)
+        if use_file:
+            config = root_cfg["agents"]
+        else:
+            config = _fetch_config()
+        _seg("step2a_fetch_config")
+
+        agent_list = config.setdefault("list", []) if config else []
         agent_idx = None
         for i, a in enumerate(agent_list):
             if a.get("id") == agent_name or a.get("name") == agent_name:
                 agent_idx = i
                 break
 
-        if agent_idx is None:
-            agent_idx = len(agent_list)
-            init_entry = {"id": agent_name, "name": agent_name}
-            if workspace:
-                init_entry["workspace"] = workspace
-            try:
-                subprocess.run(
-                    [_openclaw_bin, "config", "set",
-                     f"agents.list[{agent_idx}]", json.dumps(init_entry), "--json"],
-                    capture_output=True, text=True, timeout=10,
-                )
-            except Exception as e:
-                errors.append(f"Create config entry failed: {e}")
+        if use_file:
+            if agent_idx is None:
+                agent_idx = len(agent_list)
+                init_entry = {"id": agent_name, "name": display_name}
+                if workspace:
+                    init_entry["workspace"] = workspace
+                agent_list.append(init_entry)
+            _seg("step2b_config_set_list_entry")
 
-        skills_val = snapshot_config.get("skills")
-        skills_all = snapshot_config.get("skills_all", False)
-        if skills_all:
-            try:
-                subprocess.run(
-                    [_openclaw_bin, "config", "set",
-                     f"agents.list[{agent_idx}].skills", "--delete", "--json"],
-                    capture_output=True, text=True, timeout=10,
-                )
-            except Exception:
-                pass
-        elif skills_val is not None:
-            try:
-                subprocess.run(
-                    [_openclaw_bin, "config", "set",
-                     f"agents.list[{agent_idx}].skills", json.dumps(skills_val), "--json"],
-                    capture_output=True, text=True, timeout=10,
-                )
-            except Exception as e:
-                errors.append(f"Set skills failed: {e}")
+            entry = agent_list[agent_idx]
+            entry["id"] = agent_name
+            entry["name"] = display_name
+            skills_val = snapshot_config.get("skills")
+            skills_all = snapshot_config.get("skills_all", False)
+            if skills_all:
+                entry.pop("skills", None)
+            elif skills_val is not None:
+                entry["skills"] = skills_val
+            _seg("step2c_config_set_skills")
 
-        tools_cfg = snapshot_config.get("tools", {})
-        if tools_cfg:
-            try:
-                subprocess.run(
-                    [_openclaw_bin, "config", "set",
-                     f"agents.list[{agent_idx}].tools", json.dumps(tools_cfg), "--json"],
-                    capture_output=True, text=True, timeout=10,
-                )
-            except Exception as e:
-                errors.append(f"Set tools failed: {e}")
+            tools_cfg = snapshot_config.get("tools", {})
+            if tools_cfg:
+                entry["tools"] = sanitize_tools_dict(tools_cfg)
+            _seg("step2d_config_set_tools")
+
+            if not save_openclaw_root_config(root_cfg):
+                errors.append("Save openclaw.json failed (skills/tools not persisted)")
+        else:
+            if agent_idx is None:
+                agent_idx = len(agent_list)
+                init_entry = {"id": agent_name, "name": display_name}
+                if workspace:
+                    init_entry["workspace"] = workspace
+                try:
+                    subprocess.run(
+                        [_openclaw_bin, "config", "set",
+                         f"agents.list[{agent_idx}]", json.dumps(init_entry), "--json"],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                except Exception as e:
+                    errors.append(f"Create config entry failed: {e}")
+            _seg("step2b_config_set_list_entry")
+
+            skills_val = snapshot_config.get("skills")
+            skills_all = snapshot_config.get("skills_all", False)
+            if skills_all:
+                try:
+                    subprocess.run(
+                        [_openclaw_bin, "config", "set",
+                         f"agents.list[{agent_idx}].skills", "--delete", "--json"],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                except Exception:
+                    pass
+            elif skills_val is not None:
+                try:
+                    subprocess.run(
+                        [_openclaw_bin, "config", "set",
+                         f"agents.list[{agent_idx}].skills", json.dumps(skills_val), "--json"],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                except Exception as e:
+                    errors.append(f"Set skills failed: {e}")
+            _seg("step2c_config_set_skills")
+
+            tools_cfg = snapshot_config.get("tools", {})
+            if tools_cfg:
+                tools_cfg = sanitize_tools_dict(tools_cfg)
+                try:
+                    subprocess.run(
+                        [_openclaw_bin, "config", "set",
+                         f"agents.list[{agent_idx}].tools", json.dumps(tools_cfg), "--json"],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                except Exception as e:
+                    errors.append(f"Set tools failed: {e}")
+            _seg("step2d_config_set_tools")
+            if display_name != agent_name:
+                try:
+                    subprocess.run(
+                        [_openclaw_bin, "config", "set",
+                         f"agents.list[{agent_idx}].name", json.dumps(display_name), "--json"],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                except Exception:
+                    pass
+    else:
+        _seg("step2_skip_no_snapshot_config")
 
     # Step 3: 写入 workspace 文件
+    n_ws_files = 0
     if workspace and snapshot_files:
         ws_path = os.path.expanduser(workspace)
         os.makedirs(ws_path, exist_ok=True)
@@ -857,14 +946,44 @@ async def restore_openclaw_agent_snapshot(req: Request):
             try:
                 with open(fpath, "w", encoding="utf-8") as f:
                     f.write(content)
+                n_ws_files += 1
             except Exception as e:
                 errors.append(f"Write {safe_name} failed: {e}")
+        _seg("step3_write_workspace_files")
+    else:
+        _seg("step3_skip_no_files_or_workspace")
+
+    timing_ms["total_ms"] = round((time.perf_counter() - t_start) * 1000, 2)
+
+    _logger_restore.info(
+        "[openclaw-restore] agent=%s ok=%s total_ms=%.1f timing_ms=%s errors=%s",
+        agent_name,
+        len(errors) == 0,
+        timing_ms["total_ms"],
+        timing_ms,
+        errors,
+    )
+
+    ok_restore = len(errors) == 0
+    timing_path = append_agent_restore_record(
+        agent_name=agent_name,
+        ok=ok_restore,
+        restore_timing_ms=timing_ms,
+        restore_workspace_files_written=n_ws_files,
+        errors=errors,
+    )
+    if timing_path:
+        _logger_restore.info("[openclaw-restore] timing file=%s", timing_path)
 
     return {
-        "ok": len(errors) == 0,
+        "ok": ok_restore,
         "agent_name": agent_name,
+        "display_name": display_name,
         "workspace": workspace,
         "errors": errors,
+        "restore_timing_ms": timing_ms,
+        "restore_workspace_files_written": n_ws_files,
+        "restore_timing_log": timing_path,
         "message": f"Agent '{agent_name}' restored" + (f" with {len(errors)} error(s)" if errors else " successfully"),
     }
 
@@ -881,6 +1000,20 @@ async def remove_openclaw_agent(name: str = Query(...)):
         return JSONResponse({"ok": False, "error": "The main agent cannot be deleted"}, status_code=400)
 
     try:
+        root = load_openclaw_root_config()
+        if root:
+            nfix = sanitize_openclaw_root_agents_tools_profiles(root)
+            if nfix > 0:
+                if not save_openclaw_root_config(root):
+                    return JSONResponse(
+                        {"ok": False, "error": "Failed to repair openclaw.json (tools.profile); cannot run agents delete"},
+                        status_code=500,
+                    )
+                _logger_restore.info(
+                    "[openclaw-remove] sanitized tools.profile on %s agent(s) before delete",
+                    nfix,
+                )
+
         result = subprocess.run(
             [_openclaw_bin, "agents", "delete", agent_name, "--force", "--json"],
             capture_output=True, text=True, timeout=15,

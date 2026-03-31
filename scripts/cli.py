@@ -1594,6 +1594,28 @@ def cmd_teams(args):
         else:
             _err(code, body)
 
+    elif act == "rename":
+        if not args.team_name or not getattr(args, "new_name", None):
+            print("❌ rename 需要 --team-name 与 --new-name（仅重命名 teams 下文件夹）", file=sys.stderr)
+            return
+        new_name = (args.new_name or "").strip()
+        if not new_name:
+            print("❌ --new-name 不能为空", file=sys.stderr)
+            return
+        from urllib.parse import quote as _quote
+        path = _quote(args.team_name, safe="")
+        code, body = _req(
+            "PATCH",
+            f"{FRONT_BASE}/teams/{path}",
+            headers=_front_headers(),
+            data={"new_name": new_name},
+        )
+        if code == 200:
+            print(f"✅ Team 文件夹已重命名: {args.team_name} → {new_name}")
+            _pp(body)
+        else:
+            _err(code, body)
+
     elif act == "info":
         if not args.team_name:
             print("❌ 请指定 --team-name", file=sys.stderr); return
@@ -2379,13 +2401,14 @@ def build_parser():
 """,
                        formatter_class=argparse.RawDescriptionHelpFormatter)
     c.add_argument("action", nargs="?", default="list",
-                   choices=["list", "info", "create", "delete", "members",
+                   choices=["list", "info", "create", "delete", "rename", "members",
                             "add-ext-member", "delete-ext-member",
                             "update-ext-member", "personas", "add-persona",
                             "update-persona", "delete-persona",
                             "snapshot-preview", "snapshot-download", "snapshot-upload"],
                    help="操作 (默认: list)")
     c.add_argument("--team-name", help="Team 名称")
+    c.add_argument("--new-name", help="rename 时的新文件夹名（仅改 teams 目录名）")
     c.add_argument("--tag", help="人设 tag (update-persona/delete-persona 时)")
     c.add_argument("--data", help="JSON 数据")
     c.add_argument("-o", "--output", help="输出文件 (snapshot-download 时)")
