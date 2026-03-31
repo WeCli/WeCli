@@ -58,6 +58,7 @@ if _ACP_AVAILABLE:
 
 def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
     """Load external agents from team's external_agents.json."""
+    team = (team or "").strip()
     if not user_id or not team:
         return []
     path = os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "teams", team, "external_agents.json")
@@ -87,6 +88,37 @@ def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
         return result
     except Exception:
         return []
+
+
+def _find_external_agent(agents: list[dict], agent_key: str) -> dict | None:
+    """Match external agent by short name first, then global_name."""
+    agent_key = (agent_key or "").strip()
+    if not agent_key:
+        return None
+    for agent in agents:
+        if (agent.get("name") or "").strip() == agent_key:
+            return agent
+    for agent in agents:
+        if (agent.get("global_name") or "").strip() == agent_key:
+            return agent
+    return None
+
+
+def _find_external_agent_across_teams(user_id: str, agent_key: str) -> dict | None:
+    """Search all team folders when the primary team hint misses the agent."""
+    if not user_id or not agent_key:
+        return None
+    team_base = os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "teams")
+    if not os.path.isdir(team_base):
+        return None
+    for entry in sorted(os.listdir(team_base)):
+        path = os.path.join(team_base, entry)
+        if not os.path.isdir(path):
+            continue
+        found = _find_external_agent(_load_team_external_agents(user_id, entry), agent_key)
+        if found:
+            return found
+    return None
 
 
 class OpsService:
@@ -210,10 +242,17 @@ class OpsService:
         """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
 
-        agents = _load_team_external_agents(req.user_id, req.team)
-        agent_info = next((a for a in agents if a["name"] == req.agent_name), None)
+        team_hint = (req.team or "").strip()
+        agent_key = (req.agent_name or "").strip()
+        agents = _load_team_external_agents(req.user_id, team_hint) if team_hint else []
+        agent_info = _find_external_agent(agents, agent_key)
         if not agent_info:
-            raise HTTPException(status_code=404, detail=f"外部 agent '{req.agent_name}' 未找到")
+            agent_info = _find_external_agent_across_teams(req.user_id, agent_key)
+        if not agent_info:
+            raise HTTPException(
+                status_code=404,
+                detail=f"外部 agent '{agent_key}' 未找到（team={team_hint or '(空)'}，已在全部 team 目录中查找）",
+            )
 
         global_name = agent_info.get("global_name", "")
         if not global_name:
@@ -228,17 +267,17 @@ class OpsService:
         if not _ACP_AVAILABLE:
             raise HTTPException(status_code=500, detail="ACP 协议库不可用")
 
-        acp_session = f"agent:{global_name}:group_chat"
-        logger.info("acp_control action=%s agent=%s session=%s", req.action, req.agent_name, acp_session)
+        acp_session = f"agent:{global_name}:teamclawchat"
+        logger.info("acp_control action=%s agent=%s session=%s", req.action, agent_key, acp_session)
 
         proc = None
         try:
             # 通过命令行传入 session key（bridge 只认命令行 --session，不处理 _meta.sessionKey）
             cmd = [acp_bin, "acp", "--session", acp_session, "--no-prefix-cwd"]
-            # reset_session 通过命令行标志实现
-            if req.reset_session:
+            # new/reset 都强制重置持久化上下文；否则 new 只会复用旧线程状态
+            if req.action == "new":
                 cmd.append("--reset-session")
-                logger.info("acp_control reset_session=true for %s", req.agent_name)
+                logger.info("acp_control reset_session=true for %s", agent_key)
 
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -262,18 +301,25 @@ class OpsService:
 
             result: dict = {}
             if req.action == "new":
-                new_session = await asyncio.wait_for(
-                    conn.new_session(
-                        mcp_servers=[],
-                        cwd=os.getcwd(),
-                    ),
-                    timeout=10,
-                )
+                async def _do_new_session():
+                    try:
+                        return await conn.new_session(
+                            mcp_servers=[],
+                            cwd=os.getcwd(),
+                            metadata={"resetSession": True},
+                        )
+                    except TypeError:
+                        return await conn.new_session(
+                            mcp_servers=[],
+                            cwd=os.getcwd(),
+                        )
+
+                new_session = await asyncio.wait_for(_do_new_session(), timeout=10)
                 session_id = getattr(new_session, "session_id", str(new_session))
                 result = {
                     "session_id": session_id,
                     "acp_session": acp_session,
-                    "message": f"已为 {req.agent_name} 创建新 session",
+                    "message": f"已为 {agent_key} 创建新 session（已请求重置持久化上下文）",
                 }
                 logger.info("acp_control new session_id=%s acp_session=%s", session_id, acp_session)
 
@@ -294,7 +340,7 @@ class OpsService:
                 result = {
                     "cancelled_session": session_id,
                     "acp_session": acp_session,
-                    "message": f"已取消 {req.agent_name} 的当前操作",
+                    "message": f"已取消 {agent_key} 的当前操作",
                 }
                 logger.info("acp_control stop cancelled session_id=%s", session_id)
 
@@ -328,9 +374,14 @@ class OpsService:
         """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
 
-        agents = _load_team_external_agents(req.user_id, req.team)
+        team_hint = (req.team or "").strip()
+        agents = _load_team_external_agents(req.user_id, team_hint) if team_hint else []
         if req.agent_name:
-            agents = [a for a in agents if a["name"] == req.agent_name]
+            agent_key = req.agent_name.strip()
+            one = _find_external_agent(agents, agent_key)
+            if not one:
+                one = _find_external_agent_across_teams(req.user_id, agent_key)
+            agents = [one] if one else []
 
         if not agents:
             return {"status": "success", "agents": []}

@@ -16,6 +16,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/snapshot_zip_progress.js') }}?v=20260331-progress"></script>
 <style>
   /* ── Reset & Variables ── */
   :root {
@@ -48,10 +50,18 @@
     overflow: hidden;
   }
   /* ── Layout: mobile full-width, PC centered 480px ── */
+  /* body must not be display:flex: fixed UI appended as last body child must not be a flex item (iOS / WebKit). */
   body {
+    display: block;
+    margin: 0;
+  }
+  .body-layout {
     display: flex;
     flex-direction: column;
     align-items: center;
+    min-height: 100%;
+    width: 100%;
+    box-sizing: border-box;
   }
   .app-container {
     width: 100%;
@@ -1513,6 +1523,21 @@
   }
   .toast.show { opacity: 1; }
 
+  /* Snapshot zip progress (backup if inline styles are stripped; must beat modals ~10k and LLM banner ~99k) */
+  #team-snapshot-progress-panel {
+    position: fixed !important;
+    left: 16px !important;
+    right: 16px !important;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+    max-width: 360px !important;
+    width: auto !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    z-index: 500000 !important;
+    box-sizing: border-box !important;
+    -webkit-font-smoothing: antialiased;
+  }
+
   /* ── Loading spinner ── */
   .spinner {
     display: inline-block;
@@ -1867,6 +1892,7 @@
 </style>
 </head>
 <body>
+<div class="body-layout">
 
 <!-- LLM 未配置警告横幅（放在 app-container 外面，避免被绝对定位 tab-page 遮挡） -->
 <div id="llm-warning-banner" style="display:none;width:100%;max-width:480px;padding:10px 16px;background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;font-size:14px;text-align:center;cursor:pointer;z-index:99999;" onclick="openSettings('llm')">
@@ -1970,6 +1996,10 @@
   <div class="chat-action-item" onclick="closeChatActions(); syncMembers();">
     <span class="chat-action-icon">🔄</span>
     <span data-i18n="sync_members">同步成员</span>
+  </div>
+  <div class="chat-action-item" onclick="closeChatActions(); resetAllGroupAgents();">
+    <span class="chat-action-icon">♻️</span>
+    <span data-i18n="reset_all_agents">一次重置所有 agent</span>
   </div>
   <div class="chat-action-item danger" onclick="closeChatActions(); deleteGroup();">
     <span class="chat-action-icon">🗑️</span>
@@ -2540,6 +2570,12 @@ const I18N = {
     internal_agent: '内部 Agent',
     external_agent: '外部 Agent',
     external_agent_desc: '此为外部 Agent（通过 ACP/HTTP 连接），详细配置请查看外部 Agent 配置文件。',
+    reset_all_agents: '一次重置所有 agent',
+    reset_all_confirm: '确定要一次重置当前群里的全部 agent 吗？\n\n- 外部 agent：创建新会话并重置上下文\n- 内部 agent：终止当前任务并清空历史',
+    reset_all_none: '当前群里没有可重置的 agent',
+    reset_all_running: '正在重置全部 agent...',
+    reset_all_done: '✅ 已重置 {done} 个 agent',
+    reset_all_partial: '⚠️ 已重置 {done}/{total} 个 agent，失败 {failed} 个',
 
     // ── Add agent ──
     add_members_title: '➕ 添加成员',
@@ -2943,6 +2979,12 @@ const I18N = {
     internal_agent: 'Internal Agent',
     external_agent: 'External Agent',
     external_agent_desc: 'This is an external Agent (connected via ACP/HTTP). Check the external Agent config for details.',
+    reset_all_agents: 'Reset All Agents',
+    reset_all_confirm: 'Reset all agents in this group?\n\n- External agents: create a new session and reset context\n- Internal agents: cancel current task and clear history',
+    reset_all_none: 'No agents to reset in this group',
+    reset_all_running: 'Resetting all agents...',
+    reset_all_done: '✅ Reset {done} agents',
+    reset_all_partial: '⚠️ Reset {done}/{total} agents, {failed} failed',
 
     add_members_title: '➕ Add Members',
     public_agent: 'Public Agents',
@@ -3818,16 +3860,15 @@ async function importTeamFromZip(input) {
     return;
   }
 
-  toast(t('importing_snapshot'));
   const formData = new FormData();
   formData.append('file', file);
   formData.append('team', guessedTeam);
 
   try {
-    const resp = await fetch('/teams/snapshot/upload', {
-      method: 'POST',
-      body: formData
-    });
+    const resp =
+      typeof teamSnapshotUploadZipWithProgress === 'function'
+        ? await teamSnapshotUploadZipWithProgress(file, formData)
+        : await fetch('/teams/snapshot/upload', { method: 'POST', body: formData });
     if (!resp.ok) {
       const err = await resp.json();
       toast(t('import_failed') + ': ' + (err.error || t('unknown_error')));
@@ -5682,12 +5723,13 @@ function renderMembers(members) {
     // 操作按钮：外部 agent 显示 /new, /reset(通过_meta), 和 /stop，内部 agent 显示 cancel
     let actionBtns = '';
     if (type === 'ext') {
+      const acpKey = (shortName || globalId || '').replace(/'/g, "\\'");
       actionBtns = `
         <div class="member-actions" style="display:flex;gap:4px;margin-top:4px;">
-          <button onclick="event.stopPropagation();acpControl('${globalId.replace(/'/g, "\\'")}','new')" class="member-action-btn" title="${t('tip_acp_new')}">🔄 new</button>
-          <button onclick="event.stopPropagation();acpControl('${globalId.replace(/'/g, "\\'")}','reset')" class="member-action-btn" title="${t('tip_acp_reset')}">🔄 reset</button>
-          <button onclick="event.stopPropagation();acpControl('${globalId.replace(/'/g, "\\'")}','stop')" class="member-action-btn member-action-danger" title="${t('tip_acp_stop')}">⏹ stop</button>
-          <button onclick="event.stopPropagation();acpStatus('${globalId.replace(/'/g, "\\'")}')" class="member-action-btn" title="${t('tip_acp_status')}">📊</button>
+          <button onclick="event.stopPropagation();acpControl('${acpKey}','new')" class="member-action-btn" title="${t('tip_acp_new')}">🔄 new</button>
+          <button onclick="event.stopPropagation();acpControl('${acpKey}','reset')" class="member-action-btn" title="${t('tip_acp_reset')}">🔄 reset</button>
+          <button onclick="event.stopPropagation();acpControl('${acpKey}','stop')" class="member-action-btn member-action-danger" title="${t('tip_acp_stop')}">⏹ stop</button>
+          <button onclick="event.stopPropagation();acpStatus('${acpKey}')" class="member-action-btn" title="${t('tip_acp_status')}">📊</button>
         </div>`;
     } else if (type === 'oasis') {
       actionBtns = `
@@ -7999,6 +8041,45 @@ async function restartServices() {
 
 // ── ACP external agent control ──
 
+function acpRequestTeam() {
+    const raw = (currentTeamName || '').trim();
+    if (!raw) return '';
+    const base = raw.split('#')[0].trim();
+    return base || raw;
+}
+
+async function acpControlRequest(agentName, action) {
+    const teamName = acpRequestTeam();
+    if (!teamName) throw new Error(t('please_select_team'));
+    if (!agentName) throw new Error('agent');
+
+    const requestBody = {
+        team: teamName,
+        agent_name: agentName,
+        action: action
+    };
+    if (action === 'reset') {
+        requestBody.action = 'new';
+        requestBody.reset_session = true;
+    }
+
+    const r = await fetch('/proxy_acp_control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+    });
+    let data;
+    try {
+        data = await r.json();
+    } catch (_) {
+        throw new Error('HTTP ' + r.status);
+    }
+    if (!r.ok || data.status !== 'success') {
+        throw new Error(data.detail || data.error || action + ' ' + t('failed'));
+    }
+    return data;
+}
+
 async function acpControl(agentName, action) {
     const actionLabels = {
         'new': t('acp_new'),
@@ -8009,32 +8090,8 @@ async function acpControl(agentName, action) {
     if (!confirm(t('acp_confirm', {name: agentName, action: actionLabel}))) return;
     toast(t('acp_executing', {action: actionLabel}));
     try {
-        const teamName = currentGroupId ? currentGroupId.split('_')[0] : '';
-
-        // Build request body based on action type
-        const requestBody = {
-            team: teamName,
-            agent_name: agentName,
-            action: action
-        };
-
-        // For 'reset' action: new session with reset_session flag (--reset-session via CLI)
-        if (action === 'reset') {
-            requestBody.action = 'new';
-            requestBody.reset_session = true;
-        }
-
-        const r = await fetch('/proxy_acp_control', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
-        });
-        const data = await r.json();
-        if (r.ok && data.status === 'success') {
-            toast(`✅ ${data.message || actionLabel + ' ' + t('success')}`);
-        } else {
-            toast(`❌ ${data.detail || data.error || actionLabel + ' ' + t('failed')}`);
-        }
+        const data = await acpControlRequest(agentName, action);
+        toast(`✅ ${data.message || actionLabel + ' ' + t('success')}`);
     } catch (e) {
         toast(t('acp_request_failed') + ': ' + e.message);
     }
@@ -8043,13 +8100,27 @@ async function acpControl(agentName, action) {
 async function acpStatus(agentName) {
     toast(t('acp_query'));
     try {
-        const teamName = currentGroupId ? currentGroupId.split('_')[0] : '';
+        const teamName = acpRequestTeam();
+        if (!teamName) {
+            toast(t('acp_query_failed') + ': ' + t('please_select_team'));
+            return;
+        }
+        if (!agentName) {
+            toast(t('acp_query_failed') + ': agent');
+            return;
+        }
         const r = await fetch('/proxy_acp_status', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ team: teamName, agent_name: agentName }),
         });
-        const data = await r.json();
+        let data;
+        try {
+            data = await r.json();
+        } catch (_) {
+            toast(t('acp_query_failed') + ': HTTP ' + r.status);
+            return;
+        }
         if (r.ok && data.status === 'success' && data.agents && data.agents.length > 0) {
             const a = data.agents[0];
             const statusEmoji = a.status === 'online' ? '🟢' : a.status === 'idle' ? '⚪' : '🔴';
@@ -8067,47 +8138,83 @@ async function acpStatus(agentName) {
     }
 }
 
+async function cancelInternalAgentRequest(sid) {
+    const r = await fetch('/proxy_cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sid }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || data.error || t('cancel_failed'));
+    return data;
+}
+
 async function cancelInternalAgent(uid, sid) {
     if (!confirm(t('cancel_internal_confirm', {name: sid}))) return;
     toast(t('cancelling'));
     try {
-        const r = await fetch('/proxy_cancel', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sid }),
-        });
-        const data = await r.json();
-        if (r.ok) {
-            if (data.cancelled === false) {
-                toast(t('cancel_no_task'));
-            } else {
-                toast(t('cancelled'));
-            }
+        const data = await cancelInternalAgentRequest(sid);
+        if (data.cancelled === false) {
+            toast(t('cancel_no_task'));
         } else {
-            toast('❌ ' + (data.detail || data.error || t('cancel_failed')));
+            toast(t('cancelled'));
         }
     } catch (e) {
         toast(t('acp_request_failed') + ': ' + e.message);
     }
 }
 
+async function deleteInternalSessionRequest(sid) {
+    const r = await fetch('/proxy_delete_session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sid }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || data.error || t('clear_failed'));
+    return data;
+}
+
 async function deleteInternalSession(uid, sid) {
     if (!confirm(t('delete_session_confirm', {name: sid}))) return;
     toast(t('clearing'));
     try {
-        const r = await fetch('/proxy_delete_session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sid }),
-        });
-        const data = await r.json();
-        if (r.ok) {
-            toast(t('session_cleared'));
-        } else {
-            toast('❌ ' + (data.detail || data.error || t('clear_failed')));
-        }
+        await deleteInternalSessionRequest(sid);
+        toast(t('session_cleared'));
     } catch (e) {
         toast(t('acp_request_failed') + ': ' + e.message);
+    }
+}
+
+async function resetAllGroupAgents() {
+    const agents = currentMembers.filter(m => (m.member_type || '') !== 'owner');
+    if (!agents.length) {
+        toast(t('reset_all_none'));
+        return;
+    }
+    if (!confirm(t('reset_all_confirm'))) return;
+    toast(t('reset_all_running'));
+
+    const results = await Promise.allSettled(agents.map(async (m) => {
+        const type = m.member_type || '';
+        const sid = m.global_id || '';
+        if (type === 'ext') {
+            const key = m.short_name || m.title || sid;
+            await acpControlRequest(key, 'reset');
+            return;
+        }
+        if (type === 'oasis') {
+            await cancelInternalAgentRequest(sid);
+            await deleteInternalSessionRequest(sid);
+        }
+    }));
+
+    const done = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.length - done;
+    if (!failed) {
+        toast(t('reset_all_done', { done }));
+    } else {
+        toast(t('reset_all_partial', { done, total: results.length, failed }));
     }
 }
 
@@ -8276,6 +8383,8 @@ window.location.href = '/studio?redirect=group_chat';
 <div class="lightbox-overlay" id="lightbox-overlay" onclick="closeLightbox()">
   <img id="lightbox-img" src="" alt="preview">
 </div>
+
+</div><!-- end body-layout -->
 
 </body>
 </html>

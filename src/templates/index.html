@@ -28,7 +28,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
 
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260330-team-rename2">
 </head>
 <body class="bg-gray-100 font-sans leading-normal tracking-normal">
 
@@ -546,6 +546,7 @@
                         <button onclick="orchDownloadYaml()" class="orch-btn" data-i18n-title="orch_tip_download" title="导出工作流"><span data-i18n="orch_btn_download">⬇️ 导出工作流</span></button>
                         <button onclick="orchUploadYamlClick()" class="orch-btn" data-i18n-title="orch_tip_upload" title="导入工作流"><span data-i18n="orch_btn_upload">⬆️ 导入工作流</span></button>
                         <input type="file" id="orch-yaml-upload-input" accept=".yaml,.yml" style="display:none;" onchange="orchHandleYamlUpload(event)">
+                        <input type="file" id="orch-team-snapshot-input" accept=".zip" style="display:none;" onchange="orchHandleSnapshotUpload(event)">
                         <button onclick="orchRefreshSessions()" class="orch-btn" data-i18n-title="orch_tip_status" title="刷新 session 状态"><span data-i18n="orch_btn_status">🔄 状态</span></button>
                         <button onclick="orchClearCanvas()" class="orch-btn orch-btn-danger" data-i18n-title="orch_tip_clear" title="清空工作流"><span data-i18n="orch_btn_clear">🗑️ 清空工作流</span></button>
                         <button onclick="toggleOrchFocusMode()" id="orch-focus-btn" class="orch-btn" title="专注模式：隐藏两侧面板"><span data-i18n="orch_btn_focus">🎯 专注</span></button>
@@ -1003,6 +1004,18 @@
                         </div>
                         <div id="export-agents-list" class="ml-6 text-sm text-gray-600 max-h-24 overflow-y-auto"></div>
                     </div>
+
+                    <!-- External Agents Section -->
+                    <div class="export-section mb-4 p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center gap-2 mb-2">
+                            <input type="checkbox" id="export-external-agents" class="export-checkbox" data-section="external_agents" checked>
+                            <label for="export-external-agents" class="font-medium text-gray-800 cursor-pointer flex items-center gap-2">
+                                🔌 <span data-i18n="export_external_agents">外部 Agents</span>
+                                <span id="export-external-agents-count" class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">0</span>
+                            </label>
+                        </div>
+                        <div id="export-external-agents-list" class="ml-6 text-sm text-gray-600 max-h-24 overflow-y-auto"></div>
+                    </div>
                     
                     <!-- Personas Section -->
                     <div class="export-section mb-4 p-3 bg-gray-50 rounded-lg">
@@ -1068,9 +1081,11 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+    <script src="/static/js/snapshot_zip_progress.js?v=20260331-progress"></script>
     <!-- ===== Orchestration Page JavaScript (load first for shared utils like orchToast) ===== -->
-    <script src="/static/js/orchestration.js?v=20260327-humanfix"></script>
-    <script src="/static/js/main.js?v=20260327-humanfix"></script>
+    <script src="/static/js/orchestration.js?v=20260329-snapshot"></script>
+    <script src="/static/js/main.js?v=20260330-team-onclick-fix"></script>
     <script src="/static/js/oasis-town.bundle.js?v=20260327-humanfix"></script>
     <script src="/static/js/app.js?v=20260327-humanfix"></script>
     <script>

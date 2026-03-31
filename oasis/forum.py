@@ -121,6 +121,7 @@ class DiscussionForum:
         self._changed = asyncio.Condition(self._lock)
         self._counter = 0
         self.pending_human: PendingHumanReply | None = None
+        self._waiting_experts: set[str] = set()  # 当前 round 在等待 callback 的 expert 集合
 
     def start_clock(self):
         """Mark the discussion start time (T=0 for all elapsed calculations)."""
@@ -328,6 +329,26 @@ class DiscussionForum:
                     await asyncio.wait_for(self._changed.wait(), timeout=remaining)
                 except asyncio.TimeoutError:
                     return _predicate()
+
+    async def add_waiting_expert(self, author: str) -> None:
+        """Expert 开始等待 callback 时加入集合。"""
+        async with self._changed:
+            self._waiting_experts.add(author)
+
+    async def remove_waiting_expert(self, author: str) -> None:
+        """Expert 等待结束（成功或超时）时移除。"""
+        async with self._changed:
+            self._waiting_experts.discard(author)
+
+    async def is_waiting_expert(self, author: str) -> bool:
+        """检查 author 是否在等待集合中。"""
+        async with self._changed:
+            return author in self._waiting_experts
+
+    async def clear_round_waiting_experts(self) -> None:
+        """Round 前进时清除等待集合。"""
+        async with self._changed:
+            self._waiting_experts.clear()
 
     async def set_pending_human_reply(
         self,

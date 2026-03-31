@@ -454,6 +454,11 @@ async def add_agent_callback(topic_id: str, req: AgentCallbackRequest):
     author = (req.author or "").strip()
     if not author:
         raise HTTPException(400, "Author cannot be empty")
+    if not await forum.is_waiting_expert(author):
+        raise HTTPException(
+            409,
+            f"Author {author} is not waiting for callback in round {req.round_num}",
+        )
     if not isinstance(req.result, dict) or not req.result:
         raise HTTPException(400, "Callback result must be a non-empty object")
 

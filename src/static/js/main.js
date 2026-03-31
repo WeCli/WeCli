@@ -198,6 +198,8 @@ const i18n = {
         group_title: '👥 团队列表',
         group_new: '+ 新建',
         group_no_groups: '暂无团队',
+        group_rename_team: '重命名团队（仅文件夹）',
+        group_item_open_hint: '点击进入群聊',
         group_select_hint: '选择一个团队进行管理',
         group_create_hint: '创建或导入一个团队进行管理',
         group_members_btn: '👤 成员',
@@ -479,6 +481,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         export_preview_desc: '请选择要导出的内容：',
         export_preview_tip: '💡 提示：取消勾选某分类后，该分类下的内容将不会被导出',
         export_agents: '内部 Agents',
+        export_external_agents: '外部 Agents',
         export_personas: '自定义人设',
         export_skills: 'Skills',
         export_managed_skills: '托管 Skills',
@@ -749,6 +752,8 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         group_title: '👥 Team List',
         group_new: '+ New',
         group_no_groups: 'No teams',
+        group_rename_team: 'Rename team (folder only)',
+        group_item_open_hint: 'Click to open team',
         group_select_hint: 'Select a team to manage',
         group_create_hint: 'Create or import a team to manage',
         group_members_btn: '👤 Members',
@@ -1038,6 +1043,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         export_preview_desc: 'Please select items to export:',
         export_preview_tip: '💡 Tip: Uncheck a category to exclude it from export',
         export_agents: 'Internal Agents',
+        export_external_agents: 'External Agents',
         export_personas: 'Custom Personas',
         export_skills: 'Skills',
         export_managed_skills: 'Managed Skills',
@@ -5917,11 +5923,14 @@ function renderGroupList(teams) {
     }
     container.innerHTML = teams.map(team => {
         const isActive = team === currentGroupId;
+        // encodeURIComponent 放入 onclick 内层单引号字符串，避免 JSON.stringify 的双引号截断 HTML 属性
+        const te = encodeURIComponent(team);
         return `
-            <div class="group-item ${isActive ? 'active' : ''}" onclick="openGroup('${team}')">
+            <div class="group-item ${isActive ? 'active' : ''}" onclick="void openGroup(decodeURIComponent('${te}'))">
                 <div class="group-name">${escapeHtml(team)}</div>
-                <div class="group-meta">点击进入群聊</div>
-                <button class="group-delete-btn" onclick="event.stopPropagation(); deleteTeamByName('${team}')">🗑️</button>
+                <div class="group-meta">${escapeHtml(t('group_item_open_hint'))}</div>
+                <button type="button" class="group-rename-btn" title="${escapeHtml(t('group_rename_team'))}" aria-label="${escapeHtml(t('group_rename_team'))}" onclick="event.stopPropagation(); renameTeamByName(decodeURIComponent('${te}'))">✏️</button>
+                <button type="button" class="group-delete-btn" title="删除团队" onclick="event.stopPropagation(); deleteTeamByName(decodeURIComponent('${te}'))">🗑️</button>
             </div>`;
     }).join('');
 }
@@ -6281,8 +6290,51 @@ async function submitCreateTeam() {
     }
 }
 
+async function renameTeamByName(oldName) {
+    const def = typeof oldName === 'string' ? oldName : '';
+    const newName = prompt(
+        currentLang === 'zh-CN'
+            ? '将团队文件夹重命名为（仅改 data/.../teams 下目录名）：'
+            : 'Rename team folder to (only renames the directory under teams/):',
+        def
+    );
+    if (newName == null) return;
+    const trimmed = String(newName).trim();
+    if (!trimmed || trimmed === oldName) return;
+    try {
+        const resp = await fetch(`/teams/${encodeURIComponent(oldName)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_name: trimmed }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+            alert((currentLang === 'zh-CN' ? '重命名失败: ' : 'Rename failed: ') + (data.error || resp.statusText));
+            return;
+        }
+        if (typeof loadAgentTeams === 'function') await loadAgentTeams();
+        if (currentGroupId === oldName) {
+            currentGroupId = trimmed;
+            const gn = document.getElementById('group-active-name');
+            if (gn) gn.textContent = trimmed;
+            const sel = document.getElementById('orch-team-select');
+            if (sel && sel.value === oldName) sel.value = trimmed;
+        }
+        await loadGroupList();
+        if (typeof orchToast === 'function') {
+            orchToast(currentLang === 'zh-CN' ? '团队文件夹已重命名' : 'Team folder renamed');
+        }
+    } catch (e) {
+        alert((currentLang === 'zh-CN' ? '重命名失败: ' : 'Rename failed: ') + e.message);
+    }
+}
+
 async function deleteTeamByName(teamName) {
-    if (!confirm(`确定要删除团队 "${teamName}" 吗？`)) return;
+    const msg =
+        currentLang === 'zh-CN'
+            ? `确定要删除团队 "${teamName}" 吗？`
+            : `Delete team "${teamName}"?`;
+    if (!confirm(msg)) return;
     try {
         const resp = await fetch(`/teams/${encodeURIComponent(teamName)}`, {
             method: 'DELETE'
@@ -6541,6 +6593,20 @@ function renderExportPreview(data) {
     } else {
         agentsListEl.innerHTML = '<div class="text-gray-400 italic">' + t('export_preview_empty') + '</div>';
     }
+
+    // External Agents
+    const externalAgents = sections.external_agents || { count: 0, items: [] };
+    document.getElementById('export-external-agents-count').textContent = externalAgents.count || 0;
+    const externalAgentsListEl = document.getElementById('export-external-agents-list');
+    if (externalAgents.items && externalAgents.items.length > 0) {
+        externalAgentsListEl.innerHTML = externalAgents.items.map(a => {
+            const tagText = a.tag ? ` [${escapeHtml(a.tag)}]` : '';
+            const globalText = a.global_name ? ` <span class="text-gray-400">(${escapeHtml(a.global_name)})</span>` : '';
+            return `<div class="py-0.5">• ${escapeHtml(a.name)}${tagText}${globalText}</div>`;
+        }).join('');
+    } else {
+        externalAgentsListEl.innerHTML = '<div class="text-gray-400 italic">' + t('export_preview_empty') + '</div>';
+    }
     
     // Personas
     const personas = sections.personas || { count: 0, items: [] };
@@ -6669,11 +6735,17 @@ async function confirmExportTeam() {
     // Get selected sections
     const include = {
         agents: document.getElementById('export-agents').checked,
+        external_agents: document.getElementById('export-external-agents').checked,
         personas: document.getElementById('export-personas').checked,
         skills: document.getElementById('export-skills-all').checked,
         cron: document.getElementById('export-cron').checked,
         workflows: document.getElementById('export-workflows').checked
     };
+
+    // Skills / cron depend on external_agents.json metadata for restoration.
+    if (include.skills || include.cron) {
+        include.external_agents = true;
+    }
     
     // Handle granular skills selection - only if some skills are selected but not all
     const skills = _exportPreviewData.sections?.skills || { details: [], managed: [] };
@@ -6774,10 +6846,7 @@ async function uploadTeam(input) {
     formData.append('team', currentGroupId);
 
     try {
-        const resp = await fetch('/teams/snapshot/upload', {
-            method: 'POST',
-            body: formData
-        });
+        const resp = await teamSnapshotUploadZipWithProgress(file, formData);
         if (!resp.ok) {
             const err = await resp.json();
             alert('上传失败: ' + (err.error || '未知错误'));
@@ -6873,11 +6942,11 @@ async function importFromHub() {
     }
 
     let finalTeam = teamName;
-    if (!finalTeam) {
-        finalTeam = prompt('无法从命令中推断团队名，请输入团队名称：');
-        if (!finalTeam || !finalTeam.trim()) return;
-        finalTeam = finalTeam.trim();
-    }
+    // Always prompt user to confirm/edit the team name
+    const defaultName = finalTeam || '';
+    finalTeam = prompt('请输入团队名称：', defaultName);
+    if (!finalTeam || !finalTeam.trim()) return;
+    finalTeam = finalTeam.trim();
 
     if (!confirm(`将从 Hub 下载并导入团队 "${finalTeam}"，确定继续吗？`)) return;
 

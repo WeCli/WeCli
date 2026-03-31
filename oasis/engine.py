@@ -15,7 +15,7 @@ Three expert backends:
      - ACP agent support: tag (openclaw, codex, etc) determines the ACP binary;
        model "agent:<name>[:<session>]" prefers ACP persistent connection,
        falls back to HTTP API if ACP unavailable and api_url is configured.
-       Session defaults to team name if not specified.
+       Session suffix defaults to teamclawchat if not specified in model (aligned with group ACP).
 
 Expert pool sourcing (YAML-only, schedule_file or schedule_yaml required):
   Pool is built entirely from YAML expert names (deduplicated).
@@ -333,7 +333,10 @@ class DiscussionEngine:
                     print(f"  [OASIS] 🆕 #new: '{full_name}' → new external session '{ext_id}'")
                 cfg = ext_configs.get(full_name, {})
                 is_acp_agent = first.lower() in ExternalExpert._ACP_TOOL_TAGS
-                if not cfg.get("api_url") and not is_acp_agent:
+                tag_lower = first.lower()
+                is_openclaw_http = tag_lower == "openclaw"
+                has_http_url = bool(cfg.get("api_url")) or (is_openclaw_http and bool(os.getenv("OPENCLAW_API_URL", "")))
+                if not has_http_url and not is_acp_agent:
                     print(f"  [OASIS] ⚠️ External expert '{full_name}' missing 'api_url' in YAML, skipping.")
                     continue
                 # ACP agents can work without api_url
@@ -806,6 +809,7 @@ class DiscussionEngine:
             # Update forum progress
             self.forum.current_round = super_step
             self.forum.max_rounds = max(super_step, len(sched.nodes))
+            await self.forum.clear_round_waiting_experts()
 
             # Execute all activated nodes in parallel
             async def _exec_node(node_id: str):
