@@ -3382,6 +3382,12 @@ async function orchDoGenerateAgentYaml() {
                 if (res.saved_file && !res.saved_file.startsWith('save_error')) {
                     statusMsg += t('orch_yaml_saved_suffix', {file: res.saved_file});
                 }
+                try {
+                    const applied = await orchAutoReplaceCanvasFromYaml(res.agent_yaml, res.saved_file || '');
+                    if (applied) statusMsg += ' · 画布已自动替换';
+                } catch (applyErr) {
+                    statusMsg += ` · 自动替换失败: ${applyErr.message}`;
+                }
                 statusEl.textContent = statusMsg;
                 statusEl.style.cssText = 'color:#16a34a;background:#f0fdf4;border-color:#86efac;';
                 orchToast(res.saved_file ? t('orch_toast_yaml_generated') : t('orch_toast_agent_valid'));
@@ -3655,6 +3661,81 @@ async function orchDoLoadLayout(name) {
     } catch(e) { orchToast(t('orch_toast_load_fail') + ': ' + e.message); }
 }
 
+function orchApplyLayoutDataFromYamlImport(data) {
+    orchClearCanvas();
+    if (data.settings) {
+        document.getElementById('orch-repeat').checked = data.settings.repeat === true;
+        document.getElementById('orch-rounds').value = data.settings.max_rounds || 5;
+        if (data.settings.cluster_threshold) {
+            document.getElementById('orch-threshold').value = data.settings.cluster_threshold;
+            document.getElementById('orch-threshold-val').textContent = data.settings.cluster_threshold;
+        }
+    }
+    if (data.view) {
+        orch.zoom = data.view.zoom || 1;
+        orch.panX = data.view.panX || 0;
+        orch.panY = data.view.panY || 0;
+        orchApplyTransform();
+    }
+    const idMap = {};
+    (data.nodes || []).forEach(n => {
+        const newNode = orchAddNode(n, n.x, n.y);
+        idMap[n.id] = newNode.id;
+    });
+    (data.edges || []).forEach(e => {
+        const src = idMap[e.source], tgt = idMap[e.target];
+        if (src && tgt) orchAddEdge(src, tgt);
+    });
+    (data.conditionalEdges || []).forEach(ce => {
+        const src = idMap[ce.source] || ce.source;
+        const thenTgt = idMap[ce.then] || ce.then;
+        const elseTgt = ce.else ? (idMap[ce.else] || ce.else) : '';
+        const mainId = 'oe' + orch.eid++;
+        orch.edges.push({ id: mainId, source: src, target: thenTgt, edgeType: 'conditional', condition: ce.condition || '', thenTarget: thenTgt, elseTarget: elseTgt });
+        if (elseTgt) {
+            const elseId = 'oe' + orch.eid++;
+            orch.edges.push({ id: elseId, source: src, target: elseTgt, edgeType: 'conditional', condition: ce.condition || '', thenTarget: '', elseTarget: '', _isElseSibling: mainId });
+        }
+    });
+    (data.selectorEdges || []).forEach(se => {
+        const src = idMap[se.source] || se.source;
+        const choices = se.choices || {};
+        Object.keys(choices).sort((a, b) => Number(a) - Number(b)).forEach(num => {
+            const tgt = idMap[choices[num]] || choices[num];
+            if (src && tgt) {
+                const exists = orch.edges.some(e => e.source === src && e.target === tgt);
+                if (!exists) orchAddEdge(src, tgt);
+            }
+        });
+    });
+    (data.groups || []).forEach(g => {
+        const mapped = { ...g, nodeIds: (g.nodeIds || []).map(nid => idMap[nid]).filter(Boolean) };
+        if (mapped.nodeIds.length > 0) { orch.groups.push(mapped); orchRenderGroup(mapped); }
+    });
+    orchRenderEdges();
+    orchUpdateNodeBadges();
+    orchUpdateYaml();
+}
+
+async function orchAutoReplaceCanvasFromYaml(yamlText, suggestedName) {
+    if (!yamlText || !yamlText.trim()) return false;
+    const base = (suggestedName && !String(suggestedName).startsWith('save_error'))
+        ? String(suggestedName)
+        : `ai_generated_${Date.now()}.yaml`;
+    const filename = (base.endsWith('.yaml') || base.endsWith('.yml')) ? base : `${base}.yaml`;
+
+    const r = await fetch('/proxy_visual/upload-yaml', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, content: yamlText, team: orch.teamName || '' }),
+    });
+    const res = await r.json();
+    if (res.error) throw new Error(res.error);
+    if (!res.layout) return false;
+    orchApplyLayoutDataFromYamlImport(res.layout);
+    return true;
+}
+
 function orchExportYaml() {
     const yaml = document.getElementById('orch-yaml-content').textContent;
     if (!yaml || yaml.startsWith(t('orch_rule_yaml_hint').substring(0,2))) { orchToast(t('orch_toast_gen_yaml')); return; }
@@ -3843,4 +3924,225 @@ function orchToast(msg) {
     t.textContent = msg;
     document.body.appendChild(t);
     setTimeout(() => t.remove(), 2500);
+}
+
+// ── Generate Team from Workflow ──
+
+async function orchGenerateTeam() {
+    // 1. Collect eligible nodes (expert, session_agent, external); dedupe by tag
+    const eligible = ['expert', 'session_agent', 'external'];
+    const seen = {};
+    for (const node of orch.nodes) {
+        if (eligible.includes(node.type) && node.tag) {
+            seen[node.tag] = node;
+        }
+    }
+    const agentNodes = Object.values(seen);
+
+    // 2. Build overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'orch-modal-overlay';
+    overlay.id = 'orch-gt-overlay';
+
+    // Fetch current team list for the select
+    let teamList = [];
+    try {
+        const tlResp = await fetch('/teams');
+        if (tlResp.ok) {
+            const tlData = await tlResp.json();
+            teamList = tlData.teams || [];
+        }
+    } catch (e) { /* silently use empty list */ }
+
+    const teamOptions = teamList.map(
+        tm => `<option value="${escapeHtml(tm)}">${escapeHtml(tm)}</option>`
+    ).join('');
+
+    overlay.innerHTML = `
+        <div class="orch-modal" style="min-width:420px;max-width:520px;max-height:80vh;overflow-y:auto;">
+            <h3 style="margin:0 0 12px;font-size:14px;font-weight:700;">${t('orch_gt_title')}</h3>
+
+            <div style="margin-bottom:10px;">
+                <label style="font-size:11px;font-weight:600;color:#374151;">${t('orch_gt_label_team')}</label>
+                <div style="display:flex;gap:6px;margin-top:4px;">
+                    <select id="orch-gt-team-select" style="flex:1;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                        <option value="">— ${t('orch_gt_new_team')} —</option>
+                        ${teamOptions}
+                    </select>
+                </div>
+                <input id="orch-gt-new-name" type="text" placeholder="${t('orch_gt_new_team_placeholder')}"
+                    style="width:100%;margin-top:6px;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;">
+            </div>
+
+            <div style="margin-bottom:6px;font-size:11px;font-weight:600;color:#374151;">${t('orch_gt_agents_title')} (${agentNodes.length})</div>
+            <div id="orch-gt-agent-list" style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px;">
+                ${agentNodes.length === 0
+                    ? `<div style="font-size:11px;color:#9ca3af;padding:6px 0;">${t('orch_gt_no_agents')}</div>`
+                    : agentNodes.map(n => `
+                        <div class="orch-gt-row" data-tag="${escapeHtml(n.tag)}" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #e5e7eb;border-radius:6px;font-size:12px;">
+                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                ${escapeHtml(n.name || n.tag)}
+                                <span style="color:#9ca3af;margin-left:4px;">[${escapeHtml(n.tag)}]</span>
+                            </span>
+                            <span class="orch-gt-conflict-badge" style="display:none;font-size:10px;color:#f59e0b;white-space:nowrap;">${t('orch_gt_conflict_label')}</span>
+                            <button class="orch-gt-skip-btn" data-tag="${escapeHtml(n.tag)}" style="display:none;padding:2px 8px;font-size:10px;border-radius:4px;border:1px solid #d1d5db;background:#f9fafb;cursor:pointer;">${t('orch_gt_conflict_skip')}</button>
+                            <button class="orch-gt-overwrite-btn" data-tag="${escapeHtml(n.tag)}" style="display:none;padding:2px 8px;font-size:10px;border-radius:4px;border:none;background:#6366f1;color:white;cursor:pointer;">${t('orch_gt_conflict_overwrite')}</button>
+                        </div>`).join('')
+                }
+            </div>
+
+            <div class="orch-modal-btns">
+                <button id="orch-gt-cancel" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;cursor:pointer;font-size:12px;">${t('orch_gt_cancel')}</button>
+                <button id="orch-gt-confirm" style="padding:6px 14px;border-radius:6px;border:none;background:#6366f1;color:white;cursor:pointer;font-size:12px;">${t('orch_gt_confirm')}</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // Per-row resolution state: tag → "skip"|"overwrite"|null
+    const resolutions = {};
+
+    // Wire conflict toggle buttons
+    overlay.querySelectorAll('.orch-gt-skip-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tag = btn.dataset.tag;
+            resolutions[tag] = 'skip';
+            _orchGtHighlightRow(overlay, tag, 'skip');
+        });
+    });
+    overlay.querySelectorAll('.orch-gt-overwrite-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tag = btn.dataset.tag;
+            resolutions[tag] = 'overwrite';
+            _orchGtHighlightRow(overlay, tag, 'overwrite');
+        });
+    });
+
+    // Show/hide new-name input based on team select
+    const teamSelect = overlay.querySelector('#orch-gt-team-select');
+    const newNameInput = overlay.querySelector('#orch-gt-new-name');
+    function _syncNewNameVisibility() {
+        newNameInput.style.display = teamSelect.value === '' ? '' : 'none';
+    }
+    _syncNewNameVisibility();
+    teamSelect.addEventListener('change', async () => {
+        _syncNewNameVisibility();
+        if (teamSelect.value) {
+            await _orchGtUpdateConflicts(overlay, teamSelect.value, resolutions);
+        } else {
+            // New team — no conflicts
+            overlay.querySelectorAll('.orch-gt-row').forEach(row => {
+                row.querySelector('.orch-gt-conflict-badge').style.display = 'none';
+                row.querySelector('.orch-gt-skip-btn').style.display = 'none';
+                row.querySelector('.orch-gt-overwrite-btn').style.display = 'none';
+                row.style.borderColor = '#e5e7eb';
+            });
+        }
+    });
+
+    // Dismiss
+    overlay.querySelector('#orch-gt-cancel').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    // Confirm
+    const confirmBtn = overlay.querySelector('#orch-gt-confirm');
+    confirmBtn.addEventListener('click', async () => {
+        const selectedTeam = teamSelect.value;
+        const newName = newNameInput.value.trim();
+        const teamName = selectedTeam || newName;
+        if (!teamName) { orchToast(t('orch_gt_toast_no_team')); return; }
+        if (confirmBtn.disabled) return;
+        confirmBtn.disabled = true;
+
+        const finalResolutions = Object.assign({}, resolutions);
+
+        // Build nodes payload from canvas nodes
+        const payload = {
+            nodes: agentNodes.map(n => ({
+                type: n.type,
+                name: n.name || '',
+                tag: n.tag || '',
+                persona: n.persona || '',
+                temperature: n.temperature != null ? n.temperature : 0.7,
+                session: n.session || '',
+                global_name: n.global_name || '',
+                meta: n.meta || {}
+            })),
+            create_if_missing: !selectedTeam,
+            resolutions: finalResolutions
+        };
+
+        try {
+            const resp = await fetch(`/teams/${encodeURIComponent(teamName)}/generate-from-workflow`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                orchToast(t('orch_gt_toast_err') + ': ' + (data.error || resp.status));
+                return;
+            }
+            orchToast(t('orch_gt_toast_ok', { added: (data.added || []).length, skipped: (data.skipped || []).length }));
+            overlay.remove();
+            // Refresh team list so the new team appears in the selector
+            if (!selectedTeam) orchLoadTeamList();
+        } catch (e) {
+            orchToast(t('orch_gt_toast_err') + ': ' + e.message);
+        } finally {
+            confirmBtn.disabled = false;
+        }
+    });
+}
+
+async function _orchGtUpdateConflicts(overlay, teamName, resolutions) {
+    if (!teamName) return;
+    let existingTags = new Set();
+    try {
+        // Fetch members (oasis + external agents) and experts in parallel
+        const [mResp, eResp] = await Promise.all([
+            fetch(`/teams/${encodeURIComponent(teamName)}/members`),
+            fetch(`/teams/${encodeURIComponent(teamName)}/experts`)
+        ]);
+        if (mResp.ok) {
+            const mData = await mResp.json();
+            (mData.members || []).forEach(m => { if (m.tag) existingTags.add(m.tag); });
+        }
+        if (eResp.ok) {
+            const eData = await eResp.json();
+            (eData.experts || []).forEach(e => { if (e.tag) existingTags.add(e.tag); });
+        }
+    } catch (e) { /* silently ignore — show no conflicts */ }
+
+    overlay.querySelectorAll('.orch-gt-row').forEach(row => {
+        const tag = row.dataset.tag;
+        if (existingTags.has(tag)) {
+            row.querySelector('.orch-gt-conflict-badge').style.display = '';
+            row.querySelector('.orch-gt-skip-btn').style.display = '';
+            row.querySelector('.orch-gt-overwrite-btn').style.display = '';
+            // Default to skip unless already resolved
+            if (!resolutions[tag]) {
+                resolutions[tag] = 'skip';
+                _orchGtHighlightRow(overlay, tag, 'skip');
+            } else {
+                _orchGtHighlightRow(overlay, tag, resolutions[tag]);
+            }
+        } else {
+            row.querySelector('.orch-gt-conflict-badge').style.display = 'none';
+            row.querySelector('.orch-gt-skip-btn').style.display = 'none';
+            row.querySelector('.orch-gt-overwrite-btn').style.display = 'none';
+            row.style.borderColor = '#e5e7eb';
+            delete resolutions[tag];
+        }
+    });
+}
+
+function _orchGtHighlightRow(overlay, tag, resolution) {
+    const row = overlay.querySelector(`.orch-gt-row[data-tag="${CSS.escape(tag)}"]`);
+    if (!row) return;
+    row.style.borderColor = resolution === 'overwrite' ? '#6366f1' : '#f59e0b';
+    const skipBtn = row.querySelector('.orch-gt-skip-btn');
+    const owBtn = row.querySelector('.orch-gt-overwrite-btn');
+    if (skipBtn) skipBtn.style.background = resolution === 'skip' ? '#fef3c7' : '#f9fafb';
+    if (owBtn) owBtn.style.background = resolution === 'overwrite' ? '#4f46e5' : '#6366f1';
 }

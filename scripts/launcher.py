@@ -2,23 +2,45 @@
 # -*- coding: utf-8 -*-
 """
 TeamBot 跨平台启动器
-- 支持 Linux/macOS/Windows
+
+功能：
+- 支持 Linux/macOS/Windows 多平台
 - 精确管理子进程 PID
-- 安全关闭：Ctrl+C、关窗口、kill 都能正常清理
+- 安全关闭：Ctrl+C、关闭窗口、kill 信号 均能正常清理
+
+用法：python scripts/launcher.py
 """
 
-import subprocess
 import sys
+
+# Python version guard: fail fast with a clear message if run under Python 2
+if sys.version_info < (3, 9):
+    sys.stderr.write(
+        "\n"
+        "ERROR: TeamClaw requires Python 3.11+, but this script is running under Python {}.{}.\n"
+        "\n"
+        "Common cause: on macOS, system 'python' may point to Python 2.7.\n"
+        "Solutions:\n"
+        "  1. Use the canonical startup: bash selfskill/scripts/run.sh start\n"
+        "  2. Or activate the venv first: source .venv/bin/activate && python scripts/launcher.py\n"
+        "  3. Or use the venv python directly: .venv/bin/python scripts/launcher.py\n"
+        "\n".format(sys.version_info[0], sys.version_info[1])
+    )
+    sys.exit(1)
+
+import subprocess
 import os
 import signal
 import atexit
 import time
 import stat
 import platform
+import shutil
 import urllib.request
 import webbrowser
 from dotenv import load_dotenv
 
+# 确保 Python 输出使用 UTF-8 编码
 os.environ.setdefault("PYTHONUTF8", "1")
 os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 for stream_name in ("stdout", "stderr"):
@@ -32,9 +54,9 @@ for stream_name in ("stdout", "stderr"):
 # 切换到项目根目录
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(PROJECT_ROOT)
-ENV_PATH = os.path.join(PROJECT_ROOT, "config", ".env")
+ENV_FILE_PATH = os.path.join(PROJECT_ROOT, "config", ".env")
 
-# 检查 .env 配置
+# 检查 .env 配置文件是否存在
 if not os.path.exists("config/.env"):
     print("❌ 未找到 config/.env 文件，请先创建并填入 LLM_API_KEY")
     sys.exit(1)
@@ -42,7 +64,7 @@ if not os.path.exists("config/.env"):
 # 加载 .env 配置
 load_dotenv(dotenv_path=os.path.join(PROJECT_ROOT, "config", ".env"))
 
-# 读取端口配置
+# 读取各服务端口配置
 PORT_SCHEDULER = os.getenv("PORT_SCHEDULER", "51201")
 PORT_AGENT = os.getenv("PORT_AGENT", "51200")
 PORT_FRONTEND = os.getenv("PORT_FRONTEND", "51209")
@@ -51,24 +73,28 @@ PORT_OASIS = os.getenv("PORT_OASIS", "51202")
 # 使用当前 Python 解释器（虚拟环境已由 run.sh/run.ps1 激活）
 venv_python = sys.executable
 
-# 子进程列表
-procs = []
+# 子进程列表（用于管理所有启动的服务）
+child_procs = []
 cleanup_done = False
 
-
+# 占位符：环境变量尚未设置的标记
 PLACEHOLDER = "wait to set"
 
 
 def _init_env_placeholder(key: str):
-    """If the given key is missing or empty in config/.env, write 'wait to set' as placeholder."""
+    """如果 config/.env 中缺少某个配置项，写入占位符值
+
+    参数：
+        key: 环境变量名称
+    """
     current_value = os.getenv(key, "").strip()
     if current_value and current_value != PLACEHOLDER:
-        # Already has a real value (e.g. set by tunnel.py), skip
+        # 已有有效值（例如 tunnel.py 已设置），跳过
         return
 
-    # Write placeholder to .env so users know the field exists
-    if os.path.exists(ENV_PATH):
-        with open(ENV_PATH, "r", encoding="utf-8") as f:
+    # 写入占位符到 .env，使用户知道该字段存在
+    if os.path.exists(ENV_FILE_PATH):
+        with open(ENV_FILE_PATH, "r", encoding="utf-8") as f:
             lines = f.readlines()
     else:
         lines = []
@@ -88,12 +114,19 @@ def _init_env_placeholder(key: str):
             new_lines.append("\n")
         new_lines.append(f"{key}={PLACEHOLDER}\n")
 
-    with open(ENV_PATH, "w", encoding="utf-8") as f:
+    with open(ENV_FILE_PATH, "w", encoding="utf-8") as f:
         f.writelines(new_lines)
 
 
 def cleanup():
-    """清理所有子进程"""
+    """清理所有子进程（优雅关闭 + 强制终止）
+
+    关闭策略：
+    1. 先发送 SIGTERM（优雅关闭）
+    2. 等待最多 5 秒进程退出
+    3. 超时未退出的进程发送 SIGKILL（强制终止）
+    4. 等待所有进程最终结束
+    """
     global cleanup_done
     if cleanup_done:
         return
@@ -101,45 +134,110 @@ def cleanup():
 
     print("\n🛑 正在关闭所有服务...")
 
-    # 先发 SIGTERM（优雅关闭）
-    for p in procs:
-        if p.poll() is None:
+    # 第一步：发送 SIGTERM（优雅关闭）
+    for proc in child_procs:
+        if proc.poll() is None:
             try:
-                p.terminate()
+                proc.terminate()
             except Exception:
                 pass
 
-    # 等待进程退出（最多 5 秒）
+    # 第二步：等待进程退出（最多 5 秒）
     for _ in range(50):
-        if all(p.poll() is not None for p in procs):
+        if all(p.poll() is not None for p in child_procs):
             break
         time.sleep(0.1)
 
-    # 超时未退出的进程强制杀掉
-    for p in procs:
-        if p.poll() is None:
+    # 第三步：超时未退出的进程强制杀掉
+    for proc in child_procs:
+        if proc.poll() is None:
             try:
-                print(f"⚠️  进程 {p.pid} 未响应，强制终止...")
-                p.kill()
+                print(f"⚠️  进程 {proc.pid} 未响应，强制终止...")
+                proc.kill()
             except Exception:
                 pass
 
-    # 等待所有进程结束
-    for p in procs:
+    # 第四步：等待所有进程结束
+    for proc in child_procs:
         try:
-            p.wait(timeout=2)
+            proc.wait(timeout=2)
         except Exception:
             pass
 
     print("✅ 所有服务已关闭")
 
 
-# 注册退出清理
+def resolve_openclaw_cli():
+    """Return the preferred OpenClaw CLI binary path when available."""
+    candidates = ["openclaw.cmd", "openclaw"] if sys.platform == "win32" else ["openclaw"]
+    for candidate in candidates:
+        path = shutil.which(candidate)
+        if path:
+            return path
+    return None
+
+
+def ensure_openclaw_gateway_running():
+    """Best-effort startup for OpenClaw Gateway when the CLI is installed."""
+    openclaw_cli = resolve_openclaw_cli()
+    if not openclaw_cli:
+        return
+
+    try:
+        script_dir = os.path.join(PROJECT_ROOT, "selfskill", "scripts")
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+
+        from configure_openclaw import sync_openclaw_runtime_for_teamclaw_startup
+    except Exception as exc:
+        print(f"🦞 OpenClaw 已安装，但运行时预检查不可用: {exc}")
+        return
+
+    print("🦞 检测 OpenClaw Gateway...")
+
+    try:
+        result = sync_openclaw_runtime_for_teamclaw_startup()
+        load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
+
+        runtime_after = result.get("runtime_after")
+        api_url = result.get("api_url")
+        auth_mode = result.get("auth_mode") or "unknown"
+        sessions_file = result.get("sessions_file")
+        env_updates = result.get("env_updates") or []
+
+        if runtime_after == "running":
+            detail_parts = []
+            if result.get("gateway_started"):
+                detail_parts.append("gateway started")
+            if result.get("chat_completions_enabled"):
+                if result.get("chat_completions_changed"):
+                    detail_parts.append("chatCompletions enabled")
+                else:
+                    detail_parts.append("chatCompletions ready")
+            if api_url:
+                detail_parts.append(api_url)
+            detail = ", ".join(detail_parts) if detail_parts else "gateway running"
+            print(f"   ✅ OpenClaw 已就绪 ({detail})")
+            print(f"   ℹ️ Auth: {auth_mode}")
+            if sessions_file:
+                print(f"   ℹ️ Sessions: {sessions_file}")
+            if env_updates:
+                print(f"   ℹ️ 已刷新 .env: {', '.join(env_updates)}")
+            return
+
+        detail = result.get("gateway_start_error") or runtime_after or "gateway unavailable"
+        print(f"   ⚠️ OpenClaw 已安装，但未能准备好 runtime: {detail}")
+    except Exception as exc:
+        print(f"   ⚠️ OpenClaw 已安装，但启动预热失败: {exc}")
+
+
+# 注册退出清理函数
 atexit.register(cleanup)
 
 
-# 信号处理
+# 信号处理函数
 def signal_handler(signum, frame):
+    """处理 SIGINT/SIGBREAK 信号，触发 atexit 清理"""
     sys.exit(0)  # 触发 atexit
 
 
@@ -165,25 +263,27 @@ print()
 if not os.getenv("INTERNAL_TOKEN"):
     import secrets, re
     _token = secrets.token_hex(32)
-    with open(ENV_PATH, "r",encoding="utf-8") as f:
+    with open(ENV_FILE_PATH, "r", encoding="utf-8") as f:
         content = f.read()
     if re.search(r"^INTERNAL_TOKEN=", content, re.MULTILINE):
         content = re.sub(r"^INTERNAL_TOKEN=.*$", f"INTERNAL_TOKEN={_token}", content, flags=re.MULTILINE)
     else:
         content += f"\nINTERNAL_TOKEN={_token}\n"
-    with open(ENV_PATH, "w") as f:
+    with open(ENV_FILE_PATH, "w") as f:
         f.write(content)
     os.environ["INTERNAL_TOKEN"] = _token
     print(f"🔑 已自动生成 INTERNAL_TOKEN 并写入 .env")
 
-# 服务配置：(提示信息, 脚本路径, 启动后等待秒数)
+ensure_openclaw_gateway_running()
+
+# 服务配置列表：(显示信息, 脚本路径, 启动后等待秒数)
 services = [
     (f"⏰ [1/5] 启动定时调度中心 (port {PORT_SCHEDULER})...", "src/time.py", 2),
     (f"🏛️ [2/5] 启动 OASIS 论坛服务 (port {PORT_OASIS})...", "oasis/server.py", 2),
     (f"🤖 [3/5] 启动 AI Agent (port {PORT_AGENT})...", "src/mainagent.py", 3),
 ]
 
-# Chatbot 启动
+# Chatbot 启动（可选组件）
 chatbot_setup = os.path.join(PROJECT_ROOT, "chatbot", "setup.py")
 is_headless = os.getenv("TEAMBOT_HEADLESS", "0") == "1"
 if os.path.exists(chatbot_setup):
@@ -198,16 +298,17 @@ if os.path.exists(chatbot_setup):
 else:
     services.append((f"🌐 [4/4] 启动前端 Web UI (port {PORT_FRONTEND})...", "src/front.py", 1))
 
+# 启动所有服务
 for msg, script, wait_time in services:
     print(msg)
     proc = subprocess.Popen(
         [venv_python, script],
         cwd=PROJECT_ROOT,
-        stdin=subprocess.DEVNULL,  # 防止子进程读 stdin 导致阻塞
+        stdin=subprocess.DEVNULL,  # 防止子进程读取 stdin 导致阻塞
         stdout=None,  # 继承父进程的 stdout
         stderr=None,  # 继承父进程的 stderr
     )
-    procs.append(proc)
+    child_procs.append(proc)
     time.sleep(wait_time)
 
 print()
@@ -218,12 +319,13 @@ print("  按 Ctrl+C 停止所有服务")
 print("============================================")
 print()
 
-# 自动打开浏览器（后台线程）
+# 自动打开浏览器（后台线程执行）
 # 在无 GUI 环境下，webbrowser 可能尝试启动文本浏览器 (lynx/w3m) 并占用 stdin 导致卡死
 # 预防方式：无 DISPLAY 时将 BROWSER 设为 "true"（/usr/bin/true），静默跳过
 import threading
 
 def _open_browser():
+    """在后台线程中打开浏览器"""
     url = f"http://127.0.0.1:{PORT_FRONTEND}"
     if not os.environ.get("DISPLAY") and sys.platform != "darwin" and sys.platform != "win32":
         # 无图形环境，设 BROWSER=true 让 webbrowser 调用 /usr/bin/true 而非文本浏览器
@@ -242,41 +344,46 @@ RESTART_FLAG = os.path.join(PROJECT_ROOT, ".restart_flag")
 if os.path.isfile(RESTART_FLAG):
     os.remove(RESTART_FLAG)
 
-# 等待任意子进程退出 / 监测重启信号
+# 主循环：监测子进程退出和重启信号
 try:
     while True:
-        # 检测重启信号文件
+        # 检测重启信号文件（由 CLI restart 命令写入）
         if os.path.isfile(RESTART_FLAG):
             print("\n🔄 检测到重启信号，正在重启所有服务...")
             os.remove(RESTART_FLAG)
+
             # 停止所有子进程
-            for p in procs:
-                if p.poll() is None:
+            for proc in child_procs:
+                if proc.poll() is None:
                     try:
-                        p.terminate()
+                        proc.terminate()
                     except Exception:
                         pass
             for _ in range(50):
-                if all(p.poll() is not None for p in procs):
+                if all(p.poll() is not None for p in child_procs):
                     break
                 time.sleep(0.1)
-            for p in procs:
-                if p.poll() is None:
+            for proc in child_procs:
+                if proc.poll() is None:
                     try:
-                        p.kill()
+                        proc.kill()
                     except Exception:
                         pass
-            for p in procs:
+            for proc in child_procs:
                 try:
-                    p.wait(timeout=2)
+                    proc.wait(timeout=2)
                 except Exception:
                     pass
+
             # 等待端口释放（避免 Address already in use）
             time.sleep(2)
-            # 重新加载 .env
-            load_dotenv(dotenv_path=ENV_PATH, override=True)
+
+            # 重新加载 .env 配置
+            load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
+            ensure_openclaw_gateway_running()
+
             # 重新启动所有服务
-            procs.clear()
+            child_procs.clear()
             cleanup_done = False
             print()
             for msg, script, wait_time in services:
@@ -288,16 +395,17 @@ try:
                     stdout=None,
                     stderr=None,
                 )
-                procs.append(proc)
+                child_procs.append(proc)
                 time.sleep(wait_time)
             print()
             print("✅ 所有服务已重启！")
             print()
             continue
 
-        for p in procs:
-            if p.poll() is not None:
-                print(f"⚠️ 服务 (PID {p.pid}) 异常退出，正在关闭其余服务...")
+        # 检测子进程异常退出
+        for proc in child_procs:
+            if proc.poll() is not None:
+                print(f"⚠️ 服务 (PID {proc.pid}) 异常退出，正在关闭其余服务...")
                 sys.exit(1)
         time.sleep(0.5)
 except KeyboardInterrupt:

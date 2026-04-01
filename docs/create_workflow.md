@@ -1,4 +1,3 @@
-
 # Create OASIS Workflow YAML
 
 > This document describes the OASIS workflow YAML format (Version 2 — Graph Mode) and how to create workflow schedules for TeamClaw teams. The format rules are extracted from the visual orchestrator prompt system.
@@ -58,7 +57,7 @@ conditional_edges:
 **Supported conditions:**
 - `last_post_contains:<keyword>` — last message contains keyword
 - `last_post_not_contains:<keyword>` — last message does not contain keyword
-- `post_count_gte:<N>` — message count ≥ N
+- `post_count_gte:<N>` — message count >= N
 - `post_count_lt:<N>` — message count < N
 - `always` — always true
 - `!<expr>` — negate any expression
@@ -122,7 +121,7 @@ plan:
 
 Persona names follow a `tag#mode#identifier` convention.
 
-> **⚠️ Important: Tag vs Name**
+> **Important: Tag vs Name**
 >
 > - **Tag** is a short identifier corresponding to the `tag` field in `oasis_experts.json`. For example: `creative`, `critical`, `architect`. It is used as the **first part** of the `expert` field in YAML to look up the persona prompt.
 > - **Name** is the full display name of the persona (e.g., `"🎨 创意顾问"`, `"🔍 批判分析师"`), stored in the `name` field of `oasis_experts.json`. It is used as the **third part** (identifier) in `#oasis#` mode to reference a specific session agent.
@@ -144,26 +143,28 @@ Persona names follow a `tag#mode#identifier` convention.
 
 ### 4.2 External ACP Agents
 
-For external ACP agents (tag = `openclaw`, `codex`, etc.), additional fields are required:
+For external ACP agents (tag = `openclaw`, `codex`, `claude`, `gemini`, `aider`, etc.), additional fields are required:
 
 ```yaml
 - id: ext1
-  expert: "openclaw#ext#my_agent"     # 必须使用short name格式：tag#ext#id
+  expert: "openclaw#ext#my_agent"     # Must use short name format: tag#ext#id
   api_url: "http://127.0.0.1:23001"
   api_key: "****"
-  model: "agent:my_agent"              # 支持session扩展：agent:name 或 agent:name:session
+  model: "agent:my_agent"              # Supports session extension: agent:name or agent:name:session
 ```
 
-**关键配置要求：**
-- **expert字段**：必须使用`tag#ext#id`格式（tag可以是openclaw、codex等）
-- **model字段**：支持两种形式：
-  - `agent:<name>` - 默认 session 后缀为 `teamclawchat`（与群聊 ACP 一致，跨 team 共用同一外部 agent 上下文）
-  - `agent:<name>:<session>` - 显式指定 session 后缀
+**ACP communication**: External agents with supported tags use the `acpx` CLI adapter (`src/acpx_adapter.py`) for Agent Client Protocol communication. `acpx` is auto-installed during `setup`. If `acpx` is not available, the system falls back to HTTP-only communication.
 
-**Session控制说明：**
-- 相同session共享上下文，不同session保持独立
-- model字段中的`<name>`仅用于路由，实际agent名称来自`external_agents.json`的`global_name`字段
-- session决定对话隔离：相同session = 共享上下文，不同session = 独立上下文
+**Key configuration requirements:**
+- **expert field**: Must use `tag#ext#id` format (tag can be openclaw, codex, etc.)
+- **model field**: Supports two formats:
+  - `agent:<name>` - uses team name as session by default
+  - `agent:<name>:<session>` - explicitly specifies session name
+
+**Session control notes:**
+- Same session shares context; different sessions remain independent
+- The `<name>` in the model field is only used for routing; the actual agent name comes from the `global_name` field in `external_agents.json`
+- Session determines conversation isolation: same session = shared context, different sessions = independent context
 
 ---
 
@@ -544,4 +545,4 @@ uv run scripts/cli.py topics watch --topic-id <TOPIC_ID>
 5. **Stateless for debates**: Use `#temp#` mode for lightweight discussion personas where memory is not needed.
 6. **External agents for specialized work**: Use `#ext#` for delegating to other OpenClaw agents or external APIs with their own tools.
 7. **Edge ordering**: Selector node outgoing edges should be defined in `selector_edges`, not in regular `edges`.
-8. **⚠️ Selector edge restriction**: Selector nodes (`selector: true`) must NOT have outgoing edges defined in the regular `edges` section. All outgoing edges from a selector MUST be defined in `selector_edges`. This is a critical rule — violating it will cause the workflow to behave incorrectly.
+8. **Selector edge restriction**: Selector nodes (`selector: true`) must NOT have outgoing edges defined in the regular `edges` section. All outgoing edges from a selector MUST be defined in `selector_edges`. This is a critical rule — violating it will cause the workflow to behave incorrectly.

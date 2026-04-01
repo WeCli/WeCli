@@ -13,6 +13,8 @@ import shlex
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
+from teambot_workspace import resolve_session_workspace
+
 mcp = FastMCP("Commander")
 
 # 项目根目录
@@ -131,12 +133,9 @@ def _python_cmd() -> str:
     return sys.executable
 
 
-def _user_workspace(username: str) -> str:
+def _user_workspace(username: str, session_id: str = "", cwd: str = "") -> str:
     """获取用户独立工作目录，自动创建"""
-    safe_name = os.path.basename(username)
-    workspace = os.path.join(USER_FILES_BASE, safe_name)
-    os.makedirs(workspace, exist_ok=True)
-    return workspace
+    return str(resolve_session_workspace(username, session_id, explicit_cwd=cwd).cwd)
 
 
 def _validate_command(command: str) -> str | None:
@@ -191,7 +190,7 @@ def _truncate_output(text: str, max_len: int = MAX_OUTPUT_LENGTH) -> str:
 
 
 @mcp.tool()
-async def run_command(username: str, command: str) -> str:
+async def run_command(username: str, command: str, session_id: str = "", cwd: str = "") -> str:
     """
     在用户的隔离工作目录中执行系统命令。
     仅允许安全的只读/文本处理类命令，有超时保护。
@@ -205,7 +204,8 @@ async def run_command(username: str, command: str) -> str:
         return f"❌ {reject_reason}"
 
     # 2. 获取用户工作目录
-    workspace = _user_workspace(username)
+    workspace_state = resolve_session_workspace(username, session_id, explicit_cwd=cwd)
+    workspace = str(workspace_state.cwd)
 
     try:
         # 3. 在用户目录下执行命令（使用 shell=True 以支持管道和重定向）
@@ -239,7 +239,10 @@ async def run_command(username: str, command: str) -> str:
         else:
             result_parts.append(f"⚠️ 命令执行完毕 (exit code: {exit_code})")
 
-        result_parts.append(f"📁 工作目录: ~/{username}/")
+        result_parts.append(f"📁 工作目录: {workspace}")
+        result_parts.append(f"🧭 workspace mode: {workspace_state.mode}")
+        if workspace_state.remote:
+            result_parts.append(f"🌐 remote: {workspace_state.remote}")
 
         if out:
             result_parts.append(f"📤 标准输出:\n{_truncate_output(out)}")
@@ -255,7 +258,7 @@ async def run_command(username: str, command: str) -> str:
 
 
 @mcp.tool()
-async def run_python_code(username: str, code: str) -> str:
+async def run_python_code(username: str, code: str, session_id: str = "", cwd: str = "") -> str:
     """
     在用户的隔离工作目录中执行 Python 代码片段。
     适用于数据计算、文本处理、简单脚本等场景。
@@ -263,7 +266,8 @@ async def run_python_code(username: str, code: str) -> str:
     :param username: 用户名（由系统自动注入，无需手动传递）
     :param code: 要执行的 Python 代码
     """
-    workspace = _user_workspace(username)
+    workspace_state = resolve_session_workspace(username, session_id, explicit_cwd=cwd)
+    workspace = str(workspace_state.cwd)
 
     # 将代码写入临时文件执行（比 -c 参数更可靠，支持多行和特殊字符）
     tmp_script = os.path.join(workspace, ".tmp_exec.py")
@@ -297,6 +301,10 @@ async def run_python_code(username: str, code: str) -> str:
             result_parts.append("✅ Python 代码执行成功")
         else:
             result_parts.append(f"⚠️ Python 代码执行出错 (exit code: {exit_code})")
+        result_parts.append(f"📁 工作目录: {workspace}")
+        result_parts.append(f"🧭 workspace mode: {workspace_state.mode}")
+        if workspace_state.remote:
+            result_parts.append(f"🌐 remote: {workspace_state.remote}")
 
         if out:
             result_parts.append(f"📤 输出:\n{_truncate_output(out)}")

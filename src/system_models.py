@@ -1,3 +1,11 @@
+"""
+系统触发相关的数据模型模块
+
+定义系统触发请求和附件格式：
+- SystemTriggerAttachment：系统触发消息附件
+- SystemTriggerRequest：系统触发请求
+"""
+
 from typing import Optional
 
 from pydantic import BaseModel
@@ -12,6 +20,7 @@ class SystemTriggerAttachment(BaseModel):
 
 
 class SystemTriggerRequest(BaseModel):
+    """系统触发请求"""
     user_id: str
     text: str = "summary"
     session_id: str = "default"

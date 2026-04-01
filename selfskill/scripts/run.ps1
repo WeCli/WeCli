@@ -12,7 +12,7 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 Set-TeamClawUtf8
 
-$pidFile = Join-Path $projectRoot ".mini_timebot.pid"
+$pidFile = Join-Path $projectRoot ".teamclaw.pid"
 $tunnelPidFile = Join-Path $projectRoot ".tunnel.pid"
 $envPath = Join-Path $projectRoot "config\.env"
 
@@ -219,13 +219,14 @@ function Show-Help {
     Write-Host ""
     Write-Host "Commands:"
     Write-Host "  setup                          Install or update Python dependencies"
-    Write-Host "  start                          Start services in the background"
-    Write-Host "  start-foreground               Start services in the foreground (best for managed terminals / CI / agent runners)"
+    Write-Host "  start                          Start services in the background (also warms installed OpenClaw)"
+    Write-Host "  start-foreground               Start services in the foreground (best for managed terminals / CI / agent runners; also warms installed OpenClaw)"
     Write-Host "  stop                           Stop services"
     Write-Host "  status                         Show current service status"
     Write-Host "  add-user <name> <password>     Create or update a password user"
     Write-Host "  configure ...                  Run selfskill/scripts/configure.py"
     Write-Host "  auto-model                     Query available models from the configured API"
+    Write-Host "  sync-openclaw-llm              Sync TeamClaw's current LLM config back to OpenClaw"
     Write-Host "  cli ...                        Run scripts/cli.py"
     Write-Host "  check-openclaw                 Detect or install OpenClaw"
     Write-Host "  check-openclaw-weixin          Install or inspect the OpenClaw Weixin plugin"
@@ -427,9 +428,9 @@ switch ($Command) {
             Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
         }
 
-        # NOTE: OpenClaw / Antigravity detection is now handled by the
-        # frontend first-login Setup Wizard, not silently at start time.
-        # Users can click import buttons in the wizard interactively.
+        # NOTE: startup now warms an installed OpenClaw gateway and refreshes
+        # OPENCLAW_* runtime values, but it still does not silently import
+        # OpenClaw / Antigravity LLM settings into TeamClaw.
 
         Stop-TeamClawServiceProcesses | Out-Null
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
@@ -448,7 +449,7 @@ switch ($Command) {
         }
 
         $python = Ensure-VenvPython -ProjectRoot $projectRoot
-        $env:MINI_TIMEBOT_HEADLESS = "1"
+        $env:TEAMBOT_HEADLESS = "1"
         $stdoutLog = Join-Path $projectRoot "logs\launcher.out.log"
         $stderrLog = Join-Path $projectRoot "logs\launcher.err.log"
         $process = Start-BackgroundPythonProcess `
@@ -561,7 +562,7 @@ switch ($Command) {
         }
 
         $python = Ensure-VenvPython -ProjectRoot $projectRoot
-        $env:MINI_TIMEBOT_HEADLESS = "1"
+        $env:TEAMBOT_HEADLESS = "1"
         Write-Host "Starting TeamClaw in the foreground (headless) ..."
         Write-Host "This session stays attached. Press Ctrl+C to stop all services."
 
@@ -665,6 +666,11 @@ switch ($Command) {
 
     "auto-model" {
         $code = Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--auto-model")
+        exit $code
+    }
+
+    "sync-openclaw-llm" {
+        $code = Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--sync-teamclaw-llm")
         exit $code
     }
 

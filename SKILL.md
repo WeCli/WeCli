@@ -1,6 +1,6 @@
 ---
 name: "TeamClaw"
-description: "A multi-agent orchestration platform with visual workflow (OASIS). Create and configure agents (OpenClaw/external API), orchestrate them into Teams, design workflows via visual canvas. Supports Team conversations, scheduled tasks, Telegram/QQ bots, and Cloudflare Tunnel for remote access."
+description: "A multi-agent orchestration platform with visual workflow (OASIS). Create and configure agents (OpenClaw/external API), orchestrate them into Teams, build new Teams with Team Creator, and design workflows via visual canvas. Supports Team conversations, OASIS Town with living GraphRAG memory, scheduled tasks, Telegram/QQ bots, TinyFish competitor monitoring, and Cloudflare Tunnel for remote access."
 user-invokable: true
 compatibility:
   - "deepseek"
@@ -12,11 +12,11 @@ compatibility:
   - "antigravity"
   - "minimax"
 
-argument-hint: "[RECOMMENDED] LLM_API_KEY, LLM_BASE_URL (auto-detected from OpenClaw/Antigravity, or configured via frontend wizard on first login). [MODEL] If LLM_MODEL is not provided, the frontend setup wizard will auto-detect available models. [OPTIONAL] TTS_MODEL/TTS_VOICE, STT_MODEL/WHISPER_MODEL, OPENCLAW_*, TELEGRAM_BOT_TOKEN/QQ_APP_ID, PORT_*. [TUNNEL] Cloudflare Tunnel starts automatically with 'start' command for mobile access; PUBLIC_DOMAIN is set by tunnel.py."
+argument-hint: "[RECOMMENDED] LLM_API_KEY, LLM_BASE_URL (auto-detected from OpenClaw/Antigravity, or configured via frontend wizard on first login). [MODEL] If LLM_MODEL is not provided, the frontend setup wizard will auto-detect available models. [OPTIONAL] TTS_MODEL/TTS_VOICE, STT_MODEL/WHISPER_MODEL, OPENCLAW_*, TINYFISH_*, TELEGRAM_BOT_TOKEN/QQ_APP_ID, PORT_*. [TUNNEL] Cloudflare Tunnel starts automatically with 'start' command for mobile access; PUBLIC_DOMAIN is set by tunnel.py."
 
 metadata:
-  version: "1.0.4"
-  github: "https://github.com/Avalon-467/Teamclaw"
+  version: "1.1.0"
+  github: "https://github.com/BorisGuo6/TeamClaw"
   ports:
     agent: 51200
     scheduler: 51201
@@ -28,6 +28,8 @@ metadata:
     - "chatbot_whitelist"
   integrations:
     - "openclaw"
+    - "acpx"
+    - "tinyfish"
     - "telegram"
     - "qq"
     - "cloudflare_tunnel"
@@ -52,14 +54,16 @@ Read only the relevant docs:
 |---|---|---|
 | Install / configure / start TeamClaw | This file | [docs/ports.md](./docs/ports.md) only if ports or routing matter |
 | Understand what TeamClaw is | [docs/overview.md](./docs/overview.md) | [README.md](./README.md) |
-| Understand OASIS runtime semantics | [docs/oasis-reference.md](./docs/oasis-reference.md) | [docs/create_workflow.md](./docs/create_workflow.md) |
+| Use Team Creator or build a Team from a task description | [docs/team-creator.md](./docs/team-creator.md) | [docs/build_team.md](./docs/build_team.md), [docs/example_team.md](./docs/example_team.md) |
+| Understand OASIS runtime semantics, Town Mode, GraphRAG memory, or ReportAgent | [docs/oasis-reference.md](./docs/oasis-reference.md) | [docs/runtime-reference.md](./docs/runtime-reference.md), [docs/create_workflow.md](./docs/create_workflow.md) |
 | Understand runtime architecture / auth / services | [docs/runtime-reference.md](./docs/runtime-reference.md) | [docs/ports.md](./docs/ports.md), [docs/repo-index.md](./docs/repo-index.md) |
 | Find CLI commands | [docs/cli.md](./docs/cli.md) | `uv run scripts/cli.py <command> --help` |
 | Build or edit a Team | [docs/build_team.md](./docs/build_team.md) | [docs/example_team.md](./docs/example_team.md) |
 | Create or debug a workflow YAML | [docs/create_workflow.md](./docs/create_workflow.md) | [docs/example_team.md](./docs/example_team.md) |
 | Configure OpenClaw integration | [docs/openclaw-commands.md](./docs/openclaw-commands.md) | [docs/build_team.md](./docs/build_team.md) |
+| Configure or debug ACP / acpx (external agent communication) | [docs/runtime-reference.md](./docs/runtime-reference.md) | [docs/build_team.md](./docs/build_team.md), [docs/oasis-reference.md](./docs/oasis-reference.md) |
+| Configure TinyFish competitor monitoring | [docs/tinyfish-monitor.md](./docs/tinyfish-monitor.md) | [docs/runtime-reference.md](./docs/runtime-reference.md), [docs/repo-index.md](./docs/repo-index.md) |
 | Debug ports / service wiring / frontend proxy routes | [docs/ports.md](./docs/ports.md) | [docs/repo-index.md](./docs/repo-index.md) |
-| Refactor / deploy / rollback | [docs/migration-playbook.md](./docs/migration-playbook.md) | [docs/backend-refactor-plan.md](./docs/backend-refactor-plan.md), [docs/repo-index.md](./docs/repo-index.md) |
 
 ## Repository Indexing
 
@@ -67,7 +71,9 @@ Before touching code, read [docs/repo-index.md](./docs/repo-index.md). It maps:
 
 - runtime entrypoints (`src/mainagent.py`, `src/front.py`, `src/time.py`, `oasis/server.py`)
 - install and configuration scripts (`selfskill/scripts/run.*`, `configure.py`, `scripts/setup_apikey.*`)
-- frontend files (`src/static/js/main.js`, `src/templates/*.html`)
+- frontend files (`src/static/js/main.js`, `src/static/css/style.css`, `src/templates/*.html`)
+- OASIS Town / GraphRAG files (`oasis/swarm_engine.py`, `oasis/graph_memory.py`, `oasis/forum.py`)
+- ACP exchange adapter (`src/acpx_adapter.py`, `src/group_service.py`)
 - Team / workflow data paths under `data/user_files/...`
 - OpenClaw, bots, tests, and verification commands
 
@@ -82,6 +88,7 @@ The goal is a **silent, non-interactive install**. The AI code CLI agent should 
 1. Run `setup` → `configure --init` → `start`. The `start` command:
    - Creates a default `.env` if missing
    - Starts all services even if LLM is not yet configured
+   - Automatically warms an installed OpenClaw gateway and refreshes runtime `OPENCLAW_*` values
    - Does NOT silently import OpenClaw/Antigravity config — that's left to the user via the Setup Wizard
    - **Automatically starts Cloudflare Tunnel** for mobile remote access and prints the public URL
 2. **Do NOT ask the user for LLM credentials before starting**. The frontend provides a first-login setup wizard where the user can configure API Key, select provider, and choose a model from a dropdown — all from the web UI.
@@ -111,6 +118,7 @@ The goal is a **silent, non-interactive install**. The AI code CLI agent should 
 10. Before adding an OpenClaw agent into a Team, always run `openclaw sessions` and confirm the target agent already exists.
 11. On Windows PowerShell, prefer `openclaw.cmd` for channel and plugin commands. `openclaw` may resolve to `openclaw.ps1`, which can fail under restrictive execution policies.
 12. For the Weixin plugin on Windows, do not trust the official `npx -y @tencent-weixin/openclaw-weixin-cli@latest install` path as the only route. It may fail because the installer shells out to `which openclaw`. Fall back to manual plugin install with `openclaw.cmd`.
+13. If TeamClaw LLM settings change after OpenClaw is already installed, prefer finishing the provider/model selection before pushing TeamClaw config back into OpenClaw. Partial edits intentionally do not auto-sync; use `sync-openclaw-llm` when the desired LLM config is final.
 
 ## Standard Install Flow
 
@@ -120,7 +128,7 @@ The simplest install — no questions asked, no manual config required:
 
 ```bash
 # Linux / macOS
-bash selfskill/scripts/run.sh setup
+bash selfskill/scripts/run.sh setup          # installs uv, venv, deps, and acpx (ACP plugin)
 bash selfskill/scripts/run.sh configure --init
 bash selfskill/scripts/run.sh start
 # → Open http://127.0.0.1:51209
@@ -130,15 +138,22 @@ bash selfskill/scripts/run.sh start
 
 ```powershell
 # Windows PowerShell
-powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 setup
+powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 setup   # installs uv, venv, deps, and acpx
 powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 configure --init
 powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 start
 # → Open http://127.0.0.1:51209
 ```
 
+The `setup` command automatically:
+1. Installs `uv` package manager if missing
+2. Creates a Python 3.11+ virtual environment
+3. Installs Python dependencies from `config/requirements.txt`
+4. **Installs `acpx` (ACP exchange plugin) via `npm install -g acpx@latest`** — used for group chat broadcasting and OASIS ExternalExpert communication with external AI agents (OpenClaw, Codex, Claude, Gemini, Aider)
+
 The `start` command automatically:
 1. Creates `config/.env` from template if missing
 2. Starts all services regardless of LLM config status
+3. Warms an installed OpenClaw gateway and refreshes runtime `OPENCLAW_*` values without importing OpenClaw's LLM config
 
 After startup, the frontend setup wizard handles LLM configuration via the web UI. The wizard detects local OpenClaw and Antigravity-Manager and offers one-click import buttons.
 
@@ -273,6 +288,18 @@ powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 auto-model
 powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 configure LLM_MODEL <model>
 ```
 
+If OpenClaw is installed on the same machine, TeamClaw now supports an explicit reverse sync back into OpenClaw:
+
+```bash
+bash selfskill/scripts/run.sh sync-openclaw-llm
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 sync-openclaw-llm
+```
+
+`configure` also auto-syncs safe LLM updates when the TeamClaw config is complete. Partial edits that only touch `LLM_API_KEY` or `LLM_BASE_URL` intentionally stop short of rewriting OpenClaw, so a half-finished provider switch does not leak into the OpenClaw default model config.
+
 For managed terminals, CI, or agent runners that clean up child processes after the command exits, use `start-foreground` instead of `start`.
 
 ### Windows WSL Fallback
@@ -335,6 +362,45 @@ Notes:
 - TeamClaw starts even without LLM configured. The frontend setup wizard will prompt the user to configure on first login.
 - `chatbot/setup.py` requires an interactive terminal (`stdin.isatty()`). When launched from a non-interactive context (agent runners, CI, background processes, or `scripts/start.sh` piped from another script), `launcher.py` automatically skips the chatbot interactive menu. You can also force this by setting `TEAMBOT_HEADLESS=1`. If you still see `EOFError: EOF when reading a line`, it means the `isatty` guard was bypassed — ensure you are using `selfskill/scripts/run.sh start` (which backgrounds `launcher.py` correctly) instead of calling `scripts/start.sh` or `scripts/launcher.py` directly in a non-interactive shell.
 
+### Troubleshooting: Python 2 vs Python 3
+
+On macOS, the system `python` command may point to **Python 2.7** (`/usr/local/bin/python` or `/usr/bin/python`), while TeamClaw requires **Python 3.11+**. This causes confusing errors if you try to run scripts directly:
+
+```
+SyntaxError: Non-ASCII character '\xe5' in file front.py on line 36
+```
+
+**Root cause**: Python 2 cannot handle UTF-8 Chinese characters without a `# coding` header, and TeamClaw uses Python 3.11+ syntax throughout.
+
+**Solutions** (in order of preference):
+
+1. **Always use the canonical startup** — this handles venv creation and activation automatically:
+   ```bash
+   bash selfskill/scripts/run.sh start
+   ```
+
+2. **Activate the venv first**, then use bare `python`:
+   ```bash
+   source .venv/bin/activate
+   python scripts/launcher.py
+   ```
+
+3. **Use the venv python directly**:
+   ```bash
+   .venv/bin/python scripts/launcher.py
+   ```
+
+**Never do this**:
+```bash
+# ❌ Wrong — system python may be Python 2.7
+cd src && python front.py
+
+# ❌ Wrong — python3 may be a different version (e.g., 3.14) without project deps
+python3 src/front.py
+```
+
+**Safety guards**: `launcher.py` now includes a Python version check at startup and will print a clear error if accidentally run under Python 2. The `run.sh` and `manual_run.sh` scripts also verify the Python version after venv activation.
+
 ## Common Operations
 
 ### Runtime
@@ -391,6 +457,7 @@ See [docs/repo-index.md](./docs/repo-index.md) and [docs/example_team.md](./docs
 - [docs/index.md](./docs/index.md) — canonical docs map
 - [docs/repo-index.md](./docs/repo-index.md) — codebase and file index
 - [docs/overview.md](./docs/overview.md) — product overview
+- [docs/team-creator.md](./docs/team-creator.md) — Team Creator flow, jobs, bilingual UI, workflow-to-team bridge
 - [docs/oasis-reference.md](./docs/oasis-reference.md) — OASIS runtime model and orchestration reference
 - [docs/runtime-reference.md](./docs/runtime-reference.md) — architecture, services, auth, runtime reference
 - [docs/cli.md](./docs/cli.md) — CLI reference
@@ -398,6 +465,5 @@ See [docs/repo-index.md](./docs/repo-index.md) and [docs/example_team.md](./docs
 - [docs/create_workflow.md](./docs/create_workflow.md) — workflow YAML format
 - [docs/example_team.md](./docs/example_team.md) — example Team files
 - [docs/openclaw-commands.md](./docs/openclaw-commands.md) — OpenClaw commands and patterns
+- [docs/tinyfish-monitor.md](./docs/tinyfish-monitor.md) — TinyFish monitor operations and persistence model
 - [docs/ports.md](./docs/ports.md) — service map and ports
-- [docs/migration-playbook.md](./docs/migration-playbook.md) — deployment / rollback
-- [docs/backend-refactor-plan.md](./docs/backend-refactor-plan.md) — architecture roadmap

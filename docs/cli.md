@@ -1,6 +1,6 @@
 # TeamClaw CLI 命令大全
 
-> 最后更新：2026-03-22
+> 最后更新：2026-04-01
 
 ## 运行方式
 
@@ -18,7 +18,7 @@ Set-Location C:\path\to\Teamclaw
 uv run .\scripts\cli.py [参数...]
 ```
 
-> ⚠️ **不需要** 额外安装 `teamclaw` 命令或设置 alias。直接在项目目录下用 `uv run` 即可，它会自动解析项目依赖并执行。
+> 不需要额外安装 `teamclaw` 命令或设置 alias。直接在项目目录下用 `uv run` 即可，它会自动解析项目依赖并执行。
 > 如果你更想复用当前虚拟环境，也可以直接运行 `.venv\Scripts\python.exe .\scripts\cli.py [参数...]`。
 
 ## 概览
@@ -31,9 +31,9 @@ uv run scripts/cli.py [-u USER] <子命令> [参数...]
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
-| `-u`, `--user` | 用户名（通过 `X-User-Id` header 传递给后端） | 环境变量 `CLI_USER`，兜底 `admin` |
+| `-u`, `--user` | 用户名（通过 `X-User-Id` header 传递给后端） | 环境变量 `CLI_USER`，默认 `admin` |
 
-> 💡 `-u` 对所有走 front.py 的命令生效（internal-agents / teams / visual / openclaw-snapshot 等）。
+> `-u` 对所有走 front.py 的命令生效（internal-agents / teams / visual / openclaw-snapshot 等）。
 
 ---
 
@@ -77,8 +77,8 @@ uv run scripts/cli.py -u Avalon_01 chat "你好" -s mysession
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `message` | 消息内容（位置参数） | ✅ | — |
-| `-s`, `--session` | 会话 ID | ✅ | — |
+| `message` | 消息内容（位置参数） | 是 | — |
+| `-s`, `--session` | 会话 ID | 是 | — |
 
 ---
 
@@ -116,7 +116,7 @@ uv run scripts/cli.py session-status -s mysession
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `-s`, `--session` | 会话 ID | ❌ | `default` |
+| `-s`, `--session` | 会话 ID | 否 | `default` |
 
 ---
 
@@ -137,9 +137,9 @@ uv run scripts/cli.py -u Avalon_01 history -s mysession --full
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `-s`, `--session` | 会话 ID | ❌ | `default` |
-| `-n`, `--limit` | 最近 N 条 | ❌ | 全部 |
-| `--full` | 不截断长消息 | ❌ | `False` |
+| `-s`, `--session` | 会话 ID | 否 | `default` |
+| `-n`, `--limit` | 最近 N 条 | 否 | 全部 |
+| `--full` | 不截断长消息 | 否 | `False` |
 
 ---
 
@@ -153,7 +153,7 @@ uv run scripts/cli.py -u Avalon_01 delete-session mysession
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `session` | 会话 ID（位置参数） | ✅ | — |
+| `session` | 会话 ID（位置参数） | 是 | — |
 
 ---
 
@@ -174,8 +174,8 @@ uv run scripts/cli.py settings --set model gpt-4o
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `--full` | 显示完整设置 | ❌ | `False` |
-| `--set KEY VALUE` | 修改设置项 | ❌ | — |
+| `--full` | 显示完整设置 | 否 | `False` |
+| `--set KEY VALUE` | 修改设置项 | 否 | — |
 
 ---
 
@@ -193,7 +193,7 @@ uv run scripts/cli.py tools --brief
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `--brief` | 仅显示工具名称 | ❌ | `False` |
+| `--brief` | 仅显示工具名称 | 否 | `False` |
 
 ---
 
@@ -207,9 +207,9 @@ uv run scripts/cli.py tts "你好世界" -o hello.mp3 --voice alloy
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `text` | 要转换的文本（位置参数） | ✅ | — |
-| `-o`, `--output` | 输出文件 | ❌ | `tts_output.mp3` |
-| `--voice` | 语音角色 | ❌ | — |
+| `text` | 要转换的文本（位置参数） | 是 | — |
+| `-o`, `--output` | 输出文件 | 否 | `tts_output.mp3` |
+| `--voice` | 语音角色 | 否 | — |
 
 ---
 
@@ -223,7 +223,7 @@ uv run scripts/cli.py cancel -s mysession
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `-s`, `--session` | 会话 ID | ❌ | `default` |
+| `-s`, `--session` | 会话 ID | 否 | `default` |
 
 ---
 
@@ -280,12 +280,12 @@ uv run scripts/cli.py groups sessions --group-id abc123
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 | ❌ | `list` |
+| `action` | 操作 | 否 | `list` |
 | `--group-id` | 群组 ID | 视操作而定 | — |
 | `--name` | 群组名称 | create 时 | — |
 | `--message` | 消息内容 | send 时 | — |
-| `--data` | JSON 数据 | ❌ | — |
-| `--after-id` | 增量消息起点 | ❌ | — |
+| `--data` | JSON 数据 | 否 | — |
+| `--after-id` | 增量消息起点 | 否 | — |
 
 
 
@@ -336,8 +336,8 @@ uv run scripts/cli.py openclaw remove --name mybot
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 | ❌ | `sessions` |
-| `--filter` | 过滤关键词 | ❌ | — |
+| `action` | 操作 | 否 | `sessions` |
+| `--filter` | 过滤关键词 | 否 | — |
 | `--name` | Agent 名称 | 视操作 | — |
 | `--agent` | Agent 名称 | 视操作 | — |
 | `--workspace` | 工作区路径 | 视操作 | — |
@@ -373,8 +373,8 @@ uv run scripts/cli.py -u Avalon_01 openclaw-snapshot restore-all --team myteam
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 | ❌ | `get` |
-| `--team` | Team 名称 | ✅ | — |
+| `action` | 操作 | 否 | `get` |
+| `--team` | Team 名称 | 是 | — |
 | `--agent-name` | Agent 全名 | export 时 | — |
 | `--short-name` | 显示名 | export/restore 时 | — |
 | `--target-name` | 恢复目标 Agent 名 | restore 时 | — |
@@ -414,8 +414,8 @@ uv run scripts/cli.py -u Avalon_01 visual sessions-status
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 | ❌ | `personas` |
-| `--team` | Team 名称 | ❌ | — |
+| `action` | 操作 | 否 | `personas` |
+| `--team` | Team 名称 | 否 | — |
 | `--tag` | 人设 tag | delete-persona 时 | — |
 | `--name` | 布局名称 | load/delete 时 | — |
 | `--data` | JSON 数据 | 视操作 | — |
@@ -443,10 +443,10 @@ uv run scripts/cli.py -u Avalon_01 internal-agents delete --sid s1 --team myteam
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 | ❌ | `list` |
-| `--team` | Team 名称 | ❌ | — |
-| `--sid` | Session ID | update/delete ✅ | — |
-| `--session` | Session ID（add 时自动补入 data） | ❌ | — |
+| `action` | 操作 | 否 | `list` |
+| `--team` | Team 名称 | 否 | — |
+| `--sid` | Session ID | update/delete 时必填 | — |
+| `--session` | Session ID（add 时自动补入 data） | 否 | — |
 | `--data` | JSON 数据 | add/update 时 | — |
 
 ---
@@ -459,7 +459,7 @@ uv run scripts/cli.py -u Avalon_01 internal-agents delete --sid s1 --team myteam
 # 团队列表
 uv run scripts/cli.py -u Avalon_01 teams
 
-# 🆕 一次性查看 team 完整信息（聚合成员、人设、workflows、话题等）
+# 一次性查看 team 完整信息（聚合成员、人设、workflows、话题等）
 uv run scripts/cli.py -u Avalon_01 teams info --team-name team2
 
 # 创建 / 删除团队
@@ -494,15 +494,15 @@ uv run scripts/cli.py -u Avalon_01 teams snapshot-upload --team-name myteam --fi
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 (`list`, `info`, `create`, `delete`, `members`, `snapshot-preview`, `snapshot-download`, ...) | ❌ | `list` |
+| `action` | 操作 (`list`, `info`, `create`, `delete`, `members`, `snapshot-preview`, `snapshot-download`, ...) | 否 | `list` |
 | `--team-name` | Team 名称 | 视操作 | — |
 | `--tag` | 人设 tag | update-persona/delete-persona 时 | — |
 | `--data` | JSON 数据 | 视操作 | — |
-| `-o`, `--output` | 输出文件路径 | ❌ | `team_{name}_snapshot.zip` |
+| `-o`, `--output` | 输出文件路径 | 否 | `team_{name}_snapshot.zip` |
 | `--file` | 上传文件路径 | snapshot-upload 时 | — |
-| `--include` | 选择性导出 JSON（snapshot-download 时） | ❌ | 全量导出 |
+| `--include` | 选择性导出 JSON（snapshot-download 时） | 否 | 全量导出 |
 
-> 💡 **`info` 命令**：一次性聚合调用多个 API（成员、人设、workflows、话题、OpenClaw 快照），美化输出该 team 的完整信息快照，不直接对应单个接口。
+> `info` 命令一次性聚合调用多个 API（成员、人设、workflows、话题、OpenClaw 快照），美化输出该 team 的完整信息快照，不直接对应单个接口。
 
 ### 快照预览 (`snapshot-preview`)
 
@@ -607,7 +607,7 @@ uv run scripts/cli.py -u admin teams snapshot-download --team-name myteam \
   --include '{"skills":{"OpenClaw助手":["Teamclaw"],"另一个Agent":true}}'
 ```
 
-> 💡 **提示**：先运行 `snapshot-preview` 查看可导出内容，再根据预览结果构造 `--include` JSON。`snapshot-preview` 命令末尾也会自动生成选择性导出的示例命令。
+> 先运行 `snapshot-preview` 查看可导出内容，再根据预览结果构造 `--include` JSON。`snapshot-preview` 命令末尾也会自动生成选择性导出的示例命令。
 
 ---
 
@@ -640,12 +640,12 @@ uv run scripts/cli.py topics delete-all
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 (`list`, `show`, `watch`, `cancel`, `purge`, `delete-all`) | ❌ | `list` |
-| `--topic-id` | 话题 ID | show/watch/cancel/purge 时 ✅ | — |
-| `--raw` | 输出原始 JSON (show 时) | ❌ | `False` |
-| `--full` | 不截断长发言内容 (show 时) | ❌ | `False` |
+| `action` | 操作 (`list`, `show`, `watch`, `cancel`, `purge`, `delete-all`) | 否 | `list` |
+| `--topic-id` | 话题 ID | show/watch/cancel/purge 时必填 | — |
+| `--raw` | 输出原始 JSON (show 时) | 否 | `False` |
+| `--full` | 不截断长发言内容 (show 时) | 否 | `False` |
 
-> 💡 **三种查看方式的区别：**
+> 三种查看方式的区别：
 > - `show` — 一次性获取话题的完整快照（时间线 + 所有发言 + 结论），适合话题结束后回顾
 > - `watch` — 实时流式输出讨论进展（连接后端 SSE），适合启动 workflow 后实时跟踪
 > - `conclusion` (在 workflows 子命令中) — 阻塞等待直到讨论结束并返回结论
@@ -655,7 +655,7 @@ uv run scripts/cli.py topics delete-all
 
 **OASIS 人设管理**
 
-> **Note:** `personas` 命令管理"人设"(persona)——即 **expert persona prompt**，一种定义 Agent 角色、性格和能力的特殊提示词配置，而非一个独立的 agent。团队目录下的 `oasis_experts.json` 就是这些 persona prompt 的集合文件。
+> `personas` 命令管理"人设"(persona)——即 **expert persona prompt**，一种定义 Agent 角色、性格和能力的特殊提示词配置，而非一个独立的 agent。团队目录下的 `oasis_experts.json` 就是这些 persona prompt 的集合文件。
 
 ```bash
 # 列出人设
@@ -679,12 +679,12 @@ uv run scripts/cli.py -u Avalon_01 personas delete --tag my_lawyer --team team2
 ```
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 | ❌ | `list` |
-| `--tag` | 人设标签（唯一标识） | add/update/delete 时 ✅ | — |
-| `--persona-name` | 人设显示名称 | add 时 ✅，update 时可选（不传则保持原值） | — |
-| `--persona` | 人设描述 | ❌ | — |
-| `--temperature` | 温度参数 (0-2) | ❌ | 0.7 |
-| `--team` | Team 名称 | ❌ | — |
+| `action` | 操作 | 否 | `list` |
+| `--tag` | 人设标签（唯一标识） | add/update/delete 时必填 | — |
+| `--persona-name` | 人设显示名称 | add 时必填，update 时可选（不传则保持原值） | — |
+| `--persona` | 人设描述 | 否 | — |
+| `--temperature` | 温度参数 (0-2) | 否 | 0.7 |
+| `--team` | Team 名称 | 否 | — |
 
 ---
 
@@ -740,18 +740,18 @@ uv run scripts/cli.py -u Avalon_01 workflows conclusion --topic-id abc12345 --ti
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 | ❌ | `list` |
-| `--team` | Team 名称 | ❌ | — |
-| `--name` | Workflow 文件名（可省略 `.yaml` 后缀） | show/save 时 ✅, run 时可选 | — |
+| `action` | 操作 | 否 | `list` |
+| `--team` | Team 名称 | 否 | — |
+| `--name` | Workflow 文件名（可省略 `.yaml` 后缀） | show/save 时必填, run 时可选 | — |
 | `--yaml` | 直接传入 YAML 内容 | save/run 时可选（与 `--yaml-file` 二选一） | — |
 | `--yaml-file` | YAML 文件路径 | save/run 时可选（与 `--yaml`/`--name` 二选一） | — |
-| `--description` | Workflow 描述 | ❌ | — |
-| `--question` | 讨论问题/任务 | run 时 ✅ | — |
-| `--max-rounds` | 最大讨论轮数 (1-20) | ❌ | 5 |
-| `--discussion` | 讨论模式 (true=讨论, false=执行) | ❌ | YAML 中设定 |
-| `--early-stop` | 提前终止 | ❌ | false |
-| `--topic-id` | 话题 ID | conclusion 时 ✅ | — |
-| `--timeout` | 等待超时秒数 | ❌ | 300 |
+| `--description` | Workflow 描述 | 否 | — |
+| `--question` | 讨论问题/任务 | run 时必填 | — |
+| `--max-rounds` | 最大讨论轮数 (1-20) | 否 | 5 |
+| `--discussion` | 讨论模式 (true=讨论, false=执行) | 否 | YAML 中设定 |
+| `--early-stop` | 提前终止 | 否 | false |
+| `--topic-id` | 话题 ID | conclusion 时必填 | — |
+| `--timeout` | 等待超时秒数 | 否 | 300 |
 
 > `show` 直接读取本地 YAML 文件（`data/user_files/{user}/[teams/{team}/]oasis/yaml/{name}.yaml`），不走 HTTP。
 >
@@ -779,7 +779,7 @@ uv run scripts/cli.py tunnel stop
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 | ❌ | `status` |
+| `action` | 操作 | 否 | `status` |
 
 无 HTTP 请求。
 
@@ -810,11 +810,11 @@ uv run scripts/cli.py token decode --token "xxx"
 
 | 参数 | 说明 | 必填 | 默认值 |
 |------|------|------|--------|
-| `action` | 操作 (`generate`, `verify`, `decode`) | ❌ | `generate` |
-| `--user` | 用户名 (generate 时，也可通过 `-u` 指定) | ❌ | — |
-| `--users` | 多用户列表，逗号分隔 | ❌ | — |
+| `action` | 操作 (`generate`, `verify`, `decode`) | 否 | `generate` |
+| `--user` | 用户名 (generate 时，也可通过 `-u` 指定) | 否 | — |
+| `--users` | 多用户列表，逗号分隔 | 否 | — |
 | `--token` | Token 字符串 (verify/decode 时) | 视操作 | — |
-| `--valid-hours` | Token 有效期 (小时) | ❌ | 24 |
+| `--valid-hours` | Token 有效期 (小时) | 否 | 24 |
 
 无 HTTP 请求，纯本地操作。
 

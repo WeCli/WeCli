@@ -63,10 +63,19 @@ const i18n = {
         login_btn: '登录',
         local_login_btn: '本机免密登录',
         login_verifying: '验证中...',
+        login_username_required: '请输入用户名',
+        login_password_required: '请输入密码',
         login_error_invalid: '用户名只能包含字母、数字、下划线、短横线或中文',
         login_error_failed: '登录失败',
+        login_error_invalid_response: '服务器返回了无效响应',
+        login_error_password_login_unavailable: '用户「{user_id}」未设置密码，无法使用密码登录。请先使用「本机免密登录」，再到设置页里为这个用户名创建密码。',
         login_error_network: '网络错误',
+        login_error_timeout: '连接超时，请确认后端服务已启动后重试',
         login_footer: '身份验证后方可使用，对话和文件按用户隔离',
+        local_login_banner_title: '已使用本机免密登录',
+        local_login_banner_body: '当前用户名「{user_id}」还没有密码。如需后续密码登录或远程访问，可在 Settings 里设置密码并保存为用户。',
+        local_login_banner_action: '去设置',
+        llm_not_configured: 'LLM API 未配置，请先前往设置填写 API Key',
 
         // 头部
         encrypted: '● 已加密',
@@ -147,6 +156,71 @@ const i18n = {
         delete_success: '删除成功',
         delete_fail: '删除失败',
         delete_all: '🗑️ 清空全部',
+        subagents_title: '🧵 Subagents',
+        subagents_loading: '加载子 Agent...',
+        subagents_empty: '暂无子 Agent',
+        subagent_history: '历史',
+        subagent_hide_history: '收起',
+        subagent_stop: '停止',
+        subagent_open_parent: '父会话',
+        subagent_stop_confirm: '确定停止这个子 Agent？',
+        subagent_stop_success: '子 Agent 已停止',
+        subagent_stop_failed: '停止子 Agent 失败',
+        subagent_last_result: '最新结果',
+        subagent_history_empty: '暂无可显示的历史',
+        subagent_runtime_status: '运行状态',
+        subagent_runtime_loading: '加载运行时信息...',
+        subagent_runtime_unavailable: '当前无运行时数据',
+        subagent_runtime_workspace: 'Workspace',
+        subagent_runtime_mode: 'Mode',
+        subagent_runtime_plan: 'Plan',
+        subagent_runtime_todos: 'Todos',
+        subagent_runtime_verifications: 'Verifications',
+        subagent_runtime_approvals: 'Approvals',
+        subagent_runtime_runs: 'Runs',
+        subagent_runtime_inbox: 'Inbox',
+        subagent_runtime_artifacts: 'Artifacts',
+        subagent_runtime_relationships: 'Graph',
+        subagent_runtime_current: 'Current Session',
+        subagent_runtime_buddy: 'Buddy',
+        voice_mode: 'Voice',
+        subagent_runtime_no_plan: '暂无计划',
+        subagent_runtime_no_todos: '暂无 Todo',
+        subagent_runtime_no_verifications: '暂无验证记录',
+        subagent_runtime_no_approvals: '暂无 approval 请求',
+        subagent_runtime_no_runs: '暂无运行记录',
+        subagent_runtime_no_inbox: '暂无 Inbox 消息',
+        subagent_runtime_no_artifacts: '暂无归档 artifacts',
+        subagent_runtime_no_relationships: '暂无父子关系',
+        subagent_runtime_parent: '父会话',
+        subagent_runtime_children: '子 Agent',
+        subagent_runtime_remote: 'Remote',
+        subagent_runtime_approve: '批准',
+        subagent_runtime_approve_remember: '批准并记住',
+        subagent_runtime_deny: '拒绝',
+        subagent_runtime_approval_ok: 'Approval 已处理',
+        subagent_runtime_approval_failed: 'Approval 处理失败',
+        subagent_runtime_mode_plan: '切到 Plan',
+        subagent_runtime_mode_review: '切到 Review',
+        subagent_runtime_mode_execute: '切到 Execute',
+        subagent_runtime_mode_updated: '会话模式已更新',
+        subagent_runtime_mode_update_failed: '会话模式更新失败',
+        policy_panel_title: '🛡️ Tool Policy',
+        policy_panel_edit: '编辑',
+        policy_panel_close: '收起',
+        policy_panel_loading: '加载策略中...',
+        policy_panel_empty: '当前未配置用户级 TeamBot policy，将使用内置默认 allow。',
+        policy_default_approval: '默认审批',
+        policy_panel_format: '格式化',
+        policy_panel_save: '保存',
+        policy_panel_saved: 'Tool policy 已保存',
+        policy_panel_load_failed: '加载 tool policy 失败',
+        policy_panel_save_failed: '保存 tool policy 失败',
+        policy_panel_invalid_json: 'Policy JSON 格式无效',
+        policy_panel_summary: 'default={defaultApproval} · tools={toolCount} · hooks={hookCount}',
+        policy_panel_source: '来源: {source}',
+        policy_panel_path: '文件: {path}',
+        policy_panel_dirty: '有未保存修改',
 
         // TTS
         tts_read: '朗读',
@@ -332,6 +406,23 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         orch_tip_upload: '导入工作流',
         orch_tip_status: '刷新 session 状态',
         orch_tip_clear: '清空工作流',
+        orch_btn_generate_team: '📤 生成团队',
+        orch_tip_generate_team: '将画布中的角色自动加入团队',
+        orch_gt_title: '生成团队',
+        orch_gt_label_team: '目标团队',
+        orch_gt_new_team: '新建团队',
+        orch_gt_new_team_placeholder: '输入新团队名称',
+        orch_gt_select_team: '选择已有团队',
+        orch_gt_agents_title: '画布中的角色',
+        orch_gt_no_agents: '画布中没有可加入团队的角色（expert / session / external）',
+        orch_gt_conflict_skip: '跳过',
+        orch_gt_conflict_overwrite: '覆盖',
+        orch_gt_conflict_label: '⚠️ 已存在',
+        orch_gt_confirm: '确认生成',
+        orch_gt_cancel: '取消',
+        orch_gt_toast_ok: '✅ 已添加 {added} 个角色，跳过 {skipped} 个',
+        orch_gt_toast_err: '❌ 生成团队失败',
+        orch_gt_toast_no_team: '⚠️ 请选择或输入团队名',
         // Canvas hints
         orch_hint_drag: '拖入专家开始编排',
         // Nav controls
@@ -571,12 +662,87 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_group_bots: '机器人集成',
         settings_group_comm: '通信模式',
         settings_group_exec: '命令执行',
+        settings_group_tinyfish: 'TinyFish 竞品监控',
         settings_group_security: '安全密钥',
         settings_group_other: '其他',
+        settings_user_password_title: '当前用户密码',
+        settings_user_password_hint_local: '你现在以本机免密方式登录。为「{user_id}」设置密码后，这个用户名就可以用于密码登录。',
+        settings_user_password_hint_general: '为当前登录用户「{user_id}」设置或更新密码。保存后会写入 config/users.json。',
+        settings_user_password_status_missing: '未设置密码',
+        settings_user_password_status_set: '已设置密码，可更新',
+        settings_user_password_field: '新密码',
+        settings_user_password_confirm_field: '确认密码',
+        settings_user_password_placeholder: '输入要保存给当前用户名的密码',
+        settings_user_password_confirm_placeholder: '再次输入同一密码',
+        settings_user_password_save: '保存为用户',
+        settings_user_password_empty: '请输入密码',
+        settings_user_password_mismatch: '两次输入的密码不一致',
+        settings_user_password_saving: '保存中...',
+        settings_user_password_saved: '✅ 已为当前用户名保存密码',
+        settings_user_password_save_fail: '保存密码失败',
+        settings_user_password_opened: '已打开 Settings，可在“当前用户密码”里保存这个用户名的密码。',
+        settings_secret_saved_placeholder: '已保存（{mask}），留空不修改',
+        settings_llm_sync_title: '🔄 同步本地配置',
+        settings_openclaw_import: '🦞 从 OpenClaw 导入',
+        settings_openclaw_import_hint_ready: '自动读取已配置的 API Key、模型和 Provider',
+        settings_openclaw_import_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
+        settings_openclaw_export: '🦞 导出到 OpenClaw',
+        settings_openclaw_export_hint_ready: '把当前 TeamClaw 的 LLM 设置写回 OpenClaw 默认模型',
+        settings_openclaw_export_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
+        settings_openclaw_importing: '正在从 OpenClaw 读取配置...',
+        settings_openclaw_imported: '✅ 已从 OpenClaw 导入配置',
+        settings_openclaw_exporting: '正在把当前配置导出到 OpenClaw...',
+        settings_openclaw_exported: '✅ 已导出到 OpenClaw',
+        settings_openclaw_export_missing: '⚠️ 请先填写 Base URL 和模型；远程 provider 还需要 API Key',
+        settings_openclaw_detect_hint: '，点击“检测模型”确认',
+        settings_openclaw_gateway_restarted: 'OpenClaw Gateway 已自动重载',
+        settings_openclaw_gateway_restart_failed: '已写入配置，但 Gateway 重载失败',
+        settings_antigravity_ready_subtitle: '通过 Google One Pro 会员免费访问 Claude / Gemini / GPT',
+        settings_antigravity_missing_subtitle: '⚠️ Antigravity 未运行（未启动或无法连接）',
         settings_help_audio_group: '留空时会自动跟随当前 LLM provider。检测到 OpenAI 时默认使用 gpt-4o-mini-tts / alloy / whisper-1；检测到 Gemini 时默认使用 gemini-2.5-flash-preview-tts / charon。',
         settings_help_tts_model: '留空时自动跟随当前 LLM provider。OpenAI 默认是 gpt-4o-mini-tts，Gemini 默认是 gemini-2.5-flash-preview-tts。',
         settings_help_tts_voice: '留空时自动跟随当前 LLM provider。OpenAI 默认声音是 alloy，Gemini 默认声音是 charon。',
         settings_help_stt_model: '留空时自动跟随当前 LLM provider。OpenAI 默认是 whisper-1；Gemini 目前没有内置 STT 默认值，可按需手动填写。',
+        settings_help_tinyfish_group: '只填 TinyFish API Key 也能完成接入。保存时会自动补齐默认 Base URL/DB/Targets 配置并验证 API；若修改 cron，仍需重启服务让 scheduler 生效。',
+        settings_help_tinyfish_api_key: 'TinyFish Web Agent API Key。用于提交网站自动化采集任务。',
+        settings_help_tinyfish_base_url: 'TinyFish API 基础地址，默认 https://agent.tinyfish.ai。',
+        settings_help_tinyfish_db_path: '存储竞品采集结果与价格变化的 SQLite 路径。',
+        settings_help_tinyfish_targets_path: '竞品目标 JSON 配置文件路径。默认是 config/tinyfish_targets.json。',
+        settings_help_tinyfish_enabled: '设为 true 启用内建每日监控任务；设为 false 关闭。',
+        settings_help_tinyfish_cron: '5 段 cron 表达式，例如 0 9 * * * 代表每天早上 9 点。',
+        settings_tinyfish_quick_setup: '填入 API Key 后点击保存，系统会自动验证并补齐其余默认配置。',
+        settings_tinyfish_run_now: '立即运行',
+        settings_tinyfish_refresh: '刷新结果',
+        settings_tinyfish_loading: '正在加载 TinyFish 监控状态...',
+        settings_tinyfish_not_configured: 'TinyFish 尚未配置完整。',
+        settings_tinyfish_api_ready: 'TinyFish API 已就绪',
+        settings_tinyfish_targets_optional: '未配置目标文件；补充目标后才能运行监控。',
+        settings_tinyfish_auto_testing: '正在验证 TinyFish API 并补齐默认配置...',
+        settings_tinyfish_auto_configured: '✅ TinyFish API 已验证，默认配置已补齐',
+        settings_tinyfish_auto_config_failed: '❌ TinyFish API 验证失败',
+        settings_tinyfish_run_submitted: '✅ TinyFish 监控任务已提交',
+        settings_tinyfish_run_failed: '❌ TinyFish 运行失败',
+        settings_tinyfish_sites: '最新站点快照',
+        settings_tinyfish_changes: '最近价格变化',
+        settings_tinyfish_recent_runs: '最近运行',
+        settings_tinyfish_no_sites: '暂无站点快照',
+        settings_tinyfish_no_changes: '暂无价格变化记录',
+        settings_tinyfish_no_runs: '暂无运行记录',
+        settings_tinyfish_live_title: '实时爬取过程',
+        settings_tinyfish_live_run: 'Live Crawl',
+        settings_tinyfish_live_stop: '停止查看',
+        settings_tinyfish_live_target_loading: '正在加载目标...',
+        settings_tinyfish_live_target_empty: '暂无可用目标',
+        settings_tinyfish_live_status_idle: '选择一个目标后即可查看实时爬取过程',
+        settings_tinyfish_live_status_connecting: '正在连接 TinyFish SSE',
+        settings_tinyfish_live_status_running: 'TinyFish 正在实时爬取中',
+        settings_tinyfish_live_status_done: 'TinyFish 实时任务结束',
+        settings_tinyfish_live_open_watch: '打开 TinyFish Live Watch',
+        settings_tinyfish_live_no_events: '还没有实时事件',
+        settings_tinyfish_live_stream_closed: '实时流已结束',
+        settings_tinyfish_live_stopped: '已停止本地实时查看',
+        settings_tinyfish_live_missing_target: '请先选择一个目标站点',
+        settings_tinyfish_live_result_title: '本次实时任务结果',
         settings_antigravity_preset: '🚀 Antigravity 免费模型预设',
         settings_antigravity_hint: '一键填入 Antigravity-Manager 反代配置，通过 Google One Pro 会员免费使用模型。确保 Antigravity-Manager 已在本机运行。',
         settings_antigravity_apply: '应用 Antigravity 预设',
@@ -588,6 +754,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         tunnel_stopping: '停止中...',
         tunnel_running: '✅ 隧道运行中',
         tunnel_stopped: '❌ 隧道未运行',
+        tunnel_url_pending: '公网地址生成中...',
         tunnel_url_hint: '点击复制公网地址',
 
         // OpenClaw 对话切换
@@ -617,10 +784,19 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         login_btn: 'Login',
         local_login_btn: 'Local No-Password Login',
         login_verifying: 'Verifying...',
+        login_username_required: 'Please enter username',
+        login_password_required: 'Please enter password',
         login_error_invalid: 'Username can only contain letters, numbers, underscore, hyphen or Chinese',
         login_error_failed: 'Login failed',
+        login_error_invalid_response: 'Invalid server response',
+        login_error_password_login_unavailable: 'User "{user_id}" does not have a password configured. Use Local No-Password Login first, then create a password for this username in Settings.',
         login_error_network: 'Network error',
+        login_error_timeout: 'Connection timed out. Confirm the backend service is running and try again',
         login_footer: 'Authentication required. Conversations and files are isolated by user',
+        local_login_banner_title: 'Local no-password login active',
+        local_login_banner_body: 'The current username "{user_id}" does not have a password yet. Open Settings to save one for future password or remote login.',
+        local_login_banner_action: 'Open Settings',
+        llm_not_configured: 'LLM API not configured. Click here to set up API Key.',
 
         // Header
         encrypted: '● Encrypted',
@@ -701,6 +877,71 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         delete_success: 'Deleted',
         delete_fail: 'Delete failed',
         delete_all: '🗑️ Clear All',
+        subagents_title: '🧵 Subagents',
+        subagents_loading: 'Loading subagents...',
+        subagents_empty: 'No subagents yet',
+        subagent_history: 'History',
+        subagent_hide_history: 'Hide',
+        subagent_stop: 'Stop',
+        subagent_open_parent: 'Parent',
+        subagent_stop_confirm: 'Stop this subagent?',
+        subagent_stop_success: 'Subagent stopped',
+        subagent_stop_failed: 'Failed to stop subagent',
+        subagent_last_result: 'Latest result',
+        subagent_history_empty: 'No history available',
+        subagent_runtime_status: 'Runtime status',
+        subagent_runtime_loading: 'Loading runtime data...',
+        subagent_runtime_unavailable: 'No runtime data available',
+        subagent_runtime_workspace: 'Workspace',
+        subagent_runtime_mode: 'Mode',
+        subagent_runtime_plan: 'Plan',
+        subagent_runtime_todos: 'Todos',
+        subagent_runtime_verifications: 'Verifications',
+        subagent_runtime_approvals: 'Approvals',
+        subagent_runtime_runs: 'Runs',
+        subagent_runtime_inbox: 'Inbox',
+        subagent_runtime_artifacts: 'Artifacts',
+        subagent_runtime_relationships: 'Graph',
+        subagent_runtime_current: 'Current Session',
+        subagent_runtime_buddy: 'Buddy',
+        voice_mode: 'Voice',
+        subagent_runtime_no_plan: 'No plan yet',
+        subagent_runtime_no_todos: 'No todos yet',
+        subagent_runtime_no_verifications: 'No verifications yet',
+        subagent_runtime_no_approvals: 'No approval requests',
+        subagent_runtime_no_runs: 'No runs yet',
+        subagent_runtime_no_inbox: 'No inbox messages',
+        subagent_runtime_no_artifacts: 'No runtime artifacts',
+        subagent_runtime_no_relationships: 'No parent/child links',
+        subagent_runtime_parent: 'Parent session',
+        subagent_runtime_children: 'Child subagents',
+        subagent_runtime_remote: 'Remote',
+        subagent_runtime_approve: 'Approve',
+        subagent_runtime_approve_remember: 'Approve + remember',
+        subagent_runtime_deny: 'Deny',
+        subagent_runtime_approval_ok: 'Approval resolved',
+        subagent_runtime_approval_failed: 'Failed to resolve approval',
+        subagent_runtime_mode_plan: 'Set Plan',
+        subagent_runtime_mode_review: 'Set Review',
+        subagent_runtime_mode_execute: 'Set Execute',
+        subagent_runtime_mode_updated: 'Session mode updated',
+        subagent_runtime_mode_update_failed: 'Failed to update session mode',
+        policy_panel_title: '🛡️ Tool Policy',
+        policy_panel_edit: 'Edit',
+        policy_panel_close: 'Hide',
+        policy_panel_loading: 'Loading policy...',
+        policy_panel_empty: 'No user TeamBot policy is configured yet. Built-in default allow is active.',
+        policy_default_approval: 'Default approval',
+        policy_panel_format: 'Format',
+        policy_panel_save: 'Save',
+        policy_panel_saved: 'Tool policy saved',
+        policy_panel_load_failed: 'Failed to load tool policy',
+        policy_panel_save_failed: 'Failed to save tool policy',
+        policy_panel_invalid_json: 'Invalid policy JSON',
+        policy_panel_summary: 'default={defaultApproval} · tools={toolCount} · hooks={hookCount}',
+        policy_panel_source: 'Source: {source}',
+        policy_panel_path: 'File: {path}',
+        policy_panel_dirty: 'Unsaved changes',
 
         // TTS
         tts_read: 'Read',
@@ -882,6 +1123,23 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         orch_tip_export: 'Copy workflow to clipboard',
         orch_tip_status: 'Refresh session status',
         orch_tip_clear: 'Clear workflow',
+        orch_btn_generate_team: '📤 Generate Team',
+        orch_tip_generate_team: 'Auto-add canvas agents to a team',
+        orch_gt_title: 'Generate Team from Workflow',
+        orch_gt_label_team: 'Target Team',
+        orch_gt_new_team: 'Create new team',
+        orch_gt_new_team_placeholder: 'Enter new team name',
+        orch_gt_select_team: 'Select existing team',
+        orch_gt_agents_title: 'Canvas Agents',
+        orch_gt_no_agents: 'No eligible agents on canvas (expert / session / external)',
+        orch_gt_conflict_skip: 'Skip',
+        orch_gt_conflict_overwrite: 'Overwrite',
+        orch_gt_conflict_label: '⚠️ Exists',
+        orch_gt_confirm: 'Confirm',
+        orch_gt_cancel: 'Cancel',
+        orch_gt_toast_ok: '✅ Added {added}, skipped {skipped}',
+        orch_gt_toast_err: '❌ Failed to generate team',
+        orch_gt_toast_no_team: '⚠️ Please select or enter a team name',
         // Canvas hints
         orch_hint_drag: 'Drag experts to start orchestrating',
         // Nav controls
@@ -1133,12 +1391,87 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_group_bots: 'Bot Integration',
         settings_group_comm: 'Communication Mode',
         settings_group_exec: 'Command Execution',
+        settings_group_tinyfish: 'TinyFish Monitor',
         settings_group_security: 'Security',
         settings_group_other: 'Other',
+        settings_user_password_title: 'Current User Password',
+        settings_user_password_hint_local: 'You are currently using local no-password login. Set a password for "{user_id}" to enable password login for this username.',
+        settings_user_password_hint_general: 'Set or update the password for the currently logged-in user "{user_id}". It will be written to config/users.json.',
+        settings_user_password_status_missing: 'No password saved yet',
+        settings_user_password_status_set: 'Password saved, you can update it',
+        settings_user_password_field: 'New Password',
+        settings_user_password_confirm_field: 'Confirm Password',
+        settings_user_password_placeholder: 'Enter the password to save for this username',
+        settings_user_password_confirm_placeholder: 'Enter the same password again',
+        settings_user_password_save: 'Save as User',
+        settings_user_password_empty: 'Please enter a password',
+        settings_user_password_mismatch: 'The two passwords do not match',
+        settings_user_password_saving: 'Saving...',
+        settings_user_password_saved: '✅ Password saved for the current username',
+        settings_user_password_save_fail: 'Failed to save password',
+        settings_user_password_opened: 'Settings is open. Use "Current User Password" to save a password for this username.',
+        settings_secret_saved_placeholder: 'Saved ({mask}). Leave blank to keep it unchanged',
+        settings_llm_sync_title: '🔄 Sync Local Config',
+        settings_openclaw_import: '🦞 Import from OpenClaw',
+        settings_openclaw_import_hint_ready: 'Read the configured API key, model, and provider from OpenClaw',
+        settings_openclaw_import_hint_missing: '⚠️ OpenClaw was not detected',
+        settings_openclaw_export: '🦞 Export to OpenClaw',
+        settings_openclaw_export_hint_ready: 'Write the current TeamClaw LLM settings back to OpenClaw defaults',
+        settings_openclaw_export_hint_missing: '⚠️ OpenClaw was not detected',
+        settings_openclaw_importing: 'Reading configuration from OpenClaw...',
+        settings_openclaw_imported: '✅ Imported configuration from OpenClaw',
+        settings_openclaw_exporting: 'Writing the current configuration to OpenClaw...',
+        settings_openclaw_exported: '✅ Exported configuration to OpenClaw',
+        settings_openclaw_export_missing: '⚠️ Base URL and model are required; remote providers also need an API key',
+        settings_openclaw_detect_hint: '. Click "Detect Models" to confirm.',
+        settings_openclaw_gateway_restarted: 'OpenClaw Gateway reloaded automatically',
+        settings_openclaw_gateway_restart_failed: 'Config was saved, but Gateway reload failed',
+        settings_antigravity_ready_subtitle: 'Use Claude / Gemini / GPT via Google One Pro',
+        settings_antigravity_missing_subtitle: '⚠️ Antigravity is not running or cannot be reached',
         settings_help_audio_group: 'Leave these blank to follow the current LLM provider automatically. OpenAI defaults to gpt-4o-mini-tts / alloy / whisper-1; Gemini defaults to gemini-2.5-flash-preview-tts / charon.',
         settings_help_tts_model: 'Leave blank to follow the current LLM provider automatically. OpenAI defaults to gpt-4o-mini-tts, Gemini defaults to gemini-2.5-flash-preview-tts.',
         settings_help_tts_voice: 'Leave blank to follow the current LLM provider automatically. OpenAI uses alloy by default, Gemini uses charon.',
         settings_help_stt_model: 'Leave blank to follow the current LLM provider automatically. OpenAI defaults to whisper-1; Gemini does not currently have a built-in STT default.',
+        settings_help_tinyfish_group: 'Only the TinyFish API key is required for the initial setup. Saving auto-fills the default base URL, DB path, and target path, then validates the API. Restart is still required if you change the cron schedule.',
+        settings_help_tinyfish_api_key: 'TinyFish Web Agent API key used to submit competitor-site automation runs.',
+        settings_help_tinyfish_base_url: 'TinyFish API base URL. Defaults to https://agent.tinyfish.ai.',
+        settings_help_tinyfish_db_path: 'SQLite path used to store competitor snapshots and price changes.',
+        settings_help_tinyfish_targets_path: 'JSON file listing competitor targets. Defaults to config/tinyfish_targets.json.',
+        settings_help_tinyfish_enabled: 'Set true to enable the built-in daily monitor job; set false to disable it.',
+        settings_help_tinyfish_cron: 'Five-field cron expression, for example 0 9 * * * for every day at 9:00.',
+        settings_tinyfish_quick_setup: 'Enter the API key and save. TeamClaw will validate TinyFish and fill the remaining default settings automatically.',
+        settings_tinyfish_run_now: 'Run Now',
+        settings_tinyfish_refresh: 'Refresh',
+        settings_tinyfish_loading: 'Loading TinyFish monitor status...',
+        settings_tinyfish_not_configured: 'TinyFish is not fully configured yet.',
+        settings_tinyfish_api_ready: 'TinyFish API is ready',
+        settings_tinyfish_targets_optional: 'No target file yet. Add targets before running the monitor.',
+        settings_tinyfish_auto_testing: 'Validating TinyFish API and filling default settings...',
+        settings_tinyfish_auto_configured: '✅ TinyFish API validated and defaults applied',
+        settings_tinyfish_auto_config_failed: '❌ TinyFish API validation failed',
+        settings_tinyfish_run_submitted: '✅ TinyFish monitor run submitted',
+        settings_tinyfish_run_failed: '❌ TinyFish run failed',
+        settings_tinyfish_sites: 'Latest Site Snapshots',
+        settings_tinyfish_changes: 'Recent Price Changes',
+        settings_tinyfish_recent_runs: 'Recent Runs',
+        settings_tinyfish_no_sites: 'No site snapshots yet',
+        settings_tinyfish_no_changes: 'No price changes recorded yet',
+        settings_tinyfish_no_runs: 'No monitor runs recorded yet',
+        settings_tinyfish_live_title: 'Live Crawl',
+        settings_tinyfish_live_run: 'Live Crawl',
+        settings_tinyfish_live_stop: 'Stop Viewing',
+        settings_tinyfish_live_target_loading: 'Loading targets...',
+        settings_tinyfish_live_target_empty: 'No configured targets',
+        settings_tinyfish_live_status_idle: 'Choose a target to watch the crawl in real time',
+        settings_tinyfish_live_status_connecting: 'Connecting to TinyFish SSE',
+        settings_tinyfish_live_status_running: 'TinyFish crawl is running live',
+        settings_tinyfish_live_status_done: 'TinyFish live run finished',
+        settings_tinyfish_live_open_watch: 'Open TinyFish Live Watch',
+        settings_tinyfish_live_no_events: 'No live events yet',
+        settings_tinyfish_live_stream_closed: 'Live stream closed',
+        settings_tinyfish_live_stopped: 'Stopped local live viewing',
+        settings_tinyfish_live_missing_target: 'Choose a target site first',
+        settings_tinyfish_live_result_title: 'Live Run Result',
         settings_antigravity_preset: '🚀 Antigravity Free Models Preset',
         settings_antigravity_hint: 'Auto-fill Antigravity-Manager config. Uses Google One Pro membership for free model access. Make sure Antigravity-Manager is running locally.',
         settings_antigravity_apply: 'Apply Antigravity Preset',
@@ -1150,6 +1483,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         tunnel_stopping: 'Stopping...',
         tunnel_running: '✅ Tunnel Running',
         tunnel_stopped: '❌ Tunnel Not Running',
+        tunnel_url_pending: 'Public URL is still being generated...',
         tunnel_url_hint: 'Click to copy public URL',
 
         // OpenClaw Chat Switcher
@@ -1237,17 +1571,42 @@ function applyTranslations() {
     if (typeof renderPersonaPreview === 'function') {
         renderPersonaPreview();
     }
+    if (typeof renderSubagentPanel === 'function' && Array.isArray(_subagentPanelItems) && _subagentPanelItems.length > 0) {
+        renderSubagentPanel(_subagentPanelItems);
+    }
+    if (typeof _syncTeamBotPolicyEditor === 'function') {
+        _syncTeamBotPolicyEditor();
+    }
 }
 
-marked.setOptions({
-    highlight: function(code, lang) {
-        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-        return hljs.highlight(code, { language }).value;
-    },
-    langPrefix: 'hljs language-'
-});
+function renderMarkdown(content) {
+    if (window.TeamClawMarkdown) return window.TeamClawMarkdown.render(content);
+    return (typeof marked !== 'undefined' && content) ? marked.parse(content) : '';
+}
+
+function highlightMarkdownIn(root) {
+    if (window.TeamClawMarkdown) {
+        window.TeamClawMarkdown.highlight(root);
+        return;
+    }
+    if (!root || typeof hljs === 'undefined') return;
+    root.querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+}
+
+function renderMarkdownInto(element, content) {
+    if (window.TeamClawMarkdown) {
+        window.TeamClawMarkdown.renderInto(element, content);
+        return;
+    }
+    if (!element) return;
+    element.innerHTML = renderMarkdown(content);
+    highlightMarkdownIn(element);
+}
 
 let currentUserId = null;
+let currentUserHasPassword = false;
+let currentLoginMode = '';
+let localLoginBannerDismissed = false;
 let currentSessionId = null;
 let currentAbortController = null;
 let cancelTargetSessionId = null;  // 终止按钮绑定的会话ID
@@ -1774,12 +2133,1280 @@ function handleNewSession() {
 // ===== 历史会话侧边栏 =====
 let sessionSidebarOpen = false;
 let _historyPollingTimer = null;
+let _subagentPanelItems = [];
+let _selectedSubagentRef = '';
+let _subagentHistoryVisible = false;
+let _subagentHistoryCache = {};
+let _subagentRuntimeCache = {};
+let _subagentRuntimeLoading = {};
+let _teambotPolicyData = null;
+let _teambotPolicyDirty = false;
+let _teambotPolicyEditorOpen = false;
+let _teambotPolicyLoaded = false;
+let _currentSessionRuntime = null;
+let _teambotBridgeSockets = {};
+let _teambotBridgeReconnectTimers = {};
+let _teambotBridgeDesired = {};
+const SESSION_RUNTIME_PANEL_HEIGHT_KEY = 'teamclawSessionRuntimePanelHeightV1';
+const SESSION_RUNTIME_PANEL_MIN_HEIGHT = 140;
+const SESSION_RUNTIME_LIST_MIN_HEIGHT = 120;
+let _sessionPanelResizeState = null;
+
+function _teamBotBridgeWsUrl(path) {
+    if (!path) return '';
+    if (/^wss?:\/\//i.test(path)) return path;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+    return `${protocol}//${window.location.host}${normalized}`;
+}
+
+function _teamBotBridgeSocketLabel(sessionId) {
+    const socket = _teambotBridgeSockets[sessionId];
+    if (!socket) return 'idle';
+    switch (socket.readyState) {
+        case WebSocket.CONNECTING:
+            return 'connecting';
+        case WebSocket.OPEN:
+            return 'live';
+        case WebSocket.CLOSING:
+            return 'closing';
+        case WebSocket.CLOSED:
+        default:
+            return 'closed';
+    }
+}
+
+function _clearTeamBotBridgeReconnect(sessionId) {
+    if (_teambotBridgeReconnectTimers[sessionId]) {
+        clearTimeout(_teambotBridgeReconnectTimers[sessionId]);
+        delete _teambotBridgeReconnectTimers[sessionId];
+    }
+}
+
+function _closeTeamBotBridgeSocket(sessionId, clearDesired = false) {
+    _clearTeamBotBridgeReconnect(sessionId);
+    const socket = _teambotBridgeSockets[sessionId];
+    if (socket) {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+        try {
+            socket.close();
+        } catch (e) {
+            console.debug('Failed to close TeamBot bridge socket', e);
+        }
+        delete _teambotBridgeSockets[sessionId];
+    }
+    if (clearDesired) {
+        delete _teambotBridgeDesired[sessionId];
+    }
+}
+
+function _closeAllTeamBotBridgeSockets() {
+    Object.keys(_teambotBridgeSockets).forEach(sessionId => {
+        _closeTeamBotBridgeSocket(sessionId);
+    });
+}
+
+function _storeTeamBotRuntimeSnapshot(runtime) {
+    if (!runtime || !runtime.session_id) return;
+    if (runtime.session_id === currentSessionId) {
+        _currentSessionRuntime = runtime;
+        _renderCurrentSessionCard();
+    } else {
+        _subagentRuntimeCache[runtime.session_id] = runtime;
+        _renderSubagentDetail();
+    }
+}
+
+function _scheduleTeamBotBridgeReconnect(sessionId, bridgeRecord) {
+    if (!sessionId || !_teambotBridgeDesired[sessionId] || !sessionSidebarOpen || !bridgeRecord?.websocket_path) {
+        return;
+    }
+    if (_teambotBridgeReconnectTimers[sessionId]) return;
+    _teambotBridgeReconnectTimers[sessionId] = setTimeout(() => {
+        delete _teambotBridgeReconnectTimers[sessionId];
+        _connectTeamBotBridgeSocket(sessionId, bridgeRecord, true);
+    }, 1500);
+}
+
+function _handleTeamBotBridgeMessage(sessionId, payload) {
+    if (!payload || typeof payload !== 'object') return;
+    const messageType = String(payload.type || '').toLowerCase();
+    if (messageType === 'runtime_snapshot' || messageType === 'runtime_update') {
+        if (payload.runtime && payload.runtime.session_id) {
+            _storeTeamBotRuntimeSnapshot(payload.runtime);
+            if (payload.runtime.session_id === currentSessionId) {
+                _syncTeamBotBridgeSocket(currentSessionId, payload.runtime);
+            }
+        }
+        const changedSessionId = payload.changed_session_id || '';
+        if (sessionSidebarOpen && changedSessionId && changedSessionId !== (payload.runtime?.session_id || '')) {
+            void refreshSubagentPanel();
+        }
+    }
+}
+
+function _connectTeamBotBridgeSocket(sessionId, bridgeRecord, force = false) {
+    if (!sessionId || !bridgeRecord?.websocket_path) return;
+    const existing = _teambotBridgeSockets[sessionId];
+    if (!force && existing && (existing.readyState === WebSocket.CONNECTING || existing.readyState === WebSocket.OPEN)) {
+        return;
+    }
+    _closeTeamBotBridgeSocket(sessionId);
+    const socketUrl = _teamBotBridgeWsUrl(bridgeRecord.websocket_path);
+    if (!socketUrl) return;
+    const socket = new WebSocket(socketUrl);
+    _teambotBridgeSockets[sessionId] = socket;
+    socket.onopen = () => {
+        _clearTeamBotBridgeReconnect(sessionId);
+        try {
+            socket.send(JSON.stringify({ type: 'refresh' }));
+        } catch (e) {
+            console.debug('Failed to request TeamBot bridge refresh', e);
+        }
+    };
+    socket.onmessage = event => {
+        try {
+            const payload = JSON.parse(event.data || '{}');
+            _handleTeamBotBridgeMessage(sessionId, payload);
+        } catch (e) {
+            console.debug('Invalid TeamBot bridge payload', e);
+        }
+    };
+    socket.onerror = () => {
+        if (!_teambotBridgeDesired[sessionId]) return;
+        _setTeamBotPolicyStatus('TeamBot bridge socket error', 'error');
+    };
+    socket.onclose = () => {
+        if (_teambotBridgeSockets[sessionId] === socket) {
+            delete _teambotBridgeSockets[sessionId];
+        }
+        _scheduleTeamBotBridgeReconnect(sessionId, bridgeRecord);
+    };
+}
+
+function _syncTeamBotBridgeSocket(sessionId, runtime) {
+    if (!sessionId) return;
+    const bridge = runtime?.bridge || {};
+    const primary = bridge.primary || (Array.isArray(bridge.sessions) ? bridge.sessions[0] : null);
+    const shouldConnect = !!_teambotBridgeDesired[sessionId] || !!bridge.attached || Number(bridge.connection_count || 0) > 0;
+    if (!primary?.bridge_id || !primary?.websocket_path || !shouldConnect) {
+        _closeTeamBotBridgeSocket(sessionId);
+        return;
+    }
+    _connectTeamBotBridgeSocket(sessionId, primary);
+}
+
+function _readSessionRuntimePanelHeightPreference() {
+    try {
+        const raw = localStorage.getItem(SESSION_RUNTIME_PANEL_HEIGHT_KEY);
+        if (!raw) return null;
+        const value = parseInt(raw, 10);
+        return Number.isFinite(value) && value > 0 ? value : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _writeSessionRuntimePanelHeightPreference(height) {
+    try {
+        localStorage.setItem(SESSION_RUNTIME_PANEL_HEIGHT_KEY, String(Math.round(height)));
+    } catch (e) {
+        // ignore storage errors
+    }
+}
+
+function _getSessionRuntimePanelBounds() {
+    const sidebar = document.getElementById('session-sidebar');
+    const header = document.getElementById('session-sidebar-header');
+    const divider = document.getElementById('session-panel-divider');
+    if (!sidebar) return null;
+
+    const sidebarHeight = sidebar.clientHeight || sidebar.getBoundingClientRect().height || 0;
+    const headerHeight = header ? header.getBoundingClientRect().height : 0;
+    const dividerHeight = divider ? divider.getBoundingClientRect().height : 0;
+    const availableHeight = Math.max(0, sidebarHeight - headerHeight - dividerHeight);
+    const reservedListHeight = Math.min(
+        SESSION_RUNTIME_LIST_MIN_HEIGHT,
+        Math.max(96, Math.round(availableHeight * 0.35)),
+    );
+    const maxHeight = Math.max(96, availableHeight - reservedListHeight);
+    const minHeight = Math.min(SESSION_RUNTIME_PANEL_MIN_HEIGHT, maxHeight);
+    const defaultHeight = Math.min(
+        Math.max(Math.round(availableHeight * 0.38), minHeight),
+        maxHeight,
+    );
+
+    return { minHeight, maxHeight, defaultHeight };
+}
+
+function applySessionRuntimePanelHeight(height = null, persist = false) {
+    const panel = document.getElementById('teambot-subagent-panel');
+    const bounds = _getSessionRuntimePanelBounds();
+    if (!panel || !bounds) return;
+
+    const preferredHeight = height ?? _readSessionRuntimePanelHeightPreference() ?? panel.getBoundingClientRect().height ?? bounds.defaultHeight;
+    const clampedHeight = Math.min(Math.max(Math.round(preferredHeight), bounds.minHeight), bounds.maxHeight);
+    panel.style.height = `${clampedHeight}px`;
+    panel.style.flex = `0 0 ${clampedHeight}px`;
+    panel.style.maxHeight = 'none';
+
+    if (persist) {
+        _writeSessionRuntimePanelHeightPreference(clampedHeight);
+    }
+}
+
+function _stopSessionRuntimePanelResize(pointerId = null) {
+    const divider = document.getElementById('session-panel-divider');
+    if (divider) {
+        divider.classList.remove('dragging');
+        if (pointerId !== null && typeof divider.releasePointerCapture === 'function') {
+            try { divider.releasePointerCapture(pointerId); } catch (e) {}
+        }
+    }
+    document.body.classList.remove('session-panel-resizing');
+    _sessionPanelResizeState = null;
+}
+
+function initSessionRuntimePanelResize() {
+    const divider = document.getElementById('session-panel-divider');
+    if (!divider || divider.dataset.initialized === '1') return;
+    divider.dataset.initialized = '1';
+
+    divider.addEventListener('pointerdown', (event) => {
+        if (event.button !== undefined && event.button !== 0) return;
+        const panel = document.getElementById('teambot-subagent-panel');
+        if (!panel) return;
+        const bounds = _getSessionRuntimePanelBounds();
+        if (!bounds) return;
+
+        _sessionPanelResizeState = {
+            startY: event.clientY,
+            startHeight: panel.getBoundingClientRect().height,
+            pointerId: event.pointerId,
+        };
+        divider.classList.add('dragging');
+        document.body.classList.add('session-panel-resizing');
+        if (typeof divider.setPointerCapture === 'function') {
+            try { divider.setPointerCapture(event.pointerId); } catch (e) {}
+        }
+        event.preventDefault();
+    });
+
+    divider.addEventListener('pointermove', (event) => {
+        if (!_sessionPanelResizeState) return;
+        const deltaY = event.clientY - _sessionPanelResizeState.startY;
+        applySessionRuntimePanelHeight(_sessionPanelResizeState.startHeight - deltaY, false);
+        event.preventDefault();
+    });
+
+    const finishResize = (event) => {
+        if (!_sessionPanelResizeState) return;
+        const deltaY = event.clientY - _sessionPanelResizeState.startY;
+        applySessionRuntimePanelHeight(_sessionPanelResizeState.startHeight - deltaY, true);
+        _stopSessionRuntimePanelResize(event.pointerId);
+    };
+
+    divider.addEventListener('pointerup', finishResize);
+    divider.addEventListener('pointercancel', (event) => _stopSessionRuntimePanelResize(event.pointerId));
+    window.addEventListener('resize', () => {
+        if (sessionSidebarOpen) {
+            applySessionRuntimePanelHeight();
+        }
+    });
+}
+
+function _stripPolicyMeta(policy) {
+    const payload = JSON.parse(JSON.stringify(policy || {}));
+    delete payload.source;
+    delete payload.definition_path;
+    return payload;
+}
+
+function _countPolicyHooks(policy) {
+    let count = Array.isArray(policy && policy.hooks) ? policy.hooks.length : 0;
+    const tools = policy && typeof policy.tools === 'object' ? policy.tools : {};
+    Object.values(tools || {}).forEach(rule => {
+        if (rule && Array.isArray(rule.hooks)) count += rule.hooks.length;
+    });
+    return count;
+}
+
+function _setTeamBotPolicyStatus(message, kind = '') {
+    const el = document.getElementById('teambot-policy-status');
+    if (!el) return;
+    if (!message) {
+        el.textContent = '';
+        el.className = 'teambot-policy-status';
+        return;
+    }
+    el.textContent = message;
+    el.className = `teambot-policy-status is-visible${kind ? ` is-${kind}` : ''}`;
+}
+
+function _renderTeamBotPolicySummary() {
+    const summaryEl = document.getElementById('teambot-policy-summary');
+    const metaEl = document.getElementById('teambot-policy-meta');
+    const toggleBtn = document.getElementById('teambot-policy-toggle');
+    if (!summaryEl || !metaEl || !toggleBtn) return;
+
+    toggleBtn.textContent = t(_teambotPolicyEditorOpen ? 'policy_panel_close' : 'policy_panel_edit');
+
+    if (!_teambotPolicyData || !_teambotPolicyData.policy) {
+        summaryEl.textContent = t('policy_panel_loading');
+        metaEl.textContent = '';
+        return;
+    }
+
+    const policy = _teambotPolicyData.policy;
+    const toolCount = Object.keys(policy.tools || {}).length;
+    const hookCount = _countPolicyHooks(policy);
+    const defaultApproval = policy.default_approval || 'allow';
+    let summary = t('policy_panel_summary', {
+        defaultApproval,
+        toolCount,
+        hookCount,
+    });
+    if (_teambotPolicyDirty) {
+        summary += `\n${t('policy_panel_dirty')}`;
+    }
+    summaryEl.textContent = summary || t('policy_panel_empty');
+
+    const metaLines = [];
+    if (policy.source) metaLines.push(t('policy_panel_source', { source: policy.source }));
+    if (policy.definition_path) metaLines.push(t('policy_panel_path', { path: policy.definition_path }));
+    metaEl.textContent = metaLines.join('\n');
+}
+
+function _syncTeamBotPolicyEditor(force = false) {
+    const selectEl = document.getElementById('teambot-policy-default-approval');
+    const editorEl = document.getElementById('teambot-policy-editor');
+    const wrapEl = document.getElementById('teambot-policy-editor-wrap');
+    if (!selectEl || !editorEl || !wrapEl) return;
+    wrapEl.style.display = _teambotPolicyEditorOpen ? 'flex' : 'none';
+    if (!_teambotPolicyData || !_teambotPolicyData.policy) return;
+    if (_teambotPolicyDirty && !force) {
+        _renderTeamBotPolicySummary();
+        return;
+    }
+    const editablePolicy = _stripPolicyMeta(_teambotPolicyData.policy);
+    selectEl.value = editablePolicy.default_approval || 'allow';
+    editorEl.value = JSON.stringify(editablePolicy, null, 2);
+    _renderTeamBotPolicySummary();
+}
+
+function markTeamBotPolicyDirty() {
+    _teambotPolicyDirty = true;
+    _setTeamBotPolicyStatus('');
+    _renderTeamBotPolicySummary();
+}
+
+function _parseTeamBotPolicyEditor() {
+    const editorEl = document.getElementById('teambot-policy-editor');
+    const selectEl = document.getElementById('teambot-policy-default-approval');
+    if (!editorEl || !selectEl) return { default_approval: 'allow', tools: {} };
+    let parsed = {};
+    const raw = String(editorEl.value || '').trim();
+    if (raw) {
+        parsed = JSON.parse(raw);
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error(t('policy_panel_invalid_json'));
+    }
+    parsed.default_approval = selectEl.value || parsed.default_approval || 'allow';
+    return parsed;
+}
+
+function _escapeAndFormatText(value) {
+    return escapeHtml(String(value || ''));
+}
+
+function _modeActionButtons(sessionId, currentMode) {
+    const modes = ['plan', 'review', 'execute'];
+    return `<div class="teambot-mode-actions">${modes
+        .map(mode => {
+            const active = currentMode === mode;
+            return `<button class="teambot-mode-btn${active ? ' is-active' : ''}" type="button" onclick="updateTeamBotSessionMode('${sessionId}', '${mode}')">${t(`subagent_runtime_mode_${mode}`)}</button>`;
+        })
+        .join('')}</div>`;
+}
+
+function _buildExtendedSections(runtime, item) {
+    const sessionId = runtime?.session_id || item?.session_id || currentSessionId || '';
+    const sections = [];
+    if (runtime?.bridge) {
+        const bridge = runtime.bridge || {};
+        const primary = bridge.primary || (Array.isArray(bridge.sessions) ? bridge.sessions[0] : {}) || {};
+        const canDetach = !!(primary && primary.bridge_id);
+        const socketState = _teamBotBridgeSocketLabel(sessionId);
+        sections.push(`
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">Bridge</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(bridge.status || 'detached')} · socket=${_escapeAndFormatText(socketState)} · clients=${_escapeAndFormatText(String(bridge.connection_count || 0))}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(primary.attach_code ? `attach=${primary.attach_code}` : '')} ${_escapeAndFormatText(primary.role ? `· role=${primary.role}` : '')}</div>
+                <div class="teambot-runtime-actions">
+                    <button class="teambot-subagent-btn" type="button" onclick="attachTeamBotBridge('${encodeURIComponent(sessionId)}')">Attach</button>
+                    ${canDetach ? `<button class="teambot-subagent-btn danger" type="button" onclick="detachTeamBotBridge('${encodeURIComponent(sessionId)}', '${encodeURIComponent(primary.bridge_id || '')}')">Detach</button>` : ''}
+                </div>
+            </div>
+        `);
+    }
+    if (runtime?.voice) {
+        const voice = runtime.voice || {};
+        sections.push(`
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('voice_mode')}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(voice.status || (voice.enabled ? 'enabled' : 'disabled'))}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(`${voice.stt_model || ''} · ${voice.tts_model || ''} · ${voice.tts_voice || ''}`)}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(voice.last_transcript || '')}</div>
+                <div class="teambot-runtime-actions">
+                    <button class="teambot-subagent-btn" type="button" onclick="toggleTeamBotVoice('${encodeURIComponent(sessionId)}', ${voice.enabled ? 'false' : 'true'})">${voice.enabled ? 'Disable' : 'Enable'}</button>
+                </div>
+            </div>
+        `);
+    }
+    if (runtime?.buddy) {
+        const buddy = runtime.buddy || {};
+        sections.push(`
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_buddy')}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(`${buddy.compact_face || ''} ${buddy.name || buddy.soul?.name || ''}`)} · ${_escapeAndFormatText(buddy.species || '')} · ${_escapeAndFormatText(buddy.rarity || '')}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(buddy.personality || buddy.soul?.personality || '')}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(buddy.reaction || buddy.last_bubble || '')}</div>
+                <div class="teambot-runtime-actions">
+                    <button class="teambot-subagent-btn" type="button" onclick="petTeamBotBuddy('${encodeURIComponent(sessionId)}')">Pet</button>
+                </div>
+            </div>
+        `);
+    }
+    if (runtime?.memory) {
+        const memory = runtime.memory || {};
+        const relevant = Array.isArray(memory.relevant_entries) ? memory.relevant_entries.slice(0, 2).map(entry => entry.name || entry.path || '').filter(Boolean).join(' · ') : '';
+        sections.push(`
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">Memory</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(memory.summary || '')}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(`${memory.project_slug || ''} · entries=${memory.entry_count || 0} · can_dream=${memory.can_dream ? 'yes' : 'no'}`)}</div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(relevant)}</div>
+                <div class="teambot-runtime-actions">
+                    <button class="teambot-subagent-btn" type="button" onclick="toggleTeamBotKairos('${encodeURIComponent(sessionId)}', ${memory.kairos_enabled ? 'false' : 'true'})">${memory.kairos_enabled ? 'Kairos Off' : 'Kairos On'}</button>
+                    <button class="teambot-subagent-btn" type="button" onclick="runTeamBotDream('${encodeURIComponent(sessionId)}')">Dream</button>
+                </div>
+            </div>
+        `);
+    }
+    return sections.join('');
+}
+
+function updateTeamBotSessionMode(sessionId, mode, reason = '') {
+    if (!sessionId) return;
+    fetch('/proxy_teambot_session_mode', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({session_id: sessionId, mode, reason}),
+    })
+        .then(resp => resp.json())
+        .then(async data => {
+            if (!data || data.status !== 'success') return;
+            _setTeamBotPolicyStatus(t('subagent_runtime_mode_updated'), 'success');
+            await refreshSubagentPanel();
+        })
+        .catch(() => {
+            _setTeamBotPolicyStatus(t('subagent_runtime_mode_update_failed'), 'error');
+        });
+}
+
+async function interruptTeamBotRun(sessionId, runId, agentRef = '') {
+    if (!sessionId || !runId) return;
+    try {
+        const resp = await fetch('/proxy_teambot_run_interrupt', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId, run_id: runId, agent_ref: agentRef}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Interrupt failed');
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Interrupt failed'), 'error');
+    }
+}
+
+async function deliverTeamBotInbox(sessionId, targetRef = '', force = false) {
+    if (!sessionId) return;
+    try {
+        const resp = await fetch('/proxy_teambot_session_inbox_deliver', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId, target_ref: targetRef, force}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Inbox delivery failed');
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Inbox delivery failed'), 'error');
+    }
+}
+
+async function toggleTeamBotVoice(sessionId, enabled) {
+    if (!sessionId) return;
+    try {
+        const runtime = sessionId === currentSessionId ? (_currentSessionRuntime || {}) : (_subagentRuntimeCache[sessionId] || {});
+        const voice = runtime.voice || {};
+        const resp = await fetch('/proxy_teambot_voice', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                session_id: sessionId,
+                enabled: !!enabled,
+                auto_read_aloud: !!voice.auto_read_aloud,
+                last_transcript: voice.last_transcript || '',
+                tts_model: voice.tts_model || '',
+                tts_voice: voice.tts_voice || '',
+                stt_model: voice.stt_model || '',
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Voice update failed');
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Voice update failed'), 'error');
+    }
+}
+
+async function attachTeamBotBridge(sessionId, role = 'viewer') {
+    if (!sessionId) return;
+    try {
+        const resp = await fetch('/proxy_teambot_bridge_attach', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId, role}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Bridge attach failed');
+        }
+        _teambotBridgeDesired[sessionId] = true;
+        if (data.bridge) {
+            _connectTeamBotBridgeSocket(sessionId, data.bridge, true);
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Bridge attach failed'), 'error');
+    }
+}
+
+async function detachTeamBotBridge(sessionId, bridgeId) {
+    if (!sessionId || !bridgeId) return;
+    try {
+        delete _teambotBridgeDesired[sessionId];
+        _closeTeamBotBridgeSocket(sessionId);
+        const resp = await fetch('/proxy_teambot_bridge_detach', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({bridge_id: bridgeId}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Bridge detach failed');
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Bridge detach failed'), 'error');
+    }
+}
+
+async function toggleTeamBotKairos(sessionId, enabled) {
+    if (!sessionId) return;
+    try {
+        const resp = await fetch('/proxy_teambot_kairos', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId, enabled: !!enabled, reason: 'ui-toggle'}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Kairos update failed');
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Kairos update failed'), 'error');
+    }
+}
+
+async function runTeamBotDream(sessionId) {
+    if (!sessionId) return;
+    try {
+        const resp = await fetch('/proxy_teambot_dream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId, reason: 'ui-dream'}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Dream failed');
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Dream failed'), 'error');
+    }
+}
+
+async function petTeamBotBuddy(sessionId) {
+    try {
+        const resp = await fetch('/proxy_teambot_buddy', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId || currentSessionId || '', action: 'pet'}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Buddy action failed');
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Buddy action failed'), 'error');
+    }
+}
+
+async function refreshCurrentSessionRuntime() {
+    if (!currentUserId || !currentSessionId) {
+        return;
+    }
+    try {
+        const resp = await fetch(`/proxy_teambot_session_runtime?user_id=${encodeURIComponent(currentUserId)}&session_id=${encodeURIComponent(currentSessionId)}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        _currentSessionRuntime = data;
+        _syncTeamBotBridgeSocket(data.session_id || currentSessionId, data);
+        _renderCurrentSessionCard();
+    } catch (e) {
+        console.error('Failed to load TeamBot session runtime', e);
+    }
+}
+
+function _renderSubagentStatus(status) {
+    return escapeHtml((status || 'idle').toUpperCase());
+}
+
+function _summarizeSubagentItem(item) {
+    const updated = item.updated_at ? item.updated_at.replace('T', ' ').slice(0, 16) : '';
+    const bits = [item.agent_type || 'general'];
+    if (item.session_mode && item.session_mode.mode) bits.push(item.session_mode.mode);
+    if (item.queued_inbox_count) bits.push(`${item.queued_inbox_count} inbox`);
+    bits.push(updated || (item.session_id || '').slice(-6));
+    return bits.join(' · ');
+}
+
+function _buildSubagentHistoryHtml(messages) {
+    if (!messages || messages.length === 0) {
+        return `<div class="teambot-subagent-empty">${t('subagent_history_empty')}</div>`;
+    }
+    return messages.map(msg => `
+        <div class="teambot-subagent-history-item">
+            <div class="teambot-subagent-history-role">${escapeHtml(msg.role || 'assistant')}</div>
+            <div class="teambot-subagent-history-content">${_escapeAndFormatText(msg.content || '')}</div>
+        </div>
+    `).join('');
+}
+
+function _buildRuntimeItemList(items, emptyKey) {
+    if (!items || items.length === 0) {
+        return `<div class="teambot-runtime-empty">${t(emptyKey)}</div>`;
+    }
+    return items.map(item => `
+        <div class="teambot-runtime-row">
+            <span class="teambot-runtime-badge">${escapeHtml(item.status || 'pending')}</span>
+            <span class="teambot-runtime-text">${escapeHtml(item.step || item.title || item.tool_name || '')}</span>
+        </div>
+    `).join('');
+}
+
+function _buildRuntimeVerificationList(items) {
+    if (!items || items.length === 0) {
+        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_verifications')}</div>`;
+    }
+    return items.map(item => `
+        <div class="teambot-runtime-block">
+            <div class="teambot-runtime-row">
+                <span class="teambot-runtime-badge">${escapeHtml(item.status || '')}</span>
+                <span class="teambot-runtime-text">${escapeHtml(item.title || '')}</span>
+            </div>
+            <div class="teambot-runtime-detail">${_escapeAndFormatText(item.details || '')}</div>
+        </div>
+    `).join('');
+}
+
+function _buildRuntimeApprovalList(item, runtimeOverride = null) {
+    const runtime = runtimeOverride || _subagentRuntimeCache[item.session_id];
+    const approvals = runtime && Array.isArray(runtime.approvals) ? runtime.approvals : [];
+    if (!approvals.length) {
+        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_approvals')}</div>`;
+    }
+    return approvals.map(approval => {
+        const approvalId = encodeURIComponent(approval.approval_id || '');
+        const sessionId = encodeURIComponent(item.session_id || '');
+        const canResolve = approval.status === 'pending';
+        return `
+            <div class="teambot-runtime-block">
+                <div class="teambot-runtime-row">
+                    <span class="teambot-runtime-badge">${escapeHtml(approval.status || '')}</span>
+                    <span class="teambot-runtime-text">${escapeHtml(approval.tool_name || '')}</span>
+                </div>
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(approval.request_reason || '')}</div>
+                ${canResolve ? `
+                    <div class="teambot-runtime-actions">
+                        <button class="teambot-subagent-btn" type="button" onclick="resolveTeamBotApproval(decodeURIComponent('${approvalId}'), 'approve', false, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_approve')}</button>
+                        <button class="teambot-subagent-btn" type="button" onclick="resolveTeamBotApproval(decodeURIComponent('${approvalId}'), 'approve', true, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_approve_remember')}</button>
+                        <button class="teambot-subagent-btn danger" type="button" onclick="resolveTeamBotApproval(decodeURIComponent('${approvalId}'), 'deny', false, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_deny')}</button>
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function _buildRuntimeRunList(items, sessionId = '', agentRef = '') {
+    if (!items || items.length === 0) {
+        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_runs')}</div>`;
+    }
+    return items.map(run => {
+        const events = Array.isArray(run.events) ? run.events : [];
+        const eventHtml = events.slice(0, 4).map(event => `
+            <div class="teambot-runtime-detail">${escapeHtml(event.event_type || '')} · ${escapeHtml(event.status || '')} · ${escapeHtml(event.message || '')}</div>
+        `).join('');
+        const metaParts = [
+            run.run_kind || 'run',
+            run.mode || 'execute',
+            run.attempt_count != null ? `attempts=${run.attempt_count}` : '',
+        ].filter(Boolean);
+        const canInterrupt = !!sessionId && ['queued', 'running', 'cancelling'].includes(String(run.status || '').toLowerCase());
+        return `
+            <div class="teambot-runtime-block">
+                <div class="teambot-runtime-row">
+                    <span class="teambot-runtime-badge">${escapeHtml(run.status || '')}</span>
+                    <span class="teambot-runtime-text">${escapeHtml(run.title || run.run_id || '')}</span>
+                </div>
+                <div class="teambot-runtime-caption">${escapeHtml(metaParts.join(' · '))}</div>
+                ${run.last_error ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(run.last_error)}</div>` : ''}
+                ${run.last_result ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(run.last_result)}</div>` : ''}
+                ${canInterrupt ? `<div class="teambot-runtime-actions"><button class="teambot-subagent-btn danger" type="button" onclick="interruptTeamBotRun('${encodeURIComponent(sessionId)}', '${encodeURIComponent(run.run_id || '')}', '${encodeURIComponent(agentRef || '')}')">Interrupt</button></div>` : ''}
+                ${eventHtml}
+            </div>
+        `;
+    }).join('');
+}
+
+function _buildRuntimeInboxList(items, sessionId = '') {
+    if (!items || items.length === 0) {
+        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_inbox')}</div>`;
+    }
+    const hasQueued = items.some(item => String(item.status || '').toLowerCase() === 'queued');
+    const actionHtml = sessionId && hasQueued
+        ? `<div class="teambot-runtime-actions"><button class="teambot-subagent-btn" type="button" onclick="deliverTeamBotInbox('${encodeURIComponent(sessionId)}')">Deliver queued</button></div>`
+        : '';
+    return `${actionHtml}${items.map(item => `
+        <div class="teambot-runtime-block">
+            <div class="teambot-runtime-row">
+                <span class="teambot-runtime-badge">${escapeHtml(item.status || '')}</span>
+                <span class="teambot-runtime-text">${escapeHtml(item.source_label || item.source_session || 'unknown')}</span>
+            </div>
+            <div class="teambot-runtime-detail">${_escapeAndFormatText(item.body || '')}</div>
+        </div>
+    `).join('')}`;
+}
+
+function _buildRuntimeArtifactList(items) {
+    if (!items || items.length === 0) {
+        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_artifacts')}</div>`;
+    }
+    return items.map(item => `
+        <div class="teambot-runtime-block">
+            <div class="teambot-runtime-row">
+                <span class="teambot-runtime-badge">${escapeHtml(item.artifact_kind || '')}</span>
+                <span class="teambot-runtime-text">${escapeHtml(item.title || item.path || '')}</span>
+            </div>
+            ${item.path ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(item.path)}</div>` : ''}
+            ${item.preview ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(item.preview)}</div>` : ''}
+        </div>
+    `).join('');
+}
+
+function _buildRuntimeRelationshipList(runtime, item) {
+    const relationships = runtime && runtime.relationships ? runtime.relationships : {};
+    const children = Array.isArray(relationships.children) ? relationships.children : [];
+    const hasParent = !!(relationships.parent_session || item.parent_session);
+    if (!hasParent && children.length === 0) {
+        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_relationships')}</div>`;
+    }
+    return `
+        <div class="teambot-runtime-block">
+            <div class="teambot-runtime-row">
+                <span class="teambot-runtime-badge">${t('subagent_runtime_parent')}</span>
+                <span class="teambot-runtime-text">${escapeHtml(relationships.parent_session || item.parent_session || '(none)')}</span>
+            </div>
+        </div>
+        <div class="teambot-runtime-block">
+            <div class="teambot-runtime-row">
+                <span class="teambot-runtime-badge">${t('subagent_runtime_children')}</span>
+                <span class="teambot-runtime-text">${escapeHtml(String(children.length))}</span>
+            </div>
+            ${children.map(child => `
+                <div class="teambot-runtime-detail">${escapeHtml(child.name || child.agent_id || child.session_id || 'subagent')} · ${escapeHtml(child.status || '')}</div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function _renderCurrentSessionCard() {
+    const containerId = 'teambot-current-session';
+    let container = document.getElementById(containerId);
+    if (!container) {
+        container = document.createElement('div');
+        container.id = containerId;
+        container.className = 'teambot-current-session-card';
+        const listEl = document.getElementById('teambot-subagent-list');
+        if (listEl && listEl.parentNode) {
+            listEl.parentNode.insertBefore(container, listEl);
+        }
+    }
+    if (!_currentSessionRuntime) {
+        container.style.display = 'none';
+        return;
+    }
+    const runtime = _currentSessionRuntime;
+    const mode = runtime.mode?.mode || 'execute';
+    const planItems = runtime.plan?.items || [];
+    const todoItems = runtime.todos?.items || [];
+    const planCaption = runtime.plan?.title ? `${runtime.plan.title} · ${runtime.plan.status || 'active'}` : '';
+    const hasBridge = Boolean(runtime.bridge);
+    container.style.display = 'block';
+    container.innerHTML = `
+        <div class="teambot-current-card-header">
+            <div class="teambot-current-card-title">${t('subagent_runtime_current')}</div>
+            <div class="teambot-current-card-caption">${_escapeAndFormatText(runtime.session_id || currentSessionId || 'current')} · ${_escapeAndFormatText(mode)}</div>
+        </div>
+        <div class="teambot-mode-row">${_modeActionButtons(runtime.session_id || currentSessionId || '', mode)}</div>
+        <div class="teambot-runtime-shell">
+            <div class="teambot-runtime-grid">
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_plan')}</div>
+                    ${planCaption ? `<div class="teambot-runtime-caption">${_escapeAndFormatText(planCaption)}</div>` : ''}
+                    ${_buildRuntimeItemList(planItems, 'subagent_runtime_no_plan')}
+                </div>
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_todos')}</div>
+                    ${_buildRuntimeItemList(todoItems, 'subagent_runtime_no_todos')}
+                </div>
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_verifications')}</div>
+                    ${_buildRuntimeVerificationList(runtime.verifications || [])}
+                </div>
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_approvals')}</div>
+                    ${_buildRuntimeApprovalList({session_id: runtime.session_id || currentSessionId}, runtime)}
+                </div>
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_runs')}</div>
+                    ${_buildRuntimeRunList(runtime.runs || [], runtime.session_id || currentSessionId, '')}
+                </div>
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_inbox')}</div>
+                    ${_buildRuntimeInboxList(runtime.inbox || [], runtime.session_id || currentSessionId)}
+                </div>
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_workspace')}</div>
+                    <div class="teambot-runtime-detail">${_escapeAndFormatText(runtime.workspace || '')}</div>
+                    ${runtime.mode?.reason ? `<div class="teambot-runtime-caption">${_escapeAndFormatText(runtime.mode.reason)}</div>` : ''}
+                </div>
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_artifacts')}</div>
+                    ${_buildRuntimeArtifactList(runtime.artifacts || [])}
+                </div>
+                <div class="teambot-runtime-section">
+                    <div class="teambot-runtime-title">${t('subagent_runtime_relationships')}</div>
+                    ${_buildRuntimeRelationshipList(runtime, runtime)}
+                </div>
+                ${_buildExtendedSections(runtime, runtime)}
+            </div>
+        </div>
+    `;
+}
+
+function _buildSubagentRuntimeHtml(item) {
+    const loading = !!_subagentRuntimeLoading[item.session_id];
+    const runtime = _subagentRuntimeCache[item.session_id];
+    if (loading && !runtime) {
+        return `<div class="teambot-runtime-empty">${t('subagent_runtime_loading')}</div>`;
+    }
+    if (!runtime || runtime.status !== 'success') {
+        return `<div class="teambot-runtime-empty">${t('subagent_runtime_unavailable')}</div>`;
+    }
+    const workspace = runtime.workspace || item.workspace || '';
+    const planItems = runtime.plan && Array.isArray(runtime.plan.items) ? runtime.plan.items : [];
+    const todoItems = runtime.todos && Array.isArray(runtime.todos.items) ? runtime.todos.items : [];
+    const runtimeMode = runtime.mode || item.session_mode || {};
+    const modeLabel = runtimeMode.mode || item.session_mode?.mode || 'execute';
+    const modeReason = runtimeMode.reason ? `<div class="teambot-runtime-caption">${_escapeAndFormatText(runtimeMode.reason)}</div>` : '';
+    const remoteText = runtime.subagent && runtime.subagent.remote ? runtime.subagent.remote : (item.remote || '');
+    const modeActions = _modeActionButtons(item.session_id, modeLabel);
+    const extendedSections = _buildExtendedSections(runtime.subagent || {}, item);
+    return `
+        <div class="teambot-runtime-grid">
+            <div class="teambot-runtime-section teambot-runtime-section-full">
+                <div class="teambot-runtime-title">${t('subagent_runtime_workspace')}</div>
+                <div class="teambot-runtime-caption">${t('subagent_runtime_mode')}: ${escapeHtml(modeLabel)}</div>
+                ${modeActions}
+                ${modeReason}
+                <div class="teambot-runtime-detail">${_escapeAndFormatText(workspace || t('subagent_runtime_unavailable'))}</div>
+                ${remoteText ? `<div class="teambot-runtime-detail">${t('subagent_runtime_remote')}: ${_escapeAndFormatText(remoteText)}</div>` : ''}
+            </div>
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_plan')}</div>
+                ${runtime.plan && runtime.plan.title ? `<div class="teambot-runtime-caption">${escapeHtml(runtime.plan.title)} · ${escapeHtml(runtime.plan.status || 'active')}</div>` : ''}
+                ${_buildRuntimeItemList(planItems, 'subagent_runtime_no_plan')}
+            </div>
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_todos')}</div>
+                ${_buildRuntimeItemList(todoItems, 'subagent_runtime_no_todos')}
+            </div>
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_verifications')}</div>
+                ${_buildRuntimeVerificationList(runtime.verifications || [])}
+            </div>
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_approvals')}</div>
+                ${_buildRuntimeApprovalList(item, runtime)}
+            </div>
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_runs')}</div>
+                ${_buildRuntimeRunList(runtime.runs || [], item.session_id, item.agent_id || item.session_id)}
+            </div>
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_inbox')}</div>
+                ${_buildRuntimeInboxList(runtime.inbox || [], item.session_id)}
+            </div>
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_artifacts')}</div>
+                ${_buildRuntimeArtifactList(runtime.artifacts || [])}
+            </div>
+            <div class="teambot-runtime-section">
+                <div class="teambot-runtime-title">${t('subagent_runtime_relationships')}</div>
+                ${_buildRuntimeRelationshipList(runtime, item)}
+            </div>
+            ${extendedSections}
+        </div>
+    `;
+}
+
+function _renderSubagentDetail() {
+    const detailEl = document.getElementById('teambot-subagent-detail');
+    if (!detailEl) return;
+    const item = _subagentPanelItems.find(entry =>
+        entry.agent_id === _selectedSubagentRef || entry.session_id === _selectedSubagentRef
+    );
+    if (!item) {
+        detailEl.style.display = 'none';
+        detailEl.innerHTML = '';
+        return;
+    }
+
+    const cacheKey = item.agent_id || item.session_id;
+    const historyHtml = _subagentHistoryVisible
+        ? `<div class="teambot-subagent-history">${_buildSubagentHistoryHtml(_subagentHistoryCache[cacheKey] || [])}</div>`
+        : '';
+    const runtimeHtml = _buildSubagentRuntimeHtml(item);
+    const stopDisabled = ['completed', 'failed', 'cancelled'].includes(item.status);
+
+    detailEl.style.display = 'block';
+    const encodedRef = encodeURIComponent(cacheKey);
+    const encodedParent = encodeURIComponent(item.parent_session || '');
+    detailEl.innerHTML = `
+        <div class="teambot-subagent-detail-card">
+            <div class="teambot-subagent-detail-header">
+                <div style="min-width:0;">
+                    <div class="teambot-subagent-name">${escapeHtml(item.name || item.agent_id)}</div>
+                    <div class="teambot-subagent-meta">${t('subagent_runtime_status')}: ${escapeHtml(item.status || 'idle')} · ${escapeHtml(item.session_id || '')}</div>
+                </div>
+                <div class="teambot-subagent-detail-actions">
+                    <button class="teambot-subagent-btn" type="button" onclick="toggleSubagentHistory(decodeURIComponent('${encodedRef}'))">${t(_subagentHistoryVisible ? 'subagent_hide_history' : 'subagent_history')}</button>
+                    <button class="teambot-subagent-btn${stopDisabled ? '' : ' danger'}" type="button" onclick="cancelSubagentFromPanel(decodeURIComponent('${encodedRef}'))" ${stopDisabled ? 'disabled' : ''}>${t('subagent_stop')}</button>
+                    ${item.parent_session ? `<button class="teambot-subagent-btn" type="button" onclick="openSubagentParentSession(decodeURIComponent('${encodedParent}'))">${t('subagent_open_parent')}</button>` : ''}
+                </div>
+            </div>
+            <div class="teambot-subagent-detail-copy"><strong>${t('subagent_last_result')}:</strong>\n${_escapeAndFormatText(item.last_result || '(none)')}</div>
+            <div class="teambot-runtime-shell">${runtimeHtml}</div>
+            ${historyHtml}
+        </div>
+    `;
+}
+
+function renderSubagentPanel(subagents) {
+    const listEl = document.getElementById('teambot-subagent-list');
+    if (!listEl) return;
+    _subagentPanelItems = Array.isArray(subagents) ? subagents : [];
+
+    if (_subagentPanelItems.length === 0) {
+        listEl.innerHTML = `<div class="teambot-subagent-empty">${t('subagents_empty')}</div>`;
+        _selectedSubagentRef = '';
+        _renderSubagentDetail();
+        return;
+    }
+
+    if (!_selectedSubagentRef || !_subagentPanelItems.some(item =>
+        item.agent_id === _selectedSubagentRef || item.session_id === _selectedSubagentRef
+    )) {
+        _selectedSubagentRef = _subagentPanelItems[0].agent_id || _subagentPanelItems[0].session_id;
+    }
+
+    listEl.innerHTML = _subagentPanelItems.map(item => {
+        const ref = item.agent_id || item.session_id;
+        const active = _selectedSubagentRef === ref || _selectedSubagentRef === item.session_id;
+        const encodedRef = encodeURIComponent(ref);
+        return `
+            <div class="teambot-subagent-item${active ? ' active' : ''}" onclick="selectSubagentPanelItem(decodeURIComponent('${encodedRef}'))">
+                <div class="teambot-subagent-item-row">
+                    <div class="teambot-subagent-name">${escapeHtml(item.name || item.agent_id || 'subagent')}</div>
+                    <span class="teambot-subagent-status ${escapeHtml(item.status || 'idle')}">${_renderSubagentStatus(item.status)}</span>
+                </div>
+                <div class="teambot-subagent-meta">${escapeHtml(_summarizeSubagentItem(item))}</div>
+            </div>
+        `;
+    }).join('');
+    _renderSubagentDetail();
+    _renderCurrentSessionCard();
+}
+
+function selectSubagentPanelItem(agentRef) {
+    _selectedSubagentRef = agentRef;
+    _subagentHistoryVisible = false;
+    _renderSubagentDetail();
+    ensureSubagentRuntimeLoaded(agentRef);
+}
+
+async function refreshSubagentPanel() {
+    const listEl = document.getElementById('teambot-subagent-list');
+    if (!listEl) return;
+    if (_subagentPanelItems.length === 0) {
+        listEl.innerHTML = `<div class="teambot-subagent-empty">${t('subagents_loading')}</div>`;
+    }
+    try {
+        const resp = await fetch('/proxy_teambot_subagents');
+        const data = await resp.json();
+        renderSubagentPanel(data.subagents || []);
+        await refreshCurrentSessionRuntime();
+        const selected = _subagentPanelItems.find(item =>
+            item.agent_id === _selectedSubagentRef || item.session_id === _selectedSubagentRef
+        );
+        if (selected) {
+            ensureSubagentRuntimeLoaded(selected.agent_id || selected.session_id, true);
+        }
+    } catch (e) {
+        listEl.innerHTML = `<div class="teambot-subagent-empty">${escapeHtml(e.message || 'Failed')}</div>`;
+        _selectedSubagentRef = '';
+        _renderSubagentDetail();
+    }
+}
+
+async function ensureSubagentRuntimeLoaded(agentRef, force = false) {
+    const item = _subagentPanelItems.find(entry =>
+        entry.agent_id === agentRef || entry.session_id === agentRef
+    );
+    if (!item || !item.session_id) return;
+    if (_subagentRuntimeLoading[item.session_id]) return;
+    if (!force && _subagentRuntimeCache[item.session_id]) return;
+    _subagentRuntimeLoading[item.session_id] = true;
+    _renderSubagentDetail();
+    try {
+        const resp = await fetch(`/proxy_teambot_session_runtime?session_id=${encodeURIComponent(item.session_id)}`);
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || t('subagent_runtime_unavailable'));
+        }
+        _subagentRuntimeCache[item.session_id] = data;
+        _syncTeamBotBridgeSocket(item.session_id, data);
+    } catch (e) {
+        _subagentRuntimeCache[item.session_id] = {
+            status: 'error',
+            error: e.message || t('subagent_runtime_unavailable'),
+        };
+    } finally {
+        _subagentRuntimeLoading[item.session_id] = false;
+        _renderSubagentDetail();
+    }
+}
+
+async function resolveTeamBotApproval(approvalId, action, remember, sessionId) {
+    try {
+        const resp = await fetch('/proxy_teambot_tool_approval_resolve', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                approval_id: approvalId,
+                action,
+                remember: !!remember,
+                session_id: sessionId || '',
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || t('subagent_runtime_approval_failed'));
+        }
+        _setTeamBotPolicyStatus(t('subagent_runtime_approval_ok'), 'success');
+        if (sessionId) {
+            delete _subagentRuntimeCache[sessionId];
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(`${t('subagent_runtime_approval_failed')}: ${e.message}`, 'error');
+    }
+}
+
+async function reloadTeamBotPolicy(force = false) {
+    if (_teambotPolicyDirty && !force) {
+        _renderTeamBotPolicySummary();
+        return;
+    }
+    _setTeamBotPolicyStatus('');
+    const summaryEl = document.getElementById('teambot-policy-summary');
+    if (summaryEl && !_teambotPolicyLoaded) {
+        summaryEl.textContent = t('policy_panel_loading');
+    }
+    try {
+        const resp = await fetch('/proxy_teambot_tool_policy');
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || t('policy_panel_load_failed'));
+        }
+        _teambotPolicyData = data;
+        _teambotPolicyDirty = false;
+        _teambotPolicyLoaded = true;
+        _syncTeamBotPolicyEditor(true);
+    } catch (e) {
+        _setTeamBotPolicyStatus(`${t('policy_panel_load_failed')}: ${e.message}`, 'error');
+        if (summaryEl) summaryEl.textContent = t('policy_panel_load_failed');
+    }
+}
+
+function toggleTeamBotPolicyEditor() {
+    _teambotPolicyEditorOpen = !_teambotPolicyEditorOpen;
+    _syncTeamBotPolicyEditor();
+    if (_teambotPolicyEditorOpen && !_teambotPolicyLoaded) {
+        reloadTeamBotPolicy();
+    }
+}
+
+function formatTeamBotPolicyEditor() {
+    try {
+        const parsed = _parseTeamBotPolicyEditor();
+        const editorEl = document.getElementById('teambot-policy-editor');
+        if (!editorEl) return;
+        editorEl.value = JSON.stringify(parsed, null, 2);
+        _teambotPolicyDirty = true;
+        _setTeamBotPolicyStatus('');
+        _renderTeamBotPolicySummary();
+    } catch (e) {
+        _setTeamBotPolicyStatus(`${t('policy_panel_invalid_json')}: ${e.message}`, 'error');
+    }
+}
+
+async function saveTeamBotPolicyEditor() {
+    try {
+        const parsed = _parseTeamBotPolicyEditor();
+        const resp = await fetch('/proxy_teambot_tool_policy', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ policy: parsed })
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || t('policy_panel_save_failed'));
+        }
+        _teambotPolicyData = data;
+        _teambotPolicyDirty = false;
+        _teambotPolicyLoaded = true;
+        _syncTeamBotPolicyEditor(true);
+        _setTeamBotPolicyStatus(t('policy_panel_saved'), 'success');
+    } catch (e) {
+        _setTeamBotPolicyStatus(`${t('policy_panel_save_failed')}: ${e.message}`, 'error');
+    }
+}
+
+async function toggleSubagentHistory(agentRef) {
+    _selectedSubagentRef = agentRef;
+    _subagentHistoryVisible = !_subagentHistoryVisible;
+    if (_subagentHistoryVisible) {
+        const cacheKey = agentRef;
+        if (!_subagentHistoryCache[cacheKey]) {
+            try {
+                const resp = await fetch('/proxy_teambot_subagent_history', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ agent_ref: agentRef, limit: 12 })
+                });
+                const data = await resp.json();
+                _subagentHistoryCache[cacheKey] = data.messages || [];
+                const refreshed = (data.subagent && (data.subagent.agent_id || data.subagent.session_id))
+                    ? data.subagent
+                    : null;
+                if (refreshed) {
+                    _subagentPanelItems = _subagentPanelItems.map(item =>
+                        (item.agent_id === refreshed.agent_id || item.session_id === refreshed.session_id)
+                            ? { ...item, ...refreshed }
+                            : item
+                    );
+                }
+            } catch (e) {
+                _subagentHistoryCache[cacheKey] = [];
+            }
+        }
+    }
+    _renderSubagentDetail();
+}
+
+async function cancelSubagentFromPanel(agentRef) {
+    const item = _subagentPanelItems.find(entry =>
+        entry.agent_id === agentRef || entry.session_id === agentRef
+    );
+    if (!item) return;
+    if (['completed', 'failed', 'cancelled'].includes(item.status)) return;
+    if (!confirm(t('subagent_stop_confirm'))) return;
+    try {
+        const resp = await fetch('/proxy_teambot_subagent_cancel', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ agent_ref: agentRef })
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || t('subagent_stop_failed'));
+        }
+        _subagentHistoryVisible = false;
+        await refreshSubagentPanel();
+    } catch (e) {
+        alert(`${t('subagent_stop_failed')}: ${e.message}`);
+    }
+}
+
+function openSubagentParentSession(sessionId) {
+    if (!sessionId) return;
+    switchToSession(sessionId, true);
+}
 
 function startHistoryPolling() {
     stopHistoryPolling();
     _historyPollingTimer = setInterval(() => {
         if (sessionSidebarOpen) {
             refreshHistoryList();
+            refreshSubagentPanel();
         } else {
             // sidebar 未打开也刷新状态（发光效果），以便打开时立即可见
             refreshSessionStatus();
@@ -1798,6 +3425,14 @@ async function openSessionSidebar() {
     const sidebar = document.getElementById('session-sidebar');
     sidebar.style.display = 'flex';
     sessionSidebarOpen = true;
+    initSessionRuntimePanelResize();
+    requestAnimationFrame(() => applySessionRuntimePanelHeight());
+    refreshSubagentPanel();
+    if (!_teambotPolicyLoaded) {
+        reloadTeamBotPolicy();
+    } else {
+        _syncTeamBotPolicyEditor();
+    }
     // 移动端加遮罩
     if (window.innerWidth <= 768) {
         let overlay = document.getElementById('session-overlay');
@@ -1822,6 +3457,7 @@ async function openSessionSidebar() {
 }
 
 function closeSessionSidebar() {
+    _closeAllTeamBotBridgeSockets();
     document.getElementById('session-sidebar').style.display = 'none';
     const overlay = document.getElementById('session-overlay');
     if (overlay) overlay.style.display = 'none';
@@ -2224,8 +3860,8 @@ async function switchToSession(sessionId, force = false) {
                 }
                 chatBox.innerHTML += `
                     <div class="flex justify-start">
-                        <div class="message-agent bg-white border p-4 max-w-[85%] shadow-sm text-gray-700 markdown-body" data-tts-ready="1">
-                            ${toolCallsHtml}${msg.content ? marked.parse(msg.content) : '<span class="text-gray-400 text-xs">('+t('tool_calling')+')</span>'}
+                        <div class="message-agent bg-white border p-4 max-w-[85%] shadow-sm text-gray-700 markdown-body tc-markdown" data-tts-ready="1">
+                            ${toolCallsHtml}${msg.content ? renderMarkdown(msg.content) : '<span class="text-gray-400 text-xs">('+t('tool_calling')+')</span>'}
                         </div>
                     </div>`;
             }
@@ -2237,7 +3873,7 @@ async function switchToSession(sessionId, force = false) {
             div.appendChild(ttsBtn);
         });
         // 高亮代码块
-        chatBox.querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+        highlightMarkdownIn(chatBox);
         chatBox.scrollTop = chatBox.scrollHeight;
     } catch (e) {
         chatBox.innerHTML = `
@@ -2263,6 +3899,114 @@ async function switchToSession(sessionId, force = false) {
 }
 
 // ===== 本机免密登录 =====
+function resolveLoginErrorMessage(payload) {
+    const errorCode = payload && typeof payload === 'object' ? payload.error_code : '';
+    if (errorCode === 'user_id_required') return t('login_username_required');
+    if (errorCode === 'password_required') return t('login_password_required');
+    if (errorCode === 'password_login_not_available') {
+        return t('login_error_password_login_unavailable', {
+            user_id: payload && payload.user_id ? payload.user_id : '',
+        });
+    }
+
+    const rawMessage = typeof payload === 'string'
+        ? payload
+        : (payload && (payload.detail || payload.error)) || '';
+    const normalized = String(rawMessage || '').trim();
+    if (!normalized) return t('login_error_failed');
+    if (/invalid server response/i.test(normalized)) return t('login_error_invalid_response');
+    if (/required/i.test(normalized) && /\bpassword\b/i.test(normalized)) return t('login_password_required');
+    if (/required/i.test(normalized) && /\b(user(?:name|_?id)?)\b/i.test(normalized)) return t('login_username_required');
+    return normalized;
+}
+
+function showLoginError(errorDiv, message) {
+    errorDiv.textContent = message;
+    errorDiv.classList.remove('hidden');
+}
+
+function _localLoginBannerDismissKey(userId = currentUserId) {
+    return userId ? `teamclaw-local-login-banner-dismissed:${userId}` : '';
+}
+
+function _syncLocalLoginBannerDismissedState() {
+    const key = _localLoginBannerDismissKey();
+    localLoginBannerDismissed = key ? sessionStorage.getItem(key) === '1' : false;
+}
+
+function updateLocalLoginBanner() {
+    const banner = document.getElementById('local-login-banner');
+    const titleEl = document.getElementById('local-login-banner-title');
+    const textEl = document.getElementById('local-login-banner-text');
+    const actionEl = document.getElementById('local-login-banner-action');
+    if (!banner || !titleEl || !textEl || !actionEl) return;
+
+    const shouldShow = Boolean(
+        currentUserId &&
+        currentLoginMode === 'local_no_password' &&
+        !currentUserHasPassword &&
+        !localLoginBannerDismissed
+    );
+    banner.style.display = shouldShow ? 'flex' : 'none';
+    if (!shouldShow) return;
+
+    titleEl.textContent = t('local_login_banner_title');
+    textEl.textContent = t('local_login_banner_body', { user_id: currentUserId });
+    actionEl.textContent = t('local_login_banner_action');
+
+    const llmBanner = document.getElementById('llm-warning-banner');
+    const llmVisible = llmBanner && llmBanner.style.display !== 'none';
+    const topOffset = llmVisible ? ((llmBanner.offsetHeight || 42) + 12) : 12;
+    banner.style.top = `${topOffset}px`;
+}
+
+function dismissLocalLoginBanner(remember = true) {
+    localLoginBannerDismissed = true;
+    if (remember) {
+        const key = _localLoginBannerDismissKey();
+        if (key) sessionStorage.setItem(key, '1');
+    }
+    updateLocalLoginBanner();
+}
+
+function _setLlmWarningBannerVisible(visible) {
+    const banner = document.getElementById('llm-warning-banner');
+    if (banner) {
+        banner.style.display = visible ? 'block' : 'none';
+    }
+    updateLocalLoginBanner();
+}
+
+async function refreshLlmBannerFromSetupStatus() {
+    try {
+        const response = await fetch('/api/setup_status');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const status = await response.json();
+        window._setupStatus = status;
+        _setLlmWarningBannerVisible(!status.llm_configured);
+        return status;
+    } catch (error) {
+        try {
+            const fallbackResponse = await fetch('/api/llm_config_status');
+            if (!fallbackResponse.ok) throw new Error(`HTTP ${fallbackResponse.status}`);
+            const fallback = await fallbackResponse.json();
+            _setLlmWarningBannerVisible(!fallback.configured);
+            return null;
+        } catch (_fallbackError) {
+            return null;
+        }
+    }
+}
+
+async function openSettingsToPassword() {
+    await openSettings({ focus: 'user-password' });
+    const statusEl = document.getElementById('settings-user-password-inline-status');
+    if (statusEl) {
+        statusEl.textContent = t('settings_user_password_opened');
+        statusEl.className = 'settings-inline-status';
+    }
+}
+
 async function handleLocalLogin() {
     const nameInput = document.getElementById('username-input');
     const errorDiv = document.getElementById('login-error');
@@ -2272,15 +4016,13 @@ async function handleLocalLogin() {
     errorDiv.classList.add('hidden');
 
     if (!name) {
-        errorDiv.textContent = '请输入用户名';
-        errorDiv.classList.remove('hidden');
+        showLoginError(errorDiv, t('login_username_required'));
         nameInput.focus();
         return;
     }
 
     if (!/^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$/.test(name)) {
-        errorDiv.textContent = t('login_error_invalid');
-        errorDiv.classList.remove('hidden');
+        showLoginError(errorDiv, t('login_error_invalid'));
         return;
     }
 
@@ -2301,12 +4043,14 @@ async function handleLocalLogin() {
         let data;
         try { data = await resp.json(); } catch (_) { data = { error: 'Invalid server response' }; }
         if (!resp.ok) {
-            errorDiv.textContent = data.detail || data.error || t('login_error_failed');
-            errorDiv.classList.remove('hidden');
+            showLoginError(errorDiv, resolveLoginErrorMessage(data));
             return;
         }
 
         currentUserId = name;
+        currentUserHasPassword = Boolean(data && data.has_password);
+        currentLoginMode = data && data.mode ? data.mode : 'local_no_password';
+        _syncLocalLoginBannerDismissedState();
         initSession();
 
         // Check if we should redirect to another page (e.g. group_chat)
@@ -2319,16 +4063,16 @@ async function handleLocalLogin() {
         loadTools();
         refreshOasisTopics();
         startHistoryPolling();
-        switchPage('group');
+        switchPage('chat');
+        updateLocalLoginBanner();
         // Show setup wizard if LLM not configured
         _checkAndShowSetupWizard();
     } catch (e) {
         if (e.name === 'AbortError') {
-            errorDiv.textContent = '连接超时，请确认后端服务已启动后重试';
+            showLoginError(errorDiv, t('login_error_timeout'));
         } else {
-            errorDiv.textContent = t('login_error_network') + ': ' + e.message;
+            showLoginError(errorDiv, t('login_error_network') + ': ' + e.message);
         }
-        errorDiv.classList.remove('hidden');
     } finally {
         localLoginBtn.disabled = false;
         localLoginBtn.textContent = t('local_login_btn') || '本机免密登录';
@@ -2347,12 +4091,19 @@ async function handleLogin() {
 
     errorDiv.classList.add('hidden');
 
-    if (!name) { nameInput.focus(); return; }
-    if (!password) { pwInput.focus(); return; }
+    if (!name) {
+        showLoginError(errorDiv, t('login_username_required'));
+        nameInput.focus();
+        return;
+    }
+    if (!password) {
+        showLoginError(errorDiv, t('login_password_required'));
+        pwInput.focus();
+        return;
+    }
 
     if (!/^[a-zA-Z0-9_\-\u4e00-\u9fa5]+$/.test(name)) {
-        errorDiv.textContent = t('login_error_invalid');
-        errorDiv.classList.remove('hidden');
+        showLoginError(errorDiv, t('login_error_invalid'));
         return;
     }
 
@@ -2373,12 +4124,14 @@ async function handleLogin() {
         let data;
         try { data = await resp.json(); } catch (_) { data = { error: 'Invalid server response' }; }
         if (!resp.ok) {
-            errorDiv.textContent = data.detail || data.error || t('login_error_failed');
-            errorDiv.classList.remove('hidden');
+            showLoginError(errorDiv, resolveLoginErrorMessage(data));
             return;
         }
 
         currentUserId = name;
+        currentUserHasPassword = Boolean(data && data.has_password);
+        currentLoginMode = data && data.mode ? data.mode : 'password';
+        _syncLocalLoginBannerDismissedState();
         // Auth is managed by server-side session + cookie, no sessionStorage needed
         initSession();
 
@@ -2392,17 +4145,17 @@ async function handleLogin() {
         loadTools();
         refreshOasisTopics(); // Load OASIS topics after login
         startHistoryPolling();
-        // Default to team page after login
-        switchPage('group');
+        // Default to chat page after login
+        switchPage('chat');
+        updateLocalLoginBanner();
         // Show setup wizard if LLM not configured
         _checkAndShowSetupWizard();
     } catch (e) {
         if (e.name === 'AbortError') {
-            errorDiv.textContent = '连接超时，请确认后端服务已启动后重试';
+            showLoginError(errorDiv, t('login_error_timeout'));
         } else {
-            errorDiv.textContent = t('login_error_network') + ': ' + e.message;
+            showLoginError(errorDiv, t('login_error_network') + ': ' + e.message);
         }
-        errorDiv.classList.remove('hidden');
     } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = t('login_btn');
@@ -2421,24 +4174,51 @@ const SETTINGS_GROUPS_ORDERED = [
     { id: 'bots', label: 'settings_group_bots', keys: ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_ALLOWED_USERS', 'QQ_APP_ID', 'QQ_BOT_SECRET', 'QQ_BOT_USERNAME'] },
     { id: 'comm', label: 'settings_group_comm', keys: ['OPENAI_STANDARD_MODE'] },
     { id: 'exec', label: 'settings_group_exec', keys: ['ALLOWED_COMMANDS', 'EXEC_TIMEOUT', 'MAX_OUTPUT_LENGTH'] },
+    { id: 'tinyfish', label: 'settings_group_tinyfish', keys: ['TINYFISH_API_KEY', 'TINYFISH_BASE_URL', 'TINYFISH_MONITOR_DB_PATH', 'TINYFISH_MONITOR_TARGETS_PATH', 'TINYFISH_MONITOR_ENABLED', 'TINYFISH_MONITOR_CRON'] },
     { id: 'security', label: 'settings_group_security', keys: ['INTERNAL_TOKEN'] },
 ];
 
 const SETTINGS_GROUP_HELP_KEYS = {
     tts: 'settings_help_audio_group',
+    tinyfish: 'settings_help_tinyfish_group',
 };
 
 const SETTINGS_FIELD_HELP_KEYS = {
     TTS_MODEL: 'settings_help_tts_model',
     TTS_VOICE: 'settings_help_tts_voice',
     STT_MODEL: 'settings_help_stt_model',
+    TINYFISH_API_KEY: 'settings_help_tinyfish_api_key',
+    TINYFISH_BASE_URL: 'settings_help_tinyfish_base_url',
+    TINYFISH_MONITOR_DB_PATH: 'settings_help_tinyfish_db_path',
+    TINYFISH_MONITOR_TARGETS_PATH: 'settings_help_tinyfish_targets_path',
+    TINYFISH_MONITOR_ENABLED: 'settings_help_tinyfish_enabled',
+    TINYFISH_MONITOR_CRON: 'settings_help_tinyfish_cron',
 };
 
 let _settingsCache = {};
+let _settingsFocusTarget = '';
 
-async function openSettings() {
+function _isMaskedSettingsSecretValue(value) {
+    return typeof value === 'string' && value.includes('****');
+}
+
+function _getSettingsInputValueAndPlaceholder(value, fallbackPlaceholder, isPassword) {
+    if (isPassword && _isMaskedSettingsSecretValue(value)) {
+        return {
+            value: '',
+            placeholder: t('settings_secret_saved_placeholder', { mask: value }),
+        };
+    }
+    return {
+        value: value || '',
+        placeholder: fallbackPlaceholder,
+    };
+}
+
+async function openSettings(options = {}) {
     const modal = document.getElementById('settings-modal');
     const body = document.getElementById('settings-body');
+    _settingsFocusTarget = options && options.focus ? String(options.focus) : '';
     modal.style.display = 'flex';
     body.innerHTML = `<div class="settings-loading">${t('loading')}</div>`;
     try {
@@ -2455,6 +4235,7 @@ async function openSettings() {
 function renderSettings(settings) {
     const body = document.getElementById('settings-body');
     let html = `<div class="settings-hint">${t('settings_restart_hint')}</div>`;
+    html += _renderCurrentUserPasswordCard();
 
     // Tunnel control section
     html += `<div class="settings-group">`;
@@ -2480,6 +4261,8 @@ function renderSettings(settings) {
         });
         if (group.id === 'llm') {
             html += _renderLlmGroup(settings);
+        } else if (group.id === 'tinyfish') {
+            html += _renderTinyfishGroup(settings);
         } else {
             html += _renderGroup({
                 title: t(group.label),
@@ -2497,6 +4280,60 @@ function renderSettings(settings) {
     body.innerHTML = html;
     _refreshTunnelStatus();
     _initSettingsLlmGroup(settings);
+    refreshTinyfishMonitorPanel(true);
+    _applySettingsFocusTarget();
+}
+
+function _renderCurrentUserPasswordCard() {
+    if (!currentUserId) return '';
+    const statusText = currentUserHasPassword
+        ? t('settings_user_password_status_set')
+        : t('settings_user_password_status_missing');
+    const hintText = t(
+        currentLoginMode === 'local_no_password'
+            ? 'settings_user_password_hint_local'
+            : 'settings_user_password_hint_general',
+        { user_id: currentUserId }
+    );
+    return `
+        <div class="settings-group" id="settings-user-password-section" data-settings-focus="user-password">
+            <div class="settings-group-title" onclick="this.parentElement.classList.toggle('collapsed')">${t('settings_user_password_title')} <span class="settings-chevron">▼</span></div>
+            <div class="settings-group-body">
+                <div class="settings-user-password-card">
+                    <div class="settings-user-password-topline">
+                        <div class="settings-label">${escapeHtml(currentUserId)}</div>
+                        <span id="settings-user-password-badge" class="settings-user-password-badge">${escapeHtml(statusText)}</span>
+                    </div>
+                    <div class="settings-user-password-help">${escapeHtml(hintText)}</div>
+                    <div class="settings-field">
+                        <label class="settings-label">${t('settings_user_password_field')}</label>
+                        <input id="settings-user-password" class="settings-input" type="password" placeholder="${escapeHtml(t('settings_user_password_placeholder'))}" autocomplete="new-password" />
+                    </div>
+                    <div class="settings-field">
+                        <label class="settings-label">${t('settings_user_password_confirm_field')}</label>
+                        <input id="settings-user-password-confirm" class="settings-input" type="password" placeholder="${escapeHtml(t('settings_user_password_confirm_placeholder'))}" autocomplete="new-password" />
+                    </div>
+                    <div class="settings-user-password-actions">
+                        <button id="settings-user-password-save-btn" class="settings-btn settings-btn-save" type="button" onclick="saveCurrentUserPassword()">${t('settings_user_password_save')}</button>
+                        <div id="settings-user-password-inline-status" class="settings-inline-status"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function _applySettingsFocusTarget() {
+    if (!_settingsFocusTarget) return;
+    const target = document.querySelector(`[data-settings-focus="${_settingsFocusTarget}"]`);
+    _settingsFocusTarget = '';
+    if (!target) return;
+    requestAnimationFrame(() => {
+        target.classList.remove('collapsed');
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const input = target.querySelector('input, textarea, select, button');
+        if (input) input.focus();
+    });
 }
 
 /** 渲染 LLM 配置组（Provider 下拉 + API Key + Base URL + Model 检测下拉） */
@@ -2506,10 +4343,27 @@ function _renderLlmGroup(settings) {
     const curUrl = settings['LLM_BASE_URL'] || '';
     const curModel = settings['LLM_MODEL'] || '';
     const curVision = settings['LLM_VISION_SUPPORT'] || '';
+    const apiKeyInputState = _getSettingsInputValueAndPlaceholder(curKey, 'API Key', true);
+    const renderActionButton = (id, labelKey, subtitleId, onclick) => `
+        <button id="${id}" onclick="${onclick}" style="width:100%;padding:11px 14px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#111827;font-size:14px;font-weight:600;cursor:pointer;text-align:left;transition:background .15s;" onmouseover="if(!this.disabled)this.style.background='#f9fafb'" onmouseout="if(!this.disabled)this.style.background='#fff'">
+            ${t(labelKey)}
+            <span id="${subtitleId}" style="display:block;font-size:11px;font-weight:400;color:#6b7280;margin-top:2px;">${t('loading')}</span>
+        </button>
+    `;
 
     let html = `<div class="settings-group">`;
     html += `<div class="settings-group-title" onclick="this.parentElement.classList.toggle('collapsed')">${t('settings_group_llm')} <span class="settings-chevron">▼</span></div>`;
     html += `<div class="settings-group-body">`;
+
+    html += `<div style="margin-bottom:12px;padding:10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;">`;
+    html += `<div style="font-size:12px;font-weight:700;color:#6b7280;margin-bottom:8px;">${t('settings_llm_sync_title')}</div>`;
+    html += `<div style="display:flex;flex-direction:column;gap:8px;">`;
+    html += renderActionButton('settings-import-openclaw-btn', 'settings_openclaw_import', 'settings-openclaw-import-subtitle', 'settingsImportOpenClaw()');
+    html += renderActionButton('settings-export-openclaw-btn', 'settings_openclaw_export', 'settings-openclaw-export-subtitle', 'settingsExportOpenClaw()');
+    html += renderActionButton('settings-use-antigravity-btn', 'settings_antigravity_apply', 'settings-antigravity-subtitle', 'settingsUseAntigravity()');
+    html += `</div>`;
+    html += `<div id="settings-llm-sync-status" style="margin-top:6px;font-size:11px;color:#6b7280;"></div>`;
+    html += `</div>`;
 
     // Provider dropdown
     html += `<div class="settings-field">`;
@@ -2538,7 +4392,7 @@ function _renderLlmGroup(settings) {
     // API Key
     html += `<div class="settings-field">`;
     html += `<label class="settings-label">LLM_API_KEY</label>`;
-    html += `<input class="settings-input" data-key="LLM_API_KEY" id="settings-llm-key" type="password" value="${escapeHtml(curKey)}" placeholder="API Key" autocomplete="off" />`;
+    html += `<input class="settings-input" data-key="LLM_API_KEY" id="settings-llm-key" type="password" value="${escapeHtml(apiKeyInputState.value)}" placeholder="${escapeHtml(apiKeyInputState.placeholder)}" autocomplete="off" />`;
     html += `</div>`;
 
     // Base URL
@@ -2570,6 +4424,370 @@ function _renderLlmGroup(settings) {
 
     html += `</div></div>`;
     return html;
+}
+
+function _renderTinyfishGroup(settings) {
+    const keys = ['TINYFISH_API_KEY', 'TINYFISH_BASE_URL', 'TINYFISH_MONITOR_DB_PATH', 'TINYFISH_MONITOR_TARGETS_PATH', 'TINYFISH_MONITOR_ENABLED', 'TINYFISH_MONITOR_CRON'];
+    let html = `<div class="settings-group" id="settings-tinyfish-group">`;
+    html += `<div class="settings-group-title" onclick="this.parentElement.classList.toggle('collapsed')">${t('settings_group_tinyfish')} <span class="settings-chevron">▼</span></div>`;
+    html += `<div class="settings-group-body">`;
+    html += `<div style="margin-bottom:12px;padding:10px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;">`;
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">`;
+    html += `<button id="tinyfish-run-btn" onclick="tinyfishRunNow()" style="padding:7px 14px;border-radius:7px;border:none;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">${t('settings_tinyfish_run_now')}</button>`;
+    html += `<button id="tinyfish-refresh-btn" onclick="refreshTinyfishMonitorPanel(true)" style="padding:7px 14px;border-radius:7px;border:1px solid #d1d5db;background:#fff;color:#374151;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">${t('settings_tinyfish_refresh')}</button>`;
+    html += `</div>`;
+    html += `<div id="tinyfish-monitor-status" style="margin-top:8px;font-size:12px;color:#6b7280;">${t('settings_tinyfish_loading')}</div>`;
+    html += `<div id="tinyfish-monitor-summary" style="margin-top:8px;font-size:11px;line-height:1.5;color:#374151;"></div>`;
+    html += `<div id="tinyfish-monitor-runs"></div>`;
+    html += `<div id="tinyfish-monitor-sites"></div>`;
+    html += `<div id="tinyfish-monitor-changes"></div>`;
+    html += `</div>`;
+    for (const key of keys) {
+        const val = settings[key] || '';
+        const isPassword = /KEY|TOKEN|SECRET|PASSWORD/i.test(key);
+        const inputState = _getSettingsInputValueAndPlaceholder(val, key, isPassword);
+        const helpKey = SETTINGS_FIELD_HELP_KEYS[key];
+        const helpText = helpKey ? t(helpKey) : '';
+        html += `<div class="settings-field">`;
+        html += `<label class="settings-label" title="${key}">${key}</label>`;
+        html += `<input class="settings-input" data-key="${key}" type="${isPassword ? 'password' : 'text'}" value="${escapeHtml(inputState.value)}" placeholder="${escapeHtml(inputState.placeholder)}" autocomplete="off" />`;
+        if (helpText) {
+            html += `<div style="margin-top:5px;font-size:11px;line-height:1.5;color:#9ca3af;">${escapeHtml(helpText)}</div>`;
+        }
+        html += `</div>`;
+    }
+    html += `</div></div>`;
+    return html;
+}
+
+function _renderTinyfishList(title, itemsHtml) {
+    return `
+        <div style="margin-top:10px;">
+            <div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">${escapeHtml(title)}</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">${itemsHtml}</div>
+        </div>
+    `;
+}
+
+function _tinyfishCompactPath(pathValue) {
+    const raw = String(pathValue || '').trim();
+    if (!raw) return '-';
+    const normalized = raw.replace(/\\/g, '/');
+    const segments = normalized.split('/');
+    return segments[segments.length - 1] || raw;
+}
+
+function _tinyfishMetaChip(label, displayValue, titleValue = '') {
+    const display = displayValue || '-';
+    const title = titleValue || display;
+    return `
+        <span title="${escapeHtml(title)}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:#fff;border:1px solid #e5e7eb;color:#4b5563;max-width:100%;">
+            <strong style="font-size:10px;letter-spacing:0.02em;text-transform:uppercase;color:#6b7280;">${escapeHtml(label)}</strong>
+            <span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(display)}</span>
+        </span>
+    `;
+}
+
+async function refreshTinyfishMonitorPanel(sync = true) {
+    const statusEl = document.getElementById('tinyfish-monitor-status');
+    const summaryEl = document.getElementById('tinyfish-monitor-summary');
+    const runsEl = document.getElementById('tinyfish-monitor-runs');
+    const sitesEl = document.getElementById('tinyfish-monitor-sites');
+    const changesEl = document.getElementById('tinyfish-monitor-changes');
+    if (!statusEl || !summaryEl || !runsEl || !sitesEl || !changesEl) return;
+
+    statusEl.textContent = t('settings_tinyfish_loading');
+    try {
+        const resp = await fetch(`/api/tinyfish/status${sync ? '?sync=1' : ''}`);
+        const data = await resp.json();
+        if (!resp.ok || data.ok === false) throw new Error(data.error || 'unknown');
+
+        const cfg = data.config || {};
+        const configured = cfg.api_key_configured && cfg.targets_path_exists;
+        statusEl.textContent = configured
+            ? `✅ TinyFish ready · pending ${data.pending_runs || 0}`
+            : `⚠️ ${t('settings_tinyfish_not_configured')}`;
+
+        const summaryChips = [
+            _tinyfishMetaChip('Base URL', cfg.base_url || '-', cfg.base_url || ''),
+            _tinyfishMetaChip(
+                'Targets',
+                `${_tinyfishCompactPath(cfg.targets_path || '-')} ${cfg.targets_path_exists ? '✅' : '⚠️'}`.trim(),
+                cfg.targets_path || ''
+            ),
+            _tinyfishMetaChip('DB', _tinyfishCompactPath(cfg.db_path || '-'), cfg.db_path || ''),
+        ];
+        if (cfg.cron && cfg.cron !== '-') {
+            summaryChips.push(_tinyfishMetaChip('Cron', cfg.cron, cfg.cron));
+        }
+        summaryEl.innerHTML = `
+            <div style="display:flex;flex-wrap:wrap;gap:6px;">${summaryChips.join('')}</div>
+            ${data.targets_error ? `<div style="margin-top:8px;color:#b45309;">Targets Error: ${escapeHtml(data.targets_error)}</div>` : ''}
+        `;
+
+        const recentRuns = (data.recent_runs || []).slice(0, 5);
+        runsEl.innerHTML = recentRuns.length
+            ? _renderTinyfishList(
+                t('settings_tinyfish_recent_runs'),
+                recentRuns.map((run) => `
+                    <div style="padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;">
+                        <div style="font-size:12px;font-weight:600;color:#111827;">${escapeHtml(run.site_name || run.site_key || run.run_id)}</div>
+                        <div style="font-size:11px;color:#6b7280;margin-top:2px;">${escapeHtml(run.status || '-')} · ${escapeHtml(run.finished_at || run.started_at || run.submitted_at || '-')}</div>
+                    </div>
+                `).join('')
+            )
+            : '';
+
+        const siteCards = (data.sites || []).slice(0, 5);
+        sitesEl.innerHTML = siteCards.length
+            ? _renderTinyfishList(
+                t('settings_tinyfish_sites'),
+                siteCards.map((site) => `
+                    <div style="padding:10px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">
+                        <div style="font-size:12px;font-weight:700;color:#111827;">${escapeHtml(site.site_name || site.site_key)}</div>
+                        <div style="font-size:11px;color:#6b7280;margin-top:2px;">${escapeHtml(site.captured_at || '-')} · ${site.snapshot_count || 0} items</div>
+                        <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">
+                            ${(site.snapshots || []).slice(0, 4).map((snap) => `
+                                <div style="font-size:12px;color:#374151;">
+                                    <strong>${escapeHtml(snap.item_name || snap.plan_name || snap.item_key)}</strong>
+                                    <span style="color:#6b7280;"> · ${escapeHtml(snap.amount_text || '-')} ${snap.billing_period ? `(${escapeHtml(snap.billing_period)})` : ''}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')
+            )
+            : '';
+
+        const recentChanges = (data.recent_changes || []).slice(0, 8);
+        changesEl.innerHTML = recentChanges.length
+            ? _renderTinyfishList(
+                t('settings_tinyfish_changes'),
+                recentChanges.map((change) => `
+                    <div style="padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;">
+                        <div style="font-size:12px;font-weight:600;color:#111827;">${escapeHtml(change.site_key)} · ${escapeHtml(change.item_key)}</div>
+                        <div style="font-size:11px;color:#6b7280;margin-top:2px;">${escapeHtml(change.change_type)} · ${escapeHtml(change.previous_amount_text || '-')} → ${escapeHtml(change.current_amount_text || '-')}</div>
+                    </div>
+                `).join('')
+            )
+            : '';
+    } catch (e) {
+        statusEl.textContent = `❌ ${e.message}`;
+        summaryEl.innerHTML = '';
+        runsEl.innerHTML = '';
+        sitesEl.innerHTML = '';
+        changesEl.innerHTML = '';
+    }
+}
+
+async function tinyfishRunNow() {
+    const btn = document.getElementById('tinyfish-run-btn');
+    if (btn) btn.disabled = true;
+    try {
+        const resp = await fetch('/api/tinyfish/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wait: false }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.ok === false) throw new Error(data.error || 'unknown');
+        appendMessage(`${t('settings_tinyfish_run_submitted')}\n${(data.run_ids || []).join(', ')}`, false);
+        await refreshTinyfishMonitorPanel(false);
+    } catch (e) {
+        alert(`${t('settings_tinyfish_run_failed')}: ${e.message}`);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+const _SETTINGS_OPENCLAW_PROVIDER_MAP = {
+    openai: 'openai',
+    deepseek: 'deepseek',
+    google: 'google',
+    anthropic: 'anthropic',
+    antigravity: 'antigravity',
+    minimax: 'minimax',
+    ollama: 'ollama',
+};
+
+function _isLocalKeylessProvider(provider, baseUrl) {
+    const normalizedProvider = String(provider || '').trim().toLowerCase();
+    const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
+    if (normalizedProvider === 'ollama') return true;
+    return normalizedBaseUrl.includes('127.0.0.1:11434') || normalizedBaseUrl.includes('localhost:11434');
+}
+
+function _setSettingsActionButtonState(button, available) {
+    if (!button) return;
+    button.disabled = !available;
+    button.style.opacity = available ? '1' : '0.45';
+    button.style.cursor = available ? 'pointer' : 'not-allowed';
+}
+
+function _applySettingsImportedLlmConfig(data) {
+    const providerSel = document.getElementById('settings-llm-provider');
+    const keyInput = document.getElementById('settings-llm-key');
+    const urlInput = document.getElementById('settings-llm-url');
+    const modelSel = document.getElementById('settings-llm-model');
+
+    const providerValue = data.provider ? (_SETTINGS_OPENCLAW_PROVIDER_MAP[data.provider] || data.provider) : '';
+    if (providerSel && providerValue) {
+        const exists = Array.from(providerSel.options).some((option) => option.value === providerValue);
+        if (!exists) {
+            const opt = document.createElement('option');
+            opt.value = providerValue;
+            opt.textContent = providerValue;
+            providerSel.appendChild(opt);
+        }
+        providerSel.value = providerValue;
+    }
+    if (keyInput && data.api_key) {
+        keyInput.value = data.api_key;
+        keyInput.type = 'text';
+    }
+    if (urlInput && data.base_url) {
+        urlInput.value = data.base_url;
+    }
+    if (modelSel && data.model) {
+        const exists = Array.from(modelSel.options).some((option) => option.value === data.model);
+        if (!exists) {
+            const opt = document.createElement('option');
+            opt.value = data.model;
+            opt.textContent = data.model;
+            modelSel.insertBefore(opt, modelSel.firstChild || null);
+        }
+        modelSel.value = data.model;
+    }
+}
+
+function _collectSettingsLlmConfig() {
+    const providerEl = document.getElementById('settings-llm-provider');
+    const keyEl = document.getElementById('settings-llm-key');
+    const urlEl = document.getElementById('settings-llm-url');
+    const modelEl = document.getElementById('settings-llm-model');
+    return {
+        provider: providerEl ? providerEl.value.trim() : '',
+        api_key: keyEl ? keyEl.value.trim() : '',
+        base_url: urlEl ? urlEl.value.trim() : '',
+        model: modelEl ? modelEl.value.trim() : '',
+    };
+}
+
+function _collectSettingsLlmConfigForActions() {
+    const payload = _collectSettingsLlmConfig();
+    const cached = _settingsCache || {};
+    const readCached = (key) => (typeof cached[key] === 'string' ? cached[key].trim() : '');
+    return {
+        provider: payload.provider || readCached('LLM_PROVIDER'),
+        api_key: payload.api_key,
+        base_url: payload.base_url || readCached('LLM_BASE_URL'),
+        model: payload.model || readCached('LLM_MODEL'),
+        has_saved_api_key: Boolean(readCached('LLM_API_KEY')),
+    };
+}
+
+async function settingsImportOpenClaw() {
+    const btn = document.getElementById('settings-import-openclaw-btn');
+    const statusEl = document.getElementById('settings-llm-sync-status');
+    if (!btn || !statusEl) return;
+
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    statusEl.textContent = t('settings_openclaw_importing');
+
+    try {
+        const resp = await fetch('/api/import_openclaw_config');
+        const data = await resp.json();
+        if (!resp.ok || data.error) {
+            statusEl.textContent = '⚠️ ' + (data.error || 'Import failed');
+            return;
+        }
+
+        _applySettingsImportedLlmConfig(data);
+        statusEl.textContent = t('settings_openclaw_imported') + (data.model ? ` (${data.model})` : '') + t('settings_openclaw_detect_hint');
+        setTimeout(() => settingsDetectModels(), 300);
+    } catch (e) {
+        statusEl.textContent = '⚠️ ' + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }
+}
+
+async function settingsExportOpenClaw() {
+    const btn = document.getElementById('settings-export-openclaw-btn');
+    const statusEl = document.getElementById('settings-llm-sync-status');
+    if (!btn || !statusEl) return;
+
+    const payload = _collectSettingsLlmConfigForActions();
+    const isLocalKeyless = _isLocalKeylessProvider(payload.provider, payload.base_url);
+    if ((!payload.api_key && !payload.has_saved_api_key && !isLocalKeyless) || !payload.base_url || !payload.model) {
+        statusEl.textContent = t('settings_openclaw_export_missing');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.style.opacity = '0.6';
+    statusEl.textContent = t('settings_openclaw_exporting');
+
+    try {
+        const resp = await fetch('/api/export_openclaw_config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: payload.provider,
+                api_key: payload.api_key,
+                base_url: payload.base_url,
+                model: payload.model,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.ok === false || data.error) {
+            statusEl.textContent = '⚠️ ' + (data.error || 'Export failed');
+            return;
+        }
+
+        let suffix = '';
+        if (data.gateway_running && data.gateway_restarted) {
+            suffix = ' · ' + t('settings_openclaw_gateway_restarted');
+        } else if (data.gateway_running && !data.gateway_restarted && data.restart_error) {
+            suffix = ' · ' + t('settings_openclaw_gateway_restart_failed');
+        }
+        statusEl.textContent = t('settings_openclaw_exported') + (data.model_ref ? ` (${data.model_ref})` : '') + suffix;
+    } catch (e) {
+        statusEl.textContent = '⚠️ ' + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }
+}
+
+async function settingsUseAntigravity() {
+    const btn = document.getElementById('settings-use-antigravity-btn');
+    const statusEl = document.getElementById('settings-llm-sync-status');
+    if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+    }
+    if (statusEl) {
+        statusEl.textContent = t('settings_antigravity_apply');
+    }
+
+    const providerSel = document.getElementById('settings-llm-provider');
+    if (providerSel) {
+        providerSel.value = 'antigravity';
+        settingsLlmProviderChanged();
+    }
+    if (statusEl) {
+        statusEl.textContent = t('settings_antigravity_applied');
+    }
+    setTimeout(() => {
+        settingsDetectModels();
+        if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    }, 300);
 }
 
 /** Provider 切换时自动填充 Base URL */
@@ -2613,14 +4831,16 @@ function settingsLlmProviderChanged() {
 
 /** 检测模型按钮（复用 wizard 的 discover_models API） */
 async function settingsDetectModels() {
-    const apiKey = document.getElementById('settings-llm-key').value.trim();
-    const baseUrl = document.getElementById('settings-llm-url').value.trim();
+    const llmConfig = _collectSettingsLlmConfigForActions();
+    const apiKey = llmConfig.api_key;
+    const baseUrl = llmConfig.base_url;
     const statusEl = document.getElementById('settings-detect-status');
     const modelSel = document.getElementById('settings-llm-model');
     const detectBtn = document.getElementById('settings-detect-models-btn');
-    const provider = document.getElementById('settings-llm-provider').value;
+    const provider = llmConfig.provider;
+    const isLocalKeyless = _isLocalKeylessProvider(provider, baseUrl);
 
-    if (!apiKey) { statusEl.textContent = '⚠️ 请先输入 API Key'; return; }
+    if (!apiKey && !llmConfig.has_saved_api_key && !isLocalKeyless) { statusEl.textContent = '⚠️ 请先输入 API Key'; return; }
     if (!baseUrl) { statusEl.textContent = '⚠️ 请先输入 Base URL'; return; }
 
     const curModel = modelSel.value;
@@ -2632,7 +4852,7 @@ async function settingsDetectModels() {
         const resp = await fetch('/api/discover_models', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey, base_url: baseUrl }),
+            body: JSON.stringify({ provider, api_key: apiKey, base_url: baseUrl }),
         });
         const data = await resp.json();
 
@@ -2682,11 +4902,35 @@ async function settingsDetectModels() {
 
 /** Settings LLM 组初始化：根据当前 provider 设定 key 输入类型等 */
 function _initSettingsLlmGroup(settings) {
-    const provider = settings['LLM_PROVIDER'] || '';
+    const provider = (settings || {})['LLM_PROVIDER'] || '';
     const keyInput = document.getElementById('settings-llm-key');
     if (keyInput && (provider === 'antigravity' || provider === 'ollama')) {
         keyInput.type = 'text';
     }
+    fetch('/api/setup_status').then((r) => r.json()).then((status) => {
+        const openclawImportBtn = document.getElementById('settings-import-openclaw-btn');
+        const openclawExportBtn = document.getElementById('settings-export-openclaw-btn');
+        const antigravityBtn = document.getElementById('settings-use-antigravity-btn');
+        const openclawImportSub = document.getElementById('settings-openclaw-import-subtitle');
+        const openclawExportSub = document.getElementById('settings-openclaw-export-subtitle');
+        const antigravitySub = document.getElementById('settings-antigravity-subtitle');
+
+        const openclawAvailable = Boolean(status && status.openclaw_installed);
+        _setSettingsActionButtonState(openclawImportBtn, openclawAvailable);
+        _setSettingsActionButtonState(openclawExportBtn, openclawAvailable);
+        if (openclawImportSub) {
+            openclawImportSub.textContent = t(openclawAvailable ? 'settings_openclaw_import_hint_ready' : 'settings_openclaw_import_hint_missing');
+        }
+        if (openclawExportSub) {
+            openclawExportSub.textContent = t(openclawAvailable ? 'settings_openclaw_export_hint_ready' : 'settings_openclaw_export_hint_missing');
+        }
+
+        const antigravityAvailable = Boolean(status && status.antigravity_running);
+        _setSettingsActionButtonState(antigravityBtn, antigravityAvailable);
+        if (antigravitySub) {
+            antigravitySub.textContent = t(antigravityAvailable ? 'settings_antigravity_ready_subtitle' : 'settings_antigravity_missing_subtitle');
+        }
+    }).catch(() => {});
 }
 
 function _renderGroup(groupMeta, keys, settings) {
@@ -2701,11 +4945,12 @@ function _renderGroup(groupMeta, keys, settings) {
     for (const key of keys) {
         const val = settings[key] || '';
         const isPassword = /KEY|TOKEN|SECRET|PASSWORD/i.test(key);
+        const inputState = _getSettingsInputValueAndPlaceholder(val, key, isPassword);
         const helpKey = SETTINGS_FIELD_HELP_KEYS[key];
         const helpText = helpKey ? t(helpKey) : '';
         html += `<div class="settings-field">`;
         html += `<label class="settings-label" title="${key}">${key}</label>`;
-        html += `<input class="settings-input" data-key="${key}" type="${isPassword ? 'password' : 'text'}" value="${escapeHtml(val)}" placeholder="${key}" autocomplete="off" />`;
+        html += `<input class="settings-input" data-key="${key}" type="${isPassword ? 'password' : 'text'}" value="${escapeHtml(inputState.value)}" placeholder="${escapeHtml(inputState.placeholder)}" autocomplete="off" />`;
         if (helpText) {
             html += `<div style="margin-top:5px;font-size:11px;line-height:1.5;color:#9ca3af;">${escapeHtml(helpText)}</div>`;
         }
@@ -2725,6 +4970,64 @@ function closeSettings() {
     document.getElementById('settings-modal').style.display = 'none';
 }
 
+async function saveCurrentUserPassword() {
+    const passwordEl = document.getElementById('settings-user-password');
+    const confirmEl = document.getElementById('settings-user-password-confirm');
+    const statusEl = document.getElementById('settings-user-password-inline-status');
+    const saveBtn = document.getElementById('settings-user-password-save-btn');
+    const badgeEl = document.getElementById('settings-user-password-badge');
+    if (!passwordEl || !confirmEl || !statusEl || !saveBtn) return;
+
+    const password = passwordEl.value;
+    const confirmPassword = confirmEl.value;
+    if (!password) {
+        statusEl.textContent = t('settings_user_password_empty');
+        statusEl.className = 'settings-inline-status is-error';
+        passwordEl.focus();
+        return;
+    }
+    if (password !== confirmPassword) {
+        statusEl.textContent = t('settings_user_password_mismatch');
+        statusEl.className = 'settings-inline-status is-error';
+        confirmEl.focus();
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = t('settings_user_password_saving');
+    statusEl.textContent = '';
+    statusEl.className = 'settings-inline-status';
+
+    try {
+        const resp = await fetch('/api/current_user/password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+            throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+
+        currentUserHasPassword = true;
+        if (badgeEl) {
+            badgeEl.textContent = t('settings_user_password_status_set');
+        }
+        passwordEl.value = '';
+        confirmEl.value = '';
+        statusEl.textContent = t('settings_user_password_saved');
+        statusEl.className = 'settings-inline-status is-success';
+        dismissLocalLoginBanner(false);
+        updateLocalLoginBanner();
+    } catch (e) {
+        statusEl.textContent = `${t('settings_user_password_save_fail')}: ${e.message}`;
+        statusEl.className = 'settings-inline-status is-error';
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = t('settings_user_password_save');
+    }
+}
+
 async function saveSettings() {
     const inputs = document.querySelectorAll('#settings-body .settings-input[data-key]');
     const updates = {};
@@ -2733,6 +5036,9 @@ async function saveSettings() {
         if (!key) return;
         const val = (inp.tagName === 'SELECT' ? inp.value : inp.value.trim());
         const orig = _settingsCache[key] || '';
+        if (inp.tagName !== 'SELECT' && _isMaskedSettingsSecretValue(orig) && val === '') {
+            return;
+        }
         if (val !== orig) {
             updates[key] = val;
         }
@@ -2759,6 +5065,7 @@ async function saveSettings() {
                 const inp = document.querySelector(`#settings-body .settings-input[data-key="${k}"]`);
                 if (inp) _settingsCache[k] = (inp.tagName === 'SELECT' ? inp.value : inp.value.trim());
             }
+            await refreshLlmBannerFromSetupStatus();
         } else {
             alert(t('settings_save_fail'));
         }
@@ -2797,6 +5104,57 @@ async function restartServices() {
 }
 
 // ===== Public Toggle (header shortcut for tunnel) =====
+let _tunnelRunning = false;
+let _tunnelPublicDomain = '';
+let _tunnelPendingRefreshTimer = null;
+let _tunnelPendingRefreshAttempts = 0;
+const _TUNNEL_PENDING_REFRESH_MAX = 40;
+
+function _resetTunnelPendingRefreshState() {
+    if (_tunnelPendingRefreshTimer) {
+        clearTimeout(_tunnelPendingRefreshTimer);
+        _tunnelPendingRefreshTimer = null;
+    }
+    _tunnelPendingRefreshAttempts = 0;
+}
+
+function _hideTunnelUrlState(urlRow, urlInput) {
+    if (!urlRow) return;
+    urlRow.style.display = 'none';
+    if (urlInput) {
+        urlInput.value = '';
+        urlInput.placeholder = '';
+        urlInput.title = '';
+        urlInput.dataset.pending = '0';
+    }
+}
+
+function _showTunnelUrlState(urlRow, urlInput, publicDomain, hintKey = 'tunnel_url_hint') {
+    if (!urlRow || !urlInput) return;
+    urlRow.style.display = '';
+    if (publicDomain) {
+        urlInput.value = publicDomain;
+        urlInput.placeholder = publicDomain;
+        urlInput.title = t(hintKey);
+        urlInput.dataset.pending = '0';
+        return;
+    }
+    urlInput.value = '';
+    urlInput.placeholder = t('tunnel_url_pending');
+    urlInput.title = t('tunnel_url_pending');
+    urlInput.dataset.pending = '1';
+}
+
+function _scheduleTunnelPendingRefresh() {
+    if (_tunnelPendingRefreshTimer || _tunnelPendingRefreshAttempts >= _TUNNEL_PENDING_REFRESH_MAX) return;
+    _tunnelPendingRefreshAttempts += 1;
+    _tunnelPendingRefreshTimer = setTimeout(async () => {
+        _tunnelPendingRefreshTimer = null;
+        await _syncPublicToggle();
+        await _refreshTunnelStatus();
+    }, 1500);
+}
+
 async function _syncPublicToggle() {
     const toggle = document.getElementById('public-toggle');
     const label = document.getElementById('public-toggle-label');
@@ -2806,15 +5164,22 @@ async function _syncPublicToggle() {
     try {
         const r = await fetch('/proxy_tunnel/status');
         const data = await r.json();
-        toggle.checked = !!data.running;
+        const publicDomain = (data.public_domain || '').trim();
+        _tunnelRunning = !!data.running;
+        _tunnelPublicDomain = publicDomain;
+        toggle.checked = _tunnelRunning;
         toggle.disabled = false;
         label.textContent = '🌐';
-        if (data.running && data.public_domain && urlRow && urlInput) {
-            urlRow.style.display = '';
-            urlInput.value = data.public_domain;
-            urlInput.title = t('tunnel_url_hint');
-        } else if (urlRow) {
-            urlRow.style.display = 'none';
+        if (_tunnelRunning) {
+            _showTunnelUrlState(urlRow, urlInput, publicDomain);
+            if (publicDomain) {
+                _resetTunnelPendingRefreshState();
+            } else {
+                _scheduleTunnelPendingRefresh();
+            }
+        } else {
+            _resetTunnelPendingRefreshState();
+            _hideTunnelUrlState(urlRow, urlInput);
         }
     } catch (e) {
         toggle.disabled = true;
@@ -2824,8 +5189,15 @@ async function _syncPublicToggle() {
 async function handlePublicToggle(checked) {
     const toggle = document.getElementById('public-toggle');
     const urlRow = document.getElementById('public-url-row');
+    const urlInput = document.getElementById('public-url-input');
     toggle.disabled = true;
-    if (urlRow) urlRow.style.display = 'none';
+    _resetTunnelPendingRefreshState();
+    if (checked) {
+        _showTunnelUrlState(urlRow, urlInput, '');
+    } else {
+        _hideTunnelUrlState(urlRow, urlInput);
+        _tunnelPublicDomain = '';
+    }
     try {
         const endpoint = checked ? '/proxy_tunnel/start' : '/proxy_tunnel/stop';
         await fetch(endpoint, { method: 'POST' });
@@ -2836,7 +5208,7 @@ async function handlePublicToggle(checked) {
             await new Promise(r => setTimeout(r, interval));
             const sr = await fetch('/proxy_tunnel/status');
             const sd = await sr.json();
-            if (checked && sd.running) break;
+            if (checked && sd.running && sd.public_domain) break;
             if (!checked && !sd.running) break;
         }
     } catch (e) { /* ignore */ }
@@ -2846,13 +5218,13 @@ async function handlePublicToggle(checked) {
 }
 
 // ===== Tunnel Control =====
-let _tunnelRunning = false;
-
 async function _refreshTunnelStatus() {
     try {
         const r = await fetch('/proxy_tunnel/status');
         const data = await r.json();
-        _tunnelRunning = data.running;
+        const publicDomain = (data.public_domain || '').trim();
+        _tunnelRunning = !!data.running;
+        _tunnelPublicDomain = publicDomain;
         const statusEl = document.getElementById('tunnel-status-text');
         const btn = document.getElementById('tunnel-toggle-btn');
         const urlRow = document.getElementById('tunnel-url-row');
@@ -2860,27 +5232,33 @@ async function _refreshTunnelStatus() {
         if (!statusEl) return;
 
         if (data.running) {
-            statusEl.textContent = t('tunnel_running');
-            statusEl.style.color = '#6cf';
-            btn.textContent = t('tunnel_stop');
-            btn.style.background = '#622';
-            btn.style.borderColor = '#a44';
-            btn.disabled = false;
-            if (data.public_domain) {
-                urlRow.style.display = 'block';
-                urlInput.value = data.public_domain;
-                urlInput.title = t('tunnel_url_hint');
+            statusEl.textContent = publicDomain
+                ? t('tunnel_running')
+                : `${t('tunnel_running')} · ${t('tunnel_url_pending')}`;
+            statusEl.style.color = publicDomain ? '#6cf' : '#f6c453';
+            if (btn) {
+                btn.textContent = t('tunnel_stop');
+                btn.style.background = '#622';
+                btn.style.borderColor = '#a44';
+                btn.disabled = false;
+            }
+            _showTunnelUrlState(urlRow, urlInput, publicDomain);
+            if (publicDomain) {
+                _resetTunnelPendingRefreshState();
             } else {
-                urlRow.style.display = 'none';
+                _scheduleTunnelPendingRefresh();
             }
         } else {
+            _resetTunnelPendingRefreshState();
             statusEl.textContent = t('tunnel_stopped');
             statusEl.style.color = '#888';
-            btn.textContent = t('tunnel_start');
-            btn.style.background = '#222';
-            btn.style.borderColor = '#444';
-            btn.disabled = false;
-            urlRow.style.display = 'none';
+            if (btn) {
+                btn.textContent = t('tunnel_start');
+                btn.style.background = '#222';
+                btn.style.borderColor = '#444';
+                btn.disabled = false;
+            }
+            _hideTunnelUrlState(urlRow, urlInput);
         }
     } catch (e) {
         const statusEl = document.getElementById('tunnel-status-text');
@@ -2894,6 +5272,7 @@ async function _refreshTunnelStatus() {
 async function toggleTunnel() {
     const btn = document.getElementById('tunnel-toggle-btn');
     btn.disabled = true;
+    _resetTunnelPendingRefreshState();
 
     if (_tunnelRunning) {
         btn.textContent = t('tunnel_stopping');
@@ -2908,6 +5287,7 @@ async function toggleTunnel() {
         }
     } else {
         btn.textContent = t('tunnel_starting');
+        _showTunnelUrlState(document.getElementById('tunnel-url-row'), document.getElementById('tunnel-url-input'), '');
         try {
             await fetch('/proxy_tunnel/start', { method: 'POST' });
         } catch (e) { /* ignore */ }
@@ -2915,7 +5295,7 @@ async function toggleTunnel() {
         for (let i = 0; i < 30; i++) {
             await new Promise(r => setTimeout(r, 2000));
             await _refreshTunnelStatus();
-            if (_tunnelRunning) break;
+            if (_tunnelRunning && _tunnelPublicDomain) break;
         }
     }
     btn.disabled = false;
@@ -2924,6 +5304,9 @@ async function toggleTunnel() {
 // Reset UI to login screen without clearing backend session
 function showLoginScreen() {
     currentUserId = null;
+    currentUserHasPassword = false;
+    currentLoginMode = '';
+    localLoginBannerDismissed = false;
     currentSessionId = null;
     stopHistoryPolling();
     sessionStorage.removeItem('sessionId');
@@ -2939,9 +5322,10 @@ function showLoginScreen() {
             <div class="message-agent bg-white border p-4 max-w-[85%] shadow-sm text-gray-700">
                 ${t('welcome_message')}
             </div>
-        </div>`;
+    </div>`;
     // Stop OASIS polling
     stopOasisPolling();
+    updateLocalLoginBanner();
 }
 
 // User-initiated logout: clear backend session + reset UI
@@ -3036,6 +5420,38 @@ function checkRedirectAfterLogin() {
     return false;
 }
 
+async function extractErrorMessageFromResponse(response, fallback = 'Agent error') {
+    try {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            const data = await response.json();
+            if (data && typeof data === 'object') {
+                return data.error || data.detail || data.message || `${fallback} (${response.status})`;
+            }
+        }
+        const text = (await response.text()).trim();
+        if (text) {
+            return text.length > 240 ? text.slice(0, 240) + '…' : text;
+        }
+    } catch (err) {
+        console.warn('Failed to parse error response:', err);
+    }
+    return `${fallback} (${response.status})`;
+}
+
+async function _applyTabParam() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    if (tab === 'group' || tab === 'chat' || tab === 'orchestrate') {
+        const teamName = urlParams.get('team');
+        await switchPage(tab);
+        if (teamName) openGroup(teamName);
+        if (window.history.replaceState) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }
+}
+
 // Session check
 (async function checkSession() {
     // 初始化语言
@@ -3058,18 +5474,22 @@ function checkRedirectAfterLogin() {
             const data = await resp.json();
             if (resp.ok && data.ok) {
                 // Token 登录成功
-                currentUserId = userFromUrl;
+                currentUserId = data.user_id || userFromUrl;
+                currentUserHasPassword = Boolean(data && data.has_password);
+                currentLoginMode = data && data.mode ? data.mode : 'token_login';
+                _syncLocalLoginBannerDismissedState();
                 initSession();
-                document.getElementById('uid-display').textContent = 'UID: ' + userFromUrl;
+                document.getElementById('uid-display').textContent = 'UID: ' + currentUserId;
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('chat-screen').style.display = 'flex';
                 // Check if we should redirect to another page after login
+                updateLocalLoginBanner();
                 if (checkRedirectAfterLogin()) return;
                 loadTools();
                 refreshOasisTopics();
                 startHistoryPolling();
                 _syncPublicToggle();
-                switchPage('group');
+                switchPage('chat');
                 _checkAndShowSetupWizard();
                 // 移除 URL 中的 token 参数（安全原因）
                 if (window.history.replaceState) {
@@ -3095,8 +5515,12 @@ function checkRedirectAfterLogin() {
             const data = await resp.json();
             if (data.valid && data.user_id) {
                 currentUserId = data.user_id;
+                currentUserHasPassword = Boolean(data.has_password);
+                currentLoginMode = data.mode || '';
+                _syncLocalLoginBannerDismissedState();
                 initSession();
                 // Check if we should redirect to another page after login
+                updateLocalLoginBanner();
                 if (checkRedirectAfterLogin()) return;
                 document.getElementById('uid-display').textContent = 'UID: ' + data.user_id;
                 document.getElementById('login-screen').style.display = 'none';
@@ -3105,8 +5529,10 @@ function checkRedirectAfterLogin() {
                 refreshOasisTopics();
                 startHistoryPolling();
                 _syncPublicToggle();
-                // Default to team page after auto-login
-                switchPage('group');
+                // Apply ?tab= param if present, otherwise default to chat page
+                const _tabParam = new URLSearchParams(window.location.search).get('tab');
+                await _applyTabParam();
+                if (!_tabParam) switchPage('chat');
                 _checkAndShowSetupWizard();
                 return;
             }
@@ -3315,16 +5741,18 @@ function wizardProviderChanged() {
 }
 
 async function wizardDetectModels() {
+    const provider = document.getElementById('wizard-provider').value;
     const apiKey = document.getElementById('wizard-api-key').value.trim();
     const baseUrl = document.getElementById('wizard-base-url').value.trim();
     const statusEl = document.getElementById('wizard-detect-status');
     const errorEl = document.getElementById('wizard-error');
     const modelSel = document.getElementById('wizard-model');
     const detectBtn = document.getElementById('wizard-detect-btn');
+    const isLocalKeyless = _isLocalKeylessProvider(provider, baseUrl);
 
     errorEl.style.display = 'none';
 
-    if (!apiKey) {
+    if (!apiKey && !isLocalKeyless) {
         errorEl.textContent = '请先输入 API Key';
         errorEl.style.display = 'block';
         return;
@@ -3343,7 +5771,7 @@ async function wizardDetectModels() {
         const resp = await fetch('/api/discover_models', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey, base_url: baseUrl }),
+            body: JSON.stringify({ provider, api_key: apiKey, base_url: baseUrl }),
         });
         const data = await resp.json();
 
@@ -3372,7 +5800,6 @@ async function wizardDetectModels() {
         statusEl.textContent = `✅ 检测到 ${models.length} 个可用模型`;
 
         // Auto-select smart defaults
-        const provider = document.getElementById('wizard-provider').value;
         const preferredModels = {
             deepseek: ['deepseek-chat', 'deepseek-coder'],
             openai: ['gpt-4o', 'gpt-4.1', 'gpt-4-turbo'],
@@ -3693,9 +6120,9 @@ function appendMessage(content, isUser = false, images = [], fileNames = [], aud
             div.innerText = content;
         }
     } else {
-        div.className += " markdown-body";
-        div.innerHTML = marked.parse(content);
-        div.querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+        div.className += " markdown-body tc-markdown";
+        div.innerHTML = renderMarkdown(content);
+        highlightMarkdownIn(div);
         // AI 消息添加朗读按钮（content 非空时）
         if (content) {
             const ttsBtn = createTtsButton(() => extractTtsTextFromElement(div));
@@ -3852,7 +6279,7 @@ async function handleSend() {
             showLoginScreen();
             return;
         }
-        if (!response.ok) throw new Error("Agent error");
+        if (!response.ok) throw new Error(await extractErrorMessageFromResponse(response, "Agent error"));
 
         agentDiv = appendMessage('', false);
 
@@ -3865,8 +6292,8 @@ async function handleSend() {
         // 辅助函数：封存当前文本气泡，添加朗读按钮
         function sealCurrentBubble() {
             if (fullText && agentDiv) {
-                agentDiv.innerHTML = marked.parse(fullText);
-                agentDiv.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+                agentDiv.innerHTML = renderMarkdown(fullText);
+                highlightMarkdownIn(agentDiv);
                 const ttsBtn = createTtsButton(() => extractTtsTextFromElement(agentDiv));
                 agentDiv.appendChild(ttsBtn);
                 allSegmentTexts.push(fullText);
@@ -3943,13 +6370,9 @@ async function handleSend() {
                     // --- 处理文本内容 ---
                     if (delta.content) {
                         fullText += delta.content;
-                        agentDiv.innerHTML = marked.parse(fullText);
-                        agentDiv.querySelectorAll('pre code').forEach((block) => {
-                            if (!block.dataset.highlighted) {
-                                hljs.highlightElement(block);
-                                block.dataset.highlighted = 'true';
-                            }
-                        });
+                        agentDiv.innerHTML = renderMarkdown(fullText);
+                        agentDiv.classList.add('tc-markdown');
+                        highlightMarkdownIn(agentDiv);
                         chatBox.scrollTop = chatBox.scrollHeight;
                     }
                 } catch(e) {
@@ -3960,8 +6383,8 @@ async function handleSend() {
 
         // 流式结束：封存最后一个气泡
         if (fullText) {
-            agentDiv.innerHTML = marked.parse(fullText);
-            agentDiv.querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+            agentDiv.innerHTML = renderMarkdown(fullText);
+            highlightMarkdownIn(agentDiv);
             const ttsBtn = createTtsButton(() => extractTtsTextFromElement(agentDiv));
             agentDiv.appendChild(ttsBtn);
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -3980,7 +6403,7 @@ async function handleSend() {
         if (error.name === 'AbortError') {
             if (agentDiv) {
                 fullText += '\n\n' + t('thinking_stopped');
-                agentDiv.innerHTML = marked.parse(fullText);
+                agentDiv.innerHTML = renderMarkdown(fullText);
             } else {
                 appendMessage(t('thinking_stopped'), false);
             }
@@ -4328,7 +6751,7 @@ async function showPersonaPopup() {
 // ===== OASIS 讨论面板逻辑 =====
 // ================================================================
 
-let currentPage = 'group'; // 'chat' or 'group' or 'orchestrate'
+let currentPage = 'chat'; // 'chat' or 'group' or 'orchestrate'
 let oasisPanelOpen = false;
 let oasisCurrentTopicId = null;
 let oasisPollingTimer = null;
@@ -4340,6 +6763,36 @@ let oasisManualPostSubmitting = false;
 let oasisHumanReplySubmitting = false;
 let _oasisExpertsCache = null;
 let _overviewDetailCache = null;
+let oasisTownWorkspaceView = localStorage.getItem('oasisTownWorkspaceView') === 'graph' ? 'graph' : 'town';
+let oasisSwarmFilter = 'all';
+let oasisSwarmSelectedId = null;
+let oasisSwarmSelectedEdgeId = null;
+let oasisSwarmRefreshing = false;
+let oasisSwarmGraphCache = null;
+let oasisSwarmEdgeLabelsVisible = localStorage.getItem('oasisSwarmEdgeLabelsVisible') !== '0';
+let oasisSwarmViewport = { scale: 1, x: 0, y: 0 };
+let oasisReportLoading = false;
+const oasisReportCache = new Map();
+const TEAMCLAW_STUDIO_FIRST_VISIT_KEY = 'teamclawStudioFirstVisitV2';
+
+function applyStudioFirstVisitDefaults() {
+    try {
+        if (localStorage.getItem(TEAMCLAW_STUDIO_FIRST_VISIT_KEY) === '1') {
+            return;
+        }
+        currentPage = 'chat';
+        oasisPanelOpen = false;
+        oasisTownModeEnabled = false;
+        oasisTownAudioEnabled = false;
+        oasisTownWorkspaceView = 'town';
+        localStorage.setItem('oasisTownModeEnabled', '0');
+        localStorage.setItem('oasisTownAudioEnabled', '0');
+        localStorage.setItem('oasisTownWorkspaceView', 'town');
+        localStorage.setItem(TEAMCLAW_STUDIO_FIRST_VISIT_KEY, '1');
+    } catch (err) {
+        console.warn('[Studio] Failed to apply first-visit defaults:', err);
+    }
+}
 
 // BroadcastChannel for cross-tab OASIS data sharing
 const oasisBroadcast = (typeof BroadcastChannel !== 'undefined')
@@ -4441,19 +6894,59 @@ function ensureOasisPanelOpen() {
     }
 }
 
+function setOasisTownWorkspaceView(view) {
+    const nextView = view === 'graph' ? 'graph' : 'town';
+    oasisTownWorkspaceView = nextView;
+    localStorage.setItem('oasisTownWorkspaceView', nextView);
+    applyOasisTownWorkspaceView();
+    if (nextView === 'graph') {
+        renderOasisSwarmPanel(getCurrentOasisDetail());
+    }
+}
+
+function applyOasisTownWorkspaceView() {
+    const hostInChat = isOasisTownHostedInChat();
+    const switcher = document.getElementById('oasis-chat-workspace-switcher');
+    const townBtn = document.getElementById('oasis-chat-view-town-btn');
+    const graphBtn = document.getElementById('oasis-chat-view-graph-btn');
+    const townHost = document.getElementById('oasis-chat-town-host');
+    const graphHost = document.getElementById('oasis-chat-graph-host');
+    const shell = document.getElementById('oasis-chat-town-shell');
+    const showWorkspace = hostInChat;
+    const showGraph = showWorkspace && oasisTownWorkspaceView === 'graph';
+    const showTown = showWorkspace && !showGraph;
+
+    if (switcher) switcher.style.display = showWorkspace ? 'inline-flex' : 'none';
+    if (townBtn) townBtn.classList.toggle('is-active', showTown);
+    if (graphBtn) graphBtn.classList.toggle('is-active', showGraph);
+    if (townHost) townHost.style.display = showTown ? 'flex' : 'none';
+    if (graphHost) graphHost.style.display = showGraph ? 'flex' : 'none';
+    if (shell) shell.classList.toggle('graph-view', showGraph);
+
+    if (showGraph) {
+        renderOasisSwarmPanel(getCurrentOasisDetail());
+    }
+}
+
 function ensureOasisTownPlacement() {
     const stage = document.getElementById('oasis-town-stage');
     const composer = document.getElementById('oasis-town-composer');
     const chatHost = document.getElementById('oasis-chat-town-host');
+    const graphHost = document.getElementById('oasis-chat-graph-host');
     const detailHost = document.getElementById('oasis-detail-town-host');
+    const graphDock = document.getElementById('oasis-detail-graph-dock');
+    const swarmPanel = document.getElementById('oasis-swarm-panel');
     const panel = document.getElementById('oasis-panel');
     const chatPage = document.getElementById('page-chat');
     const hostInChat = isOasisTownHostedInChat();
     const target = hostInChat ? chatHost : detailHost;
+    const graphTarget = hostInChat && oasisTownModeEnabled ? graphHost : graphDock;
     if (panel) panel.classList.toggle('oasis-town-chat-mode', hostInChat);
     if (chatPage) chatPage.classList.toggle('oasis-town-active', hostInChat);
     if (target && stage && stage.parentElement !== target) target.appendChild(stage);
     if (target && composer && composer.parentElement !== target) target.appendChild(composer);
+    if (graphTarget && swarmPanel && swarmPanel.parentElement !== graphTarget) graphTarget.appendChild(swarmPanel);
+    applyOasisTownWorkspaceView();
 }
 
 function renderOasisTownIdleState() {
@@ -4531,6 +7024,7 @@ function applyOasisTownMode() {
         ensureOasisPanelOpen();
     }
     ensureOasisTownPlacement();
+    applyOasisTownWorkspaceView();
     if (oasisTownModeEnabled && _overviewDetailCache && oasisCurrentTopicId) {
         syncOasisTownRuntime(_overviewDetailCache);
         updateOasisTownComposer(_overviewDetailCache);
@@ -4617,6 +7111,7 @@ function toggleOasisMobile() {
     }
 }
 
+applyStudioFirstVisitDefaults();
 updateOasisTownAudioButton();
 applyOasisTownMode();
 
@@ -4747,6 +7242,9 @@ function escapeHtml(text) {
 
 async function openOasisTopic(topicId) {
     oasisCurrentTopicId = topicId;
+    oasisSwarmSelectedId = null;
+    oasisSwarmSelectedEdgeId = null;
+    oasisSwarmViewport = { scale: 1, x: 0, y: 0 };
     stopOasisPolling();
     showPageLoading();
 
@@ -4765,12 +7263,17 @@ async function openOasisTopic(topicId) {
 function showOasisTopicList() {
     stopOasisPolling();
     oasisCurrentTopicId = null;
+    oasisSwarmSelectedId = null;
+    oasisSwarmSelectedEdgeId = null;
+    oasisSwarmViewport = { scale: 1, x: 0, y: 0 };
     destroyOasisTownRuntime();
     document.getElementById('oasis-detail-view').style.display = 'none';
     document.getElementById('oasis-topic-list-view').style.display = 'flex';
+    renderOasisSwarmPanel(null);
     if (oasisTownModeEnabled) {
         renderOasisTownIdleState();
         updateOasisTownComposer(null);
+        updateOasisChatTownHud(null);
     }
     refreshOasisTopics();
 }
@@ -4930,8 +7433,8 @@ function updateOasisTownComposer(detail) {
             : 'Example: keep debating from cost, risk, and user experience.';
     } else {
         note.textContent = currentLang === 'zh-CN'
-            ? '当前没有选中运行中的 topic。直接发送会新开一个 OASIS 讨论，并在右侧打开详细发言流。'
-            : 'No live topic is selected. Submit here to start a fresh OASIS discussion on the right.';
+            ? '当前没有选中运行中的 topic。直接发送会新开一个 OASIS 讨论，并自动生成第一版 swarm graph。'
+            : 'No live topic is selected. Submit here to start a fresh OASIS discussion and auto-build a first swarm graph.';
         note.className = 'oasis-town-composer-note is-live';
         input.placeholder = currentLang === 'zh-CN'
             ? '例如：围绕这个想法拉起一场新的专家讨论'
@@ -4945,6 +7448,890 @@ function updateOasisTownComposer(detail) {
         : (isLive
             ? (currentLang === 'zh-CN' ? '推动发帖' : 'NUDGE')
             : (currentLang === 'zh-CN' ? '开启讨论' : 'START TOPIC'));
+}
+
+const OASIS_SWARM_COLORS = {
+    objective: { fill: '#f9c74f', stroke: '#f4a261', text: '#3a2300', icon: '🎯' },
+    agent: { fill: '#7dc8e3', stroke: '#4d7ea8', text: '#10213d', icon: '🧠' },
+    entity: { fill: '#8bd3a1', stroke: '#3d7a57', text: '#0e2a1b', icon: '◈' },
+    memory: { fill: '#cdb4db', stroke: '#7b5ea7', text: '#29143b', icon: '🗂' },
+    signal: { fill: '#f28482', stroke: '#b95f5f', text: '#3d1111', icon: '✦' },
+    scenario: { fill: '#f7d794', stroke: '#c78c3c', text: '#3f2700', icon: '⇢' },
+};
+
+function getCurrentOasisDetail() {
+    return _overviewDetailCache && _overviewDetailCache.topic_id === oasisCurrentTopicId
+        ? _overviewDetailCache
+        : null;
+}
+
+function setOasisSwarmFilter(filter) {
+    oasisSwarmFilter = filter || 'all';
+    renderOasisSwarmPanel(getCurrentOasisDetail());
+}
+
+function selectOasisSwarmNode(nodeId) {
+    oasisSwarmSelectedId = nodeId || null;
+    oasisSwarmSelectedEdgeId = null;
+    renderOasisSwarmPanel(getCurrentOasisDetail());
+}
+
+function selectOasisSwarmEdge(edgeId) {
+    oasisSwarmSelectedEdgeId = edgeId || null;
+    oasisSwarmSelectedId = null;
+    renderOasisSwarmPanel(getCurrentOasisDetail());
+}
+
+function clearOasisSwarmSelection() {
+    oasisSwarmSelectedId = null;
+    oasisSwarmSelectedEdgeId = null;
+    renderOasisSwarmPanel(getCurrentOasisDetail());
+}
+
+function toggleOasisSwarmEdgeLabels() {
+    oasisSwarmEdgeLabelsVisible = !oasisSwarmEdgeLabelsVisible;
+    localStorage.setItem('oasisSwarmEdgeLabelsVisible', oasisSwarmEdgeLabelsVisible ? '1' : '0');
+    renderOasisSwarmPanel(getCurrentOasisDetail());
+}
+
+function clampOasisSwarmScale(scale) {
+    return Math.max(0.72, Math.min(2.4, Number(scale || 1)));
+}
+
+function applyOasisSwarmViewportTransform() {
+    const viewport = document.querySelector('#oasis-swarm-canvas [data-oasis-swarm-viewport]');
+    if (!viewport) return;
+    viewport.setAttribute(
+        'transform',
+        `translate(${oasisSwarmViewport.x} ${oasisSwarmViewport.y}) scale(${oasisSwarmViewport.scale})`
+    );
+}
+
+function zoomOasisSwarm(delta) {
+    const nextScale = clampOasisSwarmScale(oasisSwarmViewport.scale + delta);
+    if (nextScale === oasisSwarmViewport.scale) return;
+    oasisSwarmViewport.scale = nextScale;
+    applyOasisSwarmViewportTransform();
+}
+
+function fitOasisSwarmViewport(graphState) {
+    if (!graphState?.nodes?.length) {
+        oasisSwarmViewport = { scale: 1, x: 0, y: 0 };
+        return oasisSwarmViewport;
+    }
+    const bounds = graphState.nodes.reduce((acc, node) => {
+        const halfW = (node.boxWidth || 96) / 2;
+        const halfH = (node.boxHeight || 44) / 2;
+        return {
+            minX: Math.min(acc.minX, node.x - halfW),
+            maxX: Math.max(acc.maxX, node.x + halfW),
+            minY: Math.min(acc.minY, node.y - halfH),
+            maxY: Math.max(acc.maxY, node.y + halfH),
+        };
+    }, { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+    const padding = 36;
+    const boundsWidth = Math.max(240, bounds.maxX - bounds.minX);
+    const boundsHeight = Math.max(180, bounds.maxY - bounds.minY);
+    const scale = clampOasisSwarmScale(Math.min(
+        graphState.width / (boundsWidth + (padding * 2)),
+        graphState.height / (boundsHeight + (padding * 2)),
+        2.2
+    ));
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    oasisSwarmViewport = {
+        scale,
+        x: Math.round(((graphState.width / (2 * scale)) - centerX) * 10) / 10,
+        y: Math.round(((graphState.height / (2 * scale)) - centerY) * 10) / 10,
+    };
+    return oasisSwarmViewport;
+}
+
+function resetOasisSwarmViewport() {
+    fitOasisSwarmViewport(oasisSwarmGraphCache);
+    applyOasisSwarmViewportTransform();
+}
+
+function bindOasisSwarmCanvasInteractions(canvas) {
+    if (!canvas || canvas.dataset.boundSwarmCanvas === '1') return;
+    canvas.dataset.boundSwarmCanvas = '1';
+
+    let dragState = null;
+    const finishDrag = () => {
+        dragState = null;
+        canvas.classList.remove('is-panning');
+    };
+
+    canvas.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        if (event.target.closest('[data-swarm-node],[data-swarm-edge]')) return;
+        dragState = {
+            startX: event.clientX,
+            startY: event.clientY,
+            baseX: oasisSwarmViewport.x,
+            baseY: oasisSwarmViewport.y,
+        };
+        canvas.classList.add('is-panning');
+        if (typeof canvas.setPointerCapture === 'function') {
+            try { canvas.setPointerCapture(event.pointerId); } catch (_) {}
+        }
+    });
+
+    canvas.addEventListener('pointermove', (event) => {
+        if (!dragState) return;
+        const scale = Math.max(oasisSwarmViewport.scale, 0.1);
+        oasisSwarmViewport.x = dragState.baseX + ((event.clientX - dragState.startX) / scale);
+        oasisSwarmViewport.y = dragState.baseY + ((event.clientY - dragState.startY) / scale);
+        applyOasisSwarmViewportTransform();
+    });
+
+    canvas.addEventListener('pointerup', finishDrag);
+    canvas.addEventListener('pointercancel', finishDrag);
+    canvas.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        zoomOasisSwarm(event.deltaY < 0 ? 0.12 : -0.12);
+    }, { passive: false });
+}
+
+function buildOasisSwarmActivityLookup(detail) {
+    const byKey = new Map();
+    const participants = collectOasisParticipants(detail);
+    participants.forEach((person) => {
+        const key = (person.name || '').trim().toLowerCase();
+        if (!key) return;
+        byKey.set(key, {
+            posts: Number(person.posts || 0),
+            events: Number(person.events || 0),
+            name: person.name || '',
+        });
+    });
+    return byKey;
+}
+
+function pickOasisSwarmActivity(node, detail, activityMap) {
+    if (!node || node.type !== 'agent') return { posts: 0, events: 0 };
+    const aliases = [node.label].concat(node.aliases || [], node.meta?.tag ? [node.meta.tag] : []);
+    for (const alias of aliases) {
+        const key = String(alias || '').trim().toLowerCase();
+        if (!key) continue;
+        const activity = activityMap.get(key);
+        if (activity) return activity;
+    }
+    return { posts: 0, events: 0 };
+}
+
+function clampOasisSwarmNumber(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+
+function oasisSwarmStableHash(value) {
+    return Array.from(String(value || '')).reduce((acc, ch) => ((acc * 33) + ch.charCodeAt(0)) >>> 0, 5381);
+}
+
+function oasisSwarmCharUnits(ch) {
+    if (!ch) return 0;
+    if (/\s/.test(ch)) return 0.36;
+    if (/[\u3400-\u9FFF\uF900-\uFAFF\u3040-\u30FF\uAC00-\uD7AF]/.test(ch)) return 1.72;
+    if (/[A-Z]/.test(ch)) return 0.96;
+    if (/[a-z0-9]/.test(ch)) return 0.78;
+    return 1.04;
+}
+
+function measureOasisSwarmTextUnits(text) {
+    return Array.from(String(text || '')).reduce((sum, ch) => sum + oasisSwarmCharUnits(ch), 0);
+}
+
+function fitOasisSwarmLabelSegment(text, maxUnits) {
+    const chars = Array.from(String(text || ''));
+    let out = '';
+    let units = 0;
+    for (const ch of chars) {
+        const nextUnits = oasisSwarmCharUnits(ch);
+        if (out && units + nextUnits > maxUnits) break;
+        out += ch;
+        units += nextUnits;
+    }
+    return out || (chars[0] || '');
+}
+
+function truncateOasisSwarmLabelText(label, maxUnits) {
+    const value = String(label || '').trim() || 'Untitled';
+    const chars = Array.from(value);
+    const segment = fitOasisSwarmLabelSegment(value, Math.max(4.6, maxUnits - 1.2));
+    return segment.length < chars.length ? `${segment}…` : value;
+}
+
+function buildOasisSwarmNodeMetrics(node) {
+    const typeConfig = node.type === 'objective'
+        ? { radius: 17.5, maxUnits: 14.2, labelFontSize: 11.5, minLabelWidth: 68, maxLabelWidth: 150, labelGap: 16 }
+        : node.type === 'scenario'
+            ? { radius: 15.5, maxUnits: 12.4, labelFontSize: 10.8, minLabelWidth: 58, maxLabelWidth: 132, labelGap: 14 }
+            : node.type === 'agent'
+                ? { radius: 13.4, maxUnits: 11.3, labelFontSize: 10.2, minLabelWidth: 50, maxLabelWidth: 120, labelGap: 13 }
+                : { radius: 12.4, maxUnits: 10.4, labelFontSize: 9.8, minLabelWidth: 46, maxLabelWidth: 112, labelGap: 12 };
+    const labelText = truncateOasisSwarmLabelText(node.label, typeConfig.maxUnits);
+    const labelUnits = measureOasisSwarmTextUnits(labelText);
+    const labelWidth = Math.round(clampOasisSwarmNumber(18 + (labelUnits * 7.1), typeConfig.minLabelWidth, typeConfig.maxLabelWidth));
+    const labelHeight = Math.round(typeConfig.labelFontSize + 10);
+    const boxWidth = Math.round((typeConfig.radius * 2) + typeConfig.labelGap + labelWidth + 28);
+    const boxHeight = Math.round(Math.max((typeConfig.radius * 2) + 18, labelHeight + 14));
+    const collisionRadius = Math.sqrt(((boxWidth / 2) ** 2) + ((boxHeight / 2) ** 2)) + 14;
+    return {
+        ...node,
+        labelText,
+        labelUnits,
+        labelWidth,
+        labelHeight,
+        labelFontSize: typeConfig.labelFontSize,
+        baseRadius: typeConfig.radius,
+        labelGap: typeConfig.labelGap,
+        boxWidth,
+        boxHeight,
+        collisionRadius,
+    };
+}
+
+function applyOasisSwarmNodeGeometry(node) {
+    const degreeBoost = clampOasisSwarmNumber(Number(node.degree || 0), 0, 9) * 0.72;
+    const activityBoost = node.type === 'agent'
+        ? clampOasisSwarmNumber(((Number(node.activity?.posts || 0) + Number(node.activity?.events || 0)) / 9), 0, 2.8)
+        : 0;
+    const nodeRadius = Math.round((Number(node.baseRadius || 12.4) + degreeBoost + activityBoost) * 10) / 10;
+    const labelOffsetX = Math.round((nodeRadius + Number(node.labelGap || 12)) * 10) / 10;
+    const badgeValue = node.type === 'agent'
+        ? Math.min(99, Number(node.activity?.posts || 0) || Number(node.activity?.events || 0) || 0)
+        : 0;
+    const badgeRadius = badgeValue ? 8.5 : 0;
+    const boxWidth = Math.round((nodeRadius * 2) + labelOffsetX + Number(node.labelWidth || 72) + 18);
+    const boxHeight = Math.round(Math.max((nodeRadius * 2) + 18, Number(node.labelHeight || 20) + 12, badgeValue ? (nodeRadius * 2) + 24 : 0));
+    return {
+        ...node,
+        nodeRadius,
+        ringRadius: Math.round((nodeRadius + 5.5) * 10) / 10,
+        labelOffsetX,
+        badgeValue,
+        badgeRadius,
+        boxWidth,
+        boxHeight,
+        collisionRadius: Math.sqrt(((boxWidth / 2) ** 2) + ((boxHeight / 2) ** 2)) + 10,
+    };
+}
+
+function buildOasisSwarmClusterConfig(layout) {
+    return {
+        objective: { x: layout.width * 0.5, y: layout.height * 0.12, cols: 2, anchorStrength: 0.052 },
+        signal: { x: layout.width * 0.18, y: layout.height * 0.22, cols: 2, anchorStrength: 0.035 },
+        agent: { x: layout.width * 0.18, y: layout.height * 0.58, cols: 3, anchorStrength: 0.033 },
+        entity: { x: layout.width * 0.52, y: layout.height * 0.46, cols: 5, anchorStrength: 0.028 },
+        memory: { x: layout.width * 0.82, y: layout.height * 0.28, cols: 3, anchorStrength: 0.032 },
+        scenario: { x: layout.width * 0.54, y: layout.height * 0.82, cols: 3, anchorStrength: 0.04 },
+    };
+}
+
+function seedOasisSwarmCluster(items, cluster, layout) {
+    if (!items.length) return [];
+    const sorted = [...items].sort((a, b) =>
+        (Number(b.degree || 0) - Number(a.degree || 0))
+        || (measureOasisSwarmTextUnits(b.label) - measureOasisSwarmTextUnits(a.label))
+        || String(a.label || '').localeCompare(String(b.label || ''))
+    );
+    const cols = clampOasisSwarmNumber(Math.ceil(Math.sqrt(sorted.length)), 1, cluster.cols || 3);
+    const rows = Math.ceil(sorted.length / cols);
+    const widest = Math.max(...sorted.map((item) => item.boxWidth), 140);
+    const tallest = Math.max(...sorted.map((item) => item.boxHeight), 52);
+    const gapX = widest + 44;
+    const gapY = tallest + 34;
+    const boundsPad = 40;
+
+    return sorted.map((item, idx) => {
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const hash = oasisSwarmStableHash(item.id);
+        const jitterX = ((hash % 9) - 4) * 4;
+        const jitterY = (((Math.floor(hash / 9)) % 9) - 4) * 4;
+        const x = cluster.x + ((col - ((cols - 1) / 2)) * gapX) + jitterX;
+        const y = cluster.y + ((row - ((rows - 1) / 2)) * gapY) + jitterY;
+        return {
+            ...item,
+            anchorX: cluster.x,
+            anchorY: cluster.y,
+            anchorStrength: cluster.anchorStrength,
+            vx: 0,
+            vy: 0,
+            x: clampOasisSwarmNumber(x, (item.boxWidth / 2) + boundsPad, layout.width - (item.boxWidth / 2) - boundsPad),
+            y: clampOasisSwarmNumber(y, (item.boxHeight / 2) + boundsPad, layout.height - (item.boxHeight / 2) - boundsPad),
+        };
+    });
+}
+
+function settleOasisSwarmCollisions(nodes, layout) {
+    const boundsPad = 40;
+    for (let pass = 0; pass < 10; pass += 1) {
+        let moved = false;
+        for (let i = 0; i < nodes.length; i += 1) {
+            for (let j = i + 1; j < nodes.length; j += 1) {
+                const a = nodes[i];
+                const b = nodes[j];
+                let dx = b.x - a.x;
+                let dy = b.y - a.y;
+                const overlapX = ((a.boxWidth + b.boxWidth) / 2) + 16 - Math.abs(dx);
+                const overlapY = ((a.boxHeight + b.boxHeight) / 2) + 14 - Math.abs(dy);
+                if (overlapX <= 0 || overlapY <= 0) continue;
+                moved = true;
+                if (!dx && !dy) {
+                    const hash = oasisSwarmStableHash(`${a.id}:${b.id}`);
+                    dx = ((hash % 7) - 3) || 1;
+                    dy = (((Math.floor(hash / 7)) % 7) - 3) || -1;
+                }
+                if (overlapX < overlapY) {
+                    const dir = dx >= 0 ? 1 : -1;
+                    const shift = overlapX / 2;
+                    a.x -= dir * shift;
+                    b.x += dir * shift;
+                } else {
+                    const dir = dy >= 0 ? 1 : -1;
+                    const shift = overlapY / 2;
+                    a.y -= dir * shift;
+                    b.y += dir * shift;
+                }
+            }
+        }
+        nodes.forEach((node) => {
+            node.x = clampOasisSwarmNumber(node.x, (node.boxWidth / 2) + boundsPad, layout.width - (node.boxWidth / 2) - boundsPad);
+            node.y = clampOasisSwarmNumber(node.y, (node.boxHeight / 2) + boundsPad, layout.height - (node.boxHeight / 2) - boundsPad);
+        });
+        if (!moved) break;
+    }
+}
+
+function runOasisSwarmForceLayout(nodes, edges, layout) {
+    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+    const links = edges
+        .map((edge) => ({ edge, source: nodeMap.get(edge.source), target: nodeMap.get(edge.target) }))
+        .filter((item) => item.source && item.target);
+    const iterations = clampOasisSwarmNumber(120 + (nodes.length * 4), 140, 280);
+    const boundsPad = 40;
+
+    for (let iter = 0; iter < iterations; iter += 1) {
+        const cooling = 1 - (iter / iterations);
+        nodes.forEach((node) => {
+            node.vx = (node.vx || 0) * 0.78;
+            node.vy = (node.vy || 0) * 0.78;
+            const anchorPull = (node.anchorStrength || 0.03) * (0.9 + (cooling * 0.8));
+            node.vx += (node.anchorX - node.x) * anchorPull;
+            node.vy += (node.anchorY - node.y) * anchorPull;
+        });
+
+        links.forEach(({ edge, source, target }) => {
+            let dx = target.x - source.x;
+            let dy = target.y - source.y;
+            let dist = Math.hypot(dx, dy);
+            if (!dist) {
+                dist = 0.001;
+                dx = 0.001;
+                dy = 0;
+            }
+            const desired = Math.max(
+                108,
+                (source.collisionRadius * 0.66)
+                + (target.collisionRadius * 0.66)
+                + (source.type === target.type ? 22 : 42)
+                + ((1 - clampOasisSwarmNumber(edge.weight || 0.55, 0.15, 1)) * 18)
+            );
+            const spring = (dist - desired) * 0.0032;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            source.vx += nx * spring;
+            source.vy += ny * spring;
+            target.vx -= nx * spring;
+            target.vy -= ny * spring;
+        });
+
+        for (let i = 0; i < nodes.length; i += 1) {
+            for (let j = i + 1; j < nodes.length; j += 1) {
+                const a = nodes[i];
+                const b = nodes[j];
+                let dx = b.x - a.x;
+                let dy = b.y - a.y;
+                let dist = Math.hypot(dx, dy);
+                if (!dist) {
+                    const hash = oasisSwarmStableHash(`${a.id}-${b.id}-${iter}`);
+                    dx = ((hash % 7) - 3) || 1;
+                    dy = (((Math.floor(hash / 7)) % 7) - 3) || -1;
+                    dist = Math.hypot(dx, dy);
+                }
+                const minDist = a.collisionRadius + b.collisionRadius + 10;
+                let force = 0;
+                if (dist < minDist) {
+                    force = (minDist - dist) * 0.12;
+                } else {
+                    const repelRange = minDist * 1.78;
+                    if (dist < repelRange) {
+                        force = ((repelRange - dist) / repelRange) * 2.15 * (0.45 + cooling);
+                    }
+                }
+                if (!force) continue;
+                const nx = dx / dist;
+                const ny = dy / dist;
+                a.vx -= nx * force;
+                a.vy -= ny * force;
+                b.vx += nx * force;
+                b.vy += ny * force;
+            }
+        }
+
+        nodes.forEach((node) => {
+            node.vx = clampOasisSwarmNumber(node.vx, -18, 18);
+            node.vy = clampOasisSwarmNumber(node.vy, -18, 18);
+            node.x = clampOasisSwarmNumber(node.x + node.vx, (node.boxWidth / 2) + boundsPad, layout.width - (node.boxWidth / 2) - boundsPad);
+            node.y = clampOasisSwarmNumber(node.y + node.vy, (node.boxHeight / 2) + boundsPad, layout.height - (node.boxHeight / 2) - boundsPad);
+        });
+    }
+
+    settleOasisSwarmCollisions(nodes, layout);
+    return nodes.map((node) => ({
+        ...node,
+        x: Math.round(node.x * 10) / 10,
+        y: Math.round(node.y * 10) / 10,
+    }));
+}
+
+function buildOasisSwarmGraph(detail) {
+    const swarm = detail?.swarm || {};
+    const rawNodes = Array.isArray(swarm?.graph?.nodes) ? swarm.graph.nodes : [];
+    const rawEdges = Array.isArray(swarm?.graph?.edges) ? swarm.graph.edges : [];
+    if (!rawNodes.length) return null;
+
+    const layout = {
+        width: Math.round(clampOasisSwarmNumber(1160 + (rawNodes.length * 18) + (rawEdges.length * 2.8), 1180, 2140)),
+        height: Math.round(clampOasisSwarmNumber(700 + (rawNodes.length * 12) + (rawEdges.length * 1.6), 760, 1420)),
+    };
+
+    const activityMap = buildOasisSwarmActivityLookup(detail);
+    const nodes = rawNodes.map((node) => {
+        const type = node?.type || 'entity';
+        const palette = OASIS_SWARM_COLORS[type] || OASIS_SWARM_COLORS.entity;
+        const activity = pickOasisSwarmActivity(node, detail, activityMap);
+        const meta = node?.meta && typeof node.meta === 'object' ? node.meta : {};
+        return buildOasisSwarmNodeMetrics({
+            id: String(node.id || ''),
+            label: String(node.label || node.id || ''),
+            type,
+            summary: String(node.summary || ''),
+            aliases: Array.isArray(node.aliases) ? node.aliases : [],
+            fullText: String(node.full_text || meta.full_text || ''),
+            meta,
+            fill: palette.fill,
+            stroke: palette.stroke,
+            text: palette.text,
+            icon: palette.icon,
+            activity,
+        });
+    });
+
+    const nodeIdSet = new Set(nodes.map((node) => node.id));
+    const edges = rawEdges
+        .map((edge, idx) => ({
+            id: String(edge?.id || `edge-${idx + 1}`),
+            source: String(edge?.source || ''),
+            target: String(edge?.target || ''),
+            label: String(edge?.label || edge?.kind || 'links'),
+            kind: String(edge?.kind || 'links'),
+            weight: Number(edge?.weight || 0.55),
+            summary: String(edge?.summary || ''),
+        }))
+        .filter((edge) => nodeIdSet.has(edge.source) && nodeIdSet.has(edge.target));
+    const degreeMap = new Map();
+    edges.forEach((edge) => {
+        degreeMap.set(edge.source, (degreeMap.get(edge.source) || 0) + 1);
+        degreeMap.set(edge.target, (degreeMap.get(edge.target) || 0) + 1);
+    });
+
+    const positionedNodes = nodes.map((node) => applyOasisSwarmNodeGeometry({
+        ...node,
+        degree: degreeMap.get(node.id) || 0,
+    }));
+
+    const groups = {
+        objective: positionedNodes.filter((node) => node.type === 'objective'),
+        signal: positionedNodes.filter((node) => node.type === 'signal'),
+        agent: positionedNodes.filter((node) => node.type === 'agent'),
+        entity: positionedNodes.filter((node) => node.type === 'entity'),
+        memory: positionedNodes.filter((node) => node.type === 'memory'),
+        scenario: positionedNodes.filter((node) => node.type === 'scenario'),
+    };
+    const clusters = buildOasisSwarmClusterConfig(layout);
+    const seeded = [
+        ...seedOasisSwarmCluster(groups.objective, clusters.objective, layout),
+        ...seedOasisSwarmCluster(groups.signal, clusters.signal, layout),
+        ...seedOasisSwarmCluster(groups.agent, clusters.agent, layout),
+        ...seedOasisSwarmCluster(groups.entity, clusters.entity, layout),
+        ...seedOasisSwarmCluster(groups.memory, clusters.memory, layout),
+        ...seedOasisSwarmCluster(groups.scenario, clusters.scenario, layout),
+    ];
+    const placed = runOasisSwarmForceLayout(seeded, edges, layout);
+
+    const nodeMap = new Map(placed.map((node) => [node.id, node]));
+
+    return {
+        swarm,
+        width: layout.width,
+        height: layout.height,
+        nodes: placed,
+        edges,
+        nodeMap,
+        edgeMap: new Map(edges.map((edge) => [edge.id, edge])),
+    };
+}
+
+function buildOasisSwarmNodeSvg(node, selected, muted) {
+    const radius = node.nodeRadius || node.baseRadius || 12.4;
+    const ringRadius = node.ringRadius || (radius + 5.5);
+    const opacity = muted ? 0.28 : 1;
+    const shadowId = selected ? 'oasisSwarmGlow' : 'oasisSwarmShadow';
+    const labelX = node.x + (node.labelOffsetX || (radius + 12));
+    const labelY = node.y + ((node.labelFontSize || 10) * 0.34);
+    const labelFill = selected ? '#fff6bf' : '#fff1e8';
+    const labelStroke = selected ? 'rgba(92,68,10,0.92)' : 'rgba(8,12,26,0.9)';
+    const badge = node.badgeValue
+        ? `<g opacity="${opacity}">
+            <circle cx="${node.x + (radius * 0.7)}" cy="${node.y - (radius * 0.74)}" r="${node.badgeRadius || 8.5}" fill="#111827" stroke="#fff1e8" stroke-width="1.4"></circle>
+            <text x="${node.x + (radius * 0.7)}" y="${node.y - (radius * 0.74) + 2.8}" text-anchor="middle" font-size="7.2" font-weight="700" fill="#fff1e8">${node.badgeValue}</text>
+        </g>`
+        : '';
+    const selectedHalo = selected
+        ? `<circle cx="${node.x}" cy="${node.y}" r="${ringRadius}" fill="rgba(249,199,79,0.12)" stroke="rgba(249,199,79,0.88)" stroke-width="2"></circle>`
+        : '';
+    const outlineStroke = selected ? '#f9c74f' : 'rgba(255,241,232,0.3)';
+    return `
+        <g data-swarm-node="${escapeHtml(node.id)}" onclick="selectOasisSwarmNode('${escapeHtml(node.id)}')" style="cursor:pointer;opacity:${opacity};">
+            ${selectedHalo}
+            <circle cx="${node.x}" cy="${node.y}" r="${radius + 1.4}" fill="rgba(255,255,255,0.04)" stroke="${outlineStroke}" stroke-width="${selected ? 2.4 : 1.4}"></circle>
+            <circle cx="${node.x}" cy="${node.y}" r="${radius}" fill="${node.fill}" stroke="${node.stroke}" stroke-width="${selected ? 2.7 : 2.1}" filter="url(#${shadowId})"></circle>
+            <text x="${labelX}" y="${labelY}" text-anchor="start" font-size="${node.labelFontSize || 10}" font-weight="${selected ? 700 : 600}" fill="${labelFill}" stroke="${labelStroke}" stroke-width="2.6" paint-order="stroke fill" stroke-linejoin="round">${escapeHtml(node.labelText || node.label || '')}</text>
+            ${badge}
+        </g>
+    `;
+}
+
+function buildOasisSwarmEdgeSvg(edge, graphState, muted, selected) {
+    const source = graphState.nodeMap.get(edge.source);
+    const target = graphState.nodeMap.get(edge.target);
+    if (!source || !target) return '';
+    const opacity = muted ? 0.12 : Math.max(0.22, Math.min(0.9, edge.weight));
+    const ctrlX = (source.x + target.x) / 2;
+    const ctrlY = (source.y + target.y) / 2 + (source.type === target.type ? -34 : -10);
+    const path = `M ${source.x} ${source.y} Q ${ctrlX} ${ctrlY} ${target.x} ${target.y}`;
+    const labelX = ctrlX;
+    const labelY = ctrlY - 8;
+    const stroke = selected ? '#f9c74f' : '#c2c3c7';
+    const strokeWidth = selected ? (2.6 + (edge.weight || 0.5) * 2.4) : (1.2 + (edge.weight || 0.5) * 1.9);
+    return `
+        <g opacity="${opacity}">
+            <path d="${path}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" marker-end="url(#oasisSwarmArrow)"></path>
+            <path data-swarm-edge="${escapeHtml(edge.id)}" d="${path}" fill="none" stroke="transparent" stroke-width="18" onclick="selectOasisSwarmEdge('${escapeHtml(edge.id)}')"></path>
+            ${oasisSwarmEdgeLabelsVisible
+                ? `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-size="8" fill="#fff1e8">${escapeHtml((edge.label || '').slice(0, 18))}</text>`
+                : ''}
+        </g>
+    `;
+}
+
+function renderOasisSwarmDetail(detail, graphState) {
+    const swarm = graphState?.swarm || {};
+    const detailEl = document.getElementById('oasis-swarm-detail');
+    const summaryEl = document.getElementById('oasis-swarm-summary');
+    const refreshBtn = document.getElementById('oasis-swarm-refresh-btn');
+    const labelsBtn = document.getElementById('oasis-swarm-labels-btn');
+    const titleEl = document.getElementById('oasis-swarm-title');
+    if (!detailEl || !summaryEl || !refreshBtn || !titleEl) return;
+
+    refreshBtn.disabled = !detail?.topic_id || oasisSwarmRefreshing || swarm.status === 'pending';
+    refreshBtn.textContent = oasisSwarmRefreshing || swarm.status === 'pending'
+        ? 'FORGING'
+        : 'REFORGE';
+    if (labelsBtn) {
+        labelsBtn.classList.toggle('is-active', oasisSwarmEdgeLabelsVisible);
+        labelsBtn.textContent = oasisSwarmEdgeLabelsVisible ? 'LABELS ON' : 'LABELS OFF';
+    }
+
+    titleEl.textContent = swarm.status === 'pending'
+        ? (currentLang === 'zh-CN' ? 'Swarm Graph 生成中' : 'Swarm Graph Forging')
+        : (currentLang === 'zh-CN' ? 'Swarm Graph' : 'Swarm Graph');
+
+    const chips = [
+        `${swarm.mode || 'prediction'}`.toUpperCase(),
+        `${(graphState?.nodes || []).length} NODES`,
+        `${(graphState?.edges || []).length} EDGES`,
+        ...(Array.isArray(swarm?.graphrag?.collections) ? swarm.graphrag.collections.slice(0, 2).map((item) => `MEM:${item}`) : []),
+    ];
+    summaryEl.innerHTML = chips
+        .map((chip) => `<span class="oasis-swarm-summary-chip">${escapeHtml(chip)}</span>`)
+        .join('');
+
+    const selectedNode = oasisSwarmSelectedId && graphState?.nodeMap?.has(oasisSwarmSelectedId)
+        ? graphState.nodeMap.get(oasisSwarmSelectedId)
+        : null;
+    const selectedEdge = !selectedNode && oasisSwarmSelectedEdgeId && graphState?.edgeMap?.has(oasisSwarmSelectedEdgeId)
+        ? graphState.edgeMap.get(oasisSwarmSelectedEdgeId)
+        : null;
+    if (!selectedNode && !selectedEdge) {
+        const scenarios = Array.isArray(swarm.scenarios) ? swarm.scenarios.slice(0, 2) : [];
+        const nudges = Array.isArray(swarm.nudges) ? swarm.nudges.slice(0, 2) : [];
+        const signals = Array.isArray(swarm.signals) ? swarm.signals.slice(0, 2) : [];
+        detailEl.innerHTML = `
+            <div class="oasis-swarm-detail-title">${escapeHtml(swarm.summary || '')}</div>
+            <div class="oasis-swarm-detail-copy">${escapeHtml(swarm.prediction || '')}</div>
+            <div class="oasis-swarm-detail-list">
+                <span>${currentLang === 'zh-CN' ? '提示' : 'Hint'}: ${currentLang === 'zh-CN' ? '拖动画布平移，滚轮或按钮缩放，点击节点或连线查看细节。' : 'Drag to pan, use wheel or buttons to zoom, and click a node or link for details.'}</span>
+                ${signals.map((item) => `<span>✦ ${escapeHtml(item)}</span>`).join('')}
+                ${scenarios.map((item) => `<span>⇢ ${escapeHtml(item.label || '')}: ${escapeHtml(item.summary || '')}</span>`).join('')}
+                ${nudges.map((item) => `<span>🧪 ${escapeHtml(item)}</span>`).join('')}
+            </div>
+        `;
+        return;
+    }
+
+    if (selectedEdge) {
+        const source = graphState.nodeMap.get(selectedEdge.source);
+        const target = graphState.nodeMap.get(selectedEdge.target);
+        detailEl.innerHTML = `
+            <div class="oasis-swarm-detail-title">⇢ ${escapeHtml(source?.label || selectedEdge.source)} → ${escapeHtml(target?.label || selectedEdge.target)}</div>
+            <div class="oasis-swarm-detail-copy">${escapeHtml(selectedEdge.summary || selectedEdge.label || '')}</div>
+            <div class="oasis-swarm-detail-list">
+                <span>${currentLang === 'zh-CN' ? '关系' : 'Relation'}: ${escapeHtml(selectedEdge.label || selectedEdge.kind || 'links')}</span>
+                <span>${currentLang === 'zh-CN' ? '类型' : 'Kind'}: ${escapeHtml(selectedEdge.kind || 'links')}</span>
+                <span>${currentLang === 'zh-CN' ? '强度' : 'Weight'}: ${escapeHtml(String(selectedEdge.weight || 0))}</span>
+                ${source ? `<span>${currentLang === 'zh-CN' ? '起点' : 'Source'}: ${escapeHtml(source.label)}</span>` : ''}
+                ${target ? `<span>${currentLang === 'zh-CN' ? '终点' : 'Target'}: ${escapeHtml(target.label)}</span>` : ''}
+            </div>
+        `;
+        return;
+    }
+
+    const connected = graphState.edges
+        .filter((edge) => edge.source === selectedNode.id || edge.target === selectedNode.id)
+        .map((edge) => {
+            const otherId = edge.source === selectedNode.id ? edge.target : edge.source;
+            return graphState.nodeMap.get(otherId)?.label || otherId;
+        })
+        .filter(Boolean)
+        .slice(0, 4);
+    const metaPairs = Object.entries(selectedNode.meta || {})
+        .filter(([key]) => key !== 'full_text')
+        .slice(0, 3);
+    const activityText = selectedNode.type === 'agent'
+        ? `${currentLang === 'zh-CN' ? '发言' : 'posts'} ${selectedNode.activity.posts || 0} · ${currentLang === 'zh-CN' ? '调度' : 'events'} ${selectedNode.activity.events || 0}`
+        : '';
+    const detailCopy = selectedNode.fullText || selectedNode.summary || '';
+    detailEl.innerHTML = `
+        <div class="oasis-swarm-detail-title">${selectedNode.icon} ${escapeHtml(selectedNode.label)}</div>
+        <div class="oasis-swarm-detail-copy">${escapeHtml(detailCopy)}</div>
+        <div class="oasis-swarm-detail-list">
+            <span>${currentLang === 'zh-CN' ? '类型' : 'Type'}: ${escapeHtml(selectedNode.type)}</span>
+            ${activityText ? `<span>${escapeHtml(activityText)}</span>` : ''}
+            ${connected.map((item) => `<span>${currentLang === 'zh-CN' ? '连接' : 'Links'}: ${escapeHtml(item)}</span>`).join('')}
+            ${metaPairs.map(([key, value]) => `<span>${escapeHtml(key)}: ${escapeHtml(String(value))}</span>`).join('')}
+        </div>
+    `;
+}
+
+function renderOasisReport(detail) {
+    const answerEl = document.getElementById('oasis-report-answer');
+    const askBtn = document.getElementById('oasis-report-ask-btn');
+    if (!answerEl || !askBtn) return;
+
+    askBtn.disabled = oasisReportLoading || !detail?.topic_id;
+    askBtn.textContent = oasisReportLoading ? 'THINKING' : 'EXPLAIN';
+
+    if (!detail?.topic_id) {
+        answerEl.innerHTML = `
+            <div class="oasis-report-placeholder">
+                ${currentLang === 'zh-CN'
+                    ? '切到 Town Mode 并打开一个讨论后，这里会显示 ReportAgent 的解释工作台。'
+                    : 'Open a discussion in Town Mode to use the ReportAgent workbench here.'}
+            </div>
+        `;
+        return;
+    }
+
+    const report = detail?.topic_id ? oasisReportCache.get(detail.topic_id) : null;
+    const provider = detail?.swarm?.graphrag?.provider || 'local';
+    const memoryCount = Number(detail?.swarm?.graphrag?.memory_count || 0);
+    if (!report) {
+        answerEl.innerHTML = `
+            <div class="oasis-report-placeholder">
+                ${currentLang === 'zh-CN'
+                    ? `向 ReportAgent 提问“为什么这么预测”，它会只基于图谱记忆回答。当前 provider: ${escapeHtml(provider)}，已累计 ${memoryCount} 条长期记忆。`
+                    : `Ask ReportAgent why the prediction leans this way. It answers from graph memory only. Provider: ${escapeHtml(provider)}, memories: ${memoryCount}.`}
+            </div>
+        `;
+        return;
+    }
+
+    const because = Array.isArray(report.because) ? report.because : [];
+    const watchouts = Array.isArray(report.watchouts) ? report.watchouts : [];
+    const evidence = Array.isArray(report.evidence) ? report.evidence.slice(0, 6) : [];
+    answerEl.innerHTML = `
+        <div class="oasis-report-answer-main">${escapeHtml(report.answer || '')}</div>
+        <div class="oasis-report-answer-label">${currentLang === 'zh-CN' ? '因为' : 'Because'}</div>
+        <div class="oasis-report-answer-list">
+            ${because.map((item) => `<span>• ${escapeHtml(item)}</span>`).join('')}
+        </div>
+        ${watchouts.length ? `
+            <div class="oasis-report-answer-label">${currentLang === 'zh-CN' ? '监测点' : 'Watchouts'}</div>
+            <div class="oasis-report-answer-list">
+                ${watchouts.map((item) => `<span>• ${escapeHtml(item)}</span>`).join('')}
+            </div>
+        ` : ''}
+        ${evidence.length ? `
+            <div class="oasis-report-answer-label">${currentLang === 'zh-CN' ? '证据' : 'Evidence'}</div>
+            <div class="oasis-report-evidence-wrap">
+                ${evidence.map((item) => `
+                    <span class="oasis-report-evidence">
+                        <span class="oasis-report-evidence-kind">${escapeHtml(String(item.kind || '').toUpperCase())}</span>
+                        <span>${escapeHtml(item.title || item.snippet || '')}</span>
+                    </span>
+                `).join('')}
+            </div>
+        ` : ''}
+    `;
+}
+
+function renderOasisSwarmPanel(detail) {
+    const panel = document.getElementById('oasis-swarm-panel');
+    const canvas = document.getElementById('oasis-swarm-canvas');
+    if (!panel || !canvas) return;
+
+    const graphState = buildOasisSwarmGraph(detail);
+    oasisSwarmGraphCache = graphState;
+    panel.style.display = 'block';
+    bindOasisSwarmCanvasInteractions(canvas);
+
+    const filter = oasisSwarmFilter || 'all';
+    ['all', 'agent', 'entity', 'memory', 'scenario'].forEach((name) => {
+        const btn = document.getElementById(`oasis-swarm-filter-${name}`);
+        if (btn) btn.classList.toggle('is-active', filter === name);
+    });
+
+    if (!graphState || !graphState.nodes.length) {
+        canvas.innerHTML = `<div class="oasis-swarm-empty">${currentLang === 'zh-CN' ? 'Town Graph 正在准备中，或当前还没有可视化节点。' : 'Town graph is still preparing, or there are no visual nodes yet.'}</div>`;
+        renderOasisSwarmDetail(detail || {}, {
+            swarm: detail?.swarm || {},
+            nodes: [],
+            edges: [],
+            nodeMap: new Map(),
+            edgeMap: new Map(),
+        });
+        renderOasisReport(detail || null);
+        return;
+    }
+
+    if (oasisSwarmSelectedId && !graphState.nodeMap.has(oasisSwarmSelectedId)) {
+        oasisSwarmSelectedId = null;
+    }
+    if (oasisSwarmSelectedEdgeId && !graphState.edgeMap.has(oasisSwarmSelectedEdgeId)) {
+        oasisSwarmSelectedEdgeId = null;
+    }
+
+    const svg = `
+        <svg viewBox="0 0 ${graphState.width} ${graphState.height}" role="img" aria-label="OASIS swarm graph">
+            <defs>
+                <marker id="oasisSwarmArrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+                    <path d="M0,0 L10,5 L0,10 Z" fill="#c2c3c7"></path>
+                </marker>
+                <filter id="oasisSwarmShadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.35)"></feDropShadow>
+                </filter>
+                <filter id="oasisSwarmGlow" x="-80%" y="-80%" width="260%" height="260%">
+                    <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="rgba(249,199,79,0.55)"></feDropShadow>
+                </filter>
+            </defs>
+            <rect x="0" y="0" width="${graphState.width}" height="${graphState.height}" fill="transparent" onclick="clearOasisSwarmSelection()"></rect>
+            <g data-oasis-swarm-viewport>
+                ${graphState.edges.map((edge) => {
+                    const source = graphState.nodeMap.get(edge.source);
+                    const target = graphState.nodeMap.get(edge.target);
+                    const muted = filter !== 'all' && source?.type !== filter && target?.type !== filter;
+                    return buildOasisSwarmEdgeSvg(edge, graphState, muted, oasisSwarmSelectedEdgeId === edge.id);
+                }).join('')}
+                ${graphState.nodes.map((node) => buildOasisSwarmNodeSvg(
+                    node,
+                    oasisSwarmSelectedId === node.id,
+                    filter !== 'all' && node.type !== filter,
+                )).join('')}
+            </g>
+        </svg>
+    `;
+    canvas.innerHTML = svg;
+    if (oasisSwarmViewport.scale === 1 && oasisSwarmViewport.x === 0 && oasisSwarmViewport.y === 0) {
+        fitOasisSwarmViewport(graphState);
+    }
+    applyOasisSwarmViewportTransform();
+    renderOasisSwarmDetail(detail, graphState);
+    renderOasisReport(detail);
+}
+
+async function refreshOasisSwarm(topicId = oasisCurrentTopicId) {
+    if (!topicId) return;
+    oasisSwarmRefreshing = true;
+    const detail = getCurrentOasisDetail();
+    if (detail?.swarm) {
+        detail.swarm.status = 'pending';
+        renderOasisSwarmPanel(detail);
+    }
+    try {
+        const resp = await fetch(`/proxy_oasis/topics/${topicId}/swarm/refresh`, { method: 'POST' });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+            throw new Error(data.error || data.detail || data.message || `HTTP ${resp.status}`);
+        }
+        await loadTopicDetail(topicId);
+    } catch (e) {
+        alert((currentLang === 'zh-CN' ? 'Swarm Graph 刷新失败' : 'Swarm graph refresh failed') + ': ' + e.message);
+    } finally {
+        oasisSwarmRefreshing = false;
+        const latest = getCurrentOasisDetail();
+        if (latest) renderOasisSwarmPanel(latest);
+    }
+}
+
+async function askOasisReport(topicId = oasisCurrentTopicId) {
+    if (!topicId) return;
+    const inputEl = document.getElementById('oasis-report-input');
+    const question = String(inputEl?.value || '').trim();
+    if (!question) {
+        alert(currentLang === 'zh-CN' ? '先输入你想追问的解释问题' : 'Enter a report question first');
+        return;
+    }
+    const detail = getCurrentOasisDetail();
+    oasisReportLoading = true;
+    if (detail) renderOasisReport(detail);
+    try {
+        const resp = await fetch(`/proxy_oasis/topics/${topicId}/report/ask`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question, limit: 8 }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+            throw new Error(data.error || data.detail || data.message || `HTTP ${resp.status}`);
+        }
+        oasisReportCache.set(topicId, data);
+    } catch (e) {
+        alert((currentLang === 'zh-CN' ? 'ReportAgent 提问失败' : 'ReportAgent failed') + ': ' + e.message);
+    } finally {
+        oasisReportLoading = false;
+        const latest = getCurrentOasisDetail();
+        if (latest) renderOasisReport(latest);
+    }
+}
+
+function handleOasisReportComposerKeydown(event) {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+        event.preventDefault();
+        askOasisReport();
+    }
 }
 
 function renderTopicDetail(detail) {
@@ -4962,6 +8349,8 @@ function renderTopicDetail(detail) {
     updateOasisTownComposer(detail);
     updateOasisChatTownHud(detail);
     syncOasisTownRuntime(detail);
+    renderOasisSwarmPanel(detail);
+    applyOasisTownWorkspaceView();
 
     // Render action buttons in detail header
     const actionsEl = document.getElementById('oasis-detail-actions');
@@ -4983,7 +8372,7 @@ function renderTopicDetail(detail) {
     // Show/hide conclusion
     const conclusionArea = document.getElementById('oasis-conclusion-area');
     if (detail.conclusion && detail.status === 'concluded') {
-        document.getElementById('oasis-conclusion-text').innerHTML = marked.parse(detail.conclusion || '');
+        renderMarkdownInto(document.getElementById('oasis-conclusion-text'), detail.conclusion || '');
         conclusionArea.style.display = 'block';
         // Reset to expanded state
         const textEl = document.getElementById('oasis-conclusion-text');
@@ -5355,6 +8744,8 @@ async function createOasisTopicFromTownPrompt(question) {
             max_rounds: 5,
             discussion: true,
             schedule_yaml: buildTownQuickStartYaml(tags),
+            autogen_swarm: true,
+            swarm_mode: 'prediction',
         }),
     });
     const data = await resp.json().catch(() => ({}));
@@ -5481,7 +8872,7 @@ function renderPosts(posts, timeline, _isDiscussion) {
                         </div>
                         <div class="oasis-town-post-time">${fmtElapsed(p.elapsed)}</div>
                     </div>
-                    <div class="oasis-town-speech markdown-body">${marked.parse(p.content || '')}</div>
+                    <div class="oasis-town-speech markdown-body tc-markdown">${renderMarkdown(p.content || '')}</div>
                     <div class="oasis-town-post-footer">
                         <div class="oasis-town-post-meta">
                             <span class="oasis-town-vote-summary">#${p.id}</span>
@@ -5503,10 +8894,7 @@ function renderPosts(posts, timeline, _isDiscussion) {
         box.scrollTop = box.scrollHeight;
     }
 
-    // Highlight code blocks in rendered markdown
-    box.querySelectorAll('pre code').forEach(el => {
-        try { hljs.highlightElement(el); } catch(e) {}
-    });
+    highlightMarkdownIn(box);
 }
 
 function startDetailPolling(topicId) {
@@ -6056,11 +9444,11 @@ function renderGroupMessages(messages) {
         return `
             <div class="group-msg ${msgClass}" ${isAgent ? 'data-agent-sender="'+escapeHtml(m.sender)+'"' : ''}>
                 <div class="group-msg-sender">${escapeHtml(displayName)}</div>
-                <div class="group-msg-content markdown-body">${marked.parse(m.content || '')}</div>
+                <div class="group-msg-content markdown-body tc-markdown">${renderMarkdown(m.content || '')}</div>
                 <div class="group-msg-time">${timeStr}</div>
             </div>`;
     }).join('');
-    box.querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+    highlightMarkdownIn(box);
     box.querySelectorAll('.group-msg.agent[data-agent-sender]').forEach(el => applyAgentColor(el, el.dataset.agentSender));
     box.scrollTop = box.scrollHeight;
 }
@@ -6092,9 +9480,9 @@ function appendGroupMessages(messages) {
         div.className = `group-msg ${msgClass}`;
         div.innerHTML = `
             <div class="group-msg-sender">${escapeHtml(displayName)}</div>
-            <div class="group-msg-content markdown-body">${marked.parse(m.content || '')}</div>
+            <div class="group-msg-content markdown-body tc-markdown">${renderMarkdown(m.content || '')}</div>
             <div class="group-msg-time">${timeStr}</div>`;
-        div.querySelectorAll('pre code').forEach((block) => hljs.highlightElement(block));
+        highlightMarkdownIn(div);
         if (isAgent) applyAgentColor(div, m.sender);
         box.appendChild(div);
         if (m.id > groupLastMsgId) groupLastMsgId = m.id;
@@ -6862,6 +10250,7 @@ async function uploadTeam(input) {
 }
 
 // ── Import team dropdown & Hub import ──
+const TEAM_HUB_URL = 'https://teamclawhub.com';
 
 function toggleImportDropdown() {
     const dd = document.getElementById('import-dropdown');
@@ -6892,6 +10281,10 @@ function _closeImportDropdownOutside(e) {
 function showHubImportModal() {
     const modal = document.getElementById('hub-import-modal');
     if (modal) modal.style.display = 'flex';
+}
+
+function openTeamHub() {
+    window.open(TEAM_HUB_URL, '_blank');
 }
 
 function closeHubImportModal() {

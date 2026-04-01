@@ -15,6 +15,19 @@ fi
 # 激活虚拟环境（如果存在），后续所有 python 调用均使用虚拟环境
 if [ -f .venv/bin/activate ]; then
     source .venv/bin/activate
+else
+    echo "❌ 虚拟环境 .venv 不存在，请先运行: bash selfskill/scripts/run.sh setup"
+    echo "   直接使用系统 python 可能是 Python 2.x，无法运行本项目"
+    exit 1
+fi
+
+# 检查 Python 版本（防止系统 python 指向 Python 2）
+_PY_MAJOR=$(python -c "import sys; print(sys.version_info.major)" 2>/dev/null || echo "0")
+if [ "$_PY_MAJOR" -lt 3 ]; then
+    echo "❌ 当前 python 指向 Python $_PY_MAJOR（$(which python)）"
+    echo "   本项目需要 Python 3.11+，请确保虚拟环境已正确激活"
+    echo "   推荐使用: bash selfskill/scripts/run.sh start"
+    exit 1
 fi
 
 echo ""
@@ -77,6 +90,7 @@ fi
 read -p "是否部署到公网？(y/N): " tunnel_answer
 if [[ "$tunnel_answer" =~ ^[Yy]$ ]]; then
     echo "🌐 正在后台启动 Cloudflare Tunnel..."
+    # 使用 venv 中的 python（已由上面 source .venv/bin/activate 激活）
     python scripts/tunnel.py &
     TUNNEL_PID=$!
     # 确保主进程退出时也关闭隧道

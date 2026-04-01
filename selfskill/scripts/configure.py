@@ -394,6 +394,73 @@ def detect_openclaw_api_url():
     return None
 
 
+_OPENCLAW_SYNC_TRIGGER_KEYS = {"LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_PROVIDER"}
+_OPENCLAW_SYNC_SAFE_KEYS = {"LLM_MODEL", "LLM_PROVIDER"}
+_OPENCLAW_SYNC_BATCH_KEYS = {"LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL"}
+
+
+def _has_complete_teamclaw_llm_config(kvs):
+    placeholder_values = {"", "your_api_key_here"}
+    required_keys = ("LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL")
+    for key in required_keys:
+        value = (kvs.get(key, "") or "").strip()
+        if value in placeholder_values:
+            return False
+    return True
+
+
+def _should_auto_sync_openclaw(updated_keys):
+    keys = set(updated_keys or [])
+    return bool(
+        keys & _OPENCLAW_SYNC_SAFE_KEYS
+        or _OPENCLAW_SYNC_BATCH_KEYS.issubset(keys)
+    )
+
+
+def _sync_openclaw_from_teamclaw(updated_keys):
+    keys = set(updated_keys or [])
+    if not (keys & _OPENCLAW_SYNC_TRIGGER_KEYS):
+        return
+    if not shutil.which("openclaw"):
+        return
+
+    _, kvs = read_env()
+    if not _has_complete_teamclaw_llm_config(kvs):
+        return
+
+    run_command = get_run_command()
+    if not _should_auto_sync_openclaw(keys):
+        print("ℹ️ 检测到 OpenClaw 已安装，但本次只更新了部分 LLM 字段。")
+        print("   为避免在切换 provider 的过程中把半成品配置写回 OpenClaw，")
+        print(f"   请在确认 LLM_MODEL / LLM_PROVIDER 后再次执行 configure，或手动运行: {run_command} sync-openclaw-llm")
+        return
+
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configure_openclaw.py")
+    print("🦞 检测到 OpenClaw 已安装，正在同步 TeamClaw 当前 LLM 配置...")
+    try:
+        result = subprocess.run(
+            [sys.executable, script_path, "--sync-teamclaw-llm"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        print("⚠️ OpenClaw 配置同步超时，请稍后手动执行 sync-openclaw-llm")
+        return
+    except Exception as e:
+        print(f"⚠️ OpenClaw 配置同步失败: {e}")
+        return
+
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    if stdout:
+        print(stdout)
+    if result.returncode != 0:
+        if stderr:
+            print(stderr)
+        print("⚠️ TeamClaw 配置已写入 .env，但 OpenClaw 自动同步失败")
+
+
 
 
 
@@ -449,6 +516,7 @@ def main():
         print("-" * 60)
         
         success_count = 0
+        updated_keys = set()
         total_count = len(sys.argv[2:])
         
         for arg in sys.argv[2:]:
@@ -461,6 +529,9 @@ def main():
             
             if set_env_with_validation(k, v):
                 success_count += 1
+                updated_keys.add(k)
+
+        _sync_openclaw_from_teamclaw(updated_keys)
         
         print("-" * 60)
         print(f"📊 批量配置完成: {success_count}/{total_count} 项成功设置")
@@ -480,6 +551,7 @@ def main():
         print("-" * 60)
         
         if set_env_with_validation(key, value):
+            _sync_openclaw_from_teamclaw({key})
             print("-" * 60)
             print("✅ 配置完成")
         else:

@@ -4,7 +4,7 @@ OASIS Forum - Expert Agent definitions
 Three expert backends:
   1. ExpertAgent  — direct LLM call (stateless, single-shot)
      name = "display_name#temp#N" (display_name from preset by tag)
-  2. SessionExpert — calls mini_timebot's /v1/chat/completions endpoint
+  2. SessionExpert — calls TeamBot's /v1/chat/completions endpoint
      using an existing or auto-created session_id.
      - session_id format "tag#oasis#id" → oasis-managed session, first-round
        identity injection (tag → name/persona from preset configs)
@@ -858,13 +858,13 @@ class ExpertAgent:
 
 
 # ======================================================================
-# Backend 2: SessionExpert — calls mini_timebot /v1/chat/completions
+# Backend 2: SessionExpert — calls TeamBot /v1/chat/completions
 #   using an existing session_id.  name = "title#session_id"
 # ======================================================================
 
 class SessionExpert:
     """
-    Expert backed by a mini_timebot session.
+    Expert backed by a TeamBot session.
 
     Two sub-types determined by session_id format:
       - "#oasis#" in session_id → oasis-managed session.
@@ -1143,7 +1143,7 @@ class SessionExpert:
 # ======================================================================
 # Backend 3: ExternalExpert — direct call to external OpenAI-compatible API
 #   name = "title#ext#id"
-#   Does NOT go through local mini_timebot agent.
+#   Does NOT go through local TeamBot agent.
 #   Calls external api_url directly using httpx + OpenAI chat format.
 #   ACP agent support: tag (openclaw/codex) determines the ACP binary.
 # ======================================================================
@@ -1160,9 +1160,9 @@ class ExternalExpert:
     """
     Expert backed by an external OpenAI-compatible API or ACP long-lived connection.
 
-    Unlike SessionExpert (which calls the local mini_timebot agent),
+    Unlike SessionExpert (which calls the local TeamBot agent),
     ExternalExpert directly calls any OpenAI-compatible endpoint (DeepSeek,
-    GPT-4, Moonshot, Ollama, another mini_timebot instance, etc).
+    GPT-4, Moonshot, Ollama, another TeamBot instance, etc).
 
     **ACP Agent Support**: When the ``model`` field matches
     ``agent:<agent_name>`` or ``agent:<agent_name>:<session>``, ACP

@@ -1,3 +1,12 @@
+"""
+Flask 前端群聊代理路由模块
+
+为 Flask 前端提供群聊相关的代理路由：
+- /proxy_groups：代理群聊列表/创建请求
+- /proxy_groups/{group_id}：代理群聊详情
+- /proxy_groups/{group_id}/messages：代理消息
+"""
+
 from flask import jsonify, request, session
 import requests
 

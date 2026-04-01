@@ -1,3 +1,15 @@
+"""
+Ops 操作服务路由模块
+
+提供基础运维和认证相关的 API 路由：
+- GET /tools：获取可用工具列表
+- POST /login：用户登录
+- POST /cancel：取消任务
+- POST /tts：文本转语音
+- POST /acp_control：ACP 外部 agent 控制
+- POST /acp_status：查询 ACP agent 状态
+"""
+
 from typing import Any, Callable
 
 from fastapi import APIRouter, Header

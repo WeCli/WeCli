@@ -9,10 +9,6 @@ __pycache__/
 # 环境变量配置（含密钥）
 config/.env
 
-test/*
-!test/chat.py
-!test/view_history.py
-
 # 但 .env.example 模板需要上传
 !config/.env.example
 
@@ -49,8 +45,13 @@ data/bark/
 build/
 dist/
 node_modules/
+.npm-cache/
+.playwright-browsers/
+.uv-cache/
+playwright-report/
+test-results/
 *.spec
-MiniTimeBot.exe
+TeamClaw.exe
 *.dmg
 
 
@@ -62,9 +63,10 @@ logs/
 !logs/.gitkeep
 
 # PID 文件
-.mini_timebot.pid
+.teamclaw.pid
 
 # 重启信号文件
 .restart_flag
 
 .tunnel.pid
+/test-results

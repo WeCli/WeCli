@@ -1,3 +1,13 @@
+"""
+Flask 前端会话代理路由模块
+
+为 Flask 前端提供会话相关的代理路由：
+- /proxy_sessions：代理会话列表
+- /proxy_sessions_status：代理会话状态
+- /proxy_session_history：代理会话历史
+- /proxy_session/delete：代理删除会话
+"""
+
 from flask import jsonify, request, session
 import requests
 

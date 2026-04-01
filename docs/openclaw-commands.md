@@ -1,5 +1,16 @@
 # OpenClaw 常用配置命令速查
 
+## TeamClaw 启动时会做什么
+
+从现在起，`bash selfskill/scripts/run.sh start`、`bash selfskill/scripts/run.sh start-foreground`，以及 PowerShell 对应命令，在检测到本机已安装 OpenClaw 后，会在拉起 TeamClaw 服务前自动做一轮 runtime 预热：
+
+- 尝试启动 OpenClaw gateway
+- 确保 `gateway.http.endpoints.chatCompletions.enabled=true`
+- 刷新 `OPENCLAW_API_URL`、`OPENCLAW_GATEWAY_TOKEN`、`OPENCLAW_SESSIONS_FILE`
+- 轻量修复缺失 transcript 的 sessions 坏索引
+
+这一步只处理 OpenClaw runtime 联通性，不会静默把 OpenClaw 的 LLM provider / model / key 覆盖到 TeamClaw。LLM 导入仍然走首次登录向导或 `check-openclaw`。
+
 ## Web 入口
 
 - OpenClaw Dashboard / Control UI：`http://127.0.0.1:18789/`
@@ -11,6 +22,59 @@
     `openclaw config set gateway.auth.mode none`
     `openclaw config unset gateway.auth.token`
     `openclaw gateway restart`
+
+## TeamClaw / OpenClaw LLM 双向同步
+
+### OpenClaw -> TeamClaw
+
+已有的导入路径仍然有效：
+
+- 前端首次登录向导里的 `🦞 从 OpenClaw 导入`
+- `bash selfskill/scripts/run.sh check-openclaw`
+- `powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 check-openclaw`
+
+它们会自动探测 OpenClaw 的 gateway 地址、默认模型和 provider，并尽量写回 TeamClaw 的 `config/.env`。
+
+### TeamClaw -> OpenClaw
+
+现在也支持把 TeamClaw 当前 LLM 配置反向写回 OpenClaw 默认模型：
+
+```bash
+bash selfskill/scripts/run.sh sync-openclaw-llm
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 sync-openclaw-llm
+```
+
+同步内容包括：
+
+- `models.providers.<provider>.baseUrl`
+- `models.providers.<provider>.apiKey`
+- `models.providers.<provider>.models[]`
+- `agents.defaults.model.primary`
+
+如果 OpenClaw gateway 正在运行，脚本会在写入后自动尝试重载 gateway。
+
+### 自动同步触发规则
+
+`selfskill/scripts/configure.py` 现在会在 OpenClaw 已安装、且 TeamClaw LLM 配置完整时尝试自动同步，但只在“足够安全”的情况下触发：
+
+- 更新了 `LLM_MODEL` 或 `LLM_PROVIDER`
+- 或者一次批量更新了 `LLM_API_KEY + LLM_BASE_URL + LLM_MODEL`
+
+如果你只改了 `LLM_API_KEY` 或 `LLM_BASE_URL`，脚本会故意停住并打印提示，不会把半成品 provider 切换写回 OpenClaw。
+
+### OpenAI provider 的隐藏坑
+
+OpenClaw 的 `openai` provider 运行时可能优先读取 `env.OPENAI_API_KEY`，而不是只看 `models.providers.openai.apiKey`。
+
+因此 TeamClaw 反向同步到 OpenAI provider 时，会同时写两处：
+
+- `models.providers.openai.apiKey`
+- `env.OPENAI_API_KEY`
+
+否则会出现“配置文件看起来已同步，但 OpenClaw 实际仍在用旧 key”的假同步问题。
 
 ## 疑难杂症总结
 
@@ -504,9 +568,9 @@ openclaw.cmd agents list --bindings --json
 ### bindings 匹配条件
 | 字段 | 说明 | 必填 |
 |------|------|------|
-| `type` | 固定为 `"route"` | ✅ |
-| `agentId` | 目标 agent ID | ✅ |
-| `channel` | 频道类型（telegram/webchat 等） | ✅ |
+| `type` | 固定为 `"route"` | 是 |
+| `agentId` | 目标 agent ID | 是 |
+| `channel` | 频道类型（telegram/webchat 等） | 是 |
 | `accountId` | 账号 ID | 可选 |
 | `peerId` | 用户 ID | 可选 |
 | `groupId` | 群组 ID | 可选 |
@@ -559,7 +623,7 @@ uv run scripts/cli.py -u <username> openclaw add --data '<JSON_DATA>'
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
-| `name` | ✅ | Agent 名称，全局唯一（只能包含字母、数字、下划线和连字符） |
+| `name` | 是 | Agent 名称，全局唯一（只能包含字母、数字、下划线和连字符） |
 | `workspace` | 可选 | 自定义工作区路径（不指定则自动生成） |
 
 **示例 - 创建基础 agent:**
@@ -634,4 +698,4 @@ uv run scripts/cli.py -u Avalon_01 openclaw detail --name my_new_agent
 4. **匹配优先级**：按 `bindings` 数组顺序匹配，第一个匹配生效
 
 ---
-*文档版本：v2.5 | 更新时间：2026-03-26*
+*文档版本：v2.6 | 更新时间：2026-04-01*

@@ -1,14 +1,29 @@
+"""
+SQLite checkpoint 持久化操作模块
+
+提供 LangGraph AsyncSqliteSaver 的辅助查询接口，包括：
+- 按前缀查询会话列表
+- 删除会话记录
+- 清理旧 checkpoint（只保留最近 N 个）
+"""
+
 import sqlite3
 
 import aiosqlite
 
 
 def _is_missing_table_error(exc: sqlite3.OperationalError) -> bool:
+    """判断异常是否为 'no such table' 错误。"""
     return "no such table" in str(exc).lower()
 
 
 async def list_thread_ids_by_prefix(db_path: str, prefix: str) -> list[str]:
-    """按 thread_id 前缀查询会话列表。"""
+    """按 thread_id 前缀查询会话列表。
+
+    :param db_path: SQLite 数据库路径
+    :param prefix: thread_id 前缀（如 "user#session_"）
+    :return: 匹配的 thread_id 列表
+    """
     async with aiosqlite.connect(db_path) as db:
         try:
             cursor = await db.execute(
@@ -24,7 +39,11 @@ async def list_thread_ids_by_prefix(db_path: str, prefix: str) -> list[str]:
 
 
 async def delete_thread_records(db_path: str, thread_id: str) -> None:
-    """删除指定 thread 在 checkpoints/writes 中的记录。"""
+    """删除指定 thread 在 checkpoints/writes 表中的所有记录。
+
+    :param db_path: SQLite 数据库路径
+    :param thread_id: 要删除的线程 ID
+    """
     async with aiosqlite.connect(db_path) as db:
         for table in ("checkpoints", "writes"):
             try:
@@ -36,7 +55,11 @@ async def delete_thread_records(db_path: str, thread_id: str) -> None:
 
 
 async def delete_thread_records_like(db_path: str, pattern: str) -> None:
-    """按 LIKE 模式删除 checkpoints/writes 记录。"""
+    """按 LIKE 模式删除 checkpoints/writes 记录。
+
+    :param db_path: SQLite 数据库路径
+    :param pattern: LIKE 模式（如 "user#%"）
+    """
     async with aiosqlite.connect(db_path) as db:
         for table in ("checkpoints", "writes"):
             try:
@@ -48,14 +71,16 @@ async def delete_thread_records_like(db_path: str, pattern: str) -> None:
 
 
 async def purge_old_checkpoints(db_path: str, thread_id: str, keep: int = 1) -> int:
-    """
-    清理指定 thread 的旧 checkpoint，只保留最近 `keep` 个。
+    """清理指定 thread 的旧 checkpoint，只保留最近 `keep` 个。
 
     LangGraph 的 AsyncSqliteSaver 每次 graph 执行都会写入新的 checkpoint，
     随着对话进行，checkpoint 数量会无限增长。此函数删除旧的 checkpoint 及其
     关联的 writes 记录，只保留最新的 `keep` 个。
 
-    返回删除的 checkpoint 数量。
+    :param db_path: SQLite 数据库路径
+    :param thread_id: 线程 ID
+    :param keep: 要保留的最新 checkpoint 数量，默认为 1
+    :return: 删除的 checkpoint 数量
     """
     deleted = 0
     async with aiosqlite.connect(db_path) as db:

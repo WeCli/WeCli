@@ -1,17 +1,17 @@
-# TeamBot 端口大全
+# TeamClaw 端口大全
 
-> 最后更新：2026-03-13
+> 最后更新：2026-04-01
 
 ## 端口总览
 
 | 端口 | 环境变量 | 服务文件 | 说明 | 绑定地址 | 对外暴露 |
 |------|----------|----------|------|----------|----------|
-| **51200** | `PORT_AGENT` | `src/mainagent.py` | AI Agent 主服务（OpenAI 兼容 API） | `127.0.0.1` | ❌ |
-| **51201** | `PORT_SCHEDULER` | `src/time.py` | 定时任务调度中心 | `127.0.0.1` | ❌ |
-| **51202** | `PORT_OASIS` | `oasis/server.py` | OASIS 论坛 / Agent 管理与编排中心 | `127.0.0.1` | ❌ |
-| **51209** | `PORT_FRONTEND` | `src/front.py` | 前端 Web UI（Flask） | `0.0.0.0` | ✅ Tunnel |
-| **51210** | —（硬编码） | `visual/main.py` | 可视化编排系统（开发用） | `0.0.0.0` | ❌ |
-| **58010** | `PORT_BARK` | 外部二进制 `bin/bark-server` | Bark 推送服务器 | — | ✅ Tunnel |
+| **51200** | `PORT_AGENT` | `src/mainagent.py` | AI Agent 主服务（OpenAI 兼容 API） | `127.0.0.1` | 否 |
+| **51201** | `PORT_SCHEDULER` | `src/time.py` | 定时任务调度中心 | `127.0.0.1` | 否 |
+| **51202** | `PORT_OASIS` | `oasis/server.py` | OASIS 论坛 / Agent 管理与编排中心 | `127.0.0.1` | 否 |
+| **51209** | `PORT_FRONTEND` | `src/front.py` | 前端 Web UI（Flask） | `0.0.0.0` | 是 Tunnel |
+| **51210** | —（硬编码） | `visual/main.py` | 可视化编排系统（开发用） | `0.0.0.0` | 否 |
+| **58010** | `PORT_BARK` | 外部二进制 `bin/bark-server` | Bark 推送服务器 | — | 是 Tunnel |
 | **18789** | `OPENCLAW_API_URL`（可选） | 外部服务 | OpenClaw 后端（外部集成） | 不适用 | 不适用 |
 
 ## 详细说明
@@ -34,6 +34,7 @@
   - 管理 cron / 一次性定时任务
   - 提供 `/tasks` 端点供 `mcp_scheduler.py` 调用
   - 任务到期时回调 Agent 的 `/system_trigger`
+  - 在启用时恢复 TinyFish 内建竞品巡检任务
 - **调用方**：`mcp_scheduler.py`、Agent 内部
 
 ### 51202 — OASIS 论坛服务
@@ -41,6 +42,8 @@
 - **文件**：`oasis/server.py`
 - **职责**：
   - 多人设讨论引擎（Topics / Experts / Sessions）
+  - Town Genesis / swarm blueprint 生成
+  - GraphRAG 长期记忆与 ReportAgent
   - OpenClaw 快照管理
   - `/publicnet/info` 公网信息查询
   - Agent 管理与编排中心（迁移中）
@@ -53,6 +56,9 @@
 - **职责**：
   - 用户交互界面（聊天、登录、设置、OASIS 面板）
   - 反向代理：将浏览器请求转发到 Agent / OASIS 等内部服务
+  - Team Creator 页面、构建记录与 Team Studio 相关入口
+  - Team Studio 右侧 OASIS Town 侧栏、swarm graph、ReportAgent
+  - TinyFish 监控状态、手动运行、实时爬取和站点快照查询
   - Session 管理、PWA 支持
 - **安全策略**：
   - 本地直连（`127.0.0.1` 且无任何代理头）→ 信任放行
@@ -84,6 +90,8 @@
 ## 启动顺序
 
 由 `scripts/launcher.py` 定义：
+
+在 1/5 之前，如果本机已安装 OpenClaw，launcher 会先尝试预热 OpenClaw gateway，确保 `/v1/chat/completions` 可用，并刷新 `OPENCLAW_*` 运行时配置。
 
 | 步骤 | 服务 | 端口 | 等待时间 |
 |------|------|------|----------|
@@ -127,6 +135,8 @@ PORT_FRONTEND=51209
 ### 页面 & 静态资源
 
 - `GET /` — 登录/主页面
+- `GET /creator` — Team Creator 页面
+- `GET /studio` — Team Studio / workflow canvas 页面
 - `GET /manifest.json` — PWA manifest
 - `GET /sw.js` — Service Worker
 
@@ -174,12 +184,22 @@ PORT_FRONTEND=51209
 ### OASIS 代理（→ :51202）
 
 - `GET /proxy_oasis/topics` — 话题列表
+- `POST /proxy_oasis/topics` — 创建话题；支持 `autogen_swarm`、`swarm_mode`
 - `GET /proxy_oasis/topics/<id>` — 话题详情
 - `GET /proxy_oasis/topics/<id>/stream` — 话题讨论 SSE 流
+- `POST /proxy_oasis/topics/<id>/posts` — 向运行中的 topic 注入人工 nudge
+- `POST /proxy_oasis/topics/<id>/swarm/refresh` — 重新生成 swarm / GraphRAG 蓝图
+- `POST /proxy_oasis/topics/<id>/report/ask` — 向 ReportAgent 追问当前预测原因
 - `POST /proxy_oasis/topics/<id>/cancel` — 取消讨论
 - `POST /proxy_oasis/topics/<id>/purge` — 清除话题
 - `DELETE /proxy_oasis/topics` — 删除话题
 - `GET /proxy_oasis/experts` — 人设列表
+
+补充说明：
+
+- `GET /studio` 页面内包含 Team Studio 主画布和右侧 `🏘️ OASIS Town` 侧栏
+- 第一次进入 `/studio` 时默认落在 `Chat` tab，右侧 Town 侧栏折叠、`Town Mode` 关闭、子 tab 默认是 `TOWN`
+- Town Mode、`REFORGE`、`EXPLAIN` 都在这条侧栏里，不在消息中心侧栏
 
 ### OpenClaw 代理（→ :51202）
 
@@ -206,6 +226,25 @@ PORT_FRONTEND=51209
 - `POST /team_openclaw_snapshot/sync_all` — 同步全部快照
 - `POST /team_openclaw_snapshot/restore` — 恢复单个快照
 - `POST /team_openclaw_snapshot/restore_all` — 恢复全部快照
+
+### TinyFish 竞品监控（front.py 本地处理 + TinyFish Web Agent）
+
+- `GET /api/tinyfish/status` — 获取监控配置、目标列表、最近运行、价格变化和最新站点快照
+- `POST /api/tinyfish/run` — 提交 TinyFish 监控任务，可选同步等待完成
+- `POST /api/tinyfish/live-run` — 透传 TinyFish SSE 实时爬取事件，并在结束后持久化结果
+- `GET /api/tinyfish/sites/<site_key>` — 查看单个站点最近一次存储的快照
+
+### Team Creator（front.py 本地处理 + TinyFish / OASIS）
+
+- `POST /api/team-creator/discover` — Team Creator 第 1 阶段：发现 SOP / 组织结构页面，SSE 流式返回
+- `POST /api/team-creator/extract` — Team Creator 第 2 阶段：对单个页面执行 TinyFish 角色提取，SSE 流式返回
+- `POST /api/team-creator/smart-select` — 对提取角色做智能筛选并匹配预设专家
+- `POST /api/team-creator/build` — Team Creator 第 3 阶段：生成 Team 配置、Persona、workflow DAG 和 YAML
+- `POST /api/team-creator/download` — 将构建结果导出为 ZIP
+- `POST /api/team-creator/translate` — Team Creator 动态双语翻译
+- `GET /api/team-creator/presets` — 兼容旧前端的预设专家列表
+- `GET /api/team-creator/jobs` — 最近 Team Creator 构建记录
+- `GET /api/team-creator/jobs/<job_id>` — 单条构建记录详情
 
 ### 可视化编排代理（本地处理 / → :51202）
 
@@ -248,6 +287,7 @@ PORT_FRONTEND=51209
 - `POST /teams/<name>/experts` — 添加团队人设 prompt
 - `PUT /teams/<name>/experts/<tag>` — 更新团队人设 prompt
 - `DELETE /teams/<name>/experts/<tag>` — 删除团队人设 prompt
+- `POST /teams/<name>/generate-from-workflow` — 从 Team Studio 画布节点批量生成 / 更新团队
 - `POST /teams/snapshot/download` — 下载团队快照
 - `POST /teams/snapshot/upload` — 上传团队快照
 
@@ -279,9 +319,9 @@ else → 要求登录
 
 | 场景 | 结果 |
 |------|------|
-| 本地浏览器 `127.0.0.1` 直连 | ✅ 放行 |
-| 本地 agent / MCP 工具直连 | ✅ 放行 |
-| Cloudflare Tunnel 转发（带 `Cf-Ray`） | ⛔ 要登录 |
-| Nginx 反代转发（带 `X-Forwarded-For`） | ⛔ 要登录 |
-| Caddy / Traefik / HAProxy 转发 | ⛔ 要登录 |
-| 外网 IP 直连 | ⛔ 要登录 |
+| 本地浏览器 `127.0.0.1` 直连 | 通过 |
+| 本地 agent / MCP 工具直连 | 通过 |
+| Cloudflare Tunnel 转发（带 `Cf-Ray`） | 需登录 |
+| Nginx 反代转发（带 `X-Forwarded-For`） | 需登录 |
+| Caddy / Traefik / HAProxy 转发 | 需登录 |
+| 外网 IP 直连 | 需登录 |

@@ -35,7 +35,10 @@ def _extract_pdf_text(data_uri: str) -> str:
 
 
 def _is_vision_model() -> bool:
-    """根据 LLM_VISION_SUPPORT 环境变量或模型名自动判断是否支持视觉。"""
+    """根据 LLM_VISION_SUPPORT 环境变量或模型名自动判断是否支持视觉。
+
+    :return: 是否支持视觉模型
+    """
     explicit = os.getenv("LLM_VISION_SUPPORT", "").strip().lower()
     if explicit:
         return explicit == "true"
@@ -49,8 +52,8 @@ def _is_vision_model() -> bool:
         # Antigravity reverse-proxy may use original model names (gemini-*, claude-*)
         # which are already covered above; no extra patterns needed
     )
-    for pat in vision_patterns:
-        if pat in model:
+    for pattern in vision_patterns:
+        if pattern in model:
             return True
     return False
 
@@ -61,11 +64,19 @@ def build_human_message(
     files: list[dict] | None = None,
     audios: list[dict] | None = None,
 ) -> HumanMessage:
-    """构造 HumanMessage，支持图片、文件附件（文本/PDF）和音频。"""
+    """构造 HumanMessage，支持图片、文件附件（文本/PDF）和音频。
+
+    :param text: 消息文本
+    :param images: 图片 URL 列表
+    :param files: 文件附件列表，每个文件包含 name、type、content
+    :param audios: 音频附件列表
+    :return: 构造好的 HumanMessage 对象
+    """
     vision_supported = _is_vision_model()
 
     direct_file_parts: list[dict] = []
 
+    # 媒体文件 MIME 类型映射
     media_mime = {
         ".avi": "video/x-msvideo", ".mp4": "video/mp4", ".mkv": "video/x-matroska",
         ".mov": "video/quicktime", ".webm": "video/webm",
@@ -76,47 +87,47 @@ def build_human_message(
     file_text = ""
     if files:
         file_parts = []
-        for f in files:
-            fname = f.get("name", "未知文件")
-            ftype = f.get("type", "text")
-            fcontent = f.get("content", "")
+        for file_info in files:
+            file_name = file_info.get("name", "未知文件")
+            file_type = file_info.get("type", "text")
+            file_content = file_info.get("content", "")
 
-            if ftype == "pdf":
+            if file_type == "pdf":
                 if vision_supported:
-                    pdf_text = _extract_pdf_text(fcontent)
+                    pdf_text = _extract_pdf_text(file_content)
                     if len(pdf_text) > 50000:
                         pdf_text = pdf_text[:50000] + "\n\n... (文件过长，已截断)"
-                    pdf_data_uri = fcontent if fcontent.startswith("data:") else f"data:application/pdf;base64,{fcontent}"
+                    pdf_data_uri = file_content if file_content.startswith("data:") else f"data:application/pdf;base64,{file_content}"
                     direct_file_parts.append({
                         "type": "file",
                         "file": {
-                            "filename": fname,
+                            "filename": file_name,
                             "file_data": pdf_data_uri,
                         },
                     })
-                    file_parts.append(f"📄 **附件: {fname}** (已上传原始 PDF 供分析，同时附上提取的文本)\n```\n{pdf_text}\n```")
+                    file_parts.append(f"📄 **附件: {file_name}** (已上传原始 PDF 供分析，同时附上提取的文本)\n```\n{pdf_text}\n```")
                 else:
-                    pdf_text = _extract_pdf_text(fcontent)
+                    pdf_text = _extract_pdf_text(file_content)
                     if len(pdf_text) > 50000:
                         pdf_text = pdf_text[:50000] + "\n\n... (文件过长，已截断)"
-                    file_parts.append(f"📄 **附件: {fname}**\n```\n{pdf_text}\n```")
-            elif ftype == "media":
-                ext = os.path.splitext(fname)[1].lower()
+                    file_parts.append(f"📄 **附件: {file_name}**\n```\n{pdf_text}\n```")
+            elif file_type == "media":
+                ext = os.path.splitext(file_name)[1].lower()
                 mime = media_mime.get(ext, "application/octet-stream")
-                data_uri = fcontent if fcontent.startswith("data:") else f"data:{mime};base64,{fcontent}"
+                data_uri = file_content if file_content.startswith("data:") else f"data:{mime};base64,{file_content}"
                 direct_file_parts.append({
                     "type": "file",
                     "file": {
-                        "filename": fname,
+                        "filename": file_name,
                         "file_data": data_uri,
                     },
                 })
-                file_parts.append(f"🎬 **附件: {fname}** (已上传原始媒体文件供分析)")
+                file_parts.append(f"🎬 **附件: {file_name}** (已上传原始媒体文件供分析)")
             else:
-                if len(fcontent) > 50000:
-                    full_len = len(f.get("content", ""))
-                    fcontent = fcontent[:50000] + f"\n\n... (文件过长，已截断，共 {full_len} 字符)"
-                file_parts.append(f"📄 **附件: {fname}**\n```\n{fcontent}\n```")
+                if len(file_content) > 50000:
+                    full_len = len(file_info.get("content", ""))
+                    file_content = file_content[:50000] + f"\n\n... (文件过长，已截断，共 {full_len} 字符)"
+                file_parts.append(f"📄 **附件: {file_name}**\n```\n{file_content}\n```")
 
         if file_parts:
             file_text = "\n\n" + "\n\n".join(file_parts)
@@ -128,6 +139,7 @@ def build_human_message(
     if not has_multimodal:
         return HumanMessage(content=combined_text or "(空消息)")
 
+    # 当前模型不支持多模态时的降级处理
     if not vision_supported and (all_images or audios):
         hints = []
         if all_images:
@@ -146,10 +158,10 @@ def build_human_message(
     elif audios:
         content_parts.append({"type": "text", "text": "请听取并处理以下音频："})
 
-    for img_data in all_images:
+    for image_data in all_images:
         content_parts.append({
             "type": "image_url",
-            "image_url": {"url": img_data},
+            "image_url": {"url": image_data},
         })
 
     content_parts.extend(direct_file_parts)

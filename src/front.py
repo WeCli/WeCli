@@ -1,15 +1,47 @@
-from flask import Flask, render_template, request, jsonify, session, Response, redirect
+from flask import Flask, render_template, request, jsonify, session, Response, redirect, stream_with_context
 from werkzeug.middleware.proxy_fix import ProxyFix
 import hashlib
 import requests
 import os
 import json
 from dotenv import load_dotenv
+from env_settings import read_env_all, write_env_settings
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from cron_utils import get_agent_cron_jobs, restore_cron_jobs
+from llm_factory import infer_provider
 from front_group_routes import register_group_routes
 from front_oasis_routes import register_oasis_routes
 from front_session_routes import register_session_routes
+from front_teambot_routes import register_teambot_routes
+from tinyfish_monitor_service import (
+    DEFAULT_BASE_URL as TINYFISH_DEFAULT_BASE_URL,
+    DEFAULT_DB_PATH as TINYFISH_DEFAULT_DB_PATH,
+    DEFAULT_TARGETS_PATH as TINYFISH_DEFAULT_TARGETS_PATH,
+    get_latest_site_snapshots,
+    get_monitor_overview,
+    poll_pending_runs_once,
+    probe_api_access,
+    stream_live_run,
+    submit_monitor_run,
+)
+from team_creator_service import (
+    build_from_roles,
+    build_attachment_content_disposition,
+    build_team_zip,
+    build_team_creator_download_name,
+    create_job,
+    get_job,
+    list_jobs,
+    map_roles_to_team,
+    parse_extracted_roles,
+    serialize_extracted_roles,
+    smart_select_roles,
+    stream_discovery,
+    stream_extraction,
+    translate_texts_via_llm,
+    update_job,
+    PRESET_POOL,
+)
 
 # 加载 .env 配置
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -31,7 +63,7 @@ app.secret_key = hashlib.sha256(f"teamclaw-session-{_token}".encode()).digest() 
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for image uploads
 
 # --- 配置区 ---
-from datetime import timedelta
+from datetime import datetime, timedelta
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=8)
 app.config['SESSION_COOKIE_HTTPONLY'] = True      # 防止 XSS 读取 Session Cookie
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'     # 防止 CSRF 跨站请求携带 Cookie
@@ -153,20 +185,36 @@ register_session_routes(
     local_session_status_url=LOCAL_SESSION_STATUS_URL,
     local_delete_session_url=LOCAL_DELETE_SESSION_URL,
 )
+register_teambot_routes(
+    app,
+    port_agent=PORT_AGENT,
+    internal_token=INTERNAL_TOKEN,
+)
 
 # --- users.json 检查（密码登录时验证用户是否存在）---
 USERS_PATH = os.path.join(root_dir, "config", "users.json")
 
-def _user_exists_in_users_json(username: str) -> bool:
-    """检查用户名是否在 users.json 中（有密码记录）"""
+def _load_users_json() -> dict[str, str]:
     if not os.path.exists(USERS_PATH):
-        return False
+        return {}
     try:
         with open(USERS_PATH, "r", encoding="utf-8") as f:
-            users = json.load(f)
-        return username in users
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
     except Exception:
-        return False
+        return {}
+
+def _write_users_json(users: dict[str, str]) -> None:
+    os.makedirs(os.path.dirname(USERS_PATH), exist_ok=True)
+    with open(USERS_PATH, "w", encoding="utf-8") as f:
+        json.dump(users, f, ensure_ascii=False, indent=4)
+
+def _hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+def _user_exists_in_users_json(username: str) -> bool:
+    """检查用户名是否在 users.json 中（有密码记录）"""
+    return username in _load_users_json()
 
 
 # --- Unified auth: before_request hook ---
@@ -271,10 +319,8 @@ def index():
 @app.route("/api/llm_config_status")
 def llm_config_status():
     """检查 LLM API 是否已配置，供前端判断是否显示提示横幅。"""
-    api_key = os.getenv("LLM_API_KEY", "").strip()
-    base_url = os.getenv("LLM_BASE_URL", "").strip()
-    model = os.getenv("LLM_MODEL", "").strip()
-    configured = bool(api_key) and bool(base_url) and bool(model)
+    llm_config = _read_saved_teamclaw_llm_config()
+    configured = _llm_config_complete(llm_config)
     return jsonify({"configured": configured})
 
 
@@ -282,10 +328,12 @@ def llm_config_status():
 def setup_status():
     """首次登录向导状态检测：返回 LLM、OpenClaw、Antigravity、密码等配置状态。"""
     import shutil
-    api_key = os.getenv("LLM_API_KEY", "").strip()
-    base_url = os.getenv("LLM_BASE_URL", "").strip()
-    model = os.getenv("LLM_MODEL", "").strip()
-    llm_configured = bool(api_key) and api_key != "your_api_key_here" and bool(base_url) and bool(model)
+    llm_config = _read_saved_teamclaw_llm_config()
+    api_key = llm_config["api_key"]
+    base_url = llm_config["base_url"]
+    model = llm_config["model"]
+    provider = llm_config["provider"]
+    llm_configured = _llm_config_complete(llm_config)
 
     # Check OpenClaw
     openclaw_installed = shutil.which("openclaw") is not None
@@ -319,7 +367,7 @@ def setup_status():
         "openclaw_installed": openclaw_installed,
         "antigravity_running": antigravity_running,
         "password_set": password_set,
-        "current_provider": os.getenv("LLM_PROVIDER", "").strip(),
+        "current_provider": provider,
         "current_model": model,
         "current_base_url": base_url,
     })
@@ -363,17 +411,148 @@ def import_openclaw_config():
     })
 
 
+def _read_saved_teamclaw_llm_config():
+    settings = read_env_all(os.path.join(root_dir, "config", ".env"))
+    return {
+        "api_key": (settings.get("LLM_API_KEY") or "").strip(),
+        "base_url": (settings.get("LLM_BASE_URL") or "").strip(),
+        "model": (settings.get("LLM_MODEL") or "").strip(),
+        "provider": (settings.get("LLM_PROVIDER") or "").strip(),
+    }
+
+
+def _provider_is_local_keyless(provider: str, base_url: str) -> bool:
+    normalized_provider = (provider or "").strip().lower()
+    normalized_base_url = (base_url or "").strip().lower()
+    if normalized_provider == "ollama":
+        return True
+    return "127.0.0.1:11434" in normalized_base_url or "localhost:11434" in normalized_base_url
+
+
+def _llm_config_complete(config: dict[str, str]) -> bool:
+    api_key = (config.get("api_key") or "").strip()
+    base_url = (config.get("base_url") or "").strip()
+    model = (config.get("model") or "").strip()
+    provider = (
+        (config.get("provider") or "").strip()
+        or infer_provider(
+            model=model,
+            base_url=base_url,
+            provider="",
+            api_key=api_key,
+        )
+    )
+    if not base_url or not model:
+        return False
+    if _provider_is_local_keyless(provider, base_url):
+        return True
+    return bool(api_key) and api_key != "your_api_key_here"
+
+
+def _read_saved_openclaw_runtime_config():
+    settings = read_env_all(os.path.join(root_dir, "config", ".env"))
+    gateway_token = (settings.get("OPENCLAW_GATEWAY_TOKEN") or os.getenv("OPENCLAW_GATEWAY_TOKEN") or "").strip()
+    api_key = (settings.get("OPENCLAW_API_KEY") or os.getenv("OPENCLAW_API_KEY") or "").strip()
+    return {
+        "api_url": (settings.get("OPENCLAW_API_URL") or os.getenv("OPENCLAW_API_URL") or "").strip(),
+        "api_key": gateway_token or api_key,
+    }
+
+
+def _resolve_teamclaw_llm_config(data: dict | None):
+    payload = data or {}
+    saved = _read_saved_teamclaw_llm_config()
+
+    def pick(field: str):
+        value = str(payload.get(field) or "").strip()
+        if value and "****" not in value:
+            return value
+        return saved.get(field, "")
+
+    resolved = {
+        "api_key": pick("api_key"),
+        "base_url": pick("base_url"),
+        "model": pick("model"),
+        "provider": pick("provider"),
+    }
+    if "api_key" in payload and not str(payload.get("api_key") or "").strip():
+        provider_hint = str(payload.get("provider") or resolved["provider"] or "").strip()
+        base_url_hint = str(payload.get("base_url") or resolved["base_url"] or "").strip()
+        if _provider_is_local_keyless(provider_hint, base_url_hint):
+            resolved["api_key"] = ""
+    if not resolved["provider"]:
+        resolved["provider"] = infer_provider(
+            model=resolved["model"],
+            base_url=resolved["base_url"],
+            provider="",
+            api_key=resolved["api_key"],
+        )
+    return resolved
+
+
+@app.route("/api/export_openclaw_config", methods=["POST"])
+def export_openclaw_config():
+    """将当前 TeamClaw LLM 设置写回 OpenClaw 默认 provider/model。"""
+    import shutil
+    import sys
+
+    oc_bin = shutil.which("openclaw")
+    if not oc_bin:
+        return jsonify({"ok": False, "error": "OpenClaw 未安装"}), 404
+
+    resolved = _resolve_teamclaw_llm_config(request.get_json(force=True) or {})
+    api_key = resolved["api_key"]
+    base_url = resolved["base_url"]
+    model = resolved["model"]
+    provider = resolved["provider"]
+
+    if not base_url or not model:
+        return jsonify({
+            "ok": False,
+            "error": "base_url and model are required",
+        }), 400
+    if not api_key and not _provider_is_local_keyless(provider, base_url):
+        return jsonify({
+            "ok": False,
+            "error": "api_key, base_url and model are required",
+        }), 400
+
+    script_dir = os.path.join(root_dir, "selfskill", "scripts")
+    sys_path_backup = list(sys.path)
+    try:
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+        from configure_openclaw import export_llm_config_to_openclaw
+        result = export_llm_config_to_openclaw(
+            api_key=api_key,
+            base_url=base_url,
+            model=model,
+            provider=provider,
+        )
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"写入 OpenClaw 配置失败: {e}"}), 500
+    finally:
+        sys.path[:] = sys_path_backup
+
+    return jsonify(result)
+
+
 @app.route("/api/discover_models", methods=["POST"])
 def discover_models():
     """代理调用 /v1/models 端点，返回可用模型列表。
     前端 setup wizard 用此端点检测模型。
     """
-    data = request.get_json(force=True)
-    api_key = data.get("api_key", "").strip()
-    base_url = data.get("base_url", "").strip()
+    resolved = _resolve_teamclaw_llm_config(request.get_json(force=True) or {})
+    api_key = resolved["api_key"]
+    base_url = resolved["base_url"]
+    provider = resolved["provider"]
 
-    if not api_key or not base_url:
-        return jsonify({"error": "api_key and base_url required"}), 400
+    if not base_url:
+        return jsonify({"error": "base_url required"}), 400
+    if not api_key and not _provider_is_local_keyless(provider, base_url):
+        return jsonify({"error": "api_key required"}), 400
 
     # Build /v1/models URL
     models_url = base_url.rstrip("/")
@@ -386,13 +565,10 @@ def discover_models():
         import urllib.error
         import json as _json
 
-        req = urllib.request.Request(
-            models_url,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-        )
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        req = urllib.request.Request(models_url, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = _json.loads(resp.read().decode())
 
@@ -416,6 +592,439 @@ def discover_models():
         return jsonify({"error": f"Cannot connect: {e.reason}"}), 502
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def _read_saved_tinyfish_settings() -> dict[str, str]:
+    settings = read_env_all(os.path.join(root_dir, "config", ".env"))
+    return {
+        "TINYFISH_API_KEY": (settings.get("TINYFISH_API_KEY") or "").strip(),
+        "TINYFISH_BASE_URL": (settings.get("TINYFISH_BASE_URL") or "").strip(),
+        "TINYFISH_MONITOR_DB_PATH": (settings.get("TINYFISH_MONITOR_DB_PATH") or "").strip(),
+        "TINYFISH_MONITOR_TARGETS_PATH": (settings.get("TINYFISH_MONITOR_TARGETS_PATH") or "").strip(),
+        "TINYFISH_MONITOR_ENABLED": (settings.get("TINYFISH_MONITOR_ENABLED") or "").strip(),
+        "TINYFISH_MONITOR_CRON": (settings.get("TINYFISH_MONITOR_CRON") or "").strip(),
+    }
+
+
+def _mask_secret_value(value: str) -> str:
+    normalized = (value or "").strip()
+    if len(normalized) > 8:
+        return normalized[:4] + "****" + normalized[-4:]
+    return normalized
+
+
+def _resolve_tinyfish_settings(payload: dict | None) -> dict[str, str]:
+    incoming = payload or {}
+    saved = _read_saved_tinyfish_settings()
+
+    def pick(key: str, default: str = "") -> str:
+        value = str(incoming.get(key) or "").strip()
+        if value and "****" not in value:
+            return value
+        saved_value = saved.get(key, "")
+        if saved_value:
+            return saved_value
+        return default
+
+    enabled_value = str(incoming.get("TINYFISH_MONITOR_ENABLED") or "").strip()
+    if not enabled_value:
+        enabled_value = saved.get("TINYFISH_MONITOR_ENABLED") or "false"
+
+    cron_value = str(incoming.get("TINYFISH_MONITOR_CRON") or "").strip()
+    if not cron_value:
+        cron_value = saved.get("TINYFISH_MONITOR_CRON") or ""
+
+    return {
+        "TINYFISH_API_KEY": pick("TINYFISH_API_KEY"),
+        "TINYFISH_BASE_URL": pick("TINYFISH_BASE_URL", str(TINYFISH_DEFAULT_BASE_URL)),
+        "TINYFISH_MONITOR_DB_PATH": pick("TINYFISH_MONITOR_DB_PATH", str(TINYFISH_DEFAULT_DB_PATH)),
+        "TINYFISH_MONITOR_TARGETS_PATH": pick("TINYFISH_MONITOR_TARGETS_PATH", str(TINYFISH_DEFAULT_TARGETS_PATH)),
+        "TINYFISH_MONITOR_ENABLED": enabled_value,
+        "TINYFISH_MONITOR_CRON": cron_value,
+    }
+
+
+@app.route("/api/tinyfish/configure", methods=["POST"])
+def tinyfish_configure():
+    """Validate TinyFish API access, apply defaults, and persist settings."""
+    body = request.get_json(silent=True) or {}
+    resolved = _resolve_tinyfish_settings(body.get("settings") or body)
+    api_key = resolved["TINYFISH_API_KEY"]
+    if not api_key:
+        return jsonify({"ok": False, "error": "TINYFISH_API_KEY is required"}), 400
+
+    try:
+        probe_api_access(
+            api_key=api_key,
+            base_url=resolved["TINYFISH_BASE_URL"],
+            request_timeout=15,
+        )
+    except Exception as e:
+        message = str(e)
+        status = 502 if "Failed to reach TinyFish" in message else 400
+        return jsonify({"ok": False, "error": message}), status
+
+    write_env_settings(os.path.join(root_dir, "config", ".env"), resolved)
+    load_dotenv(dotenv_path=os.path.join(root_dir, "config", ".env"), override=True)
+    for key, value in resolved.items():
+        os.environ[key] = value
+
+    return jsonify({
+        "ok": True,
+        "config": {
+            **resolved,
+            "TINYFISH_API_KEY_MASKED": _mask_secret_value(api_key),
+        },
+        "targets_path_exists": os.path.exists(resolved["TINYFISH_MONITOR_TARGETS_PATH"]),
+    })
+
+
+@app.route("/api/tinyfish/status")
+def tinyfish_status():
+    """Return TinyFish monitor config, recent runs, changes, and latest snapshots."""
+    sync = request.args.get("sync", "").strip().lower() in {"1", "true", "yes"}
+    if sync:
+        try:
+            poll_pending_runs_once()
+        except Exception:
+            # Overview should still be readable even if polling fails.
+            pass
+
+    try:
+        overview = get_monitor_overview(
+            recent_change_limit=int(request.args.get("changes", "20")),
+            recent_run_limit=int(request.args.get("runs", "10")),
+            latest_site_limit=int(request.args.get("sites", "10")),
+            snapshots_per_site=int(request.args.get("snapshots", "20")),
+        )
+        return jsonify({"ok": True, **overview})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/tinyfish/run", methods=["POST"])
+def tinyfish_run():
+    """Submit a TinyFish monitor run. Defaults to async submission only."""
+    body = request.get_json(silent=True) or {}
+    raw_sites = body.get("site_keys") or body.get("sites") or []
+    selected_sites = {str(item).strip() for item in raw_sites if str(item).strip()} or None
+    wait = bool(body.get("wait", False))
+    try:
+        result = submit_monitor_run(
+            selected_sites=selected_sites,
+            wait=wait,
+            poll_interval=float(body.get("poll_interval", 5.0)),
+            max_wait_seconds=int(body.get("max_wait", 900)),
+            request_timeout=int(body.get("request_timeout", 60)),
+        )
+        return jsonify({"ok": True, **result})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/tinyfish/live-run", methods=["POST"])
+def tinyfish_live_run():
+    """Proxy TinyFish run-sse and persist the final run into the monitor DB."""
+    body = request.get_json(silent=True) or {}
+    site_key = str(body.get("site_key") or body.get("site") or "").strip()
+    if not site_key:
+        return jsonify({"ok": False, "error": "site_key is required"}), 400
+
+    request_timeout = int(body.get("request_timeout", 300))
+
+    def generate():
+        try:
+            for event in stream_live_run(site_key=site_key, request_timeout=request_timeout):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as exc:
+            payload = {"type": "ERROR", "error": str(exc)}
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.route("/api/tinyfish/sites/<site_key>")
+def tinyfish_site_latest(site_key):
+    """Return latest stored snapshots for a single competitor site."""
+    try:
+        data = get_latest_site_snapshots(site_key, snapshots_limit=int(request.args.get("limit", "50")))
+        return jsonify({"ok": True, "site": data})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/creator")
+def creator():
+    """Team Creator page with TinyFish Live Crawl integration."""
+    return render_template("creator.html")
+
+
+# ──────────────────────────────────────────────────────────────
+# Team Creator API — three-stage pipeline
+# ──────────────────────────────────────────────────────────────
+
+@app.route("/api/team-creator/discover", methods=["POST"])
+def team_creator_discover():
+    """Stage 1: Discovery — stream SSE events while TinyFish searches for SOP/org pages."""
+    body = request.get_json(silent=True) or {}
+    task_description = str(body.get("task_description") or body.get("task") or "").strip()
+    search_url = str(body.get("search_url") or "").strip()
+
+    if not task_description:
+        return jsonify({"ok": False, "error": "task_description is required"}), 400
+
+    def generate():
+        try:
+            for event in stream_discovery(task_description, search_url):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as exc:
+            payload = {"type": "ERROR", "error": str(exc)}
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.route("/api/team-creator/extract", methods=["POST"])
+def team_creator_extract():
+    """Stage 2: Extraction — stream SSE events while TinyFish extracts roles from a page."""
+    body = request.get_json(silent=True) or {}
+    page_url = str(body.get("url") or body.get("page_url") or "").strip()
+    page_title = str(body.get("title") or "").strip()
+
+    if not page_url:
+        return jsonify({"ok": False, "error": "url is required"}), 400
+
+    def generate():
+        try:
+            for event in stream_extraction(page_url, page_title):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as exc:
+            payload = {"type": "ERROR", "error": str(exc)}
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.route("/api/team-creator/build", methods=["POST"])
+def team_creator_build():
+    """Stage 3: Build — convert roles into TeamClaw team config.
+
+    Accepts either:
+    - Pre-extracted roles: {"roles": [...], "team_name": "...", "task": "..."}
+    - Or extraction results: {"extraction_results": [...], "team_name": "...", "task": "..."}
+
+    Returns the team config JSON (experts + agents + YAML workflow).
+    """
+    body = request.get_json(silent=True) or {}
+    team_name = str(body.get("team_name") or body.get("team") or "").strip()
+    task = str(body.get("task_description") or body.get("task") or "").strip()
+
+    if not team_name:
+        return jsonify({"ok": False, "error": "team_name is required"}), 400
+
+    roles_data = body.get("roles")
+    extraction_results = body.get("extraction_results")
+    owner_id = str(session.get("user_id") or "").strip()
+
+    if not ((roles_data and isinstance(roles_data, list)) or (extraction_results and isinstance(extraction_results, list))):
+        return jsonify({"ok": False, "error": "Provide 'roles' (array) or 'extraction_results'"}), 400
+
+    def _normalize_role_records(items):
+        normalized = []
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            role_name = str(item.get("role_name") or "").strip()
+            if not role_name:
+                continue
+            normalized.append(
+                {
+                    "role_name": role_name,
+                    "personality_traits": list(item.get("personality_traits") or []),
+                    "primary_responsibilities": list(item.get("primary_responsibilities") or []),
+                    "depends_on": list(item.get("depends_on") or item.get("input_dependency") or []),
+                    "tools_used": list(item.get("tools_used") or []),
+                    "source_url": str(item.get("source_url") or "").strip(),
+                    "expert_tag": str(item.get("expert_tag") or item.get("_expert_tag") or "").strip(),
+                    "output_target": list(item.get("output_target") or []),
+                }
+            )
+        return normalized
+
+    job = create_job(task, team_name, owner_id=owner_id)
+    extracted_roles_payload = []
+
+    try:
+        update_job(job.job_id, owner_id=owner_id, status="running", error="")
+        if roles_data and isinstance(roles_data, list):
+            # Direct role input
+            extracted_roles_payload = _normalize_role_records(roles_data)
+            team_config = build_from_roles(roles_data, team_name, task)
+        elif extraction_results and isinstance(extraction_results, list):
+            # Parse from TinyFish extraction results
+            roles = parse_extracted_roles(extraction_results)
+            if not roles:
+                update_job(job.job_id, owner_id=owner_id, status="failed", error="No roles could be extracted from results")
+                return jsonify({"ok": False, "error": "No roles could be extracted from results", "job_id": job.job_id}), 400
+            extracted_roles_payload = serialize_extracted_roles(roles)
+            team_config = map_roles_to_team(roles, team_name, task)
+
+        saved_job = update_job(
+            job.job_id,
+            owner_id=owner_id,
+            status="complete",
+            extracted_roles=extracted_roles_payload,
+            team_config=team_config,
+            error="",
+        )
+        return jsonify({"ok": True, "team_config": team_config, "job": saved_job.to_dict() if saved_job else {"job_id": job.job_id}})
+    except Exception as e:
+        saved_job = update_job(
+            job.job_id,
+            owner_id=owner_id,
+            status="failed",
+            extracted_roles=extracted_roles_payload,
+            error=str(e),
+        )
+        return jsonify({"ok": False, "error": str(e), "job_id": job.job_id, "job": saved_job.to_dict() if saved_job else None}), 500
+
+
+@app.route("/api/team-creator/download", methods=["POST"])
+def team_creator_download():
+    """Download the built team as a ZIP snapshot (same format as /teams/snapshot/download).
+
+    Accepts the team_config from /api/team-creator/build.
+    """
+    body = request.get_json(silent=True) or {}
+    team_name = str(body.get("team_name") or body.get("team") or "").strip()
+    team_config = body.get("team_config")
+
+    if not team_name:
+        return jsonify({"ok": False, "error": "team_name is required"}), 400
+    if not team_config:
+        return jsonify({"ok": False, "error": "team_config is required"}), 400
+
+    try:
+        zip_bytes = build_team_zip(team_config, team_name)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = build_team_creator_download_name(team_name, timestamp)
+
+        return Response(
+            zip_bytes,
+            mimetype="application/zip",
+            headers={"Content-Disposition": build_attachment_content_disposition(filename)},
+        )
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/team-creator/smart-select", methods=["POST"])
+def team_creator_smart_select():
+    """LLM-powered intelligent role selection + preset expert matching.
+
+    Accepts:
+        {"roles": [...], "max_roles": 8, "task_description": "..."}
+
+    Returns:
+        {"ok": true, "selected_indices": [0,2,5], "preset_matches": [...], "reasoning": "..."}
+    """
+    body = request.get_json(silent=True) or {}
+    roles = body.get("roles")
+    max_roles = int(body.get("max_roles", 8))
+    task_desc = str(body.get("task_description") or "").strip()
+
+    if not roles or not isinstance(roles, list):
+        return jsonify({"ok": False, "error": "roles (array) is required"}), 400
+
+    try:
+        result = smart_select_roles(roles, max_roles, task_desc)
+        return jsonify({"ok": True, **result})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/team-creator/translate", methods=["POST"])
+def team_creator_translate():
+    """Translate Team Creator dynamic UI text into the requested language."""
+    body = request.get_json(silent=True) or {}
+    texts = body.get("texts")
+    target_lang = str(body.get("target_lang") or "").strip().lower()
+    source_lang = str(body.get("source_lang") or "").strip()
+    context = str(body.get("context") or "").strip()
+
+    if not isinstance(texts, list):
+        return jsonify({"ok": False, "error": "texts (array) is required"}), 400
+    if target_lang not in {"zh", "zh-cn", "en"}:
+        return jsonify({"ok": False, "error": "target_lang must be zh or en"}), 400
+
+    try:
+        translations = translate_texts_via_llm(
+            [str(item or "") for item in texts],
+            target_lang=target_lang,
+            source_lang=source_lang,
+            context=context,
+        )
+        return jsonify({"ok": True, "translations": translations})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/team-creator/presets")
+def team_creator_presets():
+    """Return available preset expert tags for matching UI.
+
+    Now returns richer data including category, description, name_zh
+    to support the new expert pool browser in Team Creator.
+    Note: The primary frontend now uses /proxy_visual/experts directly.
+    This endpoint remains for backward compatibility and lightweight usage.
+    """
+    presets = [
+        {
+            "tag": v["tag"],
+            "name": v["name"],
+            "name_zh": v.get("name_zh", ""),
+            "source": v["source"],
+            "category": v.get("category", ""),
+            "description": v.get("description", ""),
+            "temperature": v.get("temperature", 0.7),
+        }
+        for v in PRESET_POOL.values()
+    ]
+    return jsonify({"ok": True, "presets": presets, "count": len(presets)})
+
+
+@app.route("/api/team-creator/jobs")
+def team_creator_jobs():
+    """List all build jobs."""
+    owner_id = str(session.get("user_id") or "").strip()
+    limit = request.args.get("limit", type=int)
+    return jsonify({"ok": True, "jobs": list_jobs(owner_id=owner_id, limit=limit)})
+
+
+@app.route("/api/team-creator/jobs/<job_id>")
+def team_creator_job_status(job_id):
+    """Get status of a specific build job."""
+    owner_id = str(session.get("user_id") or "").strip()
+    job = get_job(job_id, owner_id=owner_id)
+    if not job:
+        return jsonify({"ok": False, "error": "Job not found"}), 404
+    return jsonify({"ok": True, "job": job.to_dict(include_payload=True)})
 
 
 @app.route("/studio")
@@ -598,7 +1207,12 @@ def proxy_check_session():
     """轻量 session 校验：前端页面加载时调用，确认后端 session 仍然有效"""
     user_id = session.get("user_id")
     if user_id:
-        return jsonify({"valid": True, "user_id": user_id})
+        return jsonify({
+            "valid": True,
+            "user_id": user_id,
+            "has_password": _user_exists_in_users_json(user_id),
+            "mode": session.get("login_mode", ""),
+        })
     return jsonify({"valid": False}), 401
 
 
@@ -610,30 +1224,49 @@ def proxy_login():
     1. 密码登录：user_id + password
     2. 本机免密登录：本地 127.0.0.1 直连时，只需要 user_id，不需要密码
     """
-    user_id = request.json.get("user_id", "")
-    password = request.json.get("password", "")
+    body = request.get_json(silent=True) or {}
+    user_id = str(body.get("user_id") or "").strip()
+    password = str(body.get("password") or "")
     is_local = _is_direct_local_request()
+
+    if not user_id:
+        return jsonify({
+            "error": "请输入用户名 / Username required",
+            "error_code": "user_id_required",
+        }), 400
 
     # 本机免密登录：127.0.0.1 直连且未提供密码时
     if is_local and not password:
         # 直接创建 session，不需要验证密码
-        if user_id:
-            session["user_id"] = user_id
-            session.permanent = True
-            return jsonify({"ok": True, "user_id": user_id, "mode": "local_no_password"})
-        else:
-            return jsonify({"error": "user_id required"}), 400
+        session["user_id"] = user_id
+        session["login_mode"] = "local_no_password"
+        session.permanent = True
+        return jsonify({
+            "ok": True,
+            "user_id": user_id,
+            "mode": "local_no_password",
+            "has_password": _user_exists_in_users_json(user_id),
+        })
 
     # 密码登录
     if not password:
-        return jsonify({"error": "password required"}), 400
+        return jsonify({
+            "error": "请输入密码 / Password required",
+            "error_code": "password_required",
+        }), 400
 
     # 检查用户是否在 users.json 中（有密码记录）
     # 仅免密用户（不在 users.json 中）不允许密码登录
     if not _user_exists_in_users_json(user_id):
         return jsonify({
-            "error": f"用户 '{user_id}' 未设置密码，无法使用密码登录。"
-                     f"请使用「本机免密登录」，或通过 add-user 命令创建密码。"
+            "error": (
+                f"用户 '{user_id}' 未设置密码，无法使用密码登录。"
+                f"请先使用「本机免密登录」，再到设置页为这个用户名创建密码。"
+                f" / User '{user_id}' does not have a password configured, so password login is unavailable. "
+                f"Use Local No-Password Login first, then create a password for this username in Settings."
+            ),
+            "error_code": "password_login_not_available",
+            "user_id": user_id,
         }), 403
 
     try:
@@ -642,10 +1275,45 @@ def proxy_login():
             # Login succeeded — only store user_id, NOT password.
             # Subsequent requests use INTERNAL_TOKEN for backend auth.
             session["user_id"] = user_id
+            session["login_mode"] = "password"
             session.permanent = True
-            return jsonify(r.json())
+            payload = r.json()
+            if isinstance(payload, dict):
+                payload.setdefault("has_password", True)
+                payload.setdefault("mode", "password")
+            return jsonify(payload)
         else:
             return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/current_user/password", methods=["POST"])
+def save_current_user_password():
+    """为当前登录用户创建或更新密码登录凭据。"""
+    user_id = str(session.get("user_id") or "").strip()
+    if not user_id:
+        return jsonify({"error": "未登录"}), 401
+
+    body = request.get_json(silent=True) or {}
+    password = str(body.get("password") or "")
+    if not password:
+        return jsonify({
+            "error": "请输入密码 / Password required",
+            "error_code": "password_required",
+        }), 400
+
+    try:
+        users = _load_users_json()
+        operation = "updated" if user_id in users else "created"
+        users[user_id] = _hash_password(password)
+        _write_users_json(users)
+        return jsonify({
+            "ok": True,
+            "user_id": user_id,
+            "status": operation,
+            "has_password": True,
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -798,12 +1466,14 @@ def proxy_login_with_token():
     
     # Create session
     session['user_id'] = user_id
+    session["login_mode"] = "token_login"
     session.permanent = True
     
     return jsonify({
         "ok": True,
         "user_id": user_id,
-        "mode": "token_login"
+        "mode": "token_login",
+        "has_password": _user_exists_in_users_json(user_id),
     })
 
 
@@ -1134,8 +1804,9 @@ def proxy_openclaw_chat():
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
         return resp
 
-    openclaw_api_url = os.getenv("OPENCLAW_API_URL", "")
-    openclaw_api_key = os.getenv("OPENCLAW_GATEWAY_TOKEN", "") or os.getenv("OPENCLAW_API_KEY", "")
+    runtime_config = _read_saved_openclaw_runtime_config()
+    openclaw_api_url = runtime_config["api_url"]
+    openclaw_api_key = runtime_config["api_key"]
 
     if not openclaw_api_url:
         return jsonify({"error": "OPENCLAW_API_URL not configured"}), 503
@@ -2863,6 +3534,176 @@ def delete_team_expert(team_name, tag):
             _team_experts_save(user_id, team_name, experts)
             return jsonify({"status": "success", "deleted": deleted})
     return jsonify({"error": f"Expert tag \"{tag}\" not found"}), 404
+
+
+@app.route("/teams/<team_name>/generate-from-workflow", methods=["POST"])
+def generate_team_from_workflow(team_name):
+    """Bulk-add canvas nodes to a team.
+
+    Body JSON:
+    {
+        "nodes": [
+            {
+                "type": "expert"|"session_agent"|"external",
+                "name": "...",
+                "tag": "...",
+                "persona": "...",        // expert only
+                "temperature": 0.7,      // expert only
+                "session": "...",        // session_agent only
+                "global_name": "...",    // external only
+                "meta": {...}            // external only
+            },
+            ...
+        ],
+        "create_if_missing": true|false,
+        "resolutions": {
+            "<tag>": "skip"|"overwrite"
+        }
+    }
+
+    Returns:
+    {
+        "team": "...",
+        "added": [...],
+        "skipped": [...],
+        "overwritten": [...],
+        "errors": [...]
+    }
+    """
+    user_id = session.get("user_id", "")
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+
+    team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name)
+
+    body = request.get_json(force=True)
+    nodes = body.get("nodes", [])
+    create_if_missing = bool(body.get("create_if_missing", False))
+    resolutions = body.get("resolutions", {})  # {tag: "skip"|"overwrite"}
+
+    if not os.path.exists(team_dir):
+        if create_if_missing:
+            os.makedirs(team_dir, exist_ok=True)
+        else:
+            return jsonify({"error": "Team not found"}), 404
+
+    # Deduplicate nodes by tag (last one wins)
+    seen_tags = {}
+    for node in nodes:
+        tag = node.get("tag", "").strip()
+        if tag:
+            seen_tags[tag] = node
+    unique_nodes = list(seen_tags.values())
+
+    # Load existing members by tag
+    existing_expert_tags = {e["tag"] for e in _team_experts_load(user_id, team_name)}
+    existing_ia = _ia_load(user_id, team_name)
+    existing_ia_tags = {a["meta"].get("tag", "") for a in existing_ia}
+    ext_path = _team_openclaw_agents_path(user_id, team_name)
+    existing_ext = []
+    if os.path.isfile(ext_path):
+        with open(ext_path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+            if isinstance(raw, list):
+                existing_ext = raw
+    existing_ext_tags = {a.get("tag", "") for a in existing_ext}
+
+    added = []
+    skipped = []
+    overwritten = []
+    errors = []
+
+    # Track mutations
+    experts_dirty = False
+    ia_dirty = False
+    ext_dirty = False
+
+    experts = _team_experts_load(user_id, team_name)
+    ia_agents = existing_ia[:]
+    ext_agents = existing_ext[:]
+
+    for node in unique_nodes:
+        ntype = node.get("type", "")
+        tag = node.get("tag", "").strip()
+        name = node.get("name", "").strip()
+
+        if ntype == "expert":
+            conflict = tag in existing_expert_tags
+            resolution = resolutions.get(tag, "skip") if conflict else "add"
+            if resolution == "skip":
+                skipped.append({"tag": tag, "name": name, "type": ntype})
+                continue
+            new_entry = {
+                "name": name,
+                "tag": tag,
+                "persona": node.get("persona", ""),
+                "temperature": node.get("temperature", 0.7)
+            }
+            if resolution == "overwrite":
+                experts = [e for e in experts if e["tag"] != tag]
+                overwritten.append({"tag": tag, "name": name, "type": ntype})
+            else:
+                added.append({"tag": tag, "name": name, "type": ntype})
+            experts.append(new_entry)
+            experts_dirty = True
+
+        elif ntype == "session_agent":
+            conflict = tag in existing_ia_tags
+            resolution = resolutions.get(tag, "skip") if conflict else "add"
+            if resolution == "skip":
+                skipped.append({"tag": tag, "name": name, "type": ntype})
+                continue
+            new_sid = node.get("session", "") or (
+                __import__("random").randint(0, 0xffffffff).__format__("08x")
+            )
+            new_entry = {"session": new_sid, "meta": {"name": name, "tag": tag}}
+            if resolution == "overwrite":
+                ia_agents = [a for a in ia_agents if a["meta"].get("tag", "") != tag]
+                overwritten.append({"tag": tag, "name": name, "type": ntype})
+            else:
+                added.append({"tag": tag, "name": name, "type": ntype})
+            ia_agents.append(new_entry)
+            ia_dirty = True
+
+        elif ntype == "external":
+            conflict = tag in existing_ext_tags
+            resolution = resolutions.get(tag, "skip") if conflict else "add"
+            if resolution == "skip":
+                skipped.append({"tag": tag, "name": name, "type": ntype})
+                continue
+            new_entry = {
+                "name": name,
+                "tag": tag,
+                "global_name": node.get("global_name", name),
+                "meta": node.get("meta", {})
+            }
+            if resolution == "overwrite":
+                ext_agents = [a for a in ext_agents if a.get("tag", "") != tag]
+                overwritten.append({"tag": tag, "name": name, "type": ntype})
+            else:
+                added.append({"tag": tag, "name": name, "type": ntype})
+            ext_agents.append(new_entry)
+            ext_dirty = True
+
+    # Persist changes
+    try:
+        if experts_dirty:
+            _team_experts_save(user_id, team_name, experts)
+        if ia_dirty:
+            _ia_save(user_id, ia_agents, team_name)
+        if ext_dirty:
+            with open(ext_path, "w", encoding="utf-8") as f:
+                json.dump(ext_agents, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        errors.append(str(e))
+
+    return jsonify({
+        "team": team_name,
+        "added": added,
+        "skipped": skipped,
+        "overwritten": overwritten,
+        "errors": errors
+    })
 
 
 @app.route("/teams/snapshot/preview", methods=["POST"])
