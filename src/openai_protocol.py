@@ -1,3 +1,12 @@
+"""
+OpenAI 协议兼容辅助模块
+
+提供 OpenAI API 兼容的消息格式转换和响应编码：
+- 将 OpenAI 格式消息转换为 HumanMessage
+- 构建 OpenAI 兼容的响应和流式 chunks
+- 提取和格式化外部工具调用
+"""
+
 import json
 import os
 import time
@@ -10,7 +19,7 @@ from openai_models import ChatMessage
 
 
 class OpenAIProtocolHelper:
-    """OpenAI compatibility protocol helpers (message transform + response encoding)."""
+    """OpenAI 协议兼容辅助类，负责消息转换和响应编码。"""
 
     def __init__(
         self,
@@ -20,6 +29,11 @@ class OpenAIProtocolHelper:
         self.build_human_message = build_human_message
 
     def openai_msg_to_human_message(self, msg: ChatMessage) -> HumanMessage:
+        """将 OpenAI 格式的 ChatMessage 转换为 HumanMessage。
+
+        :param msg: OpenAI 格式的聊天消息
+        :return: LangChain HumanMessage 对象
+        """
         content = msg.content
         if content is None:
             return HumanMessage(content="(空消息)")
@@ -94,6 +108,10 @@ class OpenAIProtocolHelper:
 
     @staticmethod
     def make_completion_id() -> str:
+        """生成唯一的 completion ID。
+
+        :return: 格式为 "chatcmpl-<24位十六进制>" 的 ID
+        """
         return "chatcmpl-{suffix}".format(suffix=uuid.uuid4().hex[:24])
 
     def make_openai_response(
@@ -104,6 +122,14 @@ class OpenAIProtocolHelper:
         finish_reason: str = "stop",
         tool_calls: Optional[list] = None,
     ) -> Dict[str, Any]:
+        """构建 OpenAI 兼容的完整响应。
+
+        :param content: 回复内容文本
+        :param model: 模型名称
+        :param finish_reason: 完成原因（stop/tool_calls）
+        :param tool_calls: 工具调用列表
+        :return: OpenAI 格式的响应字典
+        """
         message: Dict[str, Any] = {"role": "assistant", "content": content}
         if tool_calls:
             message["tool_calls"] = tool_calls
@@ -130,6 +156,15 @@ class OpenAIProtocolHelper:
         finish_reason: Optional[str] = None,
         meta: Optional[dict] = None,
     ) -> str:
+        """构建 SSE 格式的流式 chunk。
+
+        :param completion_id: completion ID
+        :param content: delta 内容
+        :param model: 模型名称
+        :param finish_reason: 完成原因
+        :param meta: 元数据（如 round、type 等）
+        :return: SSE 格式的 chunk 字符串
+        """
         delta: Dict[str, Any] = {}
         if content:
             delta["content"] = content
@@ -152,6 +187,11 @@ class OpenAIProtocolHelper:
 
     @staticmethod
     def extract_external_tool_names(tools: Optional[list]) -> Set[str]:
+        """从工具定义列表中提取外部工具名称。
+
+        :param tools: OpenAI 格式的工具定义列表
+        :return: 外部工具名称集合
+        """
         if not tools:
             return set()
         names: Set[str] = set()
@@ -164,6 +204,12 @@ class OpenAIProtocolHelper:
 
     @staticmethod
     def format_tool_calls_for_openai(ai_msg: AIMessage, external_names: Set[str]) -> Optional[list]:
+        """将 AI 消息中的外部工具调用格式化为 OpenAI 格式。
+
+        :param ai_msg: LangChain AI 消息
+        :param external_names: 外部工具名称集合
+        :return: OpenAI 格式的工具调用列表
+        """
         if not hasattr(ai_msg, "tool_calls") or not ai_msg.tool_calls:
             return None
         external_calls = []
@@ -181,6 +227,13 @@ class OpenAIProtocolHelper:
 
     @staticmethod
     def make_tool_calls_chunk(*, completion_id: str, model: str, tool_calls: list) -> str:
+        """构建包含工具调用的 SSE chunk。
+
+        :param completion_id: completion ID
+        :param model: 模型名称
+        :param tool_calls: 工具调用列表
+        :return: SSE 格式的 chunk 字符串
+        """
         chunk = {
             "id": completion_id,
             "object": "chat.completion.chunk",
@@ -196,6 +249,10 @@ class OpenAIProtocolHelper:
 
     @staticmethod
     def list_models_payload() -> Dict[str, Any]:
+        """返回支持的模型列表负载。
+
+        :return: OpenAI models list 格式的字典
+        """
         return {
             "object": "list",
             "data": [{

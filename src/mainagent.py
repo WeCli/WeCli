@@ -1,3 +1,13 @@
+"""
+主 Agent 服务入口模块
+
+FastAPI 应用入口，整合所有路由和服务：
+- 初始化日志和请求 ID 中间件
+- 初始化数据库和用户认证
+- 注册所有 API 路由（session、group、system、settings、ops、openai）
+- 提供 CORS 支持
+"""
+
 import os
 import secrets
 import uuid
@@ -23,6 +33,7 @@ from ops_routes import create_ops_router
 from session_routes import create_session_router
 from settings_routes import create_settings_router
 from system_routes import create_system_router
+from teambot_routes import create_teambot_router
 from message_builder import build_human_message
 from logging_utils import get_logger, request_id_ctx
 
@@ -181,6 +192,14 @@ app.include_router(
     create_settings_router(
         env_path=env_path,
         verify_auth_or_token=verify_auth_or_token,
+    )
+)
+
+app.include_router(
+    create_teambot_router(
+        agent=agent,
+        verify_auth_or_token=verify_auth_or_token,
+        extract_text=_extract_text,
     )
 )
 

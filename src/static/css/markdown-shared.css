@@ -1,0 +1,81 @@
+.tc-markdown {
+    white-space: normal;
+    overflow: visible;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.tc-markdown > :first-child {
+    margin-top: 0 !important;
+}
+
+.tc-markdown > :last-child {
+    margin-bottom: 0 !important;
+}
+
+.tc-markdown p {
+    margin: 0 0 0.45em 0;
+}
+
+.tc-markdown ul,
+.tc-markdown ol {
+    margin: 0.35em 0;
+    padding-left: 1.5em;
+    list-style-position: outside;
+}
+
+.tc-markdown ul {
+    list-style-type: disc;
+}
+
+.tc-markdown ol {
+    list-style-type: decimal;
+}
+
+.tc-markdown ul ul {
+    list-style-type: circle;
+}
+
+.tc-markdown ul ul ul {
+    list-style-type: square;
+}
+
+.tc-markdown li {
+    margin: 0.22em 0;
+}
+
+.tc-markdown li > p {
+    margin: 0.2em 0;
+}
+
+.tc-markdown pre {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.tc-markdown pre code {
+    overflow-wrap: normal;
+    word-break: normal;
+}
+
+.tc-markdown table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+}
+
+.tc-markdown img {
+    max-width: 100%;
+    height: auto;
+}
+
+.msg-bubble.markdown-body.tc-markdown,
+.message-agent.markdown-body.tc-markdown,
+.group-msg-content.markdown-body.tc-markdown,
+.oasis-post-content.markdown-body.tc-markdown,
+.oasis-town-speech.markdown-body.tc-markdown,
+.oasis-conclusion-text.markdown-body.tc-markdown,
+.oasis-conclusion-content.markdown-body.tc-markdown {
+    overflow: visible;
+}

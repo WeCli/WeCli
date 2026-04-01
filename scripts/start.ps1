@@ -8,7 +8,7 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-TeamClawUtf8
 $python = Ensure-VenvPython -ProjectRoot $projectRoot
 $envPath = Join-Path $projectRoot "config\.env"
-$env:MINI_TIMEBOT_HEADLESS = "1"
+$env:TEAMBOT_HEADLESS = "1"
 
 if (-not (Test-Path $envPath)) {
     throw "config/.env is missing. Run selfskill\scripts\run.ps1 configure --init first."

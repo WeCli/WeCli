@@ -3,13 +3,16 @@
   "private": true,
   "version": "0.0.1",
   "scripts": {
-    "build:oasis-town": "node tools/build_oasis_town.mjs"
+    "build:oasis-town": "node tools/build_oasis_town.mjs",
+    "test:node": "node test/test_tinyfish_live_shared.js",
+    "test:browser-smoke": "playwright test --config playwright.config.mjs"
   },
   "dependencies": {
     "easystarjs": "^0.4.4",
     "phaser": "^3.90.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.0",
     "esbuild": "^0.25.3"
   }
 }

@@ -15,11 +15,15 @@ from session_models import (
     SessionStatusRequest,
 )
 from session_summary import build_session_summary
+from teambot_profiles import is_subagent_session
+from teambot_subagents import delete_subagent_by_session, delete_subagents_for_user
 
 logger = get_logger("session_service")
 
 
 class SessionService:
+    """会话管理服务，提供会话列表、状态、历史、删除等功能。"""
+
     def __init__(
         self,
         *,
@@ -34,6 +38,12 @@ class SessionService:
         self.extract_text = extract_text
 
     async def list_sessions(self, req: SessionListRequest, x_internal_token: str | None):
+        """获取用户的所有会话列表。
+
+        :param req: 会话列表请求
+        :param x_internal_token: 内部令牌（可选）
+        :return: 会话列表及状态
+        """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
         logger.info("list_sessions user=%s", req.user_id)
 
@@ -43,7 +53,9 @@ class SessionService:
         rows = await list_thread_ids_by_prefix(self.db_path, prefix)
 
         for thread_id in rows:
-            sid = thread_id[len(prefix):]
+            session_id = thread_id[len(prefix):]
+            if is_subagent_session(session_id):
+                continue
 
             config = {"configurable": {"thread_id": thread_id}}
             snapshot = await self.agent.agent_app.aget_state(config)
@@ -64,7 +76,7 @@ class SessionService:
                 continue
 
             sessions.append({
-                "session_id": sid,
+                "session_id": session_id,
                 "title": first_human,
                 "last_message": last_human,
                 "message_count": msg_count,
@@ -73,6 +85,12 @@ class SessionService:
         return {"status": "success", "sessions": sessions}
 
     async def sessions_status(self, req: SessionListRequest, x_internal_token: str | None):
+        """批量获取用户所有会话的运行状态。
+
+        :param req: 会话列表请求
+        :param x_internal_token: 内部令牌（可选）
+        :return: 各会话的 busy/pending 状态列表
+        """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
 
         prefix = f"{req.user_id}#"
@@ -80,9 +98,11 @@ class SessionService:
 
         result = []
         for thread_id, info in all_status.items():
-            sid = thread_id[len(prefix):]
+            session_id = thread_id[len(prefix):]
+            if is_subagent_session(session_id):
+                continue
             result.append({
-                "session_id": sid,
+                "session_id": session_id,
                 "busy": info["busy"],
                 "source": info["source"],       # "user" | "system" | ""
                 "pending_system": info["pending_system"],
@@ -91,6 +111,12 @@ class SessionService:
         return {"status": "success", "sessions": result}
 
     async def get_session_history(self, req: SessionHistoryRequest, x_internal_token: str | None):
+        """获取指定会话的消息历史。
+
+        :param req: 会话历史请求
+        :param x_internal_token: 内部令牌（可选）
+        :return: 消息历史列表
+        """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
 
         thread_id = f"{req.user_id}#{req.session_id}"
@@ -102,15 +128,15 @@ class SessionService:
 
         msgs = snapshot.values.get("messages", [])
         result = []
-        for m in msgs:
-            msg_type = type(m).__name__
+        for msg in msgs:
+            msg_type = type(msg).__name__
             if msg_type == "HumanMessage":
-                result.append({"role": "user", "content": m.content})
+                result.append({"role": "user", "content": msg.content})
             elif msg_type == "AIMessage":
-                content = self.extract_text(m.content)
+                content = self.extract_text(msg.content)
                 tool_calls = []
-                if hasattr(m, "tool_calls") and m.tool_calls:
-                    for tc in m.tool_calls:
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    for tc in msg.tool_calls:
                         tool_calls.append({
                             "name": tc.get("name", ""),
                             "args": tc.get("args", {}),
@@ -121,8 +147,8 @@ class SessionService:
                         entry["tool_calls"] = tool_calls
                     result.append(entry)
             elif msg_type == "ToolMessage":
-                content = self.extract_text(m.content)
-                tool_name = getattr(m, "name", "")
+                content = self.extract_text(msg.content)
+                tool_name = getattr(msg, "name", "")
                 result.append({
                     "role": "tool",
                     "content": content,
@@ -132,6 +158,12 @@ class SessionService:
         return {"status": "success", "messages": result}
 
     async def delete_session(self, req: DeleteSessionRequest, x_internal_token: str | None):
+        """删除指定会话或用户的所有会话。
+
+        :param req: 删除会话请求
+        :param x_internal_token: 内部令牌（可选）
+        :return: 删除操作结果
+        """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
         logger.info("delete_session user=%s session=%s", req.user_id, req.session_id or "ALL")
 
@@ -142,6 +174,8 @@ class SessionService:
 
                 thread_id = f"{req.user_id}#{req.session_id}"
                 await delete_thread_records(self.db_path, thread_id)
+                if is_subagent_session(req.session_id):
+                    delete_subagent_by_session(req.user_id, req.session_id)
                 return {"status": "success", "message": f"会话 {req.session_id} 已删除"}
 
             prefix = f"{req.user_id}#"
@@ -151,16 +185,27 @@ class SessionService:
 
             pattern = f"{req.user_id}#%"
             await delete_thread_records_like(self.db_path, pattern)
+            delete_subagents_for_user(req.user_id)
             return {"status": "success", "message": f"用户 {req.user_id} 的所有会话已删除"}
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"删除失败: {e}")
 
     async def session_status(self, req: SessionStatusRequest, x_internal_token: str | None):
+        """查询指定会话的实时状态。
+
+        :param req: 会话状态请求
+        :param x_internal_token: 内部令牌（可选）
+        :return: 会话的 pending/busy 状态
+        """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
         thread_id = f"{req.user_id}#{req.session_id}"
         has_new = self.agent.has_pending_system_messages(thread_id)
         busy = self.agent.is_thread_busy(thread_id)
-        pending_count = self.agent.consume_pending_system_messages(thread_id) if has_new else 0
+        pending_count = (
+            self.agent.consume_pending_system_messages(thread_id)
+            if has_new and not req.peek
+            else 0
+        )
         busy_source = self.agent.get_thread_busy_source(thread_id) if busy else ""
         return {
             "has_new_messages": has_new,

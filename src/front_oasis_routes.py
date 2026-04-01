@@ -1,3 +1,11 @@
+"""
+Flask 前端 OASIS 论坛代理路由模块
+
+为 Flask 前端提供 OASIS 论坛相关的代理路由：
+- /proxy_oasis/topics：代理话题列表/创建
+- /proxy_oasis/topics/<topic_id>：代理话题详情
+"""
+
 from flask import Response, jsonify, request, session
 import requests
 
@@ -94,6 +102,38 @@ def register_oasis_routes(app, *, oasis_base_url: str) -> None:
             return jsonify(r.json()), r.status_code
         except Exception as e:
             logger.warning("Error submitting human reply to topic %s for user=%s: %s", topic_id, user_id, e)
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/proxy_oasis/topics/<topic_id>/swarm/refresh", methods=["POST"])
+    def proxy_oasis_refresh_topic_swarm(topic_id):
+        user_id = session.get("user_id", "")
+        try:
+            r = requests.post(
+                "{base}/topics/{topic_id}/swarm/refresh".format(base=oasis_base_url, topic_id=topic_id),
+                params={"user_id": user_id},
+                timeout=30,
+            )
+            return jsonify(r.json()), r.status_code
+        except Exception as e:
+            logger.warning("Error refreshing swarm for topic %s for user=%s: %s", topic_id, user_id, e)
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/proxy_oasis/topics/<topic_id>/report/ask", methods=["POST"])
+    def proxy_oasis_ask_topic_report(topic_id):
+        user_id = session.get("user_id", "")
+        try:
+            headers = {"Content-Type": "application/json"}
+            body = request.get_json(silent=True) or {}
+            body["user_id"] = user_id
+            r = requests.post(
+                "{base}/topics/{topic_id}/report/ask".format(base=oasis_base_url, topic_id=topic_id),
+                json=body,
+                headers=headers,
+                timeout=60,
+            )
+            return jsonify(r.json()), r.status_code
+        except Exception as e:
+            logger.warning("Error asking report for topic %s for user=%s: %s", topic_id, user_id, e)
             return jsonify({"error": str(e)}), 500
 
     @app.route("/proxy_oasis/topics/<topic_id>/stream")

@@ -1,14 +1,18 @@
 """
-OASIS Forum - Thread-safe discussion board with persistence
+OASIS Forum - 线程安全的讨论论坛（带持久化）
+
+提供帖子发布、投票、浏览等操作，支持多专家并发访问。
 """
 
 import asyncio
+import inspect
 import json
 import os
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
-# Persistence directory (relative to project root)
+# 持久化存储目录（相对于项目根目录）
 _this_dir = os.path.dirname(os.path.abspath(__file__))
 _project_root = os.path.dirname(_this_dir)
 DISCUSSIONS_DIR = os.path.join(_project_root, "data", "oasis_discussions")
@@ -16,14 +20,15 @@ DISCUSSIONS_DIR = os.path.join(_project_root, "data", "oasis_discussions")
 
 @dataclass
 class TimelineEvent:
-    """A timestamped event in the discussion lifecycle."""
-    elapsed: float          # seconds since discussion started
-    event: str              # e.g. "start", "agent_call", "agent_done", "round", "conclude"
-    agent: str = ""         # expert name (if applicable)
-    detail: str = ""        # extra info
+    """讨论生命周期中的带时间戳事件"""
+    elapsed: float   # 距离讨论开始的秒数
+    event: str       # 事件类型，如 "start", "agent_call", "agent_done", "round", "conclude"
+    agent: str = ""  # 关联的专家名称（如适用）
+    detail: str = "" # 附加信息
+    seq: int = 0     # topic 内事件序号，便于增量 GraphRAG 同步
 
     def to_dict(self) -> dict:
-        return {"elapsed": round(self.elapsed, 2), "event": self.event,
+        return {"seq": self.seq, "elapsed": round(self.elapsed, 2), "event": self.event,
                 "agent": self.agent, "detail": self.detail}
 
     @classmethod
@@ -100,8 +105,8 @@ class PendingHumanReply:
 
 class DiscussionForum:
     """
-    Thread-safe shared discussion board for a single topic.
-    All experts read/write through this instance concurrently.
+    线程安全的单主题共享讨论板。
+    所有专家通过此实例并发读写。
     """
 
     def __init__(self, topic_id: str, question: str, user_id: str = "anonymous", max_rounds: int = 5):
@@ -122,27 +127,77 @@ class DiscussionForum:
         self._counter = 0
         self.pending_human: PendingHumanReply | None = None
         self._waiting_experts: set[str] = set()  # 当前 round 在等待 callback 的 expert 集合
+        self.schedule_yaml: str | None = None  # 原始 workflow/schedule，供 world refresh 使用
+        self.team: str = ""
+        self.swarm_mode: str = ""
+        self.swarm: dict[str, Any] | None = None
+        self._event_counter = 0
+        self._post_hooks: list = []
+        self._event_hooks: list = []
 
     def start_clock(self):
-        """Mark the discussion start time (T=0 for all elapsed calculations)."""
+        """标记讨论开始时间（T=0，用于所有 elapsed 计算）"""
         self._start_time = time.time()
         self.log_event("start", detail="Discussion started")
 
     def elapsed(self) -> float:
-        """Seconds since start_clock(), or 0 if not started."""
+        """返回从 start_clock() 起的秒数，未开始则返回 0"""
         if self._start_time <= 0:
             return 0.0
         return time.time() - self._start_time
 
     def log_event(self, event: str, agent: str = "", detail: str = ""):
-        """Append a timestamped event to the timeline."""
-        ev = TimelineEvent(elapsed=self.elapsed(), event=event, agent=agent, detail=detail)
+        """向时间线追加带时间戳的事件"""
+        self._event_counter += 1
+        ev = TimelineEvent(
+            seq=self._event_counter,
+            elapsed=self.elapsed(),
+            event=event,
+            agent=agent,
+            detail=detail,
+        )
         self.timeline.append(ev)
         print(f"  [OASIS] ⏱ T+{ev.elapsed:.1f}s  {event}"
               + (f"  [{agent}]" if agent else "")
               + (f"  {detail}" if detail else ""))
+        self._dispatch_event_hooks(ev)
 
-    # ── Serialisation ──
+    def register_post_hook(self, callback):
+        if callback not in self._post_hooks:
+            self._post_hooks.append(callback)
+
+    def register_event_hook(self, callback):
+        if callback not in self._event_hooks:
+            self._event_hooks.append(callback)
+
+    async def _run_post_hooks(self, post: "Post"):
+        for callback in list(self._post_hooks):
+            try:
+                result = callback(self, post)
+                if inspect.isawaitable(result):
+                    await result
+            except Exception as exc:
+                print(f"[OASIS] ⚠️ post hook failed: {exc}")
+
+    def _dispatch_event_hooks(self, event: TimelineEvent):
+        if not self._event_hooks:
+            return
+
+        async def _runner():
+            for callback in list(self._event_hooks):
+                try:
+                    result = callback(self, event)
+                    if inspect.isawaitable(result):
+                        await result
+                except Exception as exc:
+                    print(f"[OASIS] ⚠️ event hook failed: {exc}")
+
+        try:
+            asyncio.get_running_loop().create_task(_runner())
+        except RuntimeError:
+            return
+
+    # ── 序列化 ──
 
     def to_dict(self) -> dict:
         return {
@@ -156,6 +211,10 @@ class DiscussionForum:
             "conclusion": self.conclusion,
             "status": self.status,
             "discussion": self.discussion,
+            "schedule_yaml": self.schedule_yaml,
+            "team": self.team,
+            "swarm_mode": self.swarm_mode,
+            "swarm": self.swarm,
             "created_at": self.created_at,
             "pending_human": self.pending_human.to_dict() if self.pending_human else None,
         }
@@ -172,6 +231,10 @@ class DiscussionForum:
         forum.conclusion = d.get("conclusion")
         forum.status = d.get("status", "concluded")
         forum.discussion = d.get("discussion", True)
+        forum.schedule_yaml = d.get("schedule_yaml")
+        forum.team = d.get("team", "")
+        forum.swarm_mode = d.get("swarm_mode", "")
+        forum.swarm = d.get("swarm")
         forum.created_at = d.get("created_at", 0)
         forum.posts = [Post.from_dict(p) for p in d.get("posts", [])]
         forum.timeline = [TimelineEvent.from_dict(e) for e in d.get("timeline", [])]
@@ -179,9 +242,10 @@ class DiscussionForum:
         if isinstance(pending_human, dict) and pending_human.get("node_id"):
             forum.pending_human = PendingHumanReply.from_dict(pending_human)
         forum._counter = max((p.id for p in forum.posts), default=0)
+        forum._event_counter = max((e.seq for e in forum.timeline), default=0)
         return forum
 
-    # ── Persistence ──
+    # ── 持久化 ──
 
     def _storage_path(self) -> str:
         user_dir = os.path.join(DISCUSSIONS_DIR, self.user_id)
@@ -189,14 +253,14 @@ class DiscussionForum:
         return os.path.join(user_dir, f"{self.topic_id}.json")
 
     def save(self):
-        """Persist current state to disk."""
+        """将当前状态持久化到磁盘"""
         path = self._storage_path()
         with open(path, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, ensure_ascii=False, indent=2)
 
     @classmethod
     def load_all(cls) -> dict[str, "DiscussionForum"]:
-        """Load all persisted discussions from disk. Returns {topic_id: forum}."""
+        """从磁盘加载所有已持久化的讨论。返回 {topic_id: forum}"""
         result: dict[str, DiscussionForum] = {}
         if not os.path.isdir(DISCUSSIONS_DIR):
             return result
@@ -213,7 +277,7 @@ class DiscussionForum:
                     forum = cls.from_dict(data)
                     result[forum.topic_id] = forum
                 except Exception as e:
-                    print(f"[OASIS] ⚠️ Failed to load {fname}: {e}")
+                    print(f"[OASIS] ⚠️ 加载 {fname} 失败: {e}")
         return result
 
     async def publish(
@@ -237,6 +301,7 @@ class DiscussionForum:
             )
             self.posts.append(post)
             self._changed.notify_all()
+            await self._run_post_hooks(post)
             return post
 
     async def vote(self, voter: str, post_id: int, direction: str):
@@ -258,13 +323,13 @@ class DiscussionForum:
         visible_authors: set[str] | None = None,
         from_round: int | None = None,
     ) -> list[Post]:
-        """Browse posts with optional visibility filtering.
+        """浏览帖子，支持可选的可见性过滤
 
         Args:
-            viewer: Current viewer's name.
-            exclude_self: If True, exclude the viewer's own posts.
-            visible_authors: If set, only include posts by these authors (execute mode DAG).
-            from_round: If set, only include posts from this round onward (execute mode non-DAG).
+            viewer: 当前查看者名称
+            exclude_self: 是否排除查看者自己的帖子
+            visible_authors: 如果设置，只包含这些作者的帖子（执行模式DAG）
+            from_round: 如果设置，只包含此轮及之后的帖子（执行模式非DAG）
         """
         async with self._lock:
             result = list(self.posts)
@@ -277,7 +342,7 @@ class DiscussionForum:
             return result
 
     async def get_top_posts(self, n: int = 3) -> list[Post]:
-        """Get the top N posts ranked by net upvotes."""
+        """获取按净点赞数排名前N的帖子"""
         async with self._lock:
             return sorted(
                 self.posts,
@@ -286,7 +351,7 @@ class DiscussionForum:
             )[:n]
 
     async def get_post_count(self) -> int:
-        """Get total number of posts."""
+        """获取帖子总数"""
         async with self._lock:
             return len(self.posts)
 
@@ -445,7 +510,6 @@ class DiscussionForum:
                     ):
                         return self._find(pending.submitted_post_id)
                     return None
-
     def _find(self, post_id: int) -> Post | None:
-        """Find a post by ID (caller must hold lock)."""
+        """根据ID查找帖子（调用者须持有锁）"""
         return next((p for p in self.posts if p.id == post_id), None)

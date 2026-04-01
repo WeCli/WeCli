@@ -1,9 +1,11 @@
 """
-Factory helpers for creating the shared LangChain chat model instance.
+LLM 模型工厂模块
 
-This module supports provider-specific SDKs when available and falls back to
-OpenAI-compatible routing for the rest. It also normalizes OpenAI base URLs so
-users can provide either a root URL or a full endpoint URL.
+创建和管理共享的 LangChain 聊天模型实例：
+- 支持多种 provider（OpenAI、Anthropic、Google、DeepSeek）
+- 自动推断 provider（根据模型名、API URL、API Key 前缀）
+- 标准化 OpenAI 兼容的 base URL
+- 提供 TTS/STT 默认配置
 """
 
 from __future__ import annotations
@@ -15,7 +17,11 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 
 def extract_text(content) -> str:
-    """Convert provider-specific message payloads into plain text."""
+    """将 provider 特定的消息内容转换为纯文本。
+
+    :param content: 消息内容（可能是字符串、列表或字典）
+    :return: 纯文本字符串
+    """
     if isinstance(content, str):
         return content
 
@@ -59,6 +65,7 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "openai": "openai",
     "anthropic": "anthropic",
     "deepseek": "deepseek",
+    "ollama": "ollama",
     "antigravity": "openai",  # Antigravity reverse-proxy → OpenAI-compatible
     "minimax": "openai",      # MiniMax API → OpenAI-compatible
 }
@@ -71,6 +78,8 @@ _BASE_URL_PROVIDER_PATTERNS: tuple[tuple[str, str], ...] = (
     ("googleapis.com", "google"),
     ("127.0.0.1:8045", "openai"),  # Antigravity-Manager default endpoint
     ("localhost:8045", "openai"),   # Antigravity-Manager default endpoint
+    ("127.0.0.1:11434", "ollama"),  # Ollama OpenAI-compatible endpoint
+    ("localhost:11434", "ollama"),  # Ollama OpenAI-compatible endpoint
     ("api.minimaxi.com", "openai"),  # MiniMax API endpoint
 )
 
@@ -83,6 +92,11 @@ _AUDIO_DEFAULTS: dict[str, dict[str, str]] = {
     "google": {
         "tts_model": "gemini-2.5-flash-preview-tts",
         "tts_voice": "charon",
+        "stt_model": "",
+    },
+    "ollama": {
+        "tts_model": "",
+        "tts_voice": "",
         "stt_model": "",
     },
 }
@@ -150,6 +164,14 @@ def infer_provider(
     provider: str = "",
     api_key: str = "",
 ) -> str:
+    """根据模型名、base_url、api_key 自动推断 provider。
+
+    :param model: 模型名称
+    :param base_url: API base URL
+    :param provider: 显式指定的 provider
+    :param api_key: API key（用于通过前缀推断）
+    :return: provider 名称（openai/anthropic/google/deepseek/ollama）
+    """
     normalized_provider = _normalize_provider_name(provider)
     if normalized_provider:
         return normalized_provider
@@ -174,6 +196,11 @@ def infer_provider(
 
 
 def get_provider_audio_defaults(provider: str) -> dict[str, str]:
+    """获取 provider 对应的音频（TTS/STT）默认模型配置。
+
+    :param provider: provider 名称
+    :return: 包含 tts_model、tts_voice、stt_model 的字典
+    """
     normalized_provider = _normalize_provider_name(provider)
     if not normalized_provider:
         return {"tts_model": "", "tts_voice": "", "stt_model": ""}
@@ -191,25 +218,40 @@ def create_chat_model(
     base_url: str | None = None,
     provider: str | None = None,
 ) -> BaseChatModel:
-    """
-    Create a chat model from TeamClaw environment variables.
+    """从环境变量创建聊天模型实例。
 
-    When *model*, *api_key*, *base_url*, or *provider* are explicitly passed
-    they take precedence over the global ``LLM_*`` environment variables.
-    This allows per-expert / per-team-member model overrides.
+    当 *model*、*api_key*、*base_url* 或 *provider* 显式传入时，
+    优先使用传入值而非全局 LLM_* 环境变量，支持 per-expert/per-team-member 的模型覆盖。
 
-    Required env vars (used as fallback when arguments are ``None``):
+    必需的环境变量（作为回退）：
       - LLM_API_KEY
       - LLM_MODEL
-      - LLM_BASE_URL (optional for providers with hosted defaults)
-    """
-    api_key = (api_key or "").strip() or os.getenv("LLM_API_KEY")
-    base_url = (base_url or "").strip() or os.getenv("LLM_BASE_URL", "https://api.deepseek.com").strip()
-    model = (model or "").strip() or (os.getenv("LLM_MODEL") or "").strip()
-    provider = (provider or "").strip().lower() or os.getenv("LLM_PROVIDER", "").strip().lower()
+      - LLM_BASE_URL（部分 provider 有默认值）
 
-    if not api_key:
-        raise ValueError("LLM_API_KEY is not configured.")
+    :param temperature: 生成温度
+    :param max_tokens: 最大 token 数
+    :param timeout: 超时时间（秒）
+    :param max_retries: 最大重试次数
+    :param model: 模型名称（优先于 env）
+    :param api_key: API key（优先于 env）
+    :param base_url: API base URL（优先于 env）
+    :param provider: provider 名称（优先于 env）
+    :return: LangChain 聊天模型实例
+    """
+    explicit_api_key = (api_key or "").strip()
+    explicit_base_url = (base_url or "").strip()
+    explicit_model = (model or "").strip()
+    explicit_provider = (provider or "").strip().lower()
+
+    env_api_key = (os.getenv("LLM_API_KEY") or "").strip()
+    env_base_url = os.getenv("LLM_BASE_URL", "https://api.deepseek.com").strip()
+    env_model = (os.getenv("LLM_MODEL") or "").strip()
+    env_provider = os.getenv("LLM_PROVIDER", "").strip().lower()
+
+    api_key = explicit_api_key or env_api_key
+    base_url = explicit_base_url or env_base_url
+    model = explicit_model or env_model
+    provider = explicit_provider or env_provider
     if not model:
         raise ValueError(
             "LLM_MODEL is not configured. Set it in config/.env, or run "
@@ -224,6 +266,18 @@ def create_chat_model(
         provider=provider,
         api_key=api_key,
     )
+
+    if provider == "ollama":
+        env_base_url_is_ollama = infer_provider(
+            model=model,
+            base_url=env_base_url,
+            provider=env_provider,
+            api_key=env_api_key,
+        ) == "ollama"
+        base_url = explicit_base_url or (env_base_url if env_base_url_is_ollama else "http://127.0.0.1:11434")
+        api_key = explicit_api_key or (env_api_key if env_base_url_is_ollama or env_provider == "ollama" else "") or "ollama"
+    elif not api_key:
+        raise ValueError("LLM_API_KEY is not configured.")
 
     if provider == "google":
         from langchain_google_genai import ChatGoogleGenerativeAI

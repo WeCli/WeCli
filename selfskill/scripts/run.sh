@@ -2,8 +2,8 @@
 # TeamBot skill 入口脚本（供外部 agent 非交互式调用）
 #
 # 用法:
-#   bash selfskill/scripts/run.sh start                          # 后台启动服务
-#   bash selfskill/scripts/run.sh start-foreground               # 前台启动服务（适合受管终端 / CI / agent runner）
+#   bash selfskill/scripts/run.sh start                          # 后台启动服务（会自动拉起已安装的 OpenClaw gateway）
+#   bash selfskill/scripts/run.sh start-foreground               # 前台启动服务（适合受管终端 / CI / agent runner；同样会自动拉起 OpenClaw）
 #   bash selfskill/scripts/run.sh stop                           # 停止服务
 #   bash selfskill/scripts/run.sh status                         # 检查服务状态
 #   bash selfskill/scripts/run.sh start-tunnel                   # 启动公网隧道（自动下载+暴露前端）
@@ -15,6 +15,7 @@
 #   bash selfskill/scripts/run.sh configure --batch K1=V1 K2=V2  # 批量设置配置
 #   bash selfskill/scripts/run.sh configure --show               # 查看当前配置
 #   bash selfskill/scripts/run.sh configure --init               # 从模板初始化 .env
+#   bash selfskill/scripts/run.sh sync-openclaw-llm              # 将 TeamClaw 当前 LLM 配置回写到 OpenClaw
 #   bash selfskill/scripts/run.sh check-openclaw                 # 检测/安装 OpenClaw
 #   bash selfskill/scripts/run.sh cli chat "你好"                # CLI: 发送消息
 #   bash selfskill/scripts/run.sh cli sessions                   # CLI: 查看会话
@@ -59,6 +60,19 @@ fi
 # 激活虚拟环境
 if [ -f .venv/bin/activate ]; then
     source .venv/bin/activate
+else
+    echo "❌ 虚拟环境 .venv 不存在，请先运行: bash selfskill/scripts/run.sh setup" >&2
+    exit 1
+fi
+
+# 验证 Python 版本（防止 venv 损坏或系统 python 泄漏）
+_PY_VER=$(python -c "import sys; print('{}.{}'.format(*sys.version_info[:2]))" 2>/dev/null || echo "0.0")
+_PY_MAJOR=$(echo "$_PY_VER" | cut -d. -f1)
+if [ "$_PY_MAJOR" -lt 3 ]; then
+    echo "❌ 虚拟环境中的 python 版本异常: Python $_PY_VER ($(which python))" >&2
+    echo "   本项目需要 Python 3.11+。请删除 .venv 并重新创建:" >&2
+    echo "   rm -rf .venv && bash selfskill/scripts/run.sh setup" >&2
+    exit 1
 fi
 
 # 确保依赖已安装（通过检查关键包是否可导入来决定是否需要安装）
@@ -68,7 +82,7 @@ if ! python -c "import fastapi" &>/dev/null; then
     echo "✅ 依赖安装完成"
 fi
 
-PIDFILE="$PROJECT_ROOT/.mini_timebot.pid"
+PIDFILE="$PROJECT_ROOT/.teamclaw.pid"
 TEAMCLAW_SERVICE_PATTERNS=(
     "scripts/launcher.py"
     "src/time.py"
@@ -286,10 +300,9 @@ case "${1:-help}" in
             python selfskill/scripts/configure.py --init
         fi
 
-        # NOTE: OpenClaw / Antigravity detection is now handled by the
-        # frontend first-login Setup Wizard, not silently at start time.
-        # Users can click "从 OpenClaw 导入" or "使用 Antigravity" buttons
-        # in the wizard to import configuration interactively.
+        # NOTE: 启动时会自动预热已安装的 OpenClaw gateway，并刷新 OPENCLAW_*
+        # runtime 配置，但不会静默改写 TeamClaw 的 LLM 配置。导入 OpenClaw /
+        # 切换 Antigravity 仍然由首次登录向导和设置页按钮负责。
 
         stop_teamclaw_service_processes || true
         rm -f "$PIDFILE"
@@ -426,6 +439,17 @@ case "${1:-help}" in
                 echo "  ⚠️  端口 $port 未监听"
             fi
         done
+        OPENCLAW_CLI=$(resolve_openclaw_cli || true)
+        if [ -n "$OPENCLAW_CLI" ]; then
+            OPENCLAW_RUNTIME=$("$OPENCLAW_CLI" gateway status 2>&1 | sed -n 's/^Runtime: //p' | head -n 1)
+            if [ -n "$OPENCLAW_RUNTIME" ]; then
+                echo "  🦞 OpenClaw Runtime: $OPENCLAW_RUNTIME"
+            else
+                echo "  🦞 OpenClaw 已安装（运行状态未探测到）"
+            fi
+        else
+            echo "  🦞 OpenClaw 未安装"
+        fi
         print_wsl_access_hint
         print_magic_link
         echo ""
@@ -436,6 +460,15 @@ case "${1:-help}" in
     setup)
         echo "=== 环境配置 ==="
         bash scripts/setup_env.sh
+
+        # acpx 自检（setup_env.sh 已处理安装，这里做最终确认）
+        if command -v acpx &>/dev/null; then
+            echo "✅ acpx 已就绪: $(acpx --version 2>/dev/null || echo 'available')"
+        else
+            echo "⚠️  acpx 未安装（ACP 外部 Agent 通信功能不可用）"
+            echo "   手动安装: npm install -g acpx@latest"
+        fi
+
         echo "=== 环境配置完成 ==="
         ;;
 
@@ -467,6 +500,11 @@ case "${1:-help}" in
         # 查询 API 可用模型列表（打印供 agent 选择，不自动写入）
         python selfskill/scripts/configure.py --auto-model
         exit 0
+        ;;
+
+    sync-openclaw-llm)
+        python selfskill/scripts/configure_openclaw.py --sync-teamclaw-llm
+        exit $?
         ;;
 
     cli)
@@ -782,8 +820,8 @@ case "${1:-help}" in
         echo "用法: bash selfskill/scripts/run.sh <command> [args]"
         echo ""
         echo "命令:"
-        echo "  start                          后台启动服务"
-        echo "  start-foreground               前台启动服务（适合受管终端 / CI / agent runner）"
+        echo "  start                          后台启动服务（自动预热已安装的 OpenClaw gateway）"
+        echo "  start-foreground               前台启动服务（适合受管终端 / CI / agent runner；同样自动预热 OpenClaw）"
         echo "  stop                           停止服务"
         echo "  status                         检查服务状态"
         echo "  start-tunnel                   启动公网隧道（自动下载 cloudflared）"
@@ -796,6 +834,7 @@ case "${1:-help}" in
         echo "  configure --show               查看当前配置"
         echo "  configure --init               从模板初始化 .env"
         echo "  auto-model                     查询 API 可用模型列表（供 agent 选择）"
+        echo "  sync-openclaw-llm              将 TeamClaw 当前 LLM 配置回写到 OpenClaw"
         echo "  check-openclaw                 检测/安装 OpenClaw 并自动配置集成"
         echo "  check-openclaw-weixin          检测/安装 OpenClaw 微信插件并提示扫码/绑定"
         echo "  bind-openclaw-channel <agent> <bind_key>  绑定 OpenClaw channel 到指定 agent"

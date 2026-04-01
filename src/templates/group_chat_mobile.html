@@ -18,6 +18,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='js/snapshot_zip_progress.js') }}?v=20260331-progress"></script>
+<link rel="stylesheet" href="/static/css/markdown-shared.css">
+<script src="/static/js/markdown-shared.js"></script>
+<script src="/static/js/tinyfish-live-shared.js"></script>
 <style>
   /* ── Reset & Variables ── */
   :root {
@@ -1886,8 +1889,114 @@
   }
   .settings-btn-restart:active { opacity: .85; }
   .settings-btn-restart:disabled { opacity: 0.5; cursor: not-allowed; }
+  .top-inline-banner {
+    width: 100%;
+    max-width: 480px;
+    flex-shrink: 0;
+  }
+  .local-password-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+    color: #fff7ed;
+    font-size: 13px;
+    line-height: 1.45;
+    box-shadow: 0 4px 18px rgba(146, 64, 14, 0.18);
+  }
+  .local-password-banner-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .local-password-banner-title {
+    font-weight: 700;
+  }
+  .local-password-banner-text {
+    font-size: 12px;
+    opacity: 0.96;
+  }
+  .local-password-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .local-password-banner-btn,
+  .local-password-banner-close {
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .local-password-banner-btn {
+    padding: 7px 12px;
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .local-password-banner-close {
+    width: 30px;
+    height: 30px;
+    background: rgba(255,255,255,0.16);
+    color: #fff;
+    font-size: 14px;
+  }
+  .settings-user-password-card {
+    padding: 6px 0 2px;
+  }
+  .settings-user-password-topline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .settings-user-password-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #fff7ed;
+    color: #b45309;
+    border: 1px solid #fed7aa;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .settings-user-password-help {
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  .settings-user-password-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .settings-inline-status {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .settings-inline-status.is-error {
+    color: #dc2626;
+  }
+  .settings-inline-status.is-success {
+    color: #16a34a;
+  }
   @media (max-width: 768px) {
     .settings-modal { width: 100%; max-width: 100%; max-height: 100vh; border-radius: 0; }
+    .local-password-banner {
+      padding: 10px 12px;
+    }
+    .local-password-banner-actions {
+      align-self: flex-start;
+    }
   }
 </style>
 </head>
@@ -1895,9 +2004,19 @@
 <div class="body-layout">
 
 <!-- LLM 未配置警告横幅（放在 app-container 外面，避免被绝对定位 tab-page 遮挡） -->
-<div id="llm-warning-banner" style="display:none;width:100%;max-width:480px;padding:10px 16px;background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;font-size:14px;text-align:center;cursor:pointer;z-index:99999;" onclick="openSettings('llm')">
+<div id="llm-warning-banner" class="top-inline-banner" style="display:none;padding:10px 16px;background:linear-gradient(90deg,#dc2626,#b91c1c);color:#fff;font-size:14px;text-align:center;cursor:pointer;z-index:99999;" onclick="openSettings('llm')">
   ⚠️ <span data-i18n="llm_not_configured">LLM API 未配置，请先前往设置填写 API Key</span>
   <span style="font-size:12px;opacity:0.85;margin-left:4px;">→</span>
+</div>
+<div id="local-password-banner" class="top-inline-banner local-password-banner">
+  <div class="local-password-banner-copy">
+    <div id="local-password-banner-title" class="local-password-banner-title">已使用本机免密登录</div>
+    <div id="local-password-banner-text" class="local-password-banner-text"></div>
+  </div>
+  <div class="local-password-banner-actions">
+    <button id="local-password-banner-action" class="local-password-banner-btn" type="button" onclick="openSettingsToPassword()">去设置</button>
+    <button class="local-password-banner-close" type="button" onclick="dismissLocalPasswordBanner(); event.stopPropagation();" aria-label="Close">✕</button>
+  </div>
 </div>
 
 <div class="app-container">
@@ -2038,10 +2157,10 @@
       <!-- Hub 导入展开区 -->
       <div id="contacts-hub-import-area" style="display:none;margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);">
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;" data-i18n="paste_hub_cmd">粘贴从 Hub 复制的下载命令：</div>
-        <textarea id="contacts-hub-curl-input" placeholder="curl -L 'https://flowhub-mu.vercel.app/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
+        <textarea id="contacts-hub-curl-input" placeholder="curl -L 'https://teamclawhub.com/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button onclick="window.open('https://flowhub-mu.vercel.app','_blank')" style="flex:1;padding:8px;background:var(--bg-card);color:#07c160;border:1px solid #07c160;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
-          <button onclick="importFromHubContacts()" style="flex:1;padding:8px;background:#07c160;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="download_import">📥 下载并导入</button>
+          <button onclick="openTeamHub()" style="flex:1;padding:8px;background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
+          <button onclick="importFromHubContacts()" style="flex:1;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="download_import">📥 下载并导入</button>
         </div>
       </div>
       <!-- 选项2: 上传导入 -->
@@ -2088,11 +2207,21 @@
       </div>
     </div>
     <div class="discover-section">
-      <div class="discover-card" onclick="window.open('https://flowhub-mu.vercel.app','_blank')">
+      <div class="discover-card" onclick="openTeamHub()">
         <div class="discover-card-icon">🌐</div>
         <div class="discover-card-body">
           <div class="discover-card-title" data-i18n="tab_team_hub">Team Hub</div>
           <div class="discover-card-desc" data-i18n="discover_hub_desc">浏览社区分享的团队配置</div>
+        </div>
+        <div class="discover-card-arrow">›</div>
+      </div>
+    </div>
+    <div class="discover-section">
+      <div class="discover-card" onclick="openTeamCreator()">
+        <div class="discover-card-icon">🛠️</div>
+        <div class="discover-card-body">
+          <div class="discover-card-title" data-i18n="team_creator">Team Creator</div>
+          <div class="discover-card-desc" data-i18n="discover_creator_desc">创建并发布新的团队页面</div>
         </div>
         <div class="discover-card-arrow">›</div>
       </div>
@@ -2250,10 +2379,10 @@
         <!-- Hub 导入展开区 -->
         <div id="hub-import-area" style="display:none;margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);">
           <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;" data-i18n="paste_hub_cmd">粘贴从 Hub 复制的下载命令：</div>
-          <textarea id="hub-curl-input" placeholder="curl -L 'https://flowhub-mu.vercel.app/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
+          <textarea id="hub-curl-input" placeholder="curl -L 'https://teamclawhub.com/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
           <div style="display:flex;gap:8px;margin-top:8px;">
-            <button onclick="window.open('https://flowhub-mu.vercel.app','_blank')" style="flex:1;padding:8px;background:var(--bg-card);color:#07c160;border:1px solid #07c160;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
-            <button onclick="importFromHub()" style="flex:1;padding:8px;background:#07c160;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="download_import">📥 下载并导入</button>
+            <button onclick="openTeamHub()" style="flex:1;padding:8px;background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
+            <button onclick="importFromHub()" style="flex:1;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="download_import">📥 下载并导入</button>
           </div>
         </div>
         <!-- 选项2: 上传导入 -->
@@ -2430,7 +2559,7 @@
             <span class="oasis-conclusion-toggle" id="oasis-conclusion-toggle">▼</span>
           </div>
         </div>
-        <div class="oasis-conclusion-content" id="oasis-conclusion-text"></div>
+        <div class="oasis-conclusion-content markdown-body tc-markdown" id="oasis-conclusion-text"></div>
       </div>
     </div>
   </div>
@@ -2458,6 +2587,8 @@ const I18N = {
     header_discover: '创造',
     discover_studio_desc: '管理你的 Agent、编排工作流',
     discover_hub_desc: '浏览社区分享的团队配置',
+    team_creator: 'Team Creator',
+    discover_creator_desc: '创建并发布新的团队页面',
     tab_profile: '个人',
 
     // ── Common ──
@@ -2684,6 +2815,9 @@ const I18N = {
     settings_save_failed: '❌ 保存设置失败',
     settings_load_failed: '加载设置失败',
     llm_not_configured: 'LLM API 未配置，请先前往设置填写 API Key',
+    local_login_banner_title: '已使用本机免密登录',
+    local_login_banner_body: '当前用户名「{user_id}」还没有密码。如需后续密码登录或远程访问，可在 Settings 里设置密码并保存为用户。',
+    local_login_banner_action: '去设置',
     confirm_restart: '确定要重启所有服务吗？这将中断当前所有连接。',
     restart_success: '✅ 服务正在重启，页面将在 15 秒后刷新',
     restart_failed: '❌ 重启失败',
@@ -2691,6 +2825,22 @@ const I18N = {
     confirm_restart_teamclaw: '确定要重启 Teamclaw 吗？这将中断当前所有连接，服务将在约 15 秒后恢复。',
     restart_signal_sent: '✅ 重启信号已发送，页面将在 15 秒后刷新',
     about_text: 'Agent 消息中心 v1.0',
+    settings_user_password_title: '当前用户密码',
+    settings_user_password_hint_local: '你现在以本机免密方式登录。为「{user_id}」设置密码后，这个用户名就可以用于密码登录。',
+    settings_user_password_hint_general: '为当前登录用户「{user_id}」设置或更新密码。保存后会写入 config/users.json。',
+    settings_user_password_status_missing: '未设置密码',
+    settings_user_password_status_set: '已设置密码，可更新',
+    settings_user_password_field: '新密码',
+    settings_user_password_confirm_field: '确认密码',
+    settings_user_password_placeholder: '输入要保存给当前用户名的密码',
+    settings_user_password_confirm_placeholder: '再次输入同一密码',
+    settings_user_password_save: '保存为用户',
+    settings_user_password_empty: '请输入密码',
+    settings_user_password_mismatch: '两次输入的密码不一致',
+    settings_user_password_saving: '保存中...',
+    settings_user_password_saved: '✅ 已为当前用户名保存密码',
+    settings_user_password_save_fail: '保存密码失败',
+    settings_user_password_opened: '已打开 Settings，可在“当前用户密码”里保存这个用户名的密码。',
 
     // ── Tunnel ──
     tunnel_control: '🌐 隧道控制',
@@ -2701,6 +2851,7 @@ const I18N = {
     tunnel_stop: '停止隧道',
     tunnel_starting: '⏳ 启动中...',
     tunnel_stopping: '⏳ 停止中...',
+    tunnel_url_pending: '公网地址生成中...',
 
     sg_antigravity: '🚀 Antigravity 免费模型预设',
     sg_antigravity_hint: '一键填入 Antigravity-Manager 反代配置，通过 Google One Pro 会员免费使用模型。确保 Antigravity-Manager 已在本机运行。',
@@ -2710,6 +2861,7 @@ const I18N = {
     // ── Settings groups ──
     sg_llm: 'LLM 模型',
     sg_tts: '音频配置',
+    sg_tinyfish: 'TinyFish 竞品监控',
     sg_oasis: 'Oasis 协作',
     sg_ports: '端口配置',
     sg_network: '网络/域名',
@@ -2718,10 +2870,62 @@ const I18N = {
     sg_exec: '执行限制',
     sg_security: '安全',
     sg_other: '其他',
+    settings_secret_saved_placeholder: '已保存（{mask}），留空不修改',
+    settings_llm_sync_title: '🔄 同步本地配置',
+    settings_openclaw_import: '🦞 从 OpenClaw 导入',
+    settings_openclaw_import_hint_ready: '自动读取已配置的 API Key、模型和 Provider',
+    settings_openclaw_import_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
+    settings_openclaw_export: '🦞 导出到 OpenClaw',
+    settings_openclaw_export_hint_ready: '把当前 TeamClaw 的 LLM 设置写回 OpenClaw 默认模型',
+    settings_openclaw_export_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
+    settings_openclaw_importing: '正在从 OpenClaw 读取配置...',
+    settings_openclaw_imported: '✅ 已从 OpenClaw 导入配置',
+    settings_openclaw_exporting: '正在把当前配置导出到 OpenClaw...',
+    settings_openclaw_exported: '✅ 已导出到 OpenClaw',
+    settings_openclaw_export_missing: '⚠️ 请先填写 Base URL 和模型；远程 provider 还需要 API Key',
+    settings_openclaw_detect_hint: '，点击“检测模型”确认',
+    settings_openclaw_gateway_restarted: 'OpenClaw Gateway 已自动重载',
+    settings_openclaw_gateway_restart_failed: '已写入配置，但 Gateway 重载失败',
+    settings_antigravity_ready_subtitle: '通过 Google One Pro 会员免费访问 Claude / Gemini / GPT',
+    settings_antigravity_missing_subtitle: '⚠️ Antigravity 未运行（未启动或无法连接）',
     sg_tts_help: '留空时会自动跟随当前 LLM provider。检测到 OpenAI 时默认使用 gpt-4o-mini-tts / alloy / whisper-1；检测到 Gemini 时默认使用 gemini-2.5-flash-preview-tts / charon。',
+    sg_tinyfish_help: '配置 TinyFish Web Agent API、监控目标文件与每日价格巡检计划。保存后重启服务，scheduler 会按 cron 自动执行。',
     sf_tts_model: '留空时自动跟随当前 LLM provider。OpenAI 默认是 gpt-4o-mini-tts，Gemini 默认是 gemini-2.5-flash-preview-tts。',
     sf_tts_voice: '留空时自动跟随当前 LLM provider。OpenAI 默认声音是 alloy，Gemini 默认声音是 charon。',
     sf_stt_model: '留空时自动跟随当前 LLM provider。OpenAI 默认是 whisper-1；Gemini 目前没有内置 STT 默认值，可按需手动填写。',
+    sf_tinyfish_api_key: 'TinyFish Web Agent API Key。用于提交网站自动化采集任务。',
+    sf_tinyfish_base_url: 'TinyFish API 基础地址，默认 https://agent.tinyfish.ai。',
+    sf_tinyfish_db_path: '存储竞品采集结果与价格变化的 SQLite 路径。',
+    sf_tinyfish_targets_path: '竞品目标 JSON 配置文件路径。默认是 config/tinyfish_targets.json。',
+    sf_tinyfish_enabled: '设为 true 启用内建每日监控任务；设为 false 关闭。',
+    sf_tinyfish_cron: '5 段 cron 表达式，例如 0 9 * * * 代表每天早上 9 点。',
+    tinyfish_run_now: '立即运行',
+    tinyfish_refresh: '刷新结果',
+    tinyfish_loading: '正在加载 TinyFish 监控状态...',
+    tinyfish_not_configured: 'TinyFish 尚未配置完整。',
+    tinyfish_run_submitted: '✅ TinyFish 监控任务已提交',
+    tinyfish_run_failed: '❌ TinyFish 运行失败',
+    tinyfish_sites: '最新站点快照',
+    tinyfish_changes: '最近价格变化',
+    tinyfish_recent_runs: '最近运行',
+    tinyfish_no_sites: '暂无站点快照',
+    tinyfish_no_changes: '暂无价格变化记录',
+    tinyfish_no_runs: '暂无运行记录',
+    tinyfish_live_title: '实时爬取过程',
+    tinyfish_live_run: 'Live Crawl',
+    tinyfish_live_stop: '停止查看',
+    tinyfish_live_target_loading: '正在加载目标...',
+    tinyfish_live_target_empty: '暂无可用目标',
+    tinyfish_live_status_idle: '选择一个目标后即可查看实时爬取过程',
+    tinyfish_live_status_connecting: '正在连接 TinyFish SSE',
+    tinyfish_live_status_running: 'TinyFish 正在实时爬取中',
+    tinyfish_live_status_done: 'TinyFish 实时任务结束',
+    tinyfish_live_open_watch: '打开 TinyFish Live Watch',
+    tinyfish_live_no_events: '还没有实时事件',
+    tinyfish_live_stream_closed: '实时流已结束',
+    tinyfish_live_stopped: '已停止本地实时查看',
+    tinyfish_live_missing_target: '请先选择一个目标站点',
+    tinyfish_live_result_title: '本次实时任务结果',
 
     // ── OASIS sidebar ──
     oasis_topics: '📋 讨论话题',
@@ -2874,6 +3078,8 @@ const I18N = {
     header_discover: 'Discover',
     discover_studio_desc: 'Manage Agents & orchestrate workflows',
     discover_hub_desc: 'Browse community-shared team configs',
+    team_creator: 'Team Creator',
+    discover_creator_desc: 'Create and publish new team pages',
     tab_profile: 'Me',
 
     back: 'Back',
@@ -3086,6 +3292,9 @@ const I18N = {
     settings_save_failed: '❌ Failed to save settings',
     settings_load_failed: 'Failed to load settings',
     llm_not_configured: 'LLM API not configured. Tap here to set up API Key.',
+    local_login_banner_title: 'Local no-password login active',
+    local_login_banner_body: 'The current username "{user_id}" does not have a password yet. Open Settings to save one for future password or remote login.',
+    local_login_banner_action: 'Open Settings',
     confirm_restart: 'Restart all services? This will interrupt all active connections.',
     restart_success: '✅ Services restarting. Page will refresh in 15 seconds.',
     restart_failed: '❌ Restart failed',
@@ -3093,6 +3302,22 @@ const I18N = {
     confirm_restart_teamclaw: 'Restart Teamclaw? All connections will be interrupted. Service will recover in ~15 seconds.',
     restart_signal_sent: '✅ Restart signal sent. Page will refresh in 15 seconds.',
     about_text: 'Agent Message Center v1.0',
+    settings_user_password_title: 'Current User Password',
+    settings_user_password_hint_local: 'You are currently using local no-password login. Set a password for "{user_id}" to enable password login for this username.',
+    settings_user_password_hint_general: 'Set or update the password for the currently logged-in user "{user_id}". It will be written to config/users.json.',
+    settings_user_password_status_missing: 'No password saved yet',
+    settings_user_password_status_set: 'Password saved, you can update it',
+    settings_user_password_field: 'New Password',
+    settings_user_password_confirm_field: 'Confirm Password',
+    settings_user_password_placeholder: 'Enter the password to save for this username',
+    settings_user_password_confirm_placeholder: 'Enter the same password again',
+    settings_user_password_save: 'Save as User',
+    settings_user_password_empty: 'Please enter a password',
+    settings_user_password_mismatch: 'The two passwords do not match',
+    settings_user_password_saving: 'Saving...',
+    settings_user_password_saved: '✅ Password saved for the current username',
+    settings_user_password_save_fail: 'Failed to save password',
+    settings_user_password_opened: 'Settings is open. Use "Current User Password" to save a password for this username.',
 
     tunnel_control: '🌐 Tunnel Control',
     tunnel_loading: '⏳ Loading...',
@@ -3102,6 +3327,7 @@ const I18N = {
     tunnel_stop: 'Stop Tunnel',
     tunnel_starting: '⏳ Starting...',
     tunnel_stopping: '⏳ Stopping...',
+    tunnel_url_pending: 'Public URL is still being generated...',
 
     sg_antigravity: '🚀 Antigravity Free Models Preset',
     sg_antigravity_hint: 'Auto-fill Antigravity-Manager config. Uses Google One Pro membership for free model access. Make sure it is running locally.',
@@ -3110,6 +3336,7 @@ const I18N = {
 
     sg_llm: 'LLM Model',
     sg_tts: 'Audio Config',
+    sg_tinyfish: 'TinyFish Monitor',
     sg_oasis: 'Oasis Collaboration',
     sg_ports: 'Port Config',
     sg_network: 'Network/Domain',
@@ -3118,10 +3345,62 @@ const I18N = {
     sg_exec: 'Execution Limits',
     sg_security: 'Security',
     sg_other: 'Other',
+    settings_secret_saved_placeholder: 'Saved ({mask}). Leave blank to keep it unchanged',
+    settings_llm_sync_title: '🔄 Sync Local Config',
+    settings_openclaw_import: '🦞 Import from OpenClaw',
+    settings_openclaw_import_hint_ready: 'Read the configured API key, model, and provider from OpenClaw',
+    settings_openclaw_import_hint_missing: '⚠️ OpenClaw was not detected',
+    settings_openclaw_export: '🦞 Export to OpenClaw',
+    settings_openclaw_export_hint_ready: 'Write the current TeamClaw LLM settings back to OpenClaw defaults',
+    settings_openclaw_export_hint_missing: '⚠️ OpenClaw was not detected',
+    settings_openclaw_importing: 'Reading configuration from OpenClaw...',
+    settings_openclaw_imported: '✅ Imported configuration from OpenClaw',
+    settings_openclaw_exporting: 'Writing the current configuration to OpenClaw...',
+    settings_openclaw_exported: '✅ Exported configuration to OpenClaw',
+    settings_openclaw_export_missing: '⚠️ Base URL and model are required; remote providers also need an API key',
+    settings_openclaw_detect_hint: '. Tap "Detect Models" to confirm.',
+    settings_openclaw_gateway_restarted: 'OpenClaw Gateway reloaded automatically',
+    settings_openclaw_gateway_restart_failed: 'Config was saved, but Gateway reload failed',
+    settings_antigravity_ready_subtitle: 'Use Claude / Gemini / GPT via Google One Pro',
+    settings_antigravity_missing_subtitle: '⚠️ Antigravity is not running or cannot be reached',
     sg_tts_help: 'When empty, automatically follows the current LLM provider. OpenAI uses gpt-4o-mini-tts / alloy / whisper-1; Gemini uses gemini-2.5-flash-preview-tts / charon.',
+    sg_tinyfish_help: 'Configure TinyFish Web Agent API access, the competitor target file, and the daily pricing-monitor schedule. Save and restart to let the scheduler pick up cron changes.',
     sf_tts_model: 'When empty, follows the current LLM provider. OpenAI defaults to gpt-4o-mini-tts, Gemini to gemini-2.5-flash-preview-tts.',
     sf_tts_voice: 'When empty, follows the current LLM provider. OpenAI defaults to alloy, Gemini to charon.',
     sf_stt_model: 'When empty, follows the current LLM provider. OpenAI defaults to whisper-1; Gemini has no built-in STT default.',
+    sf_tinyfish_api_key: 'TinyFish Web Agent API key used to submit competitor-site automation runs.',
+    sf_tinyfish_base_url: 'TinyFish API base URL. Defaults to https://agent.tinyfish.ai.',
+    sf_tinyfish_db_path: 'SQLite path used to store competitor snapshots and price changes.',
+    sf_tinyfish_targets_path: 'JSON file listing competitor targets. Defaults to config/tinyfish_targets.json.',
+    sf_tinyfish_enabled: 'Set true to enable the built-in daily monitor job; set false to disable it.',
+    sf_tinyfish_cron: 'Five-field cron expression, for example 0 9 * * * for every day at 9:00.',
+    tinyfish_run_now: 'Run Now',
+    tinyfish_refresh: 'Refresh',
+    tinyfish_loading: 'Loading TinyFish monitor status...',
+    tinyfish_not_configured: 'TinyFish is not fully configured yet.',
+    tinyfish_run_submitted: '✅ TinyFish monitor run submitted',
+    tinyfish_run_failed: '❌ TinyFish run failed',
+    tinyfish_sites: 'Latest Site Snapshots',
+    tinyfish_changes: 'Recent Price Changes',
+    tinyfish_recent_runs: 'Recent Runs',
+    tinyfish_no_sites: 'No site snapshots yet',
+    tinyfish_no_changes: 'No price changes recorded yet',
+    tinyfish_no_runs: 'No monitor runs recorded yet',
+    tinyfish_live_title: 'Live Crawl',
+    tinyfish_live_run: 'Live Crawl',
+    tinyfish_live_stop: 'Stop Viewing',
+    tinyfish_live_target_loading: 'Loading targets...',
+    tinyfish_live_target_empty: 'No configured targets',
+    tinyfish_live_status_idle: 'Choose a target to watch the crawl in real time',
+    tinyfish_live_status_connecting: 'Connecting to TinyFish SSE',
+    tinyfish_live_status_running: 'TinyFish crawl is running live',
+    tinyfish_live_status_done: 'TinyFish live run finished',
+    tinyfish_live_open_watch: 'Open TinyFish Live Watch',
+    tinyfish_live_no_events: 'No live events yet',
+    tinyfish_live_stream_closed: 'Live stream closed',
+    tinyfish_live_stopped: 'Stopped local live viewing',
+    tinyfish_live_missing_target: 'Choose a target site first',
+    tinyfish_live_result_title: 'Live Run Result',
 
     oasis_topics: '📋 Discussion Topics',
     oasis_clear_all: '🗑️ Clear All',
@@ -3257,6 +3536,9 @@ const I18N = {
 };
 
 let _currentLang = localStorage.getItem('teamclaw_lang') || 'zh';
+window.__currentUserHasPassword = false;
+window.__currentLoginMode = '';
+let _localPasswordBannerDismissed = false;
 
 /** Translate a key, optionally interpolating {placeholders}. */
 function t(key, vars) {
@@ -3281,6 +3563,7 @@ function setLang(lang) {
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
   document.title = t('page_title');
   applyLangToDOM();
+  updateLocalPasswordBanner();
   // Re-render dynamic areas that are currently visible
   if (groups && groups.length) renderGroupList(groups);
   if (document.getElementById('tab-profile').classList.contains('active')) loadProfile();
@@ -3301,19 +3584,101 @@ function applyLangToDOM() {
       el.textContent = t(key);
     }
   });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
     el.title = t(el.dataset.i18nTitle);
   });
+}
+
+function _localPasswordBannerDismissKey(userId = window.__currentUser || '') {
+  return userId ? `teamclaw-mobile-local-password-banner-dismissed:${userId}` : '';
+}
+
+function _syncLocalPasswordBannerDismissedState() {
+  const key = _localPasswordBannerDismissKey();
+  _localPasswordBannerDismissed = key ? sessionStorage.getItem(key) === '1' : false;
+}
+
+function updateLocalPasswordBanner() {
+  const banner = document.getElementById('local-password-banner');
+  const titleEl = document.getElementById('local-password-banner-title');
+  const textEl = document.getElementById('local-password-banner-text');
+  const actionEl = document.getElementById('local-password-banner-action');
+  if (!banner || !titleEl || !textEl || !actionEl) return;
+
+  const shouldShow = Boolean(
+    window.__currentUser &&
+    window.__currentLoginMode === 'local_no_password' &&
+    !window.__currentUserHasPassword &&
+    !_localPasswordBannerDismissed
+  );
+
+  banner.style.display = shouldShow ? 'flex' : 'none';
+  if (!shouldShow) return;
+
+  titleEl.textContent = t('local_login_banner_title');
+  textEl.textContent = t('local_login_banner_body', { user_id: window.__currentUser || '' });
+  actionEl.textContent = t('local_login_banner_action');
+}
+
+function dismissLocalPasswordBanner(remember = true) {
+  _localPasswordBannerDismissed = true;
+  if (remember) {
+    const key = _localPasswordBannerDismissKey();
+    if (key) sessionStorage.setItem(key, '1');
+  }
+  updateLocalPasswordBanner();
+}
+
+function _setLlmWarningBannerVisible(visible) {
+  const banner = document.getElementById('llm-warning-banner');
+  if (banner) {
+    banner.style.display = visible ? 'block' : 'none';
+  }
+}
+
+async function refreshLlmBannerFromSetupStatus() {
+  try {
+    const response = await fetch('/api/setup_status');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const status = await response.json();
+    window._setupStatus = status;
+    _setLlmWarningBannerVisible(!status.llm_configured);
+    return status;
+  } catch (error) {
+    try {
+      const fallbackResponse = await fetch('/api/llm_config_status');
+      if (!fallbackResponse.ok) throw new Error('HTTP ' + fallbackResponse.status);
+      const fallback = await fallbackResponse.json();
+      _setLlmWarningBannerVisible(!fallback.configured);
+      return null;
+    } catch (_fallbackError) {
+      return null;
+    }
+  }
+}
+
+async function openSettingsToPassword() {
+  await openSettings('user-password');
+  const statusEl = document.getElementById('settings-user-password-inline-status');
+  if (statusEl) {
+    statusEl.textContent = t('settings_user_password_opened');
+    statusEl.className = 'settings-inline-status';
+  }
 }
 
 // ── State ──
 let currentGroupId = null;
 let currentGroupName = '';
 let currentTeamName = '';
+let currentTab = 'chats';
 let lastMsgId = 0;
 const renderedMsgIds = new Set();
 let pollTimer = null;
 let oasisPollTimer = null;
+let groupsPollTimer = null;
 // BroadcastChannel: receive OASIS data from main page without extra polling
 const oasisBroadcast = (typeof BroadcastChannel !== 'undefined')
     ? new BroadcastChannel('oasis-data-sync')
@@ -3336,9 +3701,115 @@ let workflowGroups = [];  // [{group, team, layouts}] — 公共 + 各 team
 let workflowExpandedGroups = new Set();
 let contactsTeamList = [];  // teams for contacts
 let contactsLoaded = false;
+let groupListInitialized = false;
+const groupSnapshots = new Map();   // gid -> {messageCount, lastMessageTime}
+const groupUnreadCounts = new Map(); // gid -> unread count
+
+function getGroupId(group) {
+  return (group && (group.group_id || group.id) || '').toString();
+}
+
+function normalizeGroupMessageCount(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function normalizeGroupLastMessageTime(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function getGroupSnapshot(group) {
+  return {
+    messageCount: normalizeGroupMessageCount(group?.message_count),
+    lastMessageTime: normalizeGroupLastMessageTime(group?.last_message_time),
+  };
+}
+
+function getUnreadCount(gid) {
+  return groupUnreadCounts.get(gid) || 0;
+}
+
+function getTotalUnreadCount() {
+  let total = 0;
+  groupUnreadCounts.forEach(count => { total += count; });
+  return total;
+}
+
+function updateChatBadge() {
+  const badge = document.getElementById('chat-badge');
+  if (!badge) return;
+  const total = getTotalUnreadCount();
+  if (total > 0) {
+    badge.textContent = total > 99 ? '99+' : String(total);
+    badge.classList.add('show');
+  } else {
+    badge.textContent = '';
+    badge.classList.remove('show');
+  }
+}
+
+function clearGroupUnread(gid, rerender = true) {
+  if (!gid) return;
+  if (groupUnreadCounts.delete(gid)) {
+    updateChatBadge();
+    if (rerender && groups.length) renderGroupList(groups);
+  }
+}
+
+function syncGroupSnapshotsAndUnread(nextGroups) {
+  const nextIds = new Set();
+  nextGroups.forEach(group => {
+    const gid = getGroupId(group);
+    if (!gid) return;
+    nextIds.add(gid);
+    const nextSnapshot = getGroupSnapshot(group);
+    const prevSnapshot = groupSnapshots.get(gid);
+    if (groupListInitialized && prevSnapshot) {
+      const hasNewMessages =
+        nextSnapshot.messageCount > prevSnapshot.messageCount ||
+        nextSnapshot.lastMessageTime > prevSnapshot.lastMessageTime;
+      if (hasNewMessages && gid !== currentGroupId) {
+        const delta = Math.max(1, nextSnapshot.messageCount - prevSnapshot.messageCount);
+        groupUnreadCounts.set(gid, getUnreadCount(gid) + delta);
+      }
+    }
+    groupSnapshots.set(gid, nextSnapshot);
+  });
+
+  Array.from(groupSnapshots.keys()).forEach(gid => {
+    if (!nextIds.has(gid)) groupSnapshots.delete(gid);
+  });
+  Array.from(groupUnreadCounts.keys()).forEach(gid => {
+    if (!nextIds.has(gid)) groupUnreadCounts.delete(gid);
+  });
+
+  groupListInitialized = true;
+  updateChatBadge();
+}
+
+function updateCurrentGroupSnapshotFromMessages(gid, msgs) {
+  if (!gid || !msgs.length) return;
+  const lastMsg = msgs[msgs.length - 1];
+  const known = groupSnapshots.get(gid) || { messageCount: 0, lastMessageTime: 0 };
+  const group = groups.find(g => getGroupId(g) === gid);
+
+  let messageCount = known.messageCount + msgs.length;
+  let lastMessageTime = Math.max(known.lastMessageTime, normalizeGroupLastMessageTime(lastMsg?.timestamp));
+
+  if (group) {
+    const currentCount = normalizeGroupMessageCount(group.message_count);
+    messageCount = Math.max(currentCount + msgs.length, messageCount);
+    group.message_count = messageCount;
+    if (lastMsg?.timestamp) group.last_message_time = lastMsg.timestamp;
+  }
+
+  groupSnapshots.set(gid, { messageCount, lastMessageTime });
+}
 
 // ── Tab switching ──
 function switchTab(tab) {
+  currentTab = tab;
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
@@ -3409,16 +3880,37 @@ function filterGroupList() {
   renderGroupList(groups);
 }
 
-async function refreshGroups() {
+async function refreshGroups(options = {}) {
+  const { silent = false, refreshMute = true } = options;
   const container = document.getElementById('group-list-container');
   try {
     const data = await api('GET', '/proxy_groups');
-    groups = Array.isArray(data) ? data : (data.groups || []);
-    // Batch fetch mute status for all groups
-    await refreshMuteStatuses(groups);
+    const nextGroups = Array.isArray(data) ? data : (data.groups || []);
+    if (refreshMute) {
+      // Batch fetch mute status for all groups
+      await refreshMuteStatuses(nextGroups);
+    }
+    syncGroupSnapshotsAndUnread(nextGroups);
+    groups = nextGroups;
     renderGroupList(groups);
   } catch (e) {
-    container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div class="text">${e.message}</div></div>`;
+    if (!silent) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><div class="text">${e.message}</div></div>`;
+    }
+  }
+}
+
+function startGroupsPolling() {
+  stopGroupsPolling();
+  groupsPollTimer = setInterval(() => {
+    refreshGroups({ silent: true, refreshMute: false });
+  }, 5000);
+}
+
+function stopGroupsPolling() {
+  if (groupsPollTimer) {
+    clearInterval(groupsPollTimer);
+    groupsPollTimer = null;
   }
 }
 
@@ -3507,6 +3999,7 @@ function renderGroupList(list) {
 
     const displayName = isPrivate ? `🤖 ${name}` : name;
     const isMutedGroup = mutedGroupIds.has(gid);
+    const unreadCount = getUnreadCount(gid);
     const escapedGid = gid.replace(/'/g, "\\'");
     const escapedName = name.replace(/'/g, "\\'");
 
@@ -3522,6 +4015,7 @@ function renderGroupList(list) {
             <div class="group-meta-row">
               <div class="group-meta">${isPrivate ? '💬 ' + t('private_chat_label') + ' · ' : ''}${members} ${t('members')} · ${msgs} ${t('messages_count')}</div>
               ${isMutedGroup ? '<span class="group-mute-icon">🔇</span>' : ''}
+              <span class="group-badge${unreadCount ? '' : ' hidden'}">${unreadCount > 99 ? '99+' : unreadCount || ''}</span>
             </div>
           </div>
         </div>
@@ -4179,6 +4673,7 @@ async function openChat(groupId, name) {
   currentGroupName = name;
   lastMsgId = 0;
   renderedMsgIds.clear();
+  clearGroupUnread(groupId, false);
 
   document.getElementById('chat-title').textContent = name;
   document.getElementById('chat-body').innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner"></div></div>';
@@ -4226,8 +4721,7 @@ function renderMessages(msgs) {
     return;
   }
   body.innerHTML = msgs.map(m => renderOneMsgHTML(m)).join('');
-  // 代码高亮
-  body.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+  if (window.TeamClawMarkdown) window.TeamClawMarkdown.highlight(body);
   // 将初始加载的消息 ID 加入去重集合，防止后续 poll 重复渲染
   msgs.forEach(m => { if (m.id) renderedMsgIds.add(m.id); });
   updateLastMsgId(msgs);
@@ -4241,16 +4735,19 @@ function appendMessages(msgs) {
   const hint = body.querySelector('.refresh-hint');
   if (hint) hint.remove();
   
+  const appended = [];
   msgs.forEach(m => {
     // 去重：跳过已经渲染过的消息
     if (m.id && renderedMsgIds.has(m.id)) return;
     if (m.id) renderedMsgIds.add(m.id);
+    appended.push(m);
     body.insertAdjacentHTML('beforeend', renderOneMsgHTML(m));
-    // 对新追加的消息中的代码块进行高亮
     const lastChild = body.lastElementChild;
-    if (lastChild) lastChild.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+    if (lastChild && window.TeamClawMarkdown) window.TeamClawMarkdown.highlight(lastChild);
   });
-  updateLastMsgId(msgs);
+  if (!appended.length) return;
+  updateLastMsgId(appended);
+  updateCurrentGroupSnapshotFromMessages(currentGroupId, appended);
   scrollToBottom();
 }
 
@@ -4283,9 +4780,9 @@ function renderOneMsgHTML(m) {
   const rawContent = m.content || '';
   let contentHTML;
   let bubbleClass = 'msg-bubble';
-  if (!isSelf && typeof marked !== 'undefined') {
-    contentHTML = marked.parse(rawContent);
-    bubbleClass += ' markdown-body';
+  if (!isSelf) {
+    contentHTML = window.TeamClawMarkdown ? window.TeamClawMarkdown.render(rawContent) : esc(rawContent);
+    bubbleClass += ' markdown-body tc-markdown';
   } else {
     contentHTML = esc(rawContent);
   }
@@ -5116,8 +5613,11 @@ function renderOasisDetail(detail) {
   // Conclusion
   const conclusionArea = document.getElementById('oasis-conclusion-area');
   if (detail.conclusion && detail.status === 'concluded') {
-    const html = (typeof marked !== 'undefined') ? marked.parse(detail.conclusion) : esc(detail.conclusion);
-    document.getElementById('oasis-conclusion-text').innerHTML = html;
+    if (window.TeamClawMarkdown) {
+      window.TeamClawMarkdown.renderInto(document.getElementById('oasis-conclusion-text'), detail.conclusion);
+    } else {
+      document.getElementById('oasis-conclusion-text').innerHTML = esc(detail.conclusion);
+    }
     document.getElementById('oasis-conclusion-text').style.display = '';
     const toggleEl = document.getElementById('oasis-conclusion-toggle');
     if (toggleEl) toggleEl.textContent = '▼';
@@ -5240,7 +5740,7 @@ function renderOasisPosts(posts, timeline) {
     const isReply = p.reply_to !== null && p.reply_to !== undefined;
     const totalVotes = (p.upvotes || 0) + (p.downvotes || 0);
     const upPct = totalVotes > 0 ? ((p.upvotes || 0) / totalVotes * 100) : 50;
-    const contentHtml = (typeof marked !== 'undefined') ? marked.parse(p.content || '') : esc(p.content || '');
+    const contentHtml = window.TeamClawMarkdown ? window.TeamClawMarkdown.render(p.content || '') : esc(p.content || '');
 
     return `
       <div class="oasis-post-item${isReply ? ' is-reply' : ''}">
@@ -5253,7 +5753,7 @@ function renderOasisPosts(posts, timeline) {
             <span class="oasis-post-id">#${p.id}</span>
           </div>
         </div>
-        <div class="oasis-post-content">${contentHtml}</div>
+        <div class="oasis-post-content markdown-body tc-markdown">${contentHtml}</div>
         ${totalVotes > 0 ? `
           <div class="oasis-vote-row">
             <span class="oasis-vote-label">👍 ${p.upvotes || 0}</span>
@@ -5270,9 +5770,7 @@ function renderOasisPosts(posts, timeline) {
   box.scrollTop = box.scrollHeight;
 
   // Highlight code blocks
-  box.querySelectorAll('pre code').forEach(el => {
-    try { if (typeof hljs !== 'undefined') hljs.highlightElement(el); } catch(e) {}
-  });
+  if (window.TeamClawMarkdown) window.TeamClawMarkdown.highlight(box);
 }
 
 // ── Detail Polling with change detection (1.5s, matches main page) ──
@@ -5603,9 +6101,19 @@ setInterval(() => {
 }, 10000);
 
 // ── Team Studio ──
+const TEAM_HUB_URL = 'https://teamclawhub.com';
+
 function openTeamStudio() {
   // Navigate to the main Team Studio page
   window.location.href = '/studio';
+}
+
+function openTeamHub() {
+  window.open(TEAM_HUB_URL, '_blank');
+}
+
+function openTeamCreator() {
+  window.location.href = '/creator';
 }
 
 // ── Polling ──
@@ -7529,6 +8037,7 @@ async function saveProfile() {
 // ══════════════════════════════════════════════════════════
 const SETTINGS_GROUPS_ORDERED = [
     { id: 'llm',      labelKey: 'sg_llm',      keys: ['LLM_API_KEY', 'LLM_BASE_URL', 'LLM_MODEL', 'LLM_PROVIDER', 'LLM_VISION_SUPPORT'] },
+    { id: 'tinyfish', labelKey: 'sg_tinyfish', keys: ['TINYFISH_API_KEY', 'TINYFISH_BASE_URL', 'TINYFISH_MONITOR_DB_PATH', 'TINYFISH_MONITOR_TARGETS_PATH', 'TINYFISH_MONITOR_ENABLED', 'TINYFISH_MONITOR_CRON'] },
     { id: 'tts',      labelKey: 'sg_tts',      keys: ['TTS_MODEL', 'TTS_VOICE', 'STT_MODEL'] },
     { id: 'oasis',    labelKey: 'sg_oasis',    keys: ['OASIS_BASE_URL'] },
     { id: 'ports',    labelKey: 'sg_ports',    keys: ['PORT_AGENT', 'PORT_SCHEDULER', 'PORT_OASIS', 'PORT_FRONTEND', 'PORT_BARK'] },
@@ -7540,16 +8049,40 @@ const SETTINGS_GROUPS_ORDERED = [
 ];
 
 const SETTINGS_GROUP_HELP = {
+    tinyfish: 'sg_tinyfish_help',
     tts: 'sg_tts_help',
 };
 
 const SETTINGS_FIELD_HELP = {
+    TINYFISH_API_KEY: 'sf_tinyfish_api_key',
+    TINYFISH_BASE_URL: 'sf_tinyfish_base_url',
+    TINYFISH_MONITOR_DB_PATH: 'sf_tinyfish_db_path',
+    TINYFISH_MONITOR_TARGETS_PATH: 'sf_tinyfish_targets_path',
+    TINYFISH_MONITOR_ENABLED: 'sf_tinyfish_enabled',
+    TINYFISH_MONITOR_CRON: 'sf_tinyfish_cron',
     TTS_MODEL: 'sf_tts_model',
     TTS_VOICE: 'sf_tts_voice',
     STT_MODEL: 'sf_stt_model',
 };
 
 let _settingsCache = {};
+
+function _isMaskedSettingsSecretValue(value) {
+    return typeof value === 'string' && value.includes('****');
+}
+
+function _getSettingsInputValueAndPlaceholder(value, fallbackPlaceholder, isPassword) {
+    if (isPassword && _isMaskedSettingsSecretValue(value)) {
+        return {
+            value: '',
+            placeholder: t('settings_secret_saved_placeholder', { mask: value }),
+        };
+    }
+    return {
+        value: value || '',
+        placeholder: fallbackPlaceholder,
+    };
+}
 
 function escapeHtml(str) {
     const div = document.createElement('div');
@@ -7571,7 +8104,9 @@ async function openSettings(scrollToGroup) {
         renderSettings(data.settings);
         // Scroll to specific group if requested
         if (scrollToGroup) {
-            const targetGroup = document.getElementById('settings-' + scrollToGroup + '-group');
+            const targetGroup = scrollToGroup === 'user-password'
+                ? document.getElementById('settings-user-password-section')
+                : document.getElementById('settings-' + scrollToGroup + '-group');
             if (targetGroup) {
                 setTimeout(() => targetGroup.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
             }
@@ -7584,6 +8119,7 @@ async function openSettings(scrollToGroup) {
 function renderSettings(settings) {
     const body = document.getElementById('settings-body');
     let html = `<div class="settings-hint">${t('settings_hint')}</div>`;
+    html += _renderCurrentUserPasswordCard();
 
     // Tunnel control section
     html += '<div class="settings-group">';
@@ -7610,6 +8146,8 @@ function renderSettings(settings) {
         });
         if (group.id === 'llm') {
             html += _renderLlmGroup(settings);
+        } else if (group.id === 'tinyfish') {
+            html += _renderTinyfishGroup(settings);
         } else {
             html += _renderGroup({
                 title: t(group.labelKey),
@@ -7627,6 +8165,46 @@ function renderSettings(settings) {
     body.innerHTML = html;
     _refreshTunnelStatus();
     _initSettingsLlmGroup(settings);
+    refreshTinyfishMonitorPanel(true);
+}
+
+function _renderCurrentUserPasswordCard() {
+    if (!window.__currentUser) return '';
+    const statusText = window.__currentUserHasPassword
+        ? t('settings_user_password_status_set')
+        : t('settings_user_password_status_missing');
+    const hintText = t(
+        window.__currentLoginMode === 'local_no_password'
+            ? 'settings_user_password_hint_local'
+            : 'settings_user_password_hint_general',
+        { user_id: window.__currentUser }
+    );
+    return (
+        '<div class="settings-group" id="settings-user-password-section">' +
+            '<div class="settings-group-title" onclick="this.parentElement.classList.toggle(\'collapsed\')">' + escapeHtml(t('settings_user_password_title')) + ' <span class="settings-chevron">▼</span></div>' +
+            '<div class="settings-group-body">' +
+                '<div class="settings-user-password-card">' +
+                    '<div class="settings-user-password-topline">' +
+                        '<div class="settings-label">' + escapeHtml(window.__currentUser) + '</div>' +
+                        '<span id="settings-user-password-badge" class="settings-user-password-badge">' + escapeHtml(statusText) + '</span>' +
+                    '</div>' +
+                    '<div class="settings-user-password-help">' + escapeHtml(hintText) + '</div>' +
+                    '<div class="settings-field">' +
+                        '<label class="settings-label">' + escapeHtml(t('settings_user_password_field')) + '</label>' +
+                        '<input id="settings-user-password" class="settings-input" type="password" placeholder="' + escapeHtml(t('settings_user_password_placeholder')) + '" autocomplete="new-password" />' +
+                    '</div>' +
+                    '<div class="settings-field">' +
+                        '<label class="settings-label">' + escapeHtml(t('settings_user_password_confirm_field')) + '</label>' +
+                        '<input id="settings-user-password-confirm" class="settings-input" type="password" placeholder="' + escapeHtml(t('settings_user_password_confirm_placeholder')) + '" autocomplete="new-password" />' +
+                    '</div>' +
+                    '<div class="settings-user-password-actions">' +
+                        '<button id="settings-user-password-save-btn" class="settings-btn settings-btn-save" type="button" onclick="saveCurrentUserPassword()">' + escapeHtml(t('settings_user_password_save')) + '</button>' +
+                        '<div id="settings-user-password-inline-status" class="settings-inline-status"></div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+        '</div>'
+    );
 }
 
 function _renderGroup(groupMeta, keys, settings) {
@@ -7641,10 +8219,11 @@ function _renderGroup(groupMeta, keys, settings) {
     for (const key of keys) {
         const val = settings[key] || '';
         const isPassword = /KEY|TOKEN|SECRET|PASSWORD/i.test(key);
+        const inputState = _getSettingsInputValueAndPlaceholder(val, key, isPassword);
         const helpText = SETTINGS_FIELD_HELP[key] ? t(SETTINGS_FIELD_HELP[key]) : '';
         html += '<div class="settings-field">';
         html += '<label class="settings-label" title="' + key + '">' + key + '</label>';
-        html += '<input class="settings-input" data-key="' + key + '" type="' + (isPassword ? 'password' : 'text') + '" value="' + escapeHtml(val) + '" placeholder="' + key + '" autocomplete="off" />';
+        html += '<input class="settings-input" data-key="' + key + '" type="' + (isPassword ? 'password' : 'text') + '" value="' + escapeHtml(inputState.value) + '" placeholder="' + escapeHtml(inputState.placeholder) + '" autocomplete="off" />';
         if (helpText) {
             html += '<div style="margin-top:5px;font-size:11px;line-height:1.5;color:#6b7280;">' + escapeHtml(helpText) + '</div>';
         }
@@ -7679,27 +8258,26 @@ function _renderLlmGroup(settings) {
     const curUrl = settings['LLM_BASE_URL'] || '';
     const curModel = settings['LLM_MODEL'] || '';
     const curVision = settings['LLM_VISION_SUPPORT'] || '';
+    const apiKeyInputState = _getSettingsInputValueAndPlaceholder(curKey, 'API Key', true);
+    const renderActionButton = (id, labelKey, subtitleId, onclick) =>
+        '<button id="' + id + '" onclick="' + onclick + '" style="width:100%;padding:11px 14px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;text-align:left;transition:background .15s;" onmouseover="if(!this.disabled)this.style.background=\'#f5f5f5\'" onmouseout="if(!this.disabled)this.style.background=\'var(--bg-card)\'">' +
+            escapeHtml(t(labelKey)) +
+            '<span id="' + subtitleId + '" style="display:block;font-size:11px;font-weight:400;color:var(--text-hint);margin-top:2px;">' + escapeHtml(t('loading')) + '</span>' +
+        '</button>';
 
     let html = '<div class="settings-group" id="settings-llm-group">';
     html += '<div class="settings-group-title" onclick="this.parentElement.classList.toggle(\'collapsed\')">' + escapeHtml(t('sg_llm')) + ' <span class="settings-chevron">▼</span></div>';
     html += '<div class="settings-group-body">';
 
-    // ── One-click import area ──
+    // ── One-click sync area ──
     html += '<div style="margin-bottom:12px;padding:12px;background:var(--bg);border-radius:8px;">';
-    html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">🔍 一键导入本地配置</div>';
+    html += '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">' + escapeHtml(t('settings_llm_sync_title')) + '</div>';
     html += '<div style="display:flex;flex-direction:column;gap:8px;">';
-    // OpenClaw button
-    html += '<button id="settings-import-openclaw-btn" onclick="settingsImportOpenClaw()" style="width:100%;padding:11px 14px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;text-align:left;transition:background .15s;" onmouseover="if(!this.disabled)this.style.background=\'#f5f5f5\'" onmouseout="if(!this.disabled)this.style.background=\'var(--bg-card)\'">';
-    html += '🦞 从 OpenClaw 导入';
-    html += '<span id="settings-openclaw-subtitle" style="display:block;font-size:11px;font-weight:400;color:var(--text-hint);margin-top:2px;">检测中...</span>';
-    html += '</button>';
-    // Antigravity button
-    html += '<button id="settings-use-antigravity-btn" onclick="settingsUseAntigravity()" style="width:100%;padding:11px 14px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:14px;font-weight:500;cursor:pointer;text-align:left;transition:background .15s;" onmouseover="if(!this.disabled)this.style.background=\'#f5f5f5\'" onmouseout="if(!this.disabled)this.style.background=\'var(--bg-card)\'">';
-    html += '⚡ 使用 Antigravity 免费模型';
-    html += '<span id="settings-antigravity-subtitle" style="display:block;font-size:11px;font-weight:400;color:var(--text-hint);margin-top:2px;">检测中...</span>';
-    html += '</button>';
+    html += renderActionButton('settings-import-openclaw-btn', 'settings_openclaw_import', 'settings-openclaw-import-subtitle', 'settingsImportOpenClaw()');
+    html += renderActionButton('settings-export-openclaw-btn', 'settings_openclaw_export', 'settings-openclaw-export-subtitle', 'settingsExportOpenClaw()');
+    html += renderActionButton('settings-use-antigravity-btn', 'sg_antigravity_apply', 'settings-antigravity-subtitle', 'settingsUseAntigravity()');
     html += '</div>';
-    html += '<div id="settings-import-status" style="margin-top:6px;font-size:11px;color:var(--text-secondary);"></div>';
+    html += '<div id="settings-llm-sync-status" style="margin-top:6px;font-size:11px;color:var(--text-secondary);"></div>';
     html += '</div>';
 
     // ── Provider dropdown ──
@@ -7728,7 +8306,7 @@ function _renderLlmGroup(settings) {
     // ── API Key ──
     html += '<div class="settings-field">';
     html += '<label class="settings-label">LLM_API_KEY</label>';
-    html += '<input class="settings-input" data-key="LLM_API_KEY" id="settings-llm-key" type="password" value="' + escapeHtml(curKey) + '" placeholder="API Key" autocomplete="off" />';
+    html += '<input class="settings-input" data-key="LLM_API_KEY" id="settings-llm-key" type="password" value="' + escapeHtml(apiKeyInputState.value) + '" placeholder="' + escapeHtml(apiKeyInputState.placeholder) + '" autocomplete="off" />';
     html += '</div>';
 
     // ── Base URL ──
@@ -7762,6 +8340,263 @@ function _renderLlmGroup(settings) {
     return html;
 }
 
+function _renderTinyfishGroup(settings) {
+    const keys = ['TINYFISH_API_KEY', 'TINYFISH_BASE_URL', 'TINYFISH_MONITOR_DB_PATH', 'TINYFISH_MONITOR_TARGETS_PATH', 'TINYFISH_MONITOR_ENABLED', 'TINYFISH_MONITOR_CRON'];
+    let html = '<div class="settings-group" id="settings-tinyfish-group">';
+    html += '<div class="settings-group-title" onclick="this.parentElement.classList.toggle(\'collapsed\')">' + escapeHtml(t('sg_tinyfish')) + ' <span class="settings-chevron">▼</span></div>';
+    html += '<div class="settings-group-body">';
+    html += '<div style="margin-bottom:12px;padding:10px;background:var(--bg);border-radius:8px;border:0.5px solid var(--border);">';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+    html += '<button id="tinyfish-run-btn" onclick="tinyfishRunNow()" style="padding:10px 14px;border-radius:8px;border:none;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">' + escapeHtml(t('tinyfish_run_now')) + '</button>';
+    html += '<button id="tinyfish-refresh-btn" onclick="refreshTinyfishMonitorPanel(true)" style="padding:10px 14px;border-radius:8px;border:0.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">' + escapeHtml(t('tinyfish_refresh')) + '</button>';
+    html += '</div>';
+    html += '<div id="tinyfish-monitor-status" style="margin-top:8px;font-size:12px;color:var(--text-secondary);">' + escapeHtml(t('tinyfish_loading')) + '</div>';
+    html += '<div id="tinyfish-monitor-summary" style="margin-top:8px;font-size:11px;line-height:1.5;color:var(--text);"></div>';
+    html += '<div id="tinyfish-monitor-runs"></div>';
+    html += '<div id="tinyfish-monitor-sites"></div>';
+    html += '<div id="tinyfish-monitor-changes"></div>';
+    html += '</div>';
+    for (const key of keys) {
+        const val = settings[key] || '';
+        const isPassword = /KEY|TOKEN|SECRET|PASSWORD/i.test(key);
+        const inputState = _getSettingsInputValueAndPlaceholder(val, key, isPassword);
+        const helpText = SETTINGS_FIELD_HELP[key] ? t(SETTINGS_FIELD_HELP[key]) : '';
+        html += '<div class="settings-field">';
+        html += '<label class="settings-label" title="' + key + '">' + key + '</label>';
+        html += '<input class="settings-input" data-key="' + key + '" type="' + (isPassword ? 'password' : 'text') + '" value="' + escapeHtml(inputState.value) + '" placeholder="' + escapeHtml(inputState.placeholder) + '" autocomplete="off" />';
+        if (helpText) {
+            html += '<div style="margin-top:5px;font-size:11px;line-height:1.5;color:var(--text-secondary);">' + escapeHtml(helpText) + '</div>';
+        }
+        html += '</div>';
+    }
+    html += '</div></div>';
+    return html;
+}
+
+function _renderTinyfishList(title, itemsHtml) {
+    return (
+        '<div style="margin-top:10px;">' +
+            '<div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">' + escapeHtml(title) + '</div>' +
+            '<div style="display:flex;flex-direction:column;gap:6px;">' + itemsHtml + '</div>' +
+        '</div>'
+    );
+}
+
+function _tinyfishCompactPath(pathValue) {
+    const raw = String(pathValue || '').trim();
+    if (!raw) return '-';
+    const normalized = raw.replace(/\\/g, '/');
+    const segments = normalized.split('/');
+    return segments[segments.length - 1] || raw;
+}
+
+function _tinyfishMetaChip(label, displayValue, titleValue) {
+    const display = displayValue || '-';
+    const title = titleValue || display;
+    return (
+        '<span title="' + escapeHtml(title) + '" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;background:var(--bg-card);border:0.5px solid var(--border);color:var(--text-secondary);max-width:100%;">' +
+            '<strong style="font-size:10px;letter-spacing:0.02em;text-transform:uppercase;color:var(--text-secondary);">' + escapeHtml(label) + '</strong>' +
+            '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(display) + '</span>' +
+        '</span>'
+    );
+}
+
+async function refreshTinyfishMonitorPanel(sync = true) {
+    const statusEl = document.getElementById('tinyfish-monitor-status');
+    const summaryEl = document.getElementById('tinyfish-monitor-summary');
+    const runsEl = document.getElementById('tinyfish-monitor-runs');
+    const sitesEl = document.getElementById('tinyfish-monitor-sites');
+    const changesEl = document.getElementById('tinyfish-monitor-changes');
+    if (!statusEl || !summaryEl || !runsEl || !sitesEl || !changesEl) return;
+
+    statusEl.textContent = t('tinyfish_loading');
+    try {
+        const resp = await fetch('/api/tinyfish/status' + (sync ? '?sync=1' : ''));
+        const data = await resp.json();
+        if (!resp.ok || data.ok === false) throw new Error(data.error || 'unknown');
+
+        const cfg = data.config || {};
+        const configured = cfg.api_key_configured && cfg.targets_path_exists;
+        statusEl.textContent = configured
+            ? `✅ TinyFish ready · pending ${data.pending_runs || 0}`
+            : `⚠️ ${t('tinyfish_not_configured')}`;
+
+        const summaryChips = [
+            _tinyfishMetaChip('Base URL', cfg.base_url || '-', cfg.base_url || ''),
+            _tinyfishMetaChip('Targets', (_tinyfishCompactPath(cfg.targets_path || '-') + ' ' + (cfg.targets_path_exists ? '✅' : '⚠️')).trim(), cfg.targets_path || ''),
+            _tinyfishMetaChip('DB', _tinyfishCompactPath(cfg.db_path || '-'), cfg.db_path || ''),
+        ];
+        if (cfg.cron && cfg.cron !== '-') {
+            summaryChips.push(_tinyfishMetaChip('Cron', cfg.cron, cfg.cron));
+        }
+        summaryEl.innerHTML =
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + summaryChips.join('') + '</div>' +
+            (data.targets_error ? '<div style="margin-top:8px;color:#b45309;">Targets Error: ' + escapeHtml(data.targets_error) + '</div>' : '');
+
+        const recentRuns = (data.recent_runs || []).slice(0, 5);
+        runsEl.innerHTML = recentRuns.length
+            ? _renderTinyfishList(
+                t('tinyfish_recent_runs'),
+                recentRuns.map((run) =>
+                    '<div style="padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--bg-card);">' +
+                        '<div style="font-size:12px;font-weight:600;color:var(--text);">' + escapeHtml(run.site_name || run.site_key || run.run_id) + '</div>' +
+                        '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">' + escapeHtml(run.status || '-') + ' · ' + escapeHtml(run.finished_at || run.started_at || run.submitted_at || '-') + '</div>' +
+                    '</div>'
+                ).join('')
+            )
+            : '';
+
+        const siteCards = (data.sites || []).slice(0, 5);
+        sitesEl.innerHTML = siteCards.length
+            ? _renderTinyfishList(
+                t('tinyfish_sites'),
+                siteCards.map((site) =>
+                    '<div style="padding:10px;border:0.5px solid var(--border);border-radius:10px;background:var(--bg-card);">' +
+                        '<div style="font-size:12px;font-weight:700;color:var(--text);">' + escapeHtml(site.site_name || site.site_key) + '</div>' +
+                        '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">' + escapeHtml(site.captured_at || '-') + ' · ' + (site.snapshot_count || 0) + ' items</div>' +
+                        '<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;">' +
+                            ((site.snapshots || []).slice(0, 4).map((snap) =>
+                                '<div style="font-size:12px;color:var(--text);">' +
+                                    '<strong>' + escapeHtml(snap.item_name || snap.plan_name || snap.item_key) + '</strong>' +
+                                    '<span style="color:var(--text-secondary);"> · ' + escapeHtml(snap.amount_text || '-') + (snap.billing_period ? ' (' + escapeHtml(snap.billing_period) + ')' : '') + '</span>' +
+                                '</div>'
+                            ).join('')) +
+                        '</div>' +
+                    '</div>'
+                ).join('')
+            )
+            : '';
+
+        const recentChanges = (data.recent_changes || []).slice(0, 8);
+        changesEl.innerHTML = recentChanges.length
+            ? _renderTinyfishList(
+                t('tinyfish_changes'),
+                recentChanges.map((change) =>
+                    '<div style="padding:8px 10px;border:0.5px solid var(--border);border-radius:8px;background:var(--bg-card);">' +
+                        '<div style="font-size:12px;font-weight:600;color:var(--text);">' + escapeHtml(change.site_key) + ' · ' + escapeHtml(change.item_key) + '</div>' +
+                        '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">' + escapeHtml(change.change_type) + ' · ' + escapeHtml(change.previous_amount_text || '-') + ' → ' + escapeHtml(change.current_amount_text || '-') + '</div>' +
+                    '</div>'
+                ).join('')
+            )
+            : '';
+    } catch (e) {
+        statusEl.textContent = '❌ ' + e.message;
+        summaryEl.innerHTML = '';
+        runsEl.innerHTML = '';
+        sitesEl.innerHTML = '';
+        changesEl.innerHTML = '';
+    }
+}
+
+async function tinyfishRunNow() {
+    const btn = document.getElementById('tinyfish-run-btn');
+    if (btn) btn.disabled = true;
+    try {
+        const resp = await fetch('/api/tinyfish/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ wait: false }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.ok === false) throw new Error(data.error || 'unknown');
+        const runIds = (data.run_ids || []).join(', ');
+        toast(runIds ? `${t('tinyfish_run_submitted')}: ${runIds}` : t('tinyfish_run_submitted'));
+        await refreshTinyfishMonitorPanel(false);
+    } catch (e) {
+        toast(t('tinyfish_run_failed') + ': ' + e.message);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+const _SETTINGS_OPENCLAW_PROVIDER_MAP = {
+    openai: 'openai',
+    deepseek: 'deepseek',
+    google: 'google',
+    anthropic: 'anthropic',
+    antigravity: 'antigravity',
+    minimax: 'minimax',
+    ollama: 'ollama',
+};
+
+function _isLocalKeylessProvider(provider, baseUrl) {
+    const normalizedProvider = String(provider || '').trim().toLowerCase();
+    const normalizedBaseUrl = String(baseUrl || '').trim().toLowerCase();
+    if (normalizedProvider === 'ollama') return true;
+    return normalizedBaseUrl.includes('127.0.0.1:11434') || normalizedBaseUrl.includes('localhost:11434');
+}
+
+function _setSettingsActionButtonState(button, available) {
+    if (!button) return;
+    button.disabled = !available;
+    button.style.opacity = available ? '1' : '0.45';
+    button.style.cursor = available ? 'pointer' : 'not-allowed';
+}
+
+function _applySettingsImportedLlmConfig(data) {
+    const providerSel = document.getElementById('settings-llm-provider');
+    const keyInput = document.getElementById('settings-llm-key');
+    const urlInput = document.getElementById('settings-llm-url');
+    const modelSel = document.getElementById('settings-llm-model');
+
+    const providerValue = data.provider ? (_SETTINGS_OPENCLAW_PROVIDER_MAP[data.provider] || data.provider) : '';
+    if (providerSel && providerValue) {
+        const exists = Array.from(providerSel.options).some(function(option) { return option.value === providerValue; });
+        if (!exists) {
+            const opt = document.createElement('option');
+            opt.value = providerValue;
+            opt.textContent = providerValue;
+            providerSel.appendChild(opt);
+        }
+        providerSel.value = providerValue;
+    }
+    if (keyInput && data.api_key) {
+        keyInput.value = data.api_key;
+        keyInput.type = 'text';
+    }
+    if (urlInput && data.base_url) {
+        urlInput.value = data.base_url;
+    }
+    if (modelSel && data.model) {
+        const exists = Array.from(modelSel.options).some(function(option) { return option.value === data.model; });
+        if (!exists) {
+            const opt = document.createElement('option');
+            opt.value = data.model;
+            opt.textContent = data.model;
+            modelSel.insertBefore(opt, modelSel.firstChild || null);
+        }
+        modelSel.value = data.model;
+    }
+}
+
+function _collectSettingsLlmConfig() {
+    const providerEl = document.getElementById('settings-llm-provider');
+    const keyEl = document.getElementById('settings-llm-key');
+    const urlEl = document.getElementById('settings-llm-url');
+    const modelEl = document.getElementById('settings-llm-model');
+    return {
+        provider: providerEl ? providerEl.value.trim() : '',
+        api_key: keyEl ? keyEl.value.trim() : '',
+        base_url: urlEl ? urlEl.value.trim() : '',
+        model: modelEl ? modelEl.value.trim() : '',
+    };
+}
+
+function _collectSettingsLlmConfigForActions() {
+    const payload = _collectSettingsLlmConfig();
+    const cached = _settingsCache || {};
+    const readCached = function(key) {
+        return typeof cached[key] === 'string' ? cached[key].trim() : '';
+    };
+    return {
+        provider: payload.provider || readCached('LLM_PROVIDER'),
+        api_key: payload.api_key,
+        base_url: payload.base_url || readCached('LLM_BASE_URL'),
+        model: payload.model || readCached('LLM_MODEL'),
+        has_saved_api_key: Boolean(readCached('LLM_API_KEY')),
+    };
+}
+
 /** Settings LLM 组初始化：检测导入按钮可用性，设定 key 输入类型 */
 function _initSettingsLlmGroup(settings) {
     const provider = (settings || {})['LLM_PROVIDER'] || '';
@@ -7771,28 +8606,21 @@ function _initSettingsLlmGroup(settings) {
     }
     // Async check import button availability
     fetch('/api/setup_status').then(r => r.json()).then(status => {
-        const openclawBtn = document.getElementById('settings-import-openclaw-btn');
+        const openclawImportBtn = document.getElementById('settings-import-openclaw-btn');
+        const openclawExportBtn = document.getElementById('settings-export-openclaw-btn');
         const antigravityBtn = document.getElementById('settings-use-antigravity-btn');
-        const openclawSub = document.getElementById('settings-openclaw-subtitle');
+        const openclawImportSub = document.getElementById('settings-openclaw-import-subtitle');
+        const openclawExportSub = document.getElementById('settings-openclaw-export-subtitle');
         const antigravitySub = document.getElementById('settings-antigravity-subtitle');
-        if (openclawBtn) {
-            const ok = status && status.openclaw_installed;
-            openclawBtn.disabled = !ok;
-            openclawBtn.style.opacity = ok ? '1' : '0.45';
-            openclawBtn.style.cursor = ok ? 'pointer' : 'not-allowed';
-            if (openclawSub) openclawSub.textContent = ok
-                ? '自动读取已配置的 API Key、模型和 Provider'
-                : '⚠️ 未检测到 OpenClaw（未安装）';
-        }
-        if (antigravityBtn) {
-            const ok = status && status.antigravity_running;
-            antigravityBtn.disabled = !ok;
-            antigravityBtn.style.opacity = ok ? '1' : '0.45';
-            antigravityBtn.style.cursor = ok ? 'pointer' : 'not-allowed';
-            if (antigravitySub) antigravitySub.textContent = ok
-                ? '通过 Google One Pro 会员免费访问 Claude / Gemini / GPT'
-                : '⚠️ Antigravity 未运行（未启动或无法连接）';
-        }
+        const openclawAvailable = Boolean(status && status.openclaw_installed);
+        _setSettingsActionButtonState(openclawImportBtn, openclawAvailable);
+        _setSettingsActionButtonState(openclawExportBtn, openclawAvailable);
+        if (openclawImportSub) openclawImportSub.textContent = t(openclawAvailable ? 'settings_openclaw_import_hint_ready' : 'settings_openclaw_import_hint_missing');
+        if (openclawExportSub) openclawExportSub.textContent = t(openclawAvailable ? 'settings_openclaw_export_hint_ready' : 'settings_openclaw_export_hint_missing');
+
+        const antigravityAvailable = Boolean(status && status.antigravity_running);
+        _setSettingsActionButtonState(antigravityBtn, antigravityAvailable);
+        if (antigravitySub) antigravitySub.textContent = t(antigravityAvailable ? 'settings_antigravity_ready_subtitle' : 'settings_antigravity_missing_subtitle');
     }).catch(() => {});
 }
 
@@ -7836,14 +8664,16 @@ function settingsLlmProviderChanged() {
 
 /** 检测模型 */
 async function settingsDetectModels() {
-    const apiKey = document.getElementById('settings-llm-key').value.trim();
-    const baseUrl = document.getElementById('settings-llm-url').value.trim();
+    const llmConfig = _collectSettingsLlmConfigForActions();
+    const apiKey = llmConfig.api_key;
+    const baseUrl = llmConfig.base_url;
     const statusEl = document.getElementById('settings-detect-status');
     const modelSel = document.getElementById('settings-llm-model');
     const detectBtn = document.getElementById('settings-detect-models-btn');
-    const provider = document.getElementById('settings-llm-provider').value;
+    const provider = llmConfig.provider;
+    const isLocalKeyless = _isLocalKeylessProvider(provider, baseUrl);
 
-    if (!apiKey) { statusEl.textContent = '⚠️ 请先输入 API Key'; return; }
+    if (!apiKey && !llmConfig.has_saved_api_key && !isLocalKeyless) { statusEl.textContent = '⚠️ 请先输入 API Key'; return; }
     if (!baseUrl) { statusEl.textContent = '⚠️ 请先输入 Base URL'; return; }
 
     const curModel = modelSel.value;
@@ -7855,7 +8685,7 @@ async function settingsDetectModels() {
         const resp = await fetch('/api/discover_models', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey, base_url: baseUrl }),
+            body: JSON.stringify({ provider, api_key: apiKey, base_url: baseUrl }),
         });
         const data = await resp.json();
 
@@ -7906,11 +8736,12 @@ async function settingsDetectModels() {
 /** 一键从 OpenClaw 导入配置 */
 async function settingsImportOpenClaw() {
     const btn = document.getElementById('settings-import-openclaw-btn');
-    const statusEl = document.getElementById('settings-import-status');
+    const statusEl = document.getElementById('settings-llm-sync-status');
+    if (!btn || !statusEl) return;
 
     btn.disabled = true;
     btn.style.opacity = '0.6';
-    statusEl.textContent = '正在从 OpenClaw 读取配置...';
+    statusEl.textContent = t('settings_openclaw_importing');
 
     try {
         const resp = await fetch('/api/import_openclaw_config');
@@ -7921,23 +8752,8 @@ async function settingsImportOpenClaw() {
             return;
         }
 
-        // Fill provider
-        const providerSel = document.getElementById('settings-llm-provider');
-        if (data.provider && providerSel) {
-            const providerMap = { openai: 'openai', deepseek: 'deepseek', google: 'google', anthropic: 'anthropic', antigravity: 'antigravity', minimax: 'minimax', ollama: 'ollama' };
-            providerSel.value = providerMap[data.provider] || '';
-        }
-        // Fill API Key
-        const keyInput = document.getElementById('settings-llm-key');
-        if (data.api_key && keyInput) {
-            keyInput.value = data.api_key;
-            keyInput.type = 'text';
-        }
-        // Fill Base URL
-        const urlInput = document.getElementById('settings-llm-url');
-        if (data.base_url && urlInput) urlInput.value = data.base_url;
-
-        statusEl.textContent = '✅ 已从 OpenClaw 导入配置' + (data.model ? '（模型: ' + data.model + '）' : '') + '，点击"检测模型"确认';
+        _applySettingsImportedLlmConfig(data);
+        statusEl.textContent = t('settings_openclaw_imported') + (data.model ? ' (' + data.model + ')' : '') + t('settings_openclaw_detect_hint');
 
         // Auto-trigger model detection
         setTimeout(() => settingsDetectModels(), 300);
@@ -7950,14 +8766,67 @@ async function settingsImportOpenClaw() {
     }
 }
 
-/** 一键使用 Antigravity */
-async function settingsUseAntigravity() {
-    const btn = document.getElementById('settings-use-antigravity-btn');
-    const statusEl = document.getElementById('settings-import-status');
+/** 一键导出当前配置到 OpenClaw */
+async function settingsExportOpenClaw() {
+    const btn = document.getElementById('settings-export-openclaw-btn');
+    const statusEl = document.getElementById('settings-llm-sync-status');
+    if (!btn || !statusEl) return;
+
+    const payload = _collectSettingsLlmConfigForActions();
+    const isLocalKeyless = _isLocalKeylessProvider(payload.provider, payload.base_url);
+    if ((!payload.api_key && !payload.has_saved_api_key && !isLocalKeyless) || !payload.base_url || !payload.model) {
+        statusEl.textContent = t('settings_openclaw_export_missing');
+        return;
+    }
 
     btn.disabled = true;
     btn.style.opacity = '0.6';
-    statusEl.textContent = '正在配置 Antigravity...';
+    statusEl.textContent = t('settings_openclaw_exporting');
+
+    try {
+        const resp = await fetch('/api/export_openclaw_config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: payload.provider,
+                api_key: payload.api_key,
+                base_url: payload.base_url,
+                model: payload.model,
+            }),
+        });
+        const data = await resp.json();
+
+        if (!resp.ok || data.ok === false || data.error) {
+            statusEl.textContent = '⚠️ ' + (data.error || '导出失败');
+            return;
+        }
+
+        let suffix = '';
+        if (data.gateway_running && data.gateway_restarted) {
+            suffix = ' · ' + t('settings_openclaw_gateway_restarted');
+        } else if (data.gateway_running && !data.gateway_restarted && data.restart_error) {
+            suffix = ' · ' + t('settings_openclaw_gateway_restart_failed');
+        }
+        statusEl.textContent = t('settings_openclaw_exported') + (data.model_ref ? ' (' + data.model_ref + ')' : '') + suffix;
+    } catch (e) {
+        statusEl.textContent = '⚠️ ' + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }
+}
+
+/** 一键使用 Antigravity */
+async function settingsUseAntigravity() {
+    const btn = document.getElementById('settings-use-antigravity-btn');
+    const statusEl = document.getElementById('settings-llm-sync-status');
+    if (!statusEl) return;
+
+    if (btn) {
+        btn.disabled = true;
+        btn.style.opacity = '0.6';
+    }
+    statusEl.textContent = t('sg_antigravity_apply');
 
     // Set provider to antigravity, which auto-fills key and URL
     const providerSel = document.getElementById('settings-llm-provider');
@@ -7966,14 +8835,72 @@ async function settingsUseAntigravity() {
         settingsLlmProviderChanged();
     }
 
-    statusEl.textContent = '✅ 已选择 Antigravity，正在检测可用模型...';
+    statusEl.textContent = t('sg_antigravity_applied');
 
     // Auto-trigger model detection
     setTimeout(() => {
         settingsDetectModels();
-        btn.disabled = false;
-        btn.style.opacity = '1';
+        if (btn) {
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
     }, 300);
+}
+
+async function saveCurrentUserPassword() {
+    const passwordEl = document.getElementById('settings-user-password');
+    const confirmEl = document.getElementById('settings-user-password-confirm');
+    const statusEl = document.getElementById('settings-user-password-inline-status');
+    const saveBtn = document.getElementById('settings-user-password-save-btn');
+    const badgeEl = document.getElementById('settings-user-password-badge');
+    if (!passwordEl || !confirmEl || !statusEl || !saveBtn) return;
+
+    const password = passwordEl.value;
+    const confirmPassword = confirmEl.value;
+    if (!password) {
+        statusEl.textContent = t('settings_user_password_empty');
+        statusEl.className = 'settings-inline-status is-error';
+        passwordEl.focus();
+        return;
+    }
+    if (password !== confirmPassword) {
+        statusEl.textContent = t('settings_user_password_mismatch');
+        statusEl.className = 'settings-inline-status is-error';
+        confirmEl.focus();
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = t('settings_user_password_saving');
+    statusEl.textContent = '';
+    statusEl.className = 'settings-inline-status';
+
+    try {
+        const resp = await fetch('/api/current_user/password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) {
+            throw new Error(data.error || `HTTP ${resp.status}`);
+        }
+
+        window.__currentUserHasPassword = true;
+        if (badgeEl) badgeEl.textContent = t('settings_user_password_status_set');
+        passwordEl.value = '';
+        confirmEl.value = '';
+        statusEl.textContent = t('settings_user_password_saved');
+        statusEl.className = 'settings-inline-status is-success';
+        dismissLocalPasswordBanner(false);
+        updateLocalPasswordBanner();
+    } catch (e) {
+        statusEl.textContent = `${t('settings_user_password_save_fail')}: ${e.message}`;
+        statusEl.className = 'settings-inline-status is-error';
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = t('settings_user_password_save');
+    }
 }
 
 async function saveSettings() {
@@ -7984,6 +8911,7 @@ async function saveSettings() {
         if (!key) return;
         const val = inp.value.trim();
         const orig = _settingsCache[key] || '';
+        if (_isMaskedSettingsSecretValue(orig) && val === '') return;
         if (val !== orig) updates[key] = val;
     });
     if (Object.keys(updates).length === 0) {
@@ -8005,6 +8933,7 @@ async function saveSettings() {
                 const inp = document.querySelector('#settings-body .settings-input[data-key="' + k + '"]');
                 if (inp) _settingsCache[k] = inp.value.trim();
             }
+            await refreshLlmBannerFromSetupStatus();
         } else {
             toast(t('settings_save_failed'));
         }
@@ -8237,12 +9166,62 @@ async function restartTeamclaw() {
 
 // ── Tunnel control ──
 let _tunnelRunning = false;
+let _tunnelPublicDomain = '';
+let _tunnelPendingRefreshTimer = null;
+let _tunnelPendingRefreshAttempts = 0;
+const _TUNNEL_PENDING_REFRESH_MAX = 40;
+
+function _resetTunnelPendingRefreshState() {
+    if (_tunnelPendingRefreshTimer) {
+        clearTimeout(_tunnelPendingRefreshTimer);
+        _tunnelPendingRefreshTimer = null;
+    }
+    _tunnelPendingRefreshAttempts = 0;
+}
+
+function _hideTunnelUrlState(urlRow, urlInput) {
+    if (!urlRow) return;
+    urlRow.style.display = 'none';
+    if (urlInput) {
+        urlInput.value = '';
+        urlInput.placeholder = '';
+        urlInput.title = '';
+        urlInput.dataset.pending = '0';
+    }
+}
+
+function _showTunnelUrlState(urlRow, urlInput, publicDomain) {
+    if (!urlRow || !urlInput) return;
+    urlRow.style.display = 'block';
+    if (publicDomain) {
+        urlInput.value = publicDomain;
+        urlInput.placeholder = publicDomain;
+        urlInput.title = t('tip_copy_url');
+        urlInput.dataset.pending = '0';
+        return;
+    }
+    urlInput.value = '';
+    urlInput.placeholder = t('tunnel_url_pending');
+    urlInput.title = t('tunnel_url_pending');
+    urlInput.dataset.pending = '1';
+}
+
+function _scheduleTunnelPendingRefresh() {
+    if (_tunnelPendingRefreshTimer || _tunnelPendingRefreshAttempts >= _TUNNEL_PENDING_REFRESH_MAX) return;
+    _tunnelPendingRefreshAttempts += 1;
+    _tunnelPendingRefreshTimer = setTimeout(async () => {
+        _tunnelPendingRefreshTimer = null;
+        await _refreshTunnelStatus();
+    }, 1500);
+}
 
 async function _refreshTunnelStatus() {
     try {
         const r = await fetch('/proxy_tunnel/status');
         const data = await r.json();
-        _tunnelRunning = data.running;
+        const publicDomain = (data.public_domain || '').trim();
+        _tunnelRunning = !!data.running;
+        _tunnelPublicDomain = publicDomain;
         const statusEl = document.getElementById('tunnel-status-text');
         const btn = document.getElementById('tunnel-toggle-btn');
         const urlRow = document.getElementById('tunnel-url-row');
@@ -8250,29 +9229,35 @@ async function _refreshTunnelStatus() {
         if (!statusEl) return;
 
         if (data.running) {
-            statusEl.textContent = t('tunnel_running');
-            statusEl.style.color = '#16a34a';
-            btn.textContent = t('tunnel_stop');
-            btn.style.background = '#fee2e2';
-            btn.style.borderColor = '#fca5a5';
-            btn.style.color = '#dc2626';
-            btn.disabled = false;
-            if (data.public_domain) {
-                urlRow.style.display = 'block';
-                urlInput.value = data.public_domain;
-                urlInput.title = t('tip_copy_url');
+            statusEl.textContent = publicDomain
+                ? t('tunnel_running')
+                : `${t('tunnel_running')} · ${t('tunnel_url_pending')}`;
+            statusEl.style.color = publicDomain ? '#16a34a' : '#2563eb';
+            if (btn) {
+                btn.textContent = t('tunnel_stop');
+                btn.style.background = '#fee2e2';
+                btn.style.borderColor = '#fca5a5';
+                btn.style.color = '#dc2626';
+                btn.disabled = false;
+            }
+            _showTunnelUrlState(urlRow, urlInput, publicDomain);
+            if (publicDomain) {
+                _resetTunnelPendingRefreshState();
             } else {
-                urlRow.style.display = 'none';
+                _scheduleTunnelPendingRefresh();
             }
         } else {
+            _resetTunnelPendingRefreshState();
             statusEl.textContent = t('tunnel_stopped');
             statusEl.style.color = '#888';
-            btn.textContent = t('tunnel_start');
-            btn.style.background = '#f5f5f5';
-            btn.style.borderColor = '#ccc';
-            btn.style.color = '#333';
-            btn.disabled = false;
-            urlRow.style.display = 'none';
+            if (btn) {
+                btn.textContent = t('tunnel_start');
+                btn.style.background = '#f5f5f5';
+                btn.style.borderColor = '#ccc';
+                btn.style.color = '#333';
+                btn.disabled = false;
+            }
+            _hideTunnelUrlState(urlRow, urlInput);
         }
     } catch (e) {
         const statusEl = document.getElementById('tunnel-status-text');
@@ -8286,6 +9271,7 @@ async function _refreshTunnelStatus() {
 async function toggleTunnel() {
     const btn = document.getElementById('tunnel-toggle-btn');
     btn.disabled = true;
+    _resetTunnelPendingRefreshState();
 
     if (_tunnelRunning) {
         btn.textContent = t('tunnel_stopping');
@@ -8297,11 +9283,12 @@ async function toggleTunnel() {
         }
     } else {
         btn.textContent = t('tunnel_starting');
+        _showTunnelUrlState(document.getElementById('tunnel-url-row'), document.getElementById('tunnel-url-input'), '');
         try { await fetch('/proxy_tunnel/start', { method: 'POST' }); } catch (e) { /* ignore */ }
         for (let i = 0; i < 30; i++) {
             await new Promise(r => setTimeout(r, 2000));
             await _refreshTunnelStatus();
-            if (_tunnelRunning) break;
+            if (_tunnelRunning && _tunnelPublicDomain) break;
         }
     }
     btn.disabled = false;
@@ -8327,6 +9314,10 @@ window.location.href = '/studio?redirect=group_chat';
 
 // ── Init ──
 document.addEventListener('DOMContentLoaded', async () => {
+  document.documentElement.lang = _currentLang === 'zh' ? 'zh-CN' : 'en';
+  document.title = t('page_title');
+  applyLangToDOM();
+
   // Check login session first — share login with main page
   try {
     const resp = await fetch('/proxy_check_session');
@@ -8334,6 +9325,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = await resp.json();
       if (data.valid && data.user_id) {
         window.__currentUser = data.user_id;
+        window.__currentUserHasPassword = Boolean(data.has_password);
+        window.__currentLoginMode = data.mode || '';
+        _syncLocalPasswordBannerDismissedState();
       } else {
         // Not logged in — redirect to main page for login, with redirect back
 window.location.href = '/studio?redirect=group_chat';
@@ -8350,6 +9344,7 @@ window.location.href = '/studio?redirect=group_chat';
   }
 
   refreshGroups();
+  startGroupsPolling();
 
   // Check LLM API config
   try {
@@ -8361,6 +9356,8 @@ window.location.href = '/studio?redirect=group_chat';
       }
     }
   } catch(e) {}
+
+  updateLocalPasswordBanner();
 
   // Click outside to close popups
   document.addEventListener('click', (e) => {

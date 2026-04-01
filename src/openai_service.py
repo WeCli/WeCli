@@ -1,3 +1,12 @@
+"""
+OpenAI 兼容 API 服务模块
+
+提供 OpenAI Chat Completions API 的实现：
+- 处理聊天补全请求（流式/非流式）
+- 管理 agent 工具白名单
+- 支持工具调用和外部工具集成
+"""
+
 import asyncio
 import json
 import os
@@ -80,6 +89,8 @@ def _get_agent_tool_whitelist(session_id: str) -> set[str] | None:
 
 
 class OpenAIChatService:
+    """OpenAI 兼容聊天服务，提供 Chat Completions API 实现。"""
+
     def __init__(
         self,
         *,
@@ -96,6 +107,7 @@ class OpenAIChatService:
         self.protocol = OpenAIProtocolHelper(build_human_message=build_human_message)
 
     def openai_msg_to_human_message(self, msg: ChatMessage) -> HumanMessage:
+        """将 OpenAI 格式消息转换为 HumanMessage。"""
         return self.protocol.openai_msg_to_human_message(msg)
 
     def make_completion_id(self) -> str:
@@ -442,6 +454,9 @@ class OpenAIChatService:
             "enabled_tools": effective_enabled,
             "user_id": user_id,
             "session_id": session_id,
+            "max_turns": req.max_turns,
+            "max_tokens": req.max_tokens,
+            "turn_count": 0,
             "external_tools": req.tools,
         }
         # Per-request LLM model override (from OASIS SessionExpert)
@@ -459,6 +474,7 @@ class OpenAIChatService:
             model_name=model_name,
             external_tool_names=external_tool_names,
             thread_lock=thread_lock,
+            max_tokens=req.max_tokens,
         )
 
         logger.info("chat user=%s session=%s stream=%s model=%s",

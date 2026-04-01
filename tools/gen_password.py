@@ -9,20 +9,26 @@ import json
 import os
 import getpass
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config", "users.json")
+# 用户配置文件路径
+CONFIG_FILE_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "config",
+    "users.json"
+)
 
 
 def hash_password(password: str) -> str:
+    """使用 SHA-256 对密码进行哈希处理。"""
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 
 def main():
     # 加载已有用户
-    users = {}
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-            users = json.load(f)
-        print(f"已加载 {len(users)} 个用户: {', '.join(users.keys())}")
+    users_database = {}
+    if os.path.exists(CONFIG_FILE_PATH):
+        with open(CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
+            users_database = json.load(f)
+        print(f"已加载 {len(users_database)} 个用户: {', '.join(users_database.keys())}")
     else:
         print("未检测到 users.json，将创建新文件。")
 
@@ -37,19 +43,19 @@ def main():
         print("密码不能为空！")
         return
 
-    confirm = getpass.getpass("请再次输入密码: ")
-    if password != confirm:
+    password_confirm = getpass.getpass("请再次输入密码: ")
+    if password != password_confirm:
         print("两次密码不一致！")
         return
 
-    pw_hash = hash_password(password)
-    users[username] = pw_hash
+    password_hash = hash_password(password)
+    users_database[username] = password_hash
 
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=4)
+    with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+        json.dump(users_database, f, ensure_ascii=False, indent=4)
 
-    print(f"\n✅ 用户 '{username}' 已保存到 {CONFIG_PATH}")
-    print(f"   哈希: {pw_hash}")
+    print(f"\n用户 '{username}' 已保存到 {CONFIG_FILE_PATH}")
+    print(f"   哈希值: {password_hash}")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,14 @@
+"""
+会话管理路由模块
+
+提供会话相关的 API 路由：
+- POST /sessions：获取会话列表
+- POST /sessions_status：批量获取会话状态
+- POST /session_history：获取会话消息历史
+- POST /delete_session：删除会话
+- POST /session_status：获取单个会话状态
+"""
+
 from typing import Any, Callable
 
 from fastapi import APIRouter, Header

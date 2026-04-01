@@ -1,8 +1,8 @@
 """
-OASIS Forum - Discussion Engine
+OASIS Forum - 讨论引擎
 
-Manages the full lifecycle of a discussion:
-  Round loop -> scheduled/parallel expert participation -> consensus check -> summarize
+管理讨论的完整生命周期：
+  轮次循环 → 调度/并行专家参与 → 共识检查 → 总结
 
 Three expert backends:
   1. ExpertAgent  — direct LLM (stateless, name="tag#temp#N")
@@ -17,35 +17,35 @@ Three expert backends:
        falls back to HTTP API if ACP unavailable and api_url is configured.
        Session suffix defaults to teamclawchat if not specified in model (aligned with group ACP).
 
-Expert pool sourcing (YAML-only, schedule_file or schedule_yaml required):
-  Pool is built entirely from YAML expert names (deduplicated).
-  Priority: schedule_file > schedule_yaml (file takes precedence if both provided).
-  Names MUST contain '#' to specify type:
-    "tag#temp#N"              → ExpertAgent (tag looked up in presets for name/persona)
-    "tag#oasis#<name>"       → SessionExpert (name→session lookup, tag→persona)
-    "#oasis#<name>"          → SessionExpert (name→session lookup, no tag)
-    "name#ext#<id>"          → ExternalExpert (requires api_url in YAML)
-  Names without '#' are skipped with a warning.
+专家池来源（仅 YAML，需要 schedule_file 或 schedule_yaml）：
+  专家池完全从 YAML 专家名称构建（去重）。
+  优先级：schedule_file > schedule_yaml（如果两者都提供，文件优先）。
+  名称必须包含 '#' 来指定类型：
+    "tag#temp#N"              → ExpertAgent（从预设中查找 tag 获取 name/persona）
+    "tag#oasis#<name>"       → SessionExpert（name→session 查找，tag→persona）
+    "#oasis#<name>"          → SessionExpert（name→session 查找，无 tag）
+    "name#ext#<id>"          → ExternalExpert（YAML 中需要 api_url）
+  不含 '#' 的名称会被警告并跳过。
 
-  Session IDs are resolved from agent names via internal agent JSON.
-  To explicitly ensure a fresh session, append "#new" to the name:
-    "tag#oasis#name#new"  → "#new" is stripped, resolved session_id replaced with random UUID
-  This guarantees no accidental reuse of an existing session.
+  Session ID 通过内部代理 JSON 从代理名称解析。
+  要明确确保新会话，请在名称后附加 "#new"：
+    "tag#oasis#name#new"  → "#new" 被剥离，解析的 session_id 替换为随机 UUID
+  这保证了不会意外重用现有会话。
 
-  If YAML uses `all_experts: true`, all experts in the pool speak in parallel.
-  Even for simple all-parallel scenarios, a minimal YAML suffices:
+  如果 YAML 使用 `all_experts: true`，池中所有专家并行发言。
+  即使是简单的全并行场景，也只需最简 YAML：
     version: 1
     repeat: true
     plan:
       - all_experts: true
 
-No separate expert-session storage: session_ids are resolved from agent names
-via internal agent JSON (internal_agents.json), then used to access the
-Agent checkpoint DB.
+没有单独的专家-会话存储：session_id 通过内部代理 JSON
+（internal_agents.json）从代理名称解析，然后用于访问
+Agent checkpoint DB。
 
-Execution modes:
-  1. Default (repeat + all_experts): all experts participate in parallel each round
-  2. Scheduled: follow a YAML schedule that defines speaking order per step
+执行模式：
+  1. 默认（repeat + all_experts）：所有专家每轮并行参与
+  2. 调度模式：遵循 YAML 调度，定义每一步的发言顺序
 """
 
 import asyncio
@@ -78,10 +78,10 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 
 
 def _load_external_agents(user_id: str, team: str = "") -> list[dict]:
-    """Load the team's external_agents.json list.
+    """加载团队的 external_agents.json 列表。
 
-    Returns list of {"name", "tag", "global_name", "config"?, ...} entries.
-    Returns [] if file missing, unreadable, or no team specified.
+    返回 {"name", "tag", "global_name", "config"?, ...} 条目列表。
+    如果文件缺失、不可读或未指定团队，返回 []。
     """
     if not user_id or not team:
         return []
@@ -97,11 +97,11 @@ def _load_external_agents(user_id: str, team: str = "") -> list[dict]:
 
 
 def _find_external_agent_global_name(external_agents: list[dict], name: str) -> str:
-    """Find the 'global_name' field from external_agents.json by agent name.
+    """从 external_agents.json 中按代理名称查找 'global_name' 字段。
 
-    Returns the global_name string (the real ACP agent name).
-    When no team is configured (external_agents list is empty), falls back to
-    *name* itself so that ACP agents can still be created.
+    返回 global_name 字符串（真实的 ACP 代理名称）。
+    当没有配置团队（external_agents 列表为空）时，
+    回退到 *name* 本身，以便仍能创建 ACP 代理。
     """
     if not external_agents:
         return name
@@ -113,18 +113,18 @@ def _find_external_agent_global_name(external_agents: list[dict], name: str) -> 
 
 
 def _load_internal_agents(user_id: str, team: str = "") -> list[dict]:
-    """Load the internal-agent JSON list for a user.
+    """加载用户的内部代理 JSON 列表。
 
-    Reads internal_agents.json:
+    读取 internal_agents.json：
       [{"name": ..., "tag": ..., "session": "sid"}, ...]
 
-    If team is specified, load from the team-scoped path:
+    如果指定了团队，从团队作用域路径加载：
       data/user_files/{user_id}/teams/{team}/internal_agents.json
-    Otherwise load from:
+    否则从以下路径加载：
       data/user_files/{user_id}/internal_agents.json
 
-    Returns list of {"session": "<id>", "meta": {"name": ..., "tag": ...}} entries.
-    Returns [] if file missing or unreadable.
+    返回 {"session": "<id>", "meta": {"name": ..., "tag": ...}} 条目列表。
+    如果文件缺失或不可读，返回 []。
     """
     if team:
         base_dir = os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "teams", team)
@@ -154,9 +154,9 @@ def _load_internal_agents(user_id: str, team: str = "") -> list[dict]:
 
 
 def _resolve_session_by_name(agents: list[dict], name: str) -> str | None:
-    """Find session_id by matching agent meta.name (case-insensitive).
+    """通过匹配代理 meta.name 查找 session_id（不区分大小写）。
 
-    Returns the session_id string, or None if not found.
+    返回 session_id 字符串，如果未找到则返回 None。
     """
     name_lower = name.lower()
     for a in agents:
@@ -167,9 +167,9 @@ def _resolve_session_by_name(agents: list[dict], name: str) -> str | None:
 
 
 def _find_tag_in_internal_agents(agents: list[dict], session_id: str) -> str:
-    """Find the tag from internal agent JSON by session_id.
+    """通过 session_id 从内部代理 JSON 中查找 tag。
 
-    Returns the tag string, or "" if not found.
+    返回 tag 字符串，如果未找到则返回 ""。
     """
     for a in agents:
         if a.get("session") == session_id:
@@ -177,15 +177,15 @@ def _find_tag_in_internal_agents(agents: list[dict], session_id: str) -> str:
     return ""
 
 def _extract_selector_choice(content: str) -> int | None:
-    """Extract the selector choice number from a post's content.
+    """从帖子的内容中提取选择器选择编号。
 
-    Parses teamclaw_type JSON: {"teamclaw_type": "oasis choose", "choose": N, ...}
-    Reads the 'choose' field which can be:
-      - int: used directly
-      - str: converted to int if numeric
-      - dict: reads 'option' or 'choice' key
+    解析 teamclaw_type JSON：{"teamclaw_type": "oasis choose", "choose": N, ...}
+    读取 'choose' 字段，可以是：
+      - int：直接使用
+      - str：如果为数字则转换为 int
+      - dict：读取 'option' 或 'choice' 键
 
-    Returns the choice number (int), or None if no valid choice found.
+    返回选择编号（int），如果未找到有效选择则返回 None。
     """
     # Scan for top-level { ... } candidates using brace-depth tracking
     depth = 0
@@ -234,26 +234,26 @@ except FileNotFoundError:
 
 
 def _get_summarizer():
-    """Create a low-temperature LLM for reliable summarization."""
+    """创建低温 LLM 用于可靠的总结生成。"""
     return create_chat_model(temperature=0.3, max_tokens=2048)
 
 
 class DiscussionEngine:
     """
-    Orchestrates one complete discussion session.
+    协调一个完整的讨论会话。
 
-    Flow:
-      1. Execute steps in schedule-defined order
-      2. After each round, check if consensus is reached
-      3. When done (consensus or max rounds), summarize top posts into conclusion
+    流程：
+      1. 按调度定义的顺序执行步骤
+      2. 每轮后检查是否达成共识
+      3. 完成后（达成共识或达到最大轮数），将最高赞帖子总结为结论
 
-    Pool construction (YAML-only):
-      Expert pool is built entirely from YAML expert names (deduplicated).
-      "tag#temp#N"          → ExpertAgent (tag→name/persona from presets)
-      "tag#oasis#name"      → SessionExpert (name→session lookup, tag→persona)
-      "#oasis#name"         → SessionExpert (name→session lookup, no tag)
-      "name#ext#id"         → ExternalExpert (api_url/api_key/model from YAML)
-      Any name + "#new"     → force fresh session (id replaced with random UUID)
+    专家池构建（仅 YAML）：
+      专家池完全从 YAML 专家名称构建（去重）。
+      "tag#temp#N"          → ExpertAgent（tag→从预设中查找 name/persona）
+      "tag#oasis#name"      → SessionExpert（name→session 查找，tag→persona）
+      "#oasis#name"         → SessionExpert（name→session 查找，无 tag）
+      "name#ext#id"         → ExternalExpert（从 YAML 获取 api_url/api_key/model）
+      任意名称 + "#new"     → 强制新会话（id 替换为随机 UUID）
     """
 
     def __init__(
@@ -500,10 +500,10 @@ class DiscussionEngine:
 
     @staticmethod
     def _lookup_by_tag(tag: str, user_id: str, team: str = "") -> dict | None:
-        """Find expert config by tag. Returns {"name", "persona", ...} or None.
+        """通过 tag 查找专家配置。返回 {"name", "persona", ...} 或 None。
 
-        When *team* is provided, team-specific experts take priority (they
-        appear first in the list returned by get_all_experts).
+        当提供 *team* 时，团队特定专家优先
+        （它们出现在 get_all_experts 返回列表的前面）。
         """
         for c in get_all_experts(user_id, team=team):
             if c["tag"] == tag:
@@ -511,10 +511,10 @@ class DiscussionEngine:
         return None
 
     def _resolve_experts(self, names: list[str]) -> list:
-        """Resolve expert references to Expert objects.
+        """将专家引用解析为 Expert 对象。
 
-        Matching priority: full name > title > tag > session_id.
-        Skip unknown names.
+        匹配优先级：全名 > title > tag > session_id。
+        跳过未知名称。
         """
         resolved = []
         for name in names:
@@ -526,10 +526,11 @@ class DiscussionEngine:
         return resolved
 
     def cancel(self):
-        """Request graceful cancellation. Takes effect before the next round."""
+        """请求优雅取消。在下一轮之前生效。"""
         self._cancelled = True
 
     def _check_cancelled(self):
+        """检查是否已请求取消，若是则抛出 CancelledError。"""
         if self._cancelled:
             raise asyncio.CancelledError("Discussion cancelled by user")
 
@@ -696,7 +697,7 @@ class DiscussionEngine:
         )
 
     async def run(self):
-        """Run the full discussion loop (called as a background task)."""
+        """运行完整的讨论循环（作为后台任务调用）。"""
         self.forum.status = "discussing"
         self.forum.discussion = self._discussion
         self.forum.start_clock()
@@ -762,18 +763,18 @@ class DiscussionEngine:
             pass
 
     async def _run_graph(self):
-        """Execute the graph using Pregel-style super-step iteration.
+        """使用 Pregel 风格超步迭代执行图。
 
-        Algorithm:
-          1. Initialize: activate all entry nodes (nodes with no incoming edges)
-          2. Super-step loop:
-             a. Execute all activated nodes in parallel
-             b. For each completed node, evaluate outgoing edges:
-                - Fixed edges: always fire → activate target
-                - Conditional edges: evaluate condition → activate chosen target
-             c. Collect newly activated nodes for next super-step
-             d. If no new activations or END reached → stop
-          3. Safety: stop after MAX_SUPER_STEPS to prevent infinite loops
+        算法：
+          1. 初始化：激活所有入口节点（没有入边的节点）
+          2. 超步循环：
+             a. 并行执行所有已激活节点
+             b. 对于每个完成的节点，评估出边：
+                - 固定边：始终触发 → 激活目标
+                - 条件边：评估条件 → 激活选中的目标
+             c. 收集新激活的节点用于下一超步
+             d. 如果没有新激活或到达 END → 停止
+          3. 安全限制：MAX_SUPER_STEPS 后停止以防止无限循环
         """
         sched = self.schedule
         node_map = sched.node_map
@@ -967,11 +968,11 @@ class DiscussionEngine:
         print(f"  [OASIS] 🏁 Graph completed in {super_step} super-steps, {self._total_node_execs} node executions")
 
     def _build_visibility_filter_graph(self, node_id: str, completed_set: set[str]) -> dict:
-        """Build visibility filter for a node based on its upstream nodes in the graph.
+        """根据节点的上游节点构建可见性过滤器。
 
-        In execute mode (non-discussion):
-          Agent can only see posts from direct upstream (incoming edge source) nodes.
-        In discussion mode: no filtering (returns empty dict).
+        在执行模式（非讨论模式）：
+          Agent 只能看到来自直接上游（入边源）节点的帖子。
+        在讨论模式下：不进行过滤（返回空字典）。
         """
         if self._discussion:
             return {}
@@ -998,15 +999,15 @@ class DiscussionEngine:
         return {"visible_authors": upstream_authors}
 
     async def _eval_condition(self, condition: str) -> bool:
-        """Evaluate a condition expression against current forum state.
+        """根据当前论坛状态评估条件表达式。
 
-        Supported expressions:
-          last_post_contains:<keyword>       — last post content contains keyword
-          last_post_not_contains:<keyword>   — last post does NOT contain keyword
-          post_count_gte:<N>                 — total post count >= N
-          post_count_lt:<N>                  — total post count < N
-          always                             — always true
-          !<expr>                            — negate any expression
+        支持的表达式：
+          last_post_contains:<keyword>       — 最后一帖内容包含关键字
+          last_post_not_contains:<keyword>   — 最后一帖内容不包含关键字
+          post_count_gte:<N>                 — 总帖数 >= N
+          post_count_lt:<N>                  — 总帖数 < N
+          always                             — 始终为真
+          !<expr>                            — 取反任意表达式
         """
         expr = condition.strip()
 
@@ -1042,7 +1043,7 @@ class DiscussionEngine:
         return False
 
     async def _execute_node(self, step: ScheduleStep, vis: dict | None = None):
-        """Execute a single graph node."""
+        """执行单个图节点。"""
         disc = self._discussion
         if vis is None:
             vis = {}
@@ -1139,6 +1140,7 @@ class DiscussionEngine:
                 )
 
     async def _consensus_reached(self) -> bool:
+        """检查是否达成共识（最高赞帖子获得 >= 70% 专家点赞）。"""
         top = await self.forum.get_top_posts(1)
         if not top:
             return False
@@ -1146,6 +1148,7 @@ class DiscussionEngine:
         return top[0].upvotes >= threshold
 
     async def _summarize(self) -> str:
+        """总结讨论：将最高赞帖子发送给 LLM 生成综合结论。"""
         top_posts = await self.forum.get_top_posts(5)
         all_posts = await self.forum.browse()
 

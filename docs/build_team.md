@@ -2,6 +2,8 @@
 
 > This document provides a quick reference for building a team using TeamClaw CLI, focusing on core commands without trial-and-error details.
 
+If you want the browser-based flow that starts from a task description, discovered SOP pages, or a workflow canvas, read [team-creator.md](./team-creator.md) first.
+
 ---
 
 ## 1. Prerequisites
@@ -59,13 +61,15 @@ Members (1):
 
 TeamClaw supports **3 types** of agents: Internal, OpenClaw, and External.
 
+External agents communicate via HTTP or the **Agent Client Protocol (ACP)** through the `acpx` CLI adapter. ACP supports tools like `openclaw`, `codex`, `claude`, `gemini`, and `aider`. `acpx` is automatically installed during `bash selfskill/scripts/run.sh setup`.
+
 ### 3.1 Internal Agent (Lightweight)
 
 > **关键概念区分**：
-> - **`#oasis#` 格式 = Internal Agent**：在 OASIS 工作流 YAML 中，使用 `#oasis#` 格式引用的是 **Internal Agent**（团队内部已定义的 session agent）。
+> - `#oasis#` 格式 = Internal Agent：在 OASIS 工作流 YAML 中，使用 `#oasis#` 格式引用的是 **Internal Agent**（团队内部已定义的 session agent）。
 >   - 例如：`architect#oasis#my_architect` 表示使用 tag 为 `architect` 的人设，通过名为 `my_architect` 的 internal session agent 执行。
 >   - Internal Agent 需要预先在 `internal_agents.json` 中定义。
-> - **`#temp#` 格式 = 临时人设**：不需要预先定义 Internal Agent，只需要有对应的人设 prompt 即可。
+> - `#temp#` 格式 = 临时人设：不需要预先定义 Internal Agent，只需要有对应的人设 prompt 即可。
 >   - 例如：`creative#temp#1` 表示使用 tag 为 `creative` 的人设，创建一个临时的、无状态的实例。
 >   - **Temp Agent 不需要预先定义**，只要 `oasis_experts.json` 或公共人设中存在该 tag 的 prompt 即可使用。
 >   - 适合用于辩论、头脑风暴等不需要跨轮次记忆的场景。
@@ -106,7 +110,7 @@ uv run scripts/cli.py internal-agents delete \
 
 OpenClaw Agent 是运行在 OASIS 后端的真实 Agent 实例。添加到 Team 需要**先确保后端有真实配置**，再同步到 JSON。
 
-> ⚠️ **前置必要步骤**：在将 OpenClaw agent 加入 Team 之前，**必须**先执行以下命令检查已有的 OpenClaw agent：
+> 在将 OpenClaw agent 加入 Team 之前，**必须**先执行以下命令检查已有的 OpenClaw agent：
 > ```bash
 > uv run scripts/cli.py -u <username> openclaw sessions
 > ```
@@ -194,7 +198,7 @@ uv run scripts/cli.py -u <username> openclaw snapshot export \
   --name <AGENT_NAME>
 ```
 
-> ⚠️ **关键区别**: CLI 需要用户显式执行 `export` 才能将后端配置同步到 JSON；而前端在关闭 Agent 配置面板时会自动执行 sync_all。
+> CLI 需要用户显式执行 `export` 才能将后端配置同步到 JSON；而前端在关闭 Agent 配置面板时会自动执行 sync_all。
 
 ### 3.3 External Agent (API-based)
 
@@ -216,7 +220,7 @@ uv run scripts/cli.py teams add-ext-member \
   }'
 ```
 
-**Note**: 
+**Note:**
 - `name` and `global_name` are required fields. Keep them consistent to point to the same entity.
 - **Important**: When adding an OpenClaw agent, the `tag` field should be set to `"openclaw"` (recommended). This allows the system to correctly identify and route requests to the appropriate ACP (Agent Communication Protocol) handler. Other possible values include `codex`, but `openclaw` is the recommended tag for OpenClaw agents.
 
@@ -407,11 +411,9 @@ uv run scripts/cli.py teams members --team-name demo_team
 ## 8. Summary
 
 The core workflow for building a TeamClaw team using CLI is:
-**Create Team → Add Members (Internal/OpenClaw/External) → Add Personas → Verify
-**.
+**Create Team → Add Members (Internal/OpenClaw/External) → Add Personas → Verify**.
 
-All operations are based on `scripts/cli.py`, ensure execution under `uv run` en
-vironment.
+All operations are based on `scripts/cli.py`, ensure execution under `uv run` environment.
 
 ---
 

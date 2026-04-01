@@ -2,10 +2,14 @@
 # -*- coding: utf-8 -*-
 """
 Cloudflare Tunnel 公网部署脚本
+
+功能：
 - 自动检测平台（Linux/macOS/Windows + amd64/arm64）
-- 提示用户手动安装 cloudflared
+- 提示用户手动安装 cloudflared 或自动下载
 - 启动隧道：前端 Web UI
-- 打印公网地址
+- 打印公网访问地址
+
+用法：python scripts/tunnel.py
 """
 
 import os
@@ -19,34 +23,40 @@ import threading
 import atexit
 from dotenv import load_dotenv
 
+# 平台检测
 IS_WINDOWS = platform.system().lower() == "windows"
 
-# ── 项目路径 ──────────────────────────────────────────────
+# ── 项目路径配置 ──────────────────────────────────────────────
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(PROJECT_ROOT)
 
 BIN_DIR = os.path.join(PROJECT_ROOT, "bin")
-os.makedirs(BIN_DIR, exist_ok=True)
+# 注意：不在模块级别创建 bin/，仅在实际需要下载二进制文件时才创建（见 _download_cloudflared）
 
+# cloudflared 可执行文件路径
 CLOUDFLARED_PATH = os.path.join(BIN_DIR, "cloudflared.exe" if IS_WINDOWS else "cloudflared")
-ENV_PATH = os.path.join(PROJECT_ROOT, "config", ".env")
-PIDFILE_PATH = os.path.join(PROJECT_ROOT, ".tunnel.pid")
+ENV_FILE_PATH = os.path.join(PROJECT_ROOT, "config", ".env")
+PID_FILE_PATH = os.path.join(PROJECT_ROOT, ".tunnel.pid")
 
-# ── 加载配置 ──────────────────────────────────────────────
+# ── 加载环境配置 ──────────────────────────────────────────────
 load_dotenv(dotenv_path=os.path.join(PROJECT_ROOT, "config", ".env"))
 PORT_FRONTEND = os.getenv("PORT_FRONTEND", "51209")
 
-# ── 全局进程引用 ──────────────────────────────────────────
-tunnel_procs = []
-tunnel_urls = {}  # {"frontend": "https://..."}
-urls_lock = threading.Lock()
-all_tunnels_ready = threading.Event()
-expected_tunnels = 1
-_cleanup_done = False
+# ── 全局状态 ──────────────────────────────────────────────────
+tunnel_procs = []  # 隧道进程列表
+tunnel_urls = {}   # 隧道URL映射，格式：{"frontend": "https://..."}
+urls_lock = threading.Lock()  # URL映射的线程锁
+all_tunnels_ready = threading.Event()  # 隧道就绪事件
+expected_tunnels = 1  # 期望的隧道数量
+_cleanup_done = False  # 清理完成标志
 
 
 def detect_platform():
-    """检测当前平台，返回 (os_name, arch)"""
+    """检测当前操作系统和架构信息
+
+    返回：
+        tuple: (os_name, arch) - 例如 ("linux", "amd64") 或 ("darwin", "arm64")
+    """
     os_name = platform.system().lower()   # linux / darwin / windows
     machine = platform.machine().lower()  # x86_64 / aarch64 / arm64 / amd64
 
@@ -65,8 +75,16 @@ def detect_platform():
     return os_name, arch
 
 
-def download_url(os_name, arch):
-    """根据平台返回 cloudflared 下载 URL"""
+def get_download_url(os_name, arch):
+    """根据操作系统和架构生成 cloudflared 下载 URL
+
+    参数：
+        os_name: 操作系统名称（linux/darwin/windows）
+        arch: CPU架构（amd64/arm64）
+
+    返回：
+        str: 下载链接
+    """
     base = "https://github.com/cloudflare/cloudflared/releases/latest/download"
     if os_name == "linux":
         return f"{base}/cloudflared-linux-{arch}"
@@ -78,9 +96,13 @@ def download_url(os_name, arch):
 
 
 def _download_cloudflared():
-    """自动下载 cloudflared 到 bin/ 目录，返回路径或 None"""
+    """自动下载 cloudflared 到 bin/ 目录
+
+    返回：
+        str or None: 成功返回下载后的路径，失败返回 None
+    """
     os_name, arch = detect_platform()
-    url = download_url(os_name, arch)
+    url = get_download_url(os_name, arch)
     if not url:
         return None
 
@@ -88,9 +110,10 @@ def _download_cloudflared():
     print(f"   URL: {url}")
 
     try:
+        os.makedirs(BIN_DIR, exist_ok=True)
         import urllib.request
         if os_name == "darwin":
-            # macOS: 下载 tgz 并解压
+            # macOS: 下载 tgz 压缩包并解压
             tgz_path = os.path.join(BIN_DIR, "cloudflared.tgz")
             urllib.request.urlretrieve(url, tgz_path)
             import tarfile
@@ -98,7 +121,7 @@ def _download_cloudflared():
                 tar.extract("cloudflared", BIN_DIR)
             os.remove(tgz_path)
         else:
-            # Linux/Windows: 直接下载二进制
+            # Linux/Windows: 直接下载二进制文件
             urllib.request.urlretrieve(url, CLOUDFLARED_PATH)
 
         if not IS_WINDOWS:
@@ -110,9 +133,17 @@ def _download_cloudflared():
         return None
 
 
-def get_cloudflared_install_guide(os_name, arch):
-    """返回 cloudflared 手动安装指南"""
-    url = download_url(os_name, arch)
+def get_install_guide(os_name, arch):
+    """生成 cloudflared 手动安装指南（跨平台）
+
+    参数：
+        os_name: 操作系统名称
+        arch: CPU架构
+
+    返回：
+        str: 安装指南文本
+    """
+    url = get_download_url(os_name, arch)
 
     if os_name == "linux":
         return f"""
@@ -163,7 +194,13 @@ def get_cloudflared_install_guide(os_name, arch):
 
 
 def ensure_cloudflared():
-    """确保 cloudflared 可用：优先查找已有 → 自动下载 → 失败则打印手动指南"""
+    """确保 cloudflared 可用
+
+    优先级：bin/ 目录 > 系统 PATH > 自动下载 > 失败则打印手动指南
+
+    返回：
+        str: cloudflared 可执行文件路径
+    """
     # 优先检查 bin/ 目录
     if os.path.isfile(CLOUDFLARED_PATH) and (IS_WINDOWS or os.access(CLOUDFLARED_PATH, os.X_OK)):
         print(f"✅ 已找到 cloudflared: {CLOUDFLARED_PATH}")
@@ -184,28 +221,34 @@ def ensure_cloudflared():
     os_name, arch = detect_platform()
     print("❌ 未找到且自动下载失败")
     print("=" * 60)
-    print(get_cloudflared_install_guide(os_name, arch))
+    print(get_install_guide(os_name, arch))
     print("=" * 60)
     print("\n💡 安装完成后，请重新运行此脚本")
     sys.exit(1)
 
 
-def _remove_pidfile():
+def _remove_pid_file():
     """安全删除 PID 文件"""
     try:
-        if os.path.isfile(PIDFILE_PATH):
-            os.remove(PIDFILE_PATH)
+        if os.path.isfile(PID_FILE_PATH):
+            os.remove(PID_FILE_PATH)
     except OSError:
         pass
 
 
 def cleanup(signum=None, frame=None):
-    """清理所有隧道进程、PID 文件和 PUBLIC_DOMAIN"""
+    """清理所有隧道进程、PID 文件和公网域名配置
+
+    参数：
+        signum: 信号编号（用于信号处理）
+        frame: 当前栈帧
+    """
     global _cleanup_done
     if _cleanup_done:
         return
     _cleanup_done = True
 
+    # 终止所有隧道进程
     for proc in tunnel_procs:
         if proc and proc.poll() is None:
             print(f"🛑 正在关闭隧道进程 (PID: {proc.pid})...")
@@ -218,9 +261,9 @@ def cleanup(signum=None, frame=None):
         print("✅ 所有隧道已关闭")
 
     # 清理 PID 文件
-    _remove_pidfile()
+    _remove_pid_file()
 
-    # 清理 PUBLIC_DOMAIN
+    # 清理公网域名配置
     try:
         write_env_key("PUBLIC_DOMAIN", "")
         print("🧹 已清理 PUBLIC_DOMAIN")
@@ -232,8 +275,13 @@ def cleanup(signum=None, frame=None):
 
 
 def write_env_key(key: str, value: str):
-    """Write or update a single key in config/.env"""
-    env_file = ENV_PATH
+    """更新或写入 config/.env 中的单个配置项
+
+    参数：
+        key: 配置项名称
+        value: 配置项值
+    """
+    env_file = ENV_FILE_PATH
 
     if os.path.exists(env_file):
         with open(env_file, "r", encoding="utf-8") as f:
@@ -245,12 +293,14 @@ def write_env_key(key: str, value: str):
     new_lines = []
     for line in lines:
         stripped = line.strip()
+        # 匹配 key=value 或 # key=value（被注释的行）
         if stripped.startswith(f"{key}=") or stripped.startswith(f"# {key}="):
             new_lines.append(f"{key}={value}\n")
             key_found = True
         else:
             new_lines.append(line)
 
+    # 如果 key 不存在，追加到文件末尾
     if not key_found:
         if new_lines and not new_lines[-1].endswith("\n"):
             new_lines.append("\n")
@@ -261,26 +311,30 @@ def write_env_key(key: str, value: str):
 
 
 def write_domains_to_env():
-    """Write all captured tunnel URLs to config/.env"""
+    """将捕获到的隧道公网 URL 写入 config/.env"""
     with urls_lock:
         if "frontend" in tunnel_urls:
             write_env_key("PUBLIC_DOMAIN", tunnel_urls["frontend"])
-    print(f"📝 已将公网域名写入 {ENV_PATH}")
+    print(f"📝 已将公网域名写入 {ENV_FILE_PATH}")
 
 
-def run_tunnel(cf_bin: str, name: str, local_port: str, env_key: str):
+def run_tunnel(cf_bin: str, tunnel_name: str, local_port: str, env_key: str):
+    """在独立线程中启动单个 cloudflared 隧道
+
+    参数：
+        cf_bin: cloudflared 可执行文件路径
+        tunnel_name: 隧道名称（用于标识）
+        local_port: 本地服务端口
+        env_key: 环境变量名（用于存储公网URL）
     """
-    Start a single cloudflared tunnel in a thread.
-    Captures the public URL and stores it in tunnel_urls.
-    """
-    print(f"🌐 [{name}] 正在启动隧道 (转发 → 127.0.0.1:{local_port})...")
+    print(f"🌐 [{tunnel_name}] 正在启动隧道 (转发 → 127.0.0.1:{local_port})...")
 
     popen_kwargs = dict(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
     )
-    # Windows: use CREATE_NO_WINDOW to avoid flashing a console
+    # Windows: 使用 CREATE_NO_WINDOW 避免弹出控制台窗口
     if IS_WINDOWS:
         popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
@@ -290,6 +344,7 @@ def run_tunnel(cf_bin: str, name: str, local_port: str, env_key: str):
     )
     tunnel_procs.append(proc)
 
+    # Cloudflare Tunnel URL 正则匹配
     url_pattern = re.compile(r"(https://[a-zA-Z0-9-]+\.trycloudflare\.com)")
     public_url = None
 
@@ -301,19 +356,19 @@ def run_tunnel(cf_bin: str, name: str, local_port: str, env_key: str):
                 if match:
                     public_url = match.group(1)
                     with urls_lock:
-                        tunnel_urls[name] = public_url
+                        tunnel_urls[tunnel_name] = public_url
 
-                    print(f"  ✅ [{name}] 公网地址: {public_url}")
+                    print(f"  ✅ [{tunnel_name}] 公网地址: {public_url}")
 
-                    # Check if all tunnels are ready
+                    # 检查是否所有隧道都已就绪
                     with urls_lock:
                         if len(tunnel_urls) >= expected_tunnels:
                             all_tunnels_ready.set()
 
-        # stdout closed => process exited
+        # stdout 关闭 => 进程已退出
         proc.wait()
     except Exception as e:
-        print(f"  ❌ [{name}] 隧道异常: {e}")
+        print(f"  ❌ [{tunnel_name}] 隧道异常: {e}")
 
 
 def start_tunnels():
@@ -326,24 +381,24 @@ def start_tunnels():
         signal.signal(signal.SIGTERM, cleanup)
     atexit.register(cleanup)
 
-    # Define tunnels: (name, local_port, env_key)
+    # 隧道配置列表：(名称, 本地端口, 环境变量名)
     tunnel_configs = [
         ("frontend", PORT_FRONTEND, "PUBLIC_DOMAIN"),
     ]
 
-    # Start each tunnel in a background thread
+    # 在后台线程中启动每个隧道
     threads = []
-    for name, port, env_key in tunnel_configs:
-        t = threading.Thread(target=run_tunnel, args=(cf_bin, name, port, env_key), daemon=True)
+    for tunnel_name, port, env_key in tunnel_configs:
+        t = threading.Thread(target=run_tunnel, args=(cf_bin, tunnel_name, port, env_key), daemon=True)
         t.start()
         threads.append(t)
 
-    # Wait for all tunnels to report their URLs (timeout 60s)
+    # 等待所有隧道报告其公网 URL（超时 60 秒）
     print("\n⏳ 等待所有隧道就绪...")
     ready = all_tunnels_ready.wait(timeout=60)
 
     if ready:
-        # Write all URLs to .env
+        # 将所有 URL 写入 .env 文件
         write_domains_to_env()
 
         print()
@@ -360,14 +415,14 @@ def start_tunnels():
         with urls_lock:
             if tunnel_urls:
                 write_domains_to_env()
-                for name, url in tunnel_urls.items():
-                    print(f"  ✅ [{name}] {url}")
+                for tunnel_name, url in tunnel_urls.items():
+                    print(f"  ✅ [{tunnel_name}] {url}")
             else:
                 print("❌ 所有隧道均启动失败")
                 cleanup()
                 sys.exit(1)
 
-    # Keep main thread alive, waiting for tunnel threads
+    # 保持主线程运行，等待隧道线程
     try:
         for t in threads:
             t.join()

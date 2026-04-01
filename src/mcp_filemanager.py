@@ -1,24 +1,28 @@
 import os
 from mcp.server.fastmcp import FastMCP
 
+from teambot_workspace import resolve_session_workspace
+
 mcp = FastMCP("FileManager")
 
-# 用户文件根目录：data/user_files/<username>/
-BASE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "user_files")
+def _user_dir(username: str, session_id: str = "") -> str:
+    """获取用户目录路径，自动创建。
+
+    :param username: 用户名
+    :return: 用户目录的绝对路径
+    """
+    return str(resolve_session_workspace(username, session_id).root)
 
 
-def _user_dir(username: str) -> str:
-    """获取用户目录路径，自动创建"""
-    # 防止路径穿越攻击
-    safe_name = os.path.basename(username)
-    user_path = os.path.join(BASE_DIR, safe_name)
-    os.makedirs(user_path, exist_ok=True)
-    return user_path
+def _safe_path(username: str, filename: str, session_id: str = "") -> str:
+    """拼接安全路径，防止路径穿越。
 
-
-def _safe_path(username: str, filename: str) -> str:
-    """拼接安全路径，防止路径穿越"""
-    user_path = _user_dir(username)
+    :param username: 用户名
+    :param filename: 文件名
+    :return: 文件的完整绝对路径
+    :raises ValueError: 如果路径穿越尝试被检测到
+    """
+    user_path = _user_dir(username, session_id)
     full_path = os.path.normpath(os.path.join(user_path, filename))
     # 确保路径在用户目录内
     if not full_path.startswith(user_path):
@@ -27,42 +31,46 @@ def _safe_path(username: str, filename: str) -> str:
 
 
 @mcp.tool()
-async def list_files(username: str) -> str:
+async def list_files(username: str, session_id: str = "") -> str:
     """
     列出当前用户的所有文件。
+
     :param username: 用户名（由系统自动注入，无需手动传递）
+    :return: 用户文件列表的描述
     """
-    user_path = _user_dir(username)
+    user_path = _user_dir(username, session_id)
     try:
         files = os.listdir(user_path)
         if not files:
             return "📂 你还没有任何文件。"
         result = "📂 你的文件列表：\n"
-        for f in sorted(files):
-            fpath = os.path.join(user_path, f)
-            size = os.path.getsize(fpath)
+        for file_name in sorted(files):
+            file_path = os.path.join(user_path, file_name)
+            size = os.path.getsize(file_path)
             if size < 1024:
                 size_str = f"{size} B"
             else:
                 size_str = f"{size / 1024:.1f} KB"
-            result += f"  - {f} ({size_str})\n"
+            result += f"  - {file_name} ({size_str})\n"
         return result
     except Exception as e:
         return f"⚠️ 列出文件失败: {str(e)}"
 
 
 @mcp.tool()
-async def read_file(username: str, filename: str) -> str:
+async def read_file(username: str, filename: str, session_id: str = "") -> str:
     """
     读取用户的指定文件内容。
+
     :param username: 用户名（由系统自动注入，无需手动传递）
-    :param filename: 文件名
+    :param filename: 要读取的文件名
+    :return: 文件内容或错误信息
     """
     try:
-        path = _safe_path(username, filename)
-        if not os.path.exists(path):
+        file_path = _safe_path(username, filename, session_id)
+        if not os.path.exists(file_path):
             return f"❌ 文件 '{filename}' 不存在。"
-        with open(path, "r", encoding="utf-8") as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             content = f.read()
         if not content:
             return f"📄 文件 '{filename}' 是空的。"
@@ -74,16 +82,18 @@ async def read_file(username: str, filename: str) -> str:
 
 
 @mcp.tool()
-async def write_file(username: str, filename: str, content: str) -> str:
+async def write_file(username: str, filename: str, content: str, session_id: str = "") -> str:
     """
     创建或覆盖写入用户的指定文件。
+
     :param username: 用户名（由系统自动注入，无需手动传递）
-    :param filename: 文件名
+    :param filename: 要写入的文件名
     :param content: 要写入的内容
+    :return: 操作结果描述
     """
     try:
-        path = _safe_path(username, filename)
-        with open(path, "w", encoding="utf-8") as f:
+        file_path = _safe_path(username, filename, session_id)
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
         return f"✅ 文件 '{filename}' 已保存。"
     except ValueError as e:
@@ -93,16 +103,18 @@ async def write_file(username: str, filename: str, content: str) -> str:
 
 
 @mcp.tool()
-async def append_file(username: str, filename: str, content: str) -> str:
+async def append_file(username: str, filename: str, content: str, session_id: str = "") -> str:
     """
     向用户的指定文件末尾追加内容。
+
     :param username: 用户名（由系统自动注入，无需手动传递）
-    :param filename: 文件名
+    :param filename: 要追加内容的文件名
     :param content: 要追加的内容
+    :return: 操作结果描述
     """
     try:
-        path = _safe_path(username, filename)
-        with open(path, "a", encoding="utf-8") as f:
+        file_path = _safe_path(username, filename, session_id)
+        with open(file_path, "a", encoding="utf-8") as f:
             f.write(content)
         return f"✅ 内容已追加到 '{filename}'。"
     except ValueError as e:
@@ -112,17 +124,19 @@ async def append_file(username: str, filename: str, content: str) -> str:
 
 
 @mcp.tool()
-async def delete_file(username: str, filename: str) -> str:
+async def delete_file(username: str, filename: str, session_id: str = "") -> str:
     """
     删除用户的指定文件。
+
     :param username: 用户名（由系统自动注入，无需手动传递）
-    :param filename: 文件名
+    :param filename: 要删除的文件名
+    :return: 操作结果描述
     """
     try:
-        path = _safe_path(username, filename)
-        if not os.path.exists(path):
+        file_path = _safe_path(username, filename, session_id)
+        if not os.path.exists(file_path):
             return f"❌ 文件 '{filename}' 不存在，无法删除。"
-        os.remove(path)
+        os.remove(file_path)
         return f"🗑️ 文件 '{filename}' 已删除。"
     except ValueError as e:
         return f"❌ {str(e)}"

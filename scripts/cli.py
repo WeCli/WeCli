@@ -2,17 +2,27 @@
 """
 TeamClaw CLI — 命令行控制工具
 
-像人操作前端一样，通过命令行控制 Agent 的各项功能。
-直接调用后端 API（绕过 front.py session），使用 INTERNAL_TOKEN 认证。
+功能：
+- 像人操作前端一样，通过命令行控制 Agent 的各项功能
+- 直接调用后端 API（绕过 front.py session），使用 INTERNAL_TOKEN 认证
 
-用法:  python scripts/cli.py <command> [options]
+用法: python scripts/cli.py <command> [options]
 """
-import argparse, json, os, signal, socket, subprocess, sys, time
-import urllib.error, urllib.parse, urllib.request
+import argparse
+import json
+import os
+import signal
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 
 
 def _configure_stdio():
-    """Avoid help/status crashes on Windows consoles with non-UTF-8 encodings."""
+    """配置标准输出的编码，避免 Windows 控制台非 UTF-8 编码导致帮助信息崩溃"""
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             try:
@@ -29,8 +39,9 @@ _configure_stdio()
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 
-# ── 加载 .env ────────────────────────────────────────────────────────
+# ── 加载 .env 配置 ────────────────────────────────────────────────────────
 def _load_env():
+    """从 config/.env 加载环境变量到 os.environ"""
     env_path = os.path.join(PROJECT_ROOT, "config", ".env")
     if not os.path.exists(env_path):
         return
@@ -44,23 +55,41 @@ def _load_env():
             if k and k not in os.environ:
                 os.environ[k] = v
 
+
 _load_env()
 
+# 服务端口配置
 PORT_AGENT = int(os.getenv("PORT_AGENT", "51200"))
 PORT_OASIS = int(os.getenv("PORT_OASIS", "51202"))
 PORT_FRONTEND = int(os.getenv("PORT_FRONTEND", "51209"))
 INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN", "")
+
+# API 基础 URL
 AGENT_BASE = f"http://127.0.0.1:{PORT_AGENT}"
 OASIS_BASE = f"http://127.0.0.1:{PORT_OASIS}"
+FRONT_BASE = f"http://127.0.0.1:{PORT_FRONTEND}"
+
 DEFAULT_USER = os.getenv("CLI_USER", "admin")
 
 
 # ═══════════════════════════════════════════════════════════════════════
-#  HTTP 工具
+#  HTTP 工具函数
 # ═══════════════════════════════════════════════════════════════════════
 
 def _req(method, url, headers=None, data=None, params=None, timeout=30):
-    """发送 HTTP 请求，返回 (status, body_dict_or_bytes)"""
+    """发送 HTTP 请求
+
+    参数：
+        method: HTTP 方法（GET/POST/PUT/DELETE）
+        url: 请求 URL
+        headers: 请求头
+        data: 请求体数据（dict，会被 JSON 序列化）
+        params: URL 查询参数
+        timeout: 超时时间（秒）
+
+    返回：
+        tuple: (status_code, response_body)
+    """
     if params:
         url += "?" + urllib.parse.urlencode(params)
     body_bytes = None
@@ -88,8 +117,20 @@ def _req(method, url, headers=None, data=None, params=None, timeout=30):
     except urllib.error.URLError as e:
         return 0, {"error": f"连接失败: {e.reason}"}
 
+
 def _stream_req(url, headers=None, data=None, params=None, timeout=300):
-    """SSE 流式请求，yield 每行"""
+    """发送 SSE 流式请求，yield 每行数据
+
+    参数：
+        url: 请求 URL
+        headers: 请求头
+        data: 请求体数据
+        params: URL 查询参数
+        timeout: 超时时间（秒）
+
+    yeilds:
+        str: 每行响应数据
+    """
     if params:
         url += "?" + urllib.parse.urlencode(params)
     body_bytes = json.dumps(data).encode("utf-8") if data else None
@@ -106,24 +147,38 @@ def _stream_req(url, headers=None, data=None, params=None, timeout=300):
     except urllib.error.URLError as e:
         print(f"❌ 连接失败: {e.reason}", file=sys.stderr)
 
+
 def _agent_headers():
+    """返回 Agent API 的认证请求头"""
     return {"X-Internal-Token": INTERNAL_TOKEN}
 
+
 def _group_headers(user_id):
+    """返回群组 API 的认证请求头
+
+    参数：
+        user_id: 用户 ID
+
+    返回：
+        dict: 包含 Authorization 的请求头
+    """
     return {"Authorization": f"Bearer {INTERNAL_TOKEN}:{user_id}"}
 
+
 def _check_token():
+    """检查 INTERNAL_TOKEN 是否已配置，未配置则退出"""
     if not INTERNAL_TOKEN:
         print("❌ INTERNAL_TOKEN 未配置，请先启动服务或在 config/.env 中设置", file=sys.stderr)
         sys.exit(1)
 
+
 def _pp(obj):
-    """美化打印 JSON"""
+    """美化打印 JSON 对象"""
     print(json.dumps(obj, ensure_ascii=False, indent=2))
 
 
-# ── 文档提示 ──────────────────────────────────────────────────────────
-# 不同场景的文档提示映射
+# ── 文档提示 ────────────────────────────────────────────────────────────────
+# 不同场景的文档提示映射（提醒用户在操作前先阅读相关文档）
 _DOC_HINTS = {
     "team": (
         "\n⚠️  【必读】在创建或修改 Team 之前，请务必先阅读以下文档：\n"
@@ -167,13 +222,25 @@ _DOC_HINTS = {
     ),
 }
 
+
 def _print_doc_hint(hint_key: str):
-    """输出文档阅读提示"""
+    """输出文档阅读提示
+
+    参数：
+        hint_key: 提示类型键名
+    """
     hint = _DOC_HINTS.get(hint_key, "")
     if hint:
         print(hint)
 
+
 def _err(code, body):
+    """格式化输出错误信息
+
+    参数：
+        code: HTTP 状态码或错误码
+        body: 错误响应体
+    """
     msg = body.get("error", body) if isinstance(body, dict) else body
     print(f"❌ [{code}] {msg}", file=sys.stderr)
 
@@ -182,11 +249,16 @@ def _err(code, body):
 #  子命令实现
 # ═══════════════════════════════════════════════════════════════════════
 
-# ── chat: 发送消息 ───────────────────────────────────────────────────
+# ── chat: 发送消息 ─────────────────────────────────────────────────────────
 def cmd_chat(args):
-    """通过 OpenAI 兼容接口发送消息（流式输出）"""
+    """通过 OpenAI 兼容接口发送消息（流式输出）
+
+    参数：
+        args: 命令行参数对象
+    """
     if not args.user:
-        print("❌ 请指定 -u/--user 用户名", file=sys.stderr); return
+        print("❌ 请指定 -u/--user 用户名", file=sys.stderr)
+        return
     _check_token()
     url = f"{AGENT_BASE}/v1/chat/completions"
     payload = {
@@ -219,9 +291,13 @@ def cmd_chat(args):
         print()  # 换行
 
 
-# ── sessions: 会话管理 ──────────────────────────────────────────────
+# ── sessions: 会话管理 ─────────────────────────────────────────────────────
 def cmd_sessions(args):
-    """查看会话列表"""
+    """查看会话列表
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     code, body = _req("POST", f"{AGENT_BASE}/sessions",
                        headers=_agent_headers(),
@@ -238,11 +314,11 @@ def cmd_sessions(args):
             print("📭 暂无会话")
             return
         print(f"📋 会话列表 ({len(sessions)} 个):\n")
-        for s in sessions:
-            sid = s.get("session_id", s.get("id", "?"))
-            title = s.get("title", s.get("name", ""))
-            status = s.get("status", "")
-            updated = s.get("updated_at", s.get("last_active", ""))
+        for session in sessions:
+            sid = session.get("session_id", session.get("id", "?"))
+            title = session.get("title", session.get("name", ""))
+            status = session.get("status", "")
+            updated = session.get("updated_at", session.get("last_active", ""))
             flag = "🟢" if status == "active" else "⚪"
             line = f"  {flag} {sid}"
             if title:
@@ -255,7 +331,11 @@ def cmd_sessions(args):
 
 
 def cmd_history(args):
-    """查看会话历史"""
+    """查看会话历史
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     data = {"user_id": args.user, "session_id": args.session or "default"}
     code, body = _req("POST", f"{AGENT_BASE}/session_history",
@@ -283,7 +363,11 @@ def cmd_history(args):
 
 
 def cmd_delete_session(args):
-    """删除会话"""
+    """删除会话
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     data = {"user_id": args.user, "session_id": args.session}
     code, body = _req("POST", f"{AGENT_BASE}/delete_session",
@@ -294,9 +378,13 @@ def cmd_delete_session(args):
         _err(code, body)
 
 
-# ── settings: 设置 ──────────────────────────────────────────────────
+# ── settings: 设置 ─────────────────────────────────────────────────────────
 def cmd_settings(args):
-    """查看或修改设置"""
+    """查看或修改设置
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     if args.set_key:
         # 修改设置
@@ -319,9 +407,13 @@ def cmd_settings(args):
             _err(code, body)
 
 
-# ── tools: 工具列表 ──────────────────────────────────────────────────
+# ── tools: 工具列表 ────────────────────────────────────────────────────────
 def cmd_tools(args):
-    """查看可用工具"""
+    """查看可用工具
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     code, body = _req("GET", f"{AGENT_BASE}/tools",
                        headers=_agent_headers(),
@@ -332,9 +424,9 @@ def cmd_tools(args):
             print("📭 无可用工具")
             return
         print(f"🔧 可用工具 ({len(tools)} 个):\n")
-        for t in tools:
-            name = t.get("name", t.get("function", {}).get("name", "?"))
-            desc = t.get("description", t.get("function", {}).get("description", ""))
+        for tool in tools:
+            name = tool.get("name", tool.get("function", {}).get("name", "?"))
+            desc = tool.get("description", tool.get("function", {}).get("description", ""))
             print(f"  • {name}")
             if desc and not args.brief:
                 print(f"    {desc[:100]}")
@@ -342,9 +434,13 @@ def cmd_tools(args):
         _err(code, body)
 
 
-# ── tts: 语音合成 ───────────────────────────────────────────────────
+# ── tts: 语音合成 ──────────────────────────────────────────────────────────
 def cmd_tts(args):
-    """文字转语音"""
+    """文字转语音
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     data = {"user_id": args.user, "text": args.text}
     if args.voice:
@@ -363,9 +459,13 @@ def cmd_tts(args):
         _err(code, body)
 
 
-# ── cancel: 取消生成 ─────────────────────────────────────────────────
+# ── cancel: 取消生成 ────────────────────────────────────────────────────────
 def cmd_cancel(args):
-    """取消当前生成"""
+    """取消当前生成
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     data = {"user_id": args.user, "session_id": args.session or "default"}
     code, body = _req("POST", f"{AGENT_BASE}/cancel",
@@ -376,22 +476,31 @@ def cmd_cancel(args):
         _err(code, body)
 
 
-# ── restart: 重启 Agent ──────────────────────────────────────────────
+# ── restart: 重启 Agent ─────────────────────────────────────────────────────
 def cmd_restart(args):
-    """重启 Agent 服务"""
+    """重启 Agent 服务（通过写入重启标记文件）
+
+    参数：
+        args: 命令行参数对象
+    """
     flag = os.path.join(PROJECT_ROOT, ".restart_flag")
     with open(flag, "w") as f:
         f.write("restart")
     print("✅ 重启信号已发送（等待 launcher 处理）")
 
 
-# ── groups: 群组管理 ─────────────────────────────────────────────────
+# ── groups: 群组管理 ────────────────────────────────────────────────────────
 def cmd_groups(args):
-    """群组管理"""
+    """群组管理
+
+    参数：
+        args: 命令行参数对象
+    """
     hdrs = _group_headers(args.user)
     base = f"{AGENT_BASE}/groups"
 
     if args.action == "list":
+        # 列出所有群组
         code, body = _req("GET", base, headers=hdrs)
         if code == 200:
             groups = body if isinstance(body, list) else body.get("groups", [body])
@@ -399,16 +508,18 @@ def cmd_groups(args):
                 print("📭 暂无群组")
                 return
             print(f"👥 群组列表 ({len(groups)} 个):\n")
-            for g in groups:
-                gid = g.get("id", g.get("group_id", "?"))
-                name = g.get("name", "")
+            for group in groups:
+                gid = group.get("id", group.get("group_id", "?"))
+                name = group.get("name", "")
                 print(f"  • [{gid}] {name}")
         else:
             _err(code, body)
 
     elif args.action == "create":
+        # 创建群组
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         data = json.loads(args.data) if args.data else {
             "name": args.name or "新群组",
             "team_name": args.team_name,
@@ -421,29 +532,33 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "messages":
+        # 获取群组消息
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         url = f"{base}/{args.group_id}/messages"
         if args.after_id:
             url += f"?after_id={args.after_id}"
         code, body = _req("GET", url, headers=hdrs)
         if code == 200:
             msgs = body if isinstance(body, list) else body.get("messages", [body])
-            for m in msgs[-20:]:
-                sender = m.get("sender", m.get("user_id", "?"))
-                content = m.get("content", "")
+            for msg in msgs[-20:]:
+                sender = msg.get("sender", msg.get("user_id", "?"))
+                content = msg.get("content", "")
                 print(f"  [{sender}]: {content}")
         else:
             _err(code, body)
 
     elif args.action == "send":
+        # 发送消息到群组
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         url = f"{base}/{args.group_id}/messages"
         data = {"content": args.message or ""}
         if args.sender:
             data["sender"] = args.sender
-            # sender is now tag#type#short_name format, use as sender_display
+            # sender 格式: tag#type#short_name，作为发送者显示名
             data["sender_display"] = args.sender
         code, body = _req("POST", url, headers=hdrs, data=data)
         if code in (200, 201):
@@ -452,8 +567,10 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "get":
+        # 获取群组详情
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         code, body = _req("GET", f"{base}/{args.group_id}", headers=hdrs)
         if code == 200:
             _pp(body)
@@ -461,8 +578,10 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "update":
+        # 更新群组信息
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         data = json.loads(args.data) if args.data else {}
         code, body = _req("PUT", f"{base}/{args.group_id}", headers=hdrs, data=data)
         if code == 200:
@@ -472,8 +591,10 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "delete":
+        # 删除群组
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         code, body = _req("DELETE", f"{base}/{args.group_id}", headers=hdrs)
         if code == 200:
             print(f"✅ 群组 {args.group_id} 已删除")
@@ -481,8 +602,10 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "mute":
+        # 静音群组
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         code, body = _req("POST", f"{base}/{args.group_id}/mute", headers=hdrs)
         if code == 200:
             print("✅ 群组已静音")
@@ -490,8 +613,10 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "unmute":
+        # 取消静音群组
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         code, body = _req("POST", f"{base}/{args.group_id}/unmute", headers=hdrs)
         if code == 200:
             print("✅ 群组已取消静音")
@@ -499,8 +624,10 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "mute-status":
+        # 查看群组静音状态
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         code, body = _req("GET", f"{base}/{args.group_id}/mute_status", headers=hdrs)
         if code == 200:
             _pp(body)
@@ -508,8 +635,10 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "sessions":
+        # 查看群组会话
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         code, body = _req("GET", f"{base}/{args.group_id}/sessions", headers=hdrs)
         if code == 200:
             _pp(body)
@@ -517,8 +646,10 @@ def cmd_groups(args):
             _err(code, body)
 
     elif args.action == "sync-members":
+        # 同步群组成员
         if not args.group_id:
-            print("❌ 请指定 --group-id", file=sys.stderr); return
+            print("❌ 请指定 --group-id", file=sys.stderr)
+            return
         code, body = _req("POST", f"{base}/{args.group_id}/sync_members", headers=hdrs)
         if code == 200:
             print("✅ 群成员已同步")
@@ -527,18 +658,22 @@ def cmd_groups(args):
             _err(code, body)
 
 
-# ── profile: 用户画像 ────────────────────────────────────────────────
+# ── profile: 用户画像 ──────────────────────────────────────────────────────
 def cmd_profile(args):
     """用户画像管理：读取或写入用户画像
 
-    profile get   - 读取当前用户画像
-    profile set   - 写入用户画像（支持 -c/--content 或 stdin）
-    profile path  - 显示用户画像文件路径
+    参数：
+        args: 命令行参数对象
+
+    用法：
+        profile get   - 读取当前用户画像
+        profile set   - 写入用户画像（支持 -c/--content 或 stdin）
+        profile path  - 显示用户画像文件路径
     """
     user_id = args.user
     act = args.action
 
-    # Build profile path
+    # 构建用户画像文件路径
     profile_path = os.path.join(PROJECT_ROOT, "data", "user_files", user_id, "user_profile.txt")
 
     if act == "path":
@@ -572,9 +707,13 @@ def cmd_profile(args):
     print(f"❌ 未知操作: {act}", file=sys.stderr)
 
 
-# ── sessions-status: 所有会话忙碌状态 ────────────────────────────────
+# ── sessions-status: 所有会话忙碌状态 ──────────────────────────────────────
 def cmd_sessions_status(args):
-    """查看所有会话的忙碌状态"""
+    """查看所有会话的忙碌状态
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     code, body = _req("POST", f"{AGENT_BASE}/sessions_status",
                        headers=_agent_headers(),
@@ -585,9 +724,13 @@ def cmd_sessions_status(args):
         _err(code, body)
 
 
-# ── session-status: 单个会话状态 ─────────────────────────────────────
+# ── session-status: 单个会话状态 ───────────────────────────────────────────
 def cmd_session_status(args):
-    """查看单个会话是否有新消息"""
+    """查看单个会话是否有新消息
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     data = {"user_id": args.user, "session_id": args.session or "default"}
     code, body = _req("POST", f"{AGENT_BASE}/session_status",
@@ -598,12 +741,17 @@ def cmd_session_status(args):
         _err(code, body)
 
 
-# ── topics: OASIS 话题 ───────────────────────────────────────────────
+# ── topics: OASIS 话题 ─────────────────────────────────────────────────────
 def cmd_topics(args):
-    """OASIS 话题管理"""
+    """OASIS 话题管理
+
+    参数：
+        args: 命令行参数对象
+    """
     params = {"user_id": args.user}
 
     if args.action == "list":
+        # 列出所有话题
         code, body = _req("GET", f"{OASIS_BASE}/topics", params=params)
         if code == 200:
             topics = body if isinstance(body, list) else body.get("topics", [body])
@@ -611,33 +759,35 @@ def cmd_topics(args):
                 print("📭 暂无话题")
                 return
             print(f"💬 OASIS 话题 ({len(topics)} 个):\n")
-            for t in topics:
-                tid = t.get("id", t.get("topic_id", "?"))
-                title = t.get("title", t.get("question", ""))
-                status = t.get("status", "")
+            for topic in topics:
+                tid = topic.get("id", topic.get("topic_id", "?"))
+                title = topic.get("title", topic.get("question", ""))
+                status = topic.get("status", "")
                 print(f"  • [{tid}] {title}  ({status})")
         else:
             _err(code, body)
 
     elif args.action == "show":
+        # 显示话题详情
         if not args.topic_id:
-            print("❌ 请指定 --topic-id", file=sys.stderr); return
+            print("❌ 请指定 --topic-id", file=sys.stderr)
+            return
         code, body = _req("GET", f"{OASIS_BASE}/topics/{args.topic_id}", params=params)
         if code == 200:
             if args.raw:
                 _pp(body)
                 return
-            # ── 美化输出 ──
-            q = body.get("question", "")
+            # 美化输出
+            question = body.get("question", "")
             status = body.get("status", "?")
-            cur_r = body.get("current_round", "?")
-            max_r = body.get("max_rounds", "?")
-            is_disc = body.get("discussion", True)
+            current_round = body.get("current_round", "?")
+            max_rounds = body.get("max_rounds", "?")
+            is_discussion = body.get("discussion", True)
             status_icon = {"pending": "⏳", "discussing": "🔄", "concluded": "✅",
                            "error": "❌"}.get(status, "❓")
             print(f"{'─' * 60}")
-            print(f"📋 话题: {q}")
-            print(f"   状态: {status_icon} {status}  |  轮次: {cur_r}/{max_r}  |  {'讨论模式' if is_disc else '执行模式'}")
+            print(f"📋 话题: {question}")
+            print(f"   状态: {status_icon} {status}  |  轮次: {current_round}/{max_rounds}  |  {'讨论模式' if is_discussion else '执行模式'}")
             print(f"{'─' * 60}")
 
             pending_human = body.get("pending_human")
@@ -646,19 +796,18 @@ def cmd_topics(args):
                 print(f"  节点: {pending_human.get('node_id', '?')}")
                 print(f"  轮次: {pending_human.get('round_num', '?')}")
                 print(f"  提示: {pending_human.get('prompt', '')}")
-
-            # 时间线（执行模式下更有意义，讨论模式也展示）
+            # 时间线（执行模式下更有意义）
             timeline = body.get("timeline", [])
             if timeline:
                 print(f"\n⏱️  时间线 ({len(timeline)} 事件):")
-                for ev in timeline:
-                    elapsed = ev.get("elapsed", 0)
-                    event = ev.get("event", "")
-                    agent = ev.get("agent", "")
-                    detail = ev.get("detail", "")
+                for event in timeline:
+                    elapsed = event.get("elapsed", 0)
+                    event_type = event.get("event", "")
+                    agent = event.get("agent", "")
+                    detail = event.get("detail", "")
                     ev_icon = {"start": "🚀", "round": "📢", "agent_call": "⏳",
-                               "agent_done": "✅", "conclude": "🏁"}.get(event, "•")
-                    parts = [f"  {ev_icon} [{elapsed:.1f}s] {event}"]
+                               "agent_done": "✅", "conclude": "🏁"}.get(event_type, "•")
+                    parts = [f"  {ev_icon} [{elapsed:.1f}s] {event_type}"]
                     if agent:
                         parts.append(agent)
                     if detail:
@@ -669,13 +818,13 @@ def cmd_topics(args):
             posts = body.get("posts", [])
             if posts:
                 print(f"\n💬 发言记录 ({len(posts)} 条):\n")
-                for p in posts:
-                    author = p.get("author", "?")
-                    content = p.get("content", "")
-                    reply_to = p.get("reply_to")
-                    upvotes = p.get("upvotes", 0)
-                    elapsed = p.get("elapsed", 0)
-                    pid = p.get("id", "?")
+                for post in posts:
+                    author = post.get("author", "?")
+                    content = post.get("content", "")
+                    reply_to = post.get("reply_to")
+                    upvotes = post.get("upvotes", 0)
+                    elapsed = post.get("elapsed", 0)
+                    pid = post.get("id", "?")
 
                     header = f"  ┌─ #{pid} [{author}]"
                     if reply_to:
@@ -707,8 +856,10 @@ def cmd_topics(args):
             _err(code, body)
 
     elif args.action == "watch":
+        # 实时跟踪话题
         if not args.topic_id:
-            print("❌ 请指定 --topic-id", file=sys.stderr); return
+            print("❌ 请指定 --topic-id", file=sys.stderr)
+            return
         print(f"👀 实时跟踪话题 {args.topic_id}（Ctrl+C 退出）...\n")
         stream_url = f"{OASIS_BASE}/topics/{args.topic_id}/stream"
         if params:
@@ -735,8 +886,10 @@ def cmd_topics(args):
             print(f"❌ 连接失败: {e.reason}", file=sys.stderr)
 
     elif args.action == "cancel":
+        # 取消话题
         if not args.topic_id:
-            print("❌ 请指定 --topic-id", file=sys.stderr); return
+            print("❌ 请指定 --topic-id", file=sys.stderr)
+            return
         code, body = _req("DELETE", f"{OASIS_BASE}/topics/{args.topic_id}", params=params)
         if code == 200:
             print(f"✅ 话题 {args.topic_id} 已取消")
@@ -744,8 +897,10 @@ def cmd_topics(args):
             _err(code, body)
 
     elif args.action == "purge":
+        # 清除话题
         if not args.topic_id:
-            print("❌ 请指定 --topic-id", file=sys.stderr); return
+            print("❌ 请指定 --topic-id", file=sys.stderr)
+            return
         code, body = _req("POST", f"{OASIS_BASE}/topics/{args.topic_id}/purge", params=params)
         if code == 200:
             print(f"✅ 话题 {args.topic_id} 已清除")
@@ -754,19 +909,25 @@ def cmd_topics(args):
 
     elif args.action == "callback":
         if not args.topic_id:
-            print("❌ 请指定 --topic-id", file=sys.stderr); return
+            print("❌ 请指定 --topic-id", file=sys.stderr)
+            return
         if not args.author:
-            print("❌ 请指定 --author", file=sys.stderr); return
+            print("❌ 请指定 --author", file=sys.stderr)
+            return
         if args.round_num is None:
-            print("❌ 请指定 --round-num", file=sys.stderr); return
+            print("❌ 请指定 --round-num", file=sys.stderr)
+            return
         if not args.data:
-            print("❌ 请指定 --data <JSON对象>", file=sys.stderr); return
+            print("❌ 请指定 --data <JSON对象>", file=sys.stderr)
+            return
         try:
             result = json.loads(args.data)
         except json.JSONDecodeError as e:
-            print(f"❌ --data 不是合法 JSON: {e}", file=sys.stderr); return
+            print(f"❌ --data 不是合法 JSON: {e}", file=sys.stderr)
+            return
         if not isinstance(result, dict):
-            print("❌ --data 必须是 JSON 对象", file=sys.stderr); return
+            print("❌ --data 必须是 JSON 对象", file=sys.stderr)
+            return
         data = {
             "user_id": args.user,
             "author": args.author,
@@ -782,13 +943,17 @@ def cmd_topics(args):
 
     elif args.action == "human-reply":
         if not args.topic_id:
-            print("❌ 请指定 --topic-id", file=sys.stderr); return
+            print("❌ 请指定 --topic-id", file=sys.stderr)
+            return
         if not args.node_id:
-            print("❌ 请指定 --node-id", file=sys.stderr); return
+            print("❌ 请指定 --node-id", file=sys.stderr)
+            return
         if args.round_num is None:
-            print("❌ 请指定 --round-num", file=sys.stderr); return
+            print("❌ 请指定 --round-num", file=sys.stderr)
+            return
         if not args.message:
-            print("❌ 请指定 --message", file=sys.stderr); return
+            print("❌ 请指定 --message", file=sys.stderr)
+            return
         data = {
             "user_id": args.user,
             "node_id": args.node_id,
@@ -802,8 +967,8 @@ def cmd_topics(args):
             _pp(body)
         else:
             _err(code, body)
-
     elif args.action == "delete-all":
+        # 删除所有话题
         code, body = _req("DELETE", f"{OASIS_BASE}/topics", params=params)
         if code == 200:
             print("✅ 所有话题已删除")
@@ -811,12 +976,17 @@ def cmd_topics(args):
             _err(code, body)
 
 
-# ── experts: OASIS 人设 ──────────────────────────────────────────────
+# ── experts: OASIS 人设 ───────────────────────────────────────────────────
 def cmd_experts(args):
-    """OASIS 人设管理"""
+    """OASIS 人设管理
+
+    参数：
+        args: 命令行参数对象
+    """
     act = args.action
 
     if act == "list":
+        # 列出所有人设
         params = {"user_id": args.user}
         if args.team:
             params["team"] = args.team
@@ -827,10 +997,10 @@ def cmd_experts(args):
                 print("📭 暂无人设")
                 return
             print(f"🧑‍🏫 人设列表 ({len(experts)} 个):\n")
-            for e in experts:
-                tag = e.get("tag", e.get("id", "?"))
-                name = e.get("name", tag)
-                role = e.get("role", "")
+            for expert in experts:
+                tag = expert.get("tag", expert.get("id", "?"))
+                name = expert.get("name", tag)
+                role = expert.get("role", "")
                 print(f"  • [{tag}] {name}")
                 if role:
                     print(f"    {role[:80]}")
@@ -839,10 +1009,13 @@ def cmd_experts(args):
             _err(code, body)
 
     elif act == "add":
+        # 添加人设
         if not args.tag:
-            print("❌ 请指定 --tag <人设标签>", file=sys.stderr); return
+            print("❌ 请指定 --tag <人设标签>", file=sys.stderr)
+            return
         if not args.persona_name:
-            print("❌ 请指定 --persona-name <人设名称>", file=sys.stderr); return
+            print("❌ 请指定 --persona-name <人设名称>", file=sys.stderr)
+            return
         data = {
             "user_id": args.user,
             "tag": args.tag,
@@ -861,8 +1034,10 @@ def cmd_experts(args):
             _err(code, body)
 
     elif act == "update":
+        # 更新人设
         if not args.tag:
-            print("❌ 请指定 --tag <人设标签>", file=sys.stderr); return
+            print("❌ 请指定 --tag <人设标签>", file=sys.stderr)
+            return
         data = {
             "user_id": args.user,
             "tag": args.tag,
@@ -882,8 +1057,10 @@ def cmd_experts(args):
             _err(code, body)
 
     elif act == "delete":
+        # 删除人设
         if not args.tag:
-            print("❌ 请指定 --tag <人设标签>", file=sys.stderr); return
+            print("❌ 请指定 --tag <人设标签>", file=sys.stderr)
+            return
         params = {"user_id": args.user}
         if args.team:
             params["team"] = args.team
@@ -897,25 +1074,30 @@ def cmd_experts(args):
         print(f"❌ 未知操作: {act}", file=sys.stderr)
 
 
-# ── workflows: OASIS Workflow 管理 ────────────────────────────────────
+# ── workflows: OASIS Workflow 管理 ────────────────────────────────────────
 def cmd_workflows(args):
-    """OASIS Workflow 管理"""
+    """OASIS Workflow 管理
+
+    参数：
+        args: 命令行参数对象
+    """
     act = args.action
 
     if act == "list":
+        # 列出所有 workflow
         params = {"user_id": args.user}
         if args.team:
             params["team"] = args.team
         code, body = _req("GET", f"{OASIS_BASE}/workflows", params=params)
         if code == 200:
-            wfs = body.get("workflows", []) if isinstance(body, dict) else body
-            if not wfs:
+            workflows = body.get("workflows", []) if isinstance(body, dict) else body
+            if not workflows:
                 print("📭 暂无 workflow")
                 return
-            print(f"📋 Workflows ({len(wfs)} 个):\n")
-            for w in wfs:
-                fname = w.get("file", "?")
-                desc = w.get("description", "")
+            print(f"📋 Workflows ({len(workflows)} 个):\n")
+            for workflow in workflows:
+                fname = workflow.get("file", "?")
+                desc = workflow.get("description", "")
                 print(f"  • {fname}")
                 if desc:
                     print(f"    {desc}")
@@ -924,13 +1106,14 @@ def cmd_workflows(args):
             _err(code, body)
 
     elif act == "show":
+        # 显示 workflow 文件内容
         if not args.name:
-            print("❌ 请指定 --name <workflow文件名>", file=sys.stderr); return
-        # 读取 workflow YAML 文件内容
+            print("❌ 请指定 --name <workflow文件名>", file=sys.stderr)
+            return
+        # 确定 workflow YAML 文件路径
         params = {"user_id": args.user}
         if args.team:
             params["team"] = args.team
-        # 先列出所有 workflow 确认文件存在，然后直接读文件
         yaml_dir = os.path.join(PROJECT_ROOT, "data", "user_files", args.user)
         if args.team:
             yaml_dir = os.path.join(yaml_dir, "teams", args.team)
@@ -944,8 +1127,10 @@ def cmd_workflows(args):
             print(f"❌ 文件不存在: {yaml_path}", file=sys.stderr)
 
     elif act == "save":
+        # 保存 workflow
         if not args.name:
-            print("❌ 请指定 --name <workflow名称>", file=sys.stderr); return
+            print("❌ 请指定 --name <workflow名称>", file=sys.stderr)
+            return
         # 从 --yaml-file 读取 YAML 内容，或从 --yaml 直接传入
         yaml_content = None
         if args.yaml_file:
@@ -953,11 +1138,13 @@ def cmd_workflows(args):
                 with open(args.yaml_file, "r", encoding="utf-8") as f:
                     yaml_content = f.read()
             except Exception as e:
-                print(f"❌ 读取文件失败: {e}", file=sys.stderr); return
+                print(f"❌ 读取文件失败: {e}", file=sys.stderr)
+                return
         elif args.yaml:
             yaml_content = args.yaml
         else:
-            print("❌ 请指定 --yaml <YAML内容> 或 --yaml-file <YAML文件路径>", file=sys.stderr); return
+            print("❌ 请指定 --yaml <YAML内容> 或 --yaml-file <YAML文件路径>", file=sys.stderr)
+            return
         data = {
             "user_id": args.user,
             "name": args.name,
@@ -972,16 +1159,17 @@ def cmd_workflows(args):
             _err(code, body)
 
     elif act == "run":
-        # 需要 question + (schedule_file 或 schedule_yaml)
+        # 运行 workflow
         if not args.question:
-            print("❌ 请指定 --question <讨论问题/任务>", file=sys.stderr); return
+            print("❌ 请指定 --question <讨论问题/任务>", file=sys.stderr)
+            return
 
         data = {
             "user_id": args.user,
             "question": args.question,
             "team": args.team or "",
         }
-        # 优先用 schedule_file（已保存的 workflow 文件名 → 转为绝对路径）
+        # 优先使用 schedule_file（已保存的 workflow 文件名 -> 转为绝对路径）
         if args.name:
             fname = args.name if args.name.endswith(".yaml") else args.name + ".yaml"
             if args.team:
@@ -996,11 +1184,13 @@ def cmd_workflows(args):
                 with open(args.yaml_file, "r", encoding="utf-8") as f:
                     data["schedule_yaml"] = f.read()
             except Exception as e:
-                print(f"❌ 读取文件失败: {e}", file=sys.stderr); return
+                print(f"❌ 读取文件失败: {e}", file=sys.stderr)
+                return
         elif args.yaml:
             data["schedule_yaml"] = args.yaml
         else:
-            print("❌ 请指定 --name <已保存的workflow名> 或 --yaml-file <YAML文件> 或 --yaml <YAML内容>", file=sys.stderr); return
+            print("❌ 请指定 --name <已保存的workflow名> 或 --yaml-file <YAML文件> 或 --yaml <YAML内容>", file=sys.stderr)
+            return
 
         if args.max_rounds:
             data["max_rounds"] = args.max_rounds
@@ -1023,8 +1213,10 @@ def cmd_workflows(args):
             _err(code, body)
 
     elif act == "conclusion":
+        # 获取 workflow 结论
         if not args.topic_id:
-            print("❌ 请指定 --topic-id <话题ID>", file=sys.stderr); return
+            print("❌ 请指定 --topic-id <话题ID>", file=sys.stderr)
+            return
         params = {"user_id": args.user}
         timeout = args.timeout or 300
         params["timeout"] = timeout
@@ -1047,12 +1239,17 @@ def cmd_workflows(args):
         print(f"❌ 未知操作: {act}", file=sys.stderr)
 
 
-# ── tunnel: Tunnel 管理 ──────────────────────────────────────────────
+# ── tunnel: Tunnel 管理 ───────────────────────────────────────────────────
 def cmd_tunnel(args):
-    """Cloudflare Tunnel 管理"""
+    """Cloudflare Tunnel 管理
+
+    参数：
+        args: 命令行参数对象
+    """
     pidfile = os.path.join(PROJECT_ROOT, ".tunnel.pid")
 
-    def _running():
+    def _is_running():
+        """检查 tunnel 是否正在运行"""
         if not os.path.exists(pidfile):
             return False, 0
         with open(pidfile) as f:
@@ -1063,7 +1260,8 @@ def cmd_tunnel(args):
         except OSError:
             return False, pid
 
-    def _public_domain():
+    def _get_public_domain():
+        """获取公网域名"""
         env_path = os.path.join(PROJECT_ROOT, "config", ".env")
         if not os.path.exists(env_path):
             return None
@@ -1076,9 +1274,10 @@ def cmd_tunnel(args):
         return None
 
     if args.action == "status":
-        ok, pid = _running()
+        # 查看 tunnel 状态
+        ok, pid = _is_running()
         if ok:
-            domain = _public_domain()
+            domain = _get_public_domain()
             print(f"✅ Tunnel 运行中 (PID: {pid})")
             if domain:
                 print(f"🌍 公网地址: {domain}")
@@ -1088,7 +1287,8 @@ def cmd_tunnel(args):
             print("❌ Tunnel 未运行")
 
     elif args.action == "start":
-        ok, pid = _running()
+        # 启动 tunnel
+        ok, pid = _is_running()
         if ok:
             print(f"⚠️ Tunnel 已在运行 (PID: {pid})")
             return
@@ -1107,14 +1307,15 @@ def cmd_tunnel(args):
         # 等待公网地址
         for _ in range(30):
             time.sleep(2)
-            domain = _public_domain()
+            domain = _get_public_domain()
             if domain:
                 print(f"🌍 公网地址: {domain}")
                 return
         print("⏳ 公网地址尚未就绪，请查看日志")
 
     elif args.action == "stop":
-        ok, pid = _running()
+        # 停止 tunnel
+        ok, pid = _is_running()
         if not ok:
             print("Tunnel 未运行")
             return
@@ -1132,13 +1333,18 @@ def cmd_tunnel(args):
         print("✅ Tunnel 已停止")
 
 
-# ── openclaw: OpenClaw Agent 管理 ─────────────────────────────────────
+# ── openclaw: OpenClaw Agent 管理 ─────────────────────────────────────────
 def cmd_openclaw(args):
-    """OpenClaw Agent 管理"""
+    """OpenClaw Agent 管理
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     act = args.action
 
     if act == "sessions":
+        # 查看 OpenClaw 会话列表
         params = {}
         if args.filter:
             params["filter"] = args.filter
@@ -1151,6 +1357,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "add":
+        # 添加 OpenClaw Agent
         data = json.loads(args.data) if args.data else {}
         code, body = _req("POST", f"{OASIS_BASE}/sessions/openclaw/add",
                            data=data, timeout=35)
@@ -1161,6 +1368,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "default-workspace":
+        # 获取默认工作区
         code, body = _req("GET", f"{OASIS_BASE}/sessions/openclaw/default-workspace")
         if code == 200:
             _pp(body)
@@ -1168,6 +1376,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "workspace-files":
+        # 列出工作区文件
         code, body = _req("GET", f"{OASIS_BASE}/sessions/openclaw/workspace-files",
                            params={"workspace": args.workspace or ""})
         if code == 200:
@@ -1176,6 +1385,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "workspace-file-read":
+        # 读取工作区文件
         code, body = _req("GET", f"{OASIS_BASE}/sessions/openclaw/workspace-file",
                            params={"workspace": args.workspace or "",
                                    "filename": args.filename or ""})
@@ -1185,6 +1395,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "workspace-file-save":
+        # 保存工作区文件
         data = json.loads(args.data) if args.data else {}
         code, body = _req("POST", f"{OASIS_BASE}/sessions/openclaw/workspace-file",
                            data=data, timeout=15)
@@ -1195,6 +1406,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "detail":
+        # 获取 Agent 详情
         code, body = _req("GET", f"{OASIS_BASE}/sessions/openclaw/agent-detail",
                            params={"name": args.name or ""}, timeout=15)
         if code == 200:
@@ -1203,6 +1415,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "skills":
+        # 查看 Agent 技能
         params = {}
         if args.agent:
             params["name"] = args.agent
@@ -1214,6 +1427,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "tool-groups":
+        # 查看工具组
         code, body = _req("GET", f"{OASIS_BASE}/sessions/openclaw/tool-groups")
         if code == 200:
             _pp(body)
@@ -1221,6 +1435,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "update-config":
+        # 更新配置
         data = json.loads(args.data) if args.data else {}
         code, body = _req("POST", f"{OASIS_BASE}/sessions/openclaw/update-config",
                            data=data, timeout=15)
@@ -1231,6 +1446,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "channels":
+        # 查看频道
         code, body = _req("GET", f"{OASIS_BASE}/sessions/openclaw/channels",
                            timeout=45)
         if code == 200:
@@ -1239,6 +1455,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "bindings":
+        # 查看绑定
         code, body = _req("GET", f"{OASIS_BASE}/sessions/openclaw/agent-bindings",
                            params={"agent": args.agent or ""}, timeout=45)
         if code == 200:
@@ -1247,6 +1464,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "bind":
+        # 绑定 Agent
         data = json.loads(args.data) if args.data else {}
         code, body = _req("POST", f"{OASIS_BASE}/sessions/openclaw/agent-bind",
                            data=data, timeout=45)
@@ -1257,6 +1475,7 @@ def cmd_openclaw(args):
             _err(code, body)
 
     elif act == "remove":
+        # 删除 Agent
         data = {"name": args.name or ""}
         code, body = _req("DELETE", f"{OASIS_BASE}/sessions/openclaw/remove",
                            data=data, timeout=15)
@@ -1270,26 +1489,37 @@ def cmd_openclaw(args):
         print(f"❌ 未知操作: {act}", file=sys.stderr)
 
 
-# ── openclaw-snapshot: OpenClaw 快照管理 ──────────────────────────────
-FRONT_BASE = f"http://127.0.0.1:{PORT_FRONTEND}"
-
+# ── openclaw-snapshot: OpenClaw 快照管理 ────────────────────────────────────
 def _front_headers(args=None):
-    """前端接口的请求头（带 session cookie 模拟 + 用户身份）"""
+    """前端接口的请求头（带 session cookie 模拟 + 用户身份）
+
+    参数：
+        args: 命令行参数对象
+
+    返回：
+        dict: 请求头字典
+    """
     h = {"X-Internal-Token": INTERNAL_TOKEN}
     # 将 CLI 的 -u/--user 通过 X-User-Id 传给 front.py
     uid = getattr(args, "user", None) if args else None
     if not uid:
-        uid = _cli_user  # fallback 到全局缓存
+        uid = _cli_user  # 回退到全局缓存的用户名
     if uid:
         h["X-User-Id"] = uid
     return h
 
+
 def cmd_openclaw_snapshot(args):
-    """OpenClaw 快照管理 (通过 front.py 接口)"""
+    """OpenClaw 快照管理 (通过 front.py 接口)
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     act = args.action
 
     if act == "get":
+        # 获取快照
         code, body = _req("GET", f"{FRONT_BASE}/team_openclaw_snapshot",
                            headers=_front_headers(),
                            params={"team": args.team or ""})
@@ -1299,6 +1529,7 @@ def cmd_openclaw_snapshot(args):
             _err(code, body)
 
     elif act == "export":
+        # 导出快照
         data = {"team": args.team or "", "agent_name": args.agent_name or "",
                 "short_name": args.short_name or ""}
         code, body = _req("POST", f"{FRONT_BASE}/team_openclaw_snapshot/export",
@@ -1310,6 +1541,7 @@ def cmd_openclaw_snapshot(args):
             _err(code, body)
 
     elif act == "sync-all":
+        # 同步所有快照
         data = {"team": args.team or ""}
         code, body = _req("POST", f"{FRONT_BASE}/team_openclaw_snapshot/sync_all",
                            headers=_front_headers(), data=data, timeout=60)
@@ -1320,6 +1552,7 @@ def cmd_openclaw_snapshot(args):
             _err(code, body)
 
     elif act == "restore":
+        # 恢复快照
         data = {"team": args.team or "", "short_name": args.short_name or ""}
         if args.target_name:
             data["target_agent_name"] = args.target_name
@@ -1332,6 +1565,7 @@ def cmd_openclaw_snapshot(args):
             _err(code, body)
 
     elif act == "export-all":
+        # 导出所有快照
         data = {"team": args.team or ""}
         code, body = _req("POST", f"{FRONT_BASE}/team_openclaw_snapshot/export_all",
                            headers=_front_headers(), data=data, timeout=120)
@@ -1342,6 +1576,7 @@ def cmd_openclaw_snapshot(args):
             _err(code, body)
 
     elif act == "restore-all":
+        # 恢复所有快照
         data = {"team": args.team or ""}
         code, body = _req("POST", f"{FRONT_BASE}/team_openclaw_snapshot/restore_all",
                            headers=_front_headers(), data=data, timeout=120)
@@ -1355,13 +1590,18 @@ def cmd_openclaw_snapshot(args):
         print(f"❌ 未知操作: {act}", file=sys.stderr)
 
 
-# ── visual: 可视化编排 ───────────────────────────────────────────────
+# ── visual: 可视化编排 ─────────────────────────────────────────────────────
 def cmd_visual(args):
-    """可视化编排管理"""
+    """可视化编排管理
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     act = args.action
 
     if act == "personas":
+        # 查看自定义人设
         params = {}
         if args.team:
             params["team"] = args.team
@@ -1373,6 +1613,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "add-persona":
+        # 添加自定义人设
         data = json.loads(args.data) if args.data else {}
         if args.team:
             data["team"] = args.team
@@ -1385,6 +1626,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "delete-persona":
+        # 删除自定义人设
         params = {}
         if args.team:
             params["team"] = args.team
@@ -1396,8 +1638,8 @@ def cmd_visual(args):
         else:
             _err(code, body)
 
-
     elif act == "generate-yaml":
+        # 生成 YAML
         data = json.loads(args.data) if args.data else {}
         code, body = _req("POST", f"{FRONT_BASE}/proxy_visual/generate-yaml",
                            headers=_front_headers(), data=data)
@@ -1407,6 +1649,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "agent-generate-yaml":
+        # Agent 生成 YAML
         data = json.loads(args.data) if args.data else {}
         if args.team:
             data["team"] = args.team
@@ -1418,6 +1661,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "save-layout":
+        # 保存布局
         data = json.loads(args.data) if args.data else {}
         if args.team:
             data["team"] = args.team
@@ -1429,6 +1673,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "load-layouts":
+        # 加载所有布局
         params = {}
         if args.team:
             params["team"] = args.team
@@ -1440,6 +1685,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "load-layout":
+        # 加载指定布局
         params = {}
         if args.team:
             params["team"] = args.team
@@ -1452,6 +1698,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "load-yaml-raw":
+        # 原始加载 YAML
         params = {}
         if args.team:
             params["team"] = args.team
@@ -1464,6 +1711,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "delete-layout":
+        # 删除布局
         params = {}
         if args.team:
             params["team"] = args.team
@@ -1476,6 +1724,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "upload-yaml":
+        # 上传 YAML
         data = json.loads(args.data) if args.data else {}
         if args.team:
             data["team"] = args.team
@@ -1488,6 +1737,7 @@ def cmd_visual(args):
             _err(code, body)
 
     elif act == "sessions-status":
+        # 查看会话状态
         code, body = _req("GET", f"{FRONT_BASE}/proxy_visual/sessions-status",
                            headers=_front_headers())
         if code == 200:
@@ -1499,9 +1749,13 @@ def cmd_visual(args):
         print(f"❌ 未知操作: {act}", file=sys.stderr)
 
 
-# ── internal-agents: 内部 Agent CRUD ─────────────────────────────────
+# ── internal-agents: 内部 Agent CRUD ──────────────────────────────────────
 def cmd_internal_agents(args):
-    """内部 Agent 管理"""
+    """内部 Agent 管理
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     act = args.action
     params = {}
@@ -1509,6 +1763,7 @@ def cmd_internal_agents(args):
         params["team"] = args.team
 
     if act == "list":
+        # 列出内部 Agent
         code, body = _req("GET", f"{FRONT_BASE}/internal_agents",
                            headers=_front_headers(), params=params)
         if code == 200:
@@ -1518,6 +1773,7 @@ def cmd_internal_agents(args):
             _err(code, body)
 
     elif act == "add":
+        # 添加内部 Agent
         data = json.loads(args.data) if args.data else {}
         if "session" not in data and args.session:
             data["session"] = args.session
@@ -1531,8 +1787,10 @@ def cmd_internal_agents(args):
             _err(code, body)
 
     elif act == "update":
+        # 更新内部 Agent
         if not args.sid:
-            print("❌ 请指定 --sid", file=sys.stderr); return
+            print("❌ 请指定 --sid", file=sys.stderr)
+            return
         data = json.loads(args.data) if args.data else {}
         code, body = _req("PUT", f"{FRONT_BASE}/internal_agents/{args.sid}",
                            headers=_front_headers(), data=data,
@@ -1544,8 +1802,10 @@ def cmd_internal_agents(args):
             _err(code, body)
 
     elif act == "delete":
+        # 删除内部 Agent
         if not args.sid:
-            print("❌ 请指定 --sid", file=sys.stderr); return
+            print("❌ 请指定 --sid", file=sys.stderr)
+            return
         code, body = _req("DELETE", f"{FRONT_BASE}/internal_agents/{args.sid}",
                            headers=_front_headers(), params=params)
         if code == 200:
@@ -1557,13 +1817,18 @@ def cmd_internal_agents(args):
         print(f"❌ 未知操作: {act}", file=sys.stderr)
 
 
-# ── teams: Team 管理 ─────────────────────────────────────────────────
+# ── teams: Team 管理 ───────────────────────────────────────────────────────
 def cmd_teams(args):
-    """Team 管理"""
+    """Team 管理
+
+    参数：
+        args: 命令行参数对象
+    """
     _check_token()
     act = args.action
 
     if act == "list":
+        # 列出所有 Team
         code, body = _req("GET", f"{FRONT_BASE}/teams",
                            headers=_front_headers())
         if code == 200:
@@ -1573,6 +1838,7 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "create":
+        # 创建 Team
         data = {"team": args.team_name or ""}
         code, body = _req("POST", f"{FRONT_BASE}/teams",
                            headers=_front_headers(), data=data)
@@ -1584,8 +1850,10 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "delete":
+        # 删除 Team
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         code, body = _req("DELETE", f"{FRONT_BASE}/teams/{args.team_name}",
                            headers=_front_headers(), timeout=30)
         if code == 200:
@@ -1617,16 +1885,18 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "info":
+        # 查看 Team 详细信息
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
-        team = args.team_name
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
+        team_name = args.team_name
         hdrs = _front_headers()
         print(f"{'═' * 60}")
-        print(f"📋 Team: {team}")
+        print(f"📋 Team: {team_name}")
         print(f"{'═' * 60}")
 
-        # ── 1. 成员 ──
-        code, body = _req("GET", f"{FRONT_BASE}/teams/{team}/members", headers=hdrs)
+        # 1. 成员信息
+        code, body = _req("GET", f"{FRONT_BASE}/teams/{team_name}/members", headers=hdrs)
         if code == 200:
             members = body.get("members", [])
             oasis_members = [m for m in members if m.get("type") == "oasis"]
@@ -1666,16 +1936,16 @@ def cmd_teams(args):
         else:
             print(f"  ⚠️ 获取成员失败: [{code}]", file=sys.stderr)
 
-        # ── 2. 人设 ──
-        code2, body2 = _req("GET", f"{FRONT_BASE}/teams/{team}/experts", headers=hdrs)
+        # 2. 人设信息
+        code2, body2 = _req("GET", f"{FRONT_BASE}/teams/{team_name}/experts", headers=hdrs)
         if code2 == 200:
             experts = body2.get("experts", [])
             print(f"\n🧑‍🏫 自定义人设 ({len(experts)} 个):")
             if experts:
-                for e in experts:
-                    tag = e.get("tag", "?")
-                    name = e.get("name", tag)
-                    prompt = e.get("prompt", e.get("persona", ""))
+                for expert in experts:
+                    tag = expert.get("tag", "?")
+                    name = expert.get("name", tag)
+                    prompt = expert.get("prompt", expert.get("persona", ""))
                     print(f"  • [{tag}] {name}")
                     if prompt:
                         preview = prompt[:80].replace("\n", " ")
@@ -1687,16 +1957,16 @@ def cmd_teams(args):
         else:
             print(f"  ⚠️ 获取人设失败: [{code2}]", file=sys.stderr)
 
-        # ── 3. Workflows ──
-        params_wf = {"user_id": args.user, "team": team}
+        # 3. Workflows
+        params_wf = {"user_id": args.user, "team": team_name}
         code3, body3 = _req("GET", f"{OASIS_BASE}/workflows", params=params_wf)
         if code3 == 200:
-            wfs = body3.get("workflows", []) if isinstance(body3, dict) else body3
-            print(f"\n📐 Workflows ({len(wfs)} 个):")
-            if wfs:
-                for w in wfs:
-                    fname = w.get("file", "?")
-                    desc = w.get("description", "")
+            workflows = body3.get("workflows", []) if isinstance(body3, dict) else body3
+            print(f"\n📐 Workflows ({len(workflows)} 个):")
+            if workflows:
+                for workflow in workflows:
+                    fname = workflow.get("file", "?")
+                    desc = workflow.get("description", "")
                     line = f"  • {fname}"
                     if desc:
                         line += f"  — {desc}"
@@ -1706,25 +1976,25 @@ def cmd_teams(args):
         else:
             print(f"  ⚠️ 获取 workflows 失败: [{code3}]", file=sys.stderr)
 
-        # ── 4. 最近话题 ──
+        # 4. 最近话题
         params_tp = {"user_id": args.user}
         code4, body4 = _req("GET", f"{OASIS_BASE}/topics", params=params_tp)
         if code4 == 200:
             all_topics = body4 if isinstance(body4, list) else body4.get("topics", [])
-            # 过滤属于当前 team 的话题 (通过 team 字段或 schedule_file 路径)
+            # 过滤属于当前 team 的话题
             team_topics = []
             for t in all_topics:
                 t_team = t.get("team", "")
-                if t_team == team:
+                if t_team == team_name:
                     team_topics.append(t)
             print(f"\n💬 话题 ({len(team_topics)} 个):")
             if team_topics:
                 status_icon = {"pending": "⏳", "discussing": "🔄", "concluded": "✅",
                                "error": "❌"}
-                for t in team_topics[-10:]:  # 最多展示最近 10 个
-                    tid = t.get("id", t.get("topic_id", "?"))
-                    q = t.get("title", t.get("question", ""))
-                    st = t.get("status", "?")
+                for topic in team_topics[-10:]:  # 最多展示最近 10 个
+                    tid = topic.get("id", topic.get("topic_id", "?"))
+                    q = topic.get("title", topic.get("question", ""))
+                    st = topic.get("status", "?")
                     icon = status_icon.get(st, "❓")
                     # 截断过长标题
                     if len(q) > 60:
@@ -1737,9 +2007,9 @@ def cmd_teams(args):
         else:
             print(f"  ⚠️ 获取话题失败: [{code4}]", file=sys.stderr)
 
-        # ── 5. OpenClaw 快照 ──
+        # 5. OpenClaw 快照
         code5, body5 = _req("GET", f"{FRONT_BASE}/team_openclaw_snapshot",
-                             headers=hdrs, params={"team": team})
+                             headers=hdrs, params={"team": team_name})
         if code5 == 200:
             snapshots = body5.get("snapshots", body5.get("agents", []))
             if isinstance(body5, dict) and not snapshots:
@@ -1750,9 +2020,9 @@ def cmd_teams(args):
                         break
             if snapshots:
                 print(f"\n📸 OpenClaw 快照 ({len(snapshots)} 个):")
-                for s in snapshots:
-                    sname = s.get("short_name", s.get("name", "?"))
-                    agent_name = s.get("agent_name", "")
+                for snapshot in snapshots:
+                    sname = snapshot.get("short_name", snapshot.get("name", "?"))
+                    agent_name = snapshot.get("agent_name", "")
                     line = f"  • {sname}"
                     if agent_name:
                         line += f"  → {agent_name}"
@@ -1762,8 +2032,10 @@ def cmd_teams(args):
         _print_doc_hint("team")
 
     elif act == "members":
+        # 查看 Team 成员
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         code, body = _req("GET", f"{FRONT_BASE}/teams/{args.team_name}/members",
                            headers=_front_headers())
         if code == 200:
@@ -1773,8 +2045,10 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "add-ext-member":
+        # 添加外部成员
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         data = json.loads(args.data) if args.data else {}
         code, body = _req("POST",
                            f"{FRONT_BASE}/teams/{args.team_name}/members/external",
@@ -1787,8 +2061,10 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "delete-ext-member":
+        # 删除外部成员
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         data = json.loads(args.data) if args.data else {}
         code, body = _req("DELETE",
                            f"{FRONT_BASE}/teams/{args.team_name}/members/external",
@@ -1800,8 +2076,10 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "update-ext-member":
+        # 更新外部成员
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         data = json.loads(args.data) if args.data else {}
         code, body = _req("PUT",
                            f"{FRONT_BASE}/teams/{args.team_name}/members/external",
@@ -1813,8 +2091,10 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "personas":
+        # 查看 Team 人设
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         code, body = _req("GET",
                            f"{FRONT_BASE}/teams/{args.team_name}/experts",
                            headers=_front_headers())
@@ -1825,8 +2105,10 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "add-persona":
+        # 添加 Team 人设
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         data = json.loads(args.data) if args.data else {}
         code, body = _req("POST",
                            f"{FRONT_BASE}/teams/{args.team_name}/experts",
@@ -1838,8 +2120,10 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "update-persona":
+        # 更新 Team 人设
         if not args.team_name or not args.tag:
-            print("❌ 请指定 --team-name 和 --tag", file=sys.stderr); return
+            print("❌ 请指定 --team-name 和 --tag", file=sys.stderr)
+            return
         data = json.loads(args.data) if args.data else {}
         code, body = _req("PUT",
                            f"{FRONT_BASE}/teams/{args.team_name}/experts/{args.tag}",
@@ -1851,8 +2135,10 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "delete-persona":
+        # 删除 Team 人设
         if not args.team_name or not args.tag:
-            print("❌ 请指定 --team-name 和 --tag", file=sys.stderr); return
+            print("❌ 请指定 --team-name 和 --tag", file=sys.stderr)
+            return
         code, body = _req("DELETE",
                            f"{FRONT_BASE}/teams/{args.team_name}/experts/{args.tag}",
                            headers=_front_headers())
@@ -1863,20 +2149,22 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "snapshot-preview":
+        # 快照预览
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         data = {"team": args.team_name}
         code, body = _req("POST", f"{FRONT_BASE}/teams/snapshot/preview",
                            headers=_front_headers(), data=data, timeout=60)
         if code == 200:
-            # Output full JSON directly
             _pp(body)
         else:
             _err(code, body)
 
     elif act == "snapshot-download":
+        # 下载快照
         data = {"team": args.team_name or ""}
-        # Parse --include JSON for selective export
+        # 解析 --include JSON 实现选择性导出
         if args.include:
             try:
                 include_filter = json.loads(args.include)
@@ -1900,17 +2188,20 @@ def cmd_teams(args):
             _err(code, body)
 
     elif act == "snapshot-upload":
+        # 上传快照
         if not args.team_name:
-            print("❌ 请指定 --team-name", file=sys.stderr); return
+            print("❌ 请指定 --team-name", file=sys.stderr)
+            return
         if not args.file:
-            print("❌ 请指定 --file (zip 文件路径)", file=sys.stderr); return
+            print("❌ 请指定 --file (zip 文件路径)", file=sys.stderr)
+            return
         # 使用 multipart/form-data 上传
         import mimetypes
         boundary = "----CLIUploadBoundary"
         body_parts = []
-        # team field
+        # team 字段
         body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"team\"\r\n\r\n{args.team_name}")
-        # file field
+        # file 字段
         fname = os.path.basename(args.file)
         ct = mimetypes.guess_type(args.file)[0] or "application/zip"
         with open(args.file, "rb") as f:
@@ -1918,7 +2209,7 @@ def cmd_teams(args):
         body_parts.append(
             f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{fname}\"\r\nContent-Type: {ct}\r\n\r\n"
         )
-        # 手动拼装
+        # 手动拼装 multipart body
         encoded = b""
         for i, part in enumerate(body_parts):
             encoded += part.encode("utf-8")
@@ -1953,16 +2244,23 @@ def cmd_teams(args):
         print(f"❌ 未知操作: {act}", file=sys.stderr)
 
 
-# ── token: Token 生成与验证 ──────────────────────────────────────────
+# ── token: Token 生成与验证 ────────────────────────────────────────────────
 import hashlib
 import hmac
 import secrets
 import base64
 
+
 def _generate_login_token(user_id: str, internal_token: str, valid_hours: int = 24) -> str:
-    """Generate HMAC-signed login token.
-    Token format: base64(user_id:expire_ts:random:signature)
-    Signature = HMAC(INTERNAL_TOKEN, user_id:expire_ts:random)
+    """生成 HMAC 签名的登录 Token
+
+    参数：
+        user_id: 用户 ID
+        internal_token: 内部认证 Token
+        valid_hours: 有效期（小时）
+
+    返回：
+        str: 生成的登录 Token，格式：base64(user_id:expire_ts:random:signature)
     """
     expire_ts = int(time.time()) + valid_hours * 3600
     random_str = secrets.token_urlsafe(8)
@@ -1977,7 +2275,15 @@ def _generate_login_token(user_id: str, internal_token: str, valid_hours: int = 
 
 
 def _verify_login_token(token: str, internal_token: str) -> str | None:
-    """Verify HMAC-signed login token."""
+    """验证 HMAC 签名的登录 Token
+
+    参数：
+        token: 待验证的 Token
+        internal_token: 内部认证 Token
+
+    返回：
+        str or None: 验证成功返回 user_id，失败返回 None
+    """
     try:
         padded = token + '=' * (-len(token) % 4)
         decoded = base64.urlsafe_b64decode(padded).decode()
@@ -2006,12 +2312,17 @@ def _verify_login_token(token: str, internal_token: str) -> str | None:
 
 
 def cmd_token(args):
-    """Token 生成与验证"""
+    """Token 生成与验证
+
+    参数：
+        args: 命令行参数对象
+    """
     if args.action == "generate":
+        # 生成 Token
         if not INTERNAL_TOKEN:
             print("❌ INTERNAL_TOKEN 未配置", file=sys.stderr)
             return
-        # Support multiple users
+        # 支持多用户
         users = []
         if args.user:
             users = [u.strip() for u in args.user.split(',')]
@@ -2023,7 +2334,7 @@ def cmd_token(args):
 
         valid_hours = args.valid_hours or 24
 
-        # Detect local IP for link generation
+        # 获取本机 IP 用于生成链接
         local_ip = _get_local_ip() or "127.0.0.1"
         port = PORT_FRONTEND
 
@@ -2034,7 +2345,7 @@ def cmd_token(args):
         for user_id in users:
             token = _generate_login_token(user_id, INTERNAL_TOKEN, valid_hours)
 
-            # Build links
+            # 生成访问链接
             local_link = f"http://127.0.0.1:{port}/login-link/{token}"
             lan_link = f"http://{local_ip}:{port}/login-link/{token}"
 
@@ -2045,6 +2356,7 @@ def cmd_token(args):
             print()
 
     elif args.action == "verify":
+        # 验证 Token
         token = args.token.strip() if args.token else ""
         if not token:
             print("❌ 请提供 token: --token <token>", file=sys.stderr)
@@ -2061,6 +2373,7 @@ def cmd_token(args):
             print("❌ Token 无效或已过期")
 
     elif args.action == "decode":
+        # 解码 Token
         token = args.token.strip() if args.token else ""
         if not token:
             print("❌ 请提供 token: --token <token>", file=sys.stderr)
@@ -2090,7 +2403,11 @@ def cmd_token(args):
 
 
 def _get_local_ip() -> str | None:
-    """Get local IP address."""
+    """获取本机局域网 IP 地址
+
+    返回：
+        str or None: 本机 IP 地址，获取失败返回 None
+    """
     import socket
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -2107,12 +2424,16 @@ def _get_local_ip() -> str | None:
         return None
 
 
-# ── status: 服务状态 ─────────────────────────────────────────────────
+# ── status: 服务状态 ───────────────────────────────────────────────────────
 def cmd_status(args):
-    """检查各服务状态、外部平台、API Key 等"""
+    """检查各服务状态、外部平台、API Key 等
+
+    参数：
+        args: 命令行参数对象
+    """
     import shutil
 
-    # ── 1. 服务在线状态 ──
+    # 1. 服务在线状态
     services = [
         ("Agent",     f"http://127.0.0.1:{PORT_AGENT}/v1/models"),
         ("OASIS",     f"http://127.0.0.1:{PORT_OASIS}/experts"),
@@ -2127,7 +2448,7 @@ def cmd_status(args):
         except Exception:
             print(f"  ❌ {name:12s}  :{url.split(':')[2].split('/')[0]}  不可达")
 
-    # ── 2. LLM API Key 状态 ──
+    # 2. LLM API Key 状态
     print(f"\n{'─' * 50}")
     print("🔑 API Key 配置:\n")
     env_path = os.path.join(PROJECT_ROOT, "config", ".env")
@@ -2165,7 +2486,7 @@ def cmd_status(args):
         print(f"\n  💡 即使没有 API Key，仍可使用以下外部 Agent 平台:")
         print(f"     openclaw / codex / claude (claude-code) / gemini (gemini-cli) / aider")
 
-    # ── 3. 外部 Agent 平台检测 ──
+    # 3. 外部 Agent 平台检测
     print(f"\n{'─' * 50}")
     print("🖥️  外部 Agent 平台:\n")
 
@@ -2178,14 +2499,14 @@ def cmd_status(args):
     ]
 
     available_platforms = []
-    for cmd, display_name, description in platforms:
-        path = shutil.which(cmd)
+    for cmd_name, display_name, description in platforms:
+        path = shutil.which(cmd_name)
         if path:
-            # 尝试获取版本
+            # 尝试获取版本信息
             version_str = ""
             try:
                 result = subprocess.run(
-                    [cmd, "--version"], capture_output=True, text=True, timeout=5
+                    [cmd_name, "--version"], capture_output=True, text=True, timeout=5
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     ver_line = result.stdout.strip().splitlines()[0]
@@ -2200,7 +2521,7 @@ def cmd_status(args):
             print(f"     路径: {path}")
             available_platforms.append(display_name)
         else:
-            print(f"  ❌ {display_name:14s} — 未安装 (命令 '{cmd}' 不在 PATH 中)")
+            print(f"  ❌ {display_name:14s} — 未安装 (命令 '{cmd_name}' 不在 PATH 中)")
 
     # OpenClaw 额外检查: API URL 和 sessions file
     openclaw_api_url = env_vars.get("OPENCLAW_API_URL", "")
@@ -2213,7 +2534,7 @@ def cmd_status(args):
             icon = "✅" if exists else "⚠️"
             print(f"  {icon} OpenClaw Sessions   = {openclaw_sessions}")
 
-    # ── 4. 综合总结 ──
+    # 4. 综合总结
     print(f"\n{'─' * 50}")
     print("📋 总结:\n")
 
@@ -2241,6 +2562,7 @@ def cmd_status(args):
 # ═══════════════════════════════════════════════════════════════════════
 
 def build_parser():
+    """构建命令行参数解析器"""
     p = argparse.ArgumentParser(
         prog="teamclaw",
         description="TeamClaw CLI — 命令行控制工具",
@@ -2487,7 +2809,12 @@ def build_parser():
     return p
 
 
+# 全局 CLI 用户名缓存（用于 front_headers 回退）
+_cli_user = ""
+
+
 def main():
+    """CLI 主入口函数"""
     global _cli_user
     parser = build_parser()
     args = parser.parse_args()
@@ -2497,11 +2824,12 @@ def main():
         parser.print_help()
         sys.exit(0)
 
-    # settings 特殊处理
+    # settings 命令特殊处理
     if args.command == "settings":
         args.set_key = args.set_pair[0] if args.set_pair else None
         args.set_value = args.set_pair[1] if args.set_pair else None
 
+    # 命令分发映射
     dispatch = {
         "chat": cmd_chat,
         "sessions": cmd_sessions,

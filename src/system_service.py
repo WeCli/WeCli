@@ -1,3 +1,11 @@
+"""
+系统触发服务模块
+
+处理来自定时任务、外部系统等触发源的请求：
+- 系统触发消息处理
+- 多模态附件（图片/音频/文件）处理
+"""
+
 import asyncio
 import base64
 from typing import Any, Callable
@@ -136,6 +144,8 @@ class SystemService:
             "enabled_tools": None,
             "user_id": req.user_id,
             "session_id": req.session_id,
+            "max_turns": None,
+            "turn_count": 0,
         }
 
         async def wait_and_invoke():

@@ -1,3 +1,12 @@
+"""
+设置管理路由模块
+
+提供系统配置相关的 API 路由：
+- GET/POST /settings：获取/更新白名单配置
+- GET/POST /settings/full：获取/更新完整配置（含敏感信息）
+- POST /restart：发送重启信号
+"""
+
 from typing import Callable
 
 from fastapi import APIRouter, Header

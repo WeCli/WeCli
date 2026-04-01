@@ -1,3 +1,10 @@
+"""
+系统触发路由模块
+
+提供系统触发相关的 API 路由：
+- POST /system_trigger：触发系统消息
+"""
+
 from typing import Any, Callable
 
 from fastapi import APIRouter, Header

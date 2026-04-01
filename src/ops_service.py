@@ -32,7 +32,7 @@ except ImportError:
 
 if _ACP_AVAILABLE:
     class _SecureStreamReader(asyncio.StreamReader):
-        """Wraps subprocess stdout, only passing JSON-RPC lines."""
+        """包装 subprocess stdout，只传递 JSON-RPC 行。"""
         def __init__(self, real_reader, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self._real_reader = real_reader
@@ -47,7 +47,7 @@ if _ACP_AVAILABLE:
                 continue
 
     class _ACPClient(Client):
-        """Minimal ACP client for control operations."""
+        """ACP 协议客户端，用于控制操作。"""
         def __init__(self):
             self.chunks: list[str] = []
 
@@ -70,17 +70,17 @@ def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
         if not isinstance(data, list):
             return []
         result = []
-        for a in data:
-            if not isinstance(a, dict) or "name" not in a:
+        for agent in data:
+            if not isinstance(agent, dict) or "name" not in agent:
                 continue
-            ext_config = a.get("config") or a.get("meta") or {}
+            ext_config = agent.get("config") or agent.get("meta") or {}
             result.append({
                 "user_id": "ext",
-                "session_id": a.get("name", ""),
+                "session_id": agent.get("name", ""),
                 "member_type": "ext",
-                "name": a.get("name", ""),
-                "tag": a.get("tag", ""),
-                "global_name": a.get("global_name", ""),
+                "name": agent.get("name", ""),
+                "tag": agent.get("tag", ""),
+                "global_name": agent.get("global_name", ""),
                 "api_url": ext_config.get("api_url", ""),
                 "api_key": ext_config.get("api_key", ""),
                 "model": ext_config.get("model", ""),
@@ -122,6 +122,8 @@ def _find_external_agent_across_teams(user_id: str, agent_key: str) -> dict | No
 
 
 class OpsService:
+    """操作服务类，提供工具列表、登录、TTS、ACP 外部 agent 控制等功能。"""
+
     def __init__(
         self,
         *,
@@ -136,6 +138,13 @@ class OpsService:
         self.verify_auth_or_token = verify_auth_or_token
 
     async def get_tools_list(self, x_internal_token: str | None, authorization: str | None):
+        """获取可用工具列表。
+
+        :param x_internal_token: 内部令牌（可选）
+        :param authorization: Bearer 授权头（可选）
+        :return: 包含工具列表的字典
+        :raises HTTPException: 认证失败时抛出 403 异常
+        """
         if x_internal_token and x_internal_token == self.internal_token:
             return {"status": "success", "tools": self.agent.get_tools_info()}
         parts = parse_bearer_parts(authorization)
@@ -148,6 +157,12 @@ class OpsService:
         raise HTTPException(status_code=403, detail="认证失败")
 
     async def login(self, req: LoginRequest):
+        """用户登录验证。
+
+        :param req: 登录请求，包含 user_id 和 password
+        :return: 登录成功状态
+        :raises HTTPException: 密码错误时抛出 401 异常
+        """
         if self.verify_password(req.user_id, req.password):
             logger.info("login success user=%s", req.user_id)
             return {"status": "success", "message": "登录成功"}
@@ -155,6 +170,12 @@ class OpsService:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
 
     async def cancel_agent(self, req: CancelRequest, x_internal_token: str | None):
+        """取消指定用户的运行中任务。
+
+        :param req: 取消请求，包含 user_id、session_id、password
+        :param x_internal_token: 内部令牌（可选）
+        :return: 取消操作结果
+        """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
         task_key = f"{req.user_id}#{req.session_id}"
         logger.info("cancel user=%s session=%s", req.user_id, req.session_id)
@@ -164,6 +185,13 @@ class OpsService:
         return {"status": "success", "message": "当前没有运行中的任务", "cancelled": False}
 
     async def text_to_speech(self, req: TTSRequest, x_internal_token: str | None):
+        """文本转语音（TTS）服务。
+
+        :param req: TTS 请求，包含 text、voice 等
+        :param x_internal_token: 内部令牌（可选）
+        :return: 音频流响应
+        :raises HTTPException: 未配置 API 或文本为空时抛出异常
+        """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
 
         tts_text = req.text.strip()
@@ -371,6 +399,10 @@ class OpsService:
 
         优先走 CLI `openclaw sessions --all-agents --json` 获取全局状态，
         如 CLI 不支持则逐个通过 ACP 协议 list_sessions。
+
+        :param req: 状态查询请求，包含 user_id、team、agent_name（可选）
+        :param x_internal_token: 内部令牌（可选）
+        :return: agent 状态列表
         """
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
 
@@ -401,7 +433,11 @@ class OpsService:
         return {"status": "success", "agents": results}
 
     async def _acp_status_via_cli(self, agents: list[dict]) -> list[dict] | None:
-        """尝试通过 CLI 获取所有 agent sessions（一次调用，高效）。"""
+        """尝试通过 CLI 获取所有 agent sessions（一次调用，高效）。
+
+        :param agents: 外部 agent 配置列表
+        :return: agent 状态列表，获取失败时返回 None
+        """
         # 取第一个 agent 的 tag 来决定 binary
         first_tag = agents[0].get("tag", "").lower() if agents else ""
         acp_tool = first_tag if first_tag in _ACP_KNOWN_TOOLS else "openclaw"
@@ -454,6 +490,9 @@ class OpsService:
 
         bridge 不支持 session/list 方法，改用 `openclaw sessions --json` 过滤
         对应 agent 的 session key 前缀来判断状态。
+
+        :param agent_info: 外部 agent 配置信息
+        :return: 该 agent 的详细状态信息
         """
         name = agent_info.get("name", "")
         global_name = agent_info.get("global_name", "")

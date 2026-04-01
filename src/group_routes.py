@@ -1,3 +1,15 @@
+"""
+群聊管理路由模块
+
+提供群聊相关的 API 路由：
+- POST/GET /groups：创建/获取群聊
+- GET /groups/{group_id}：获取群聊详情
+- GET/POST /groups/{group_id}/messages：获取/发送群聊消息
+- PUT /groups/{group_id}：更新群聊
+- DELETE /groups/{group_id}：删除群聊
+- 群成员管理、禁言、成员同步等
+"""
+
 from typing import Any, Callable
 
 from fastapi import APIRouter, Header

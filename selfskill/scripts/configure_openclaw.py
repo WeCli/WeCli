@@ -7,18 +7,22 @@ API token 等配置，并写入 TeamClaw 的 config/.env。
 
 用法:
     python selfskill/scripts/configure_openclaw.py --auto-detect       # 自动探测并配置（含 workspace 初始化）
+    python selfskill/scripts/configure_openclaw.py --sync-teamclaw-llm # 将 TeamClaw 当前 LLM 配置回写到 OpenClaw
     python selfskill/scripts/configure_openclaw.py --status            # 仅显示检测状态
     python selfskill/scripts/configure_openclaw.py --install-guide     # 输出 OpenClaw 安装/初始化流程
     python selfskill/scripts/configure_openclaw.py --repair-health     # 检查并修复轻量健康问题
     python selfskill/scripts/configure_openclaw.py --init-workspace    # 仅初始化 workspace 默认模板
 """
 
+import copy
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
 import sys
+import time
 
 # 复用 configure.py 的配置写入逻辑
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -537,6 +541,102 @@ def repair_sessions_health(store_path):
     return result
 
 
+def wait_for_gateway_runtime(target="running", timeout=20, interval=1.0):
+    """等待 Gateway 达到目标状态。"""
+    deadline = time.time() + max(timeout, 0)
+    last_runtime = None
+    while time.time() <= deadline:
+        last_runtime = detect_gateway_runtime()
+        if last_runtime == target:
+            return last_runtime
+        time.sleep(interval)
+    return last_runtime
+
+
+def sync_openclaw_runtime_for_teamclaw_startup():
+    """为 TeamClaw 启动准备 OpenClaw runtime。
+
+    该流程只同步 OpenClaw runtime 相关配置，不会把 OpenClaw 的 LLM 配置
+    自动导入 TeamClaw，避免覆盖用户在 TeamClaw 中维护的 provider/model。
+    """
+    result = {
+        "installed": False,
+        "cli_path": "",
+        "runtime_before": None,
+        "runtime_after": None,
+        "gateway_started": False,
+        "gateway_start_error": "",
+        "chat_completions_enabled": False,
+        "chat_completions_changed": False,
+        "auth_mode": None,
+        "api_url": "",
+        "token_present": False,
+        "sessions_file": "",
+        "sessions_health": None,
+        "env_updates": [],
+    }
+
+    oc_bin = detect_openclaw_bin()
+    if not oc_bin:
+        return result
+
+    result["installed"] = True
+    result["cli_path"] = oc_bin
+    result["runtime_before"] = detect_gateway_runtime()
+
+    if result["runtime_before"] != "running":
+        rc, out, err = run_cmd(["openclaw", "gateway", "start"], timeout=30)
+        if rc == 0:
+            result["gateway_started"] = True
+            result["runtime_after"] = wait_for_gateway_runtime(target="running", timeout=20)
+        else:
+            result["gateway_start_error"] = err or out or "failed to start gateway"
+            result["runtime_after"] = detect_gateway_runtime()
+    else:
+        result["runtime_after"] = result["runtime_before"]
+
+    enabled, changed = enable_chat_completions_endpoint()
+    result["chat_completions_enabled"] = enabled
+    result["chat_completions_changed"] = changed
+    if changed:
+        result["runtime_after"] = wait_for_gateway_runtime(target="running", timeout=20)
+    elif result["runtime_after"] is None:
+        result["runtime_after"] = detect_gateway_runtime()
+
+    auth_mode = detect_gateway_auth_mode()
+    result["auth_mode"] = auth_mode
+
+    _, kvs = read_env()
+
+    port = detect_gateway_port()
+    if port:
+        api_url = f"http://127.0.0.1:{port}/v1/chat/completions"
+        result["api_url"] = api_url
+        if kvs.get("OPENCLAW_API_URL", "").strip() != api_url:
+            set_env_with_validation("OPENCLAW_API_URL", api_url)
+            result["env_updates"].append("OPENCLAW_API_URL")
+
+    token = detect_gateway_token()
+    if token:
+        result["token_present"] = True
+        if kvs.get("OPENCLAW_GATEWAY_TOKEN", "").strip() != token:
+            set_env_with_validation("OPENCLAW_GATEWAY_TOKEN", token)
+            result["env_updates"].append("OPENCLAW_GATEWAY_TOKEN")
+
+    sessions_file = detect_sessions_file()
+    if sessions_file:
+        result["sessions_file"] = sessions_file
+        if kvs.get("OPENCLAW_SESSIONS_FILE", "").strip() != sessions_file:
+            set_env_with_validation("OPENCLAW_SESSIONS_FILE", sessions_file)
+            result["env_updates"].append("OPENCLAW_SESSIONS_FILE")
+        result["sessions_health"] = repair_sessions_health(sessions_file)
+
+    if result["runtime_after"] is None:
+        result["runtime_after"] = detect_gateway_runtime()
+
+    return result
+
+
 def print_health_status(sessions_file=None, repair=False):
     """输出轻量健康状态；可选自动修复 sessions 坏索引。"""
     print("\n🔍 检查 OpenClaw 轻量健康状态...")
@@ -609,10 +709,17 @@ def detect_llm_config_from_openclaw():
     else:
         provider_cfg = {}
 
-    api_key = provider_cfg.get("apiKey") or ""
-    if not api_key:
-        # fallback: 从 openclaw.json env 段取 OPENAI_API_KEY
-        api_key = (config.get("env") or {}).get("OPENAI_API_KEY", "")
+    provider_name = (provider_id or "").strip().lower()
+    api_key = ""
+    if isinstance(provider_cfg, dict):
+        api_key = (provider_cfg.get("apiKey") or "").strip()
+    # OpenClaw 的 openai provider 会优先读取 env.OPENAI_API_KEY。
+    # 导入 TeamClaw 时必须按实际生效值返回，避免“看起来已同步、实际仍在用旧 key”。
+    if provider_name == "openai":
+        api_key = ((config.get("env") or {}).get("OPENAI_API_KEY") or "").strip() or api_key
+    elif not api_key and not provider_name:
+        # fallback: 未识别出 provider 时，尽量返回 env 中的 OpenAI key
+        api_key = ((config.get("env") or {}).get("OPENAI_API_KEY") or "").strip()
 
     base_url = provider_cfg.get("baseUrl") or ""
     # OpenClaw baseUrl 通常带 /v1，TeamClaw 的 LLM_BASE_URL 不带
@@ -668,6 +775,301 @@ def sync_llm_config_from_openclaw():
         print("   ℹ️ LLM 配置已是最新，无需同步")
 
     return synced
+
+
+def _infer_teamclaw_provider(provider, base_url="", model=""):
+    """根据 TeamClaw 当前配置推断 OpenClaw provider id。"""
+    if isinstance(provider, str) and provider.strip():
+        return provider.strip().lower()
+
+    base = (base_url or "").strip().lower()
+    model_name = (model or "").strip().lower()
+
+    base_markers = [
+        ("api.deepseek.com", "deepseek"),
+        ("api.openai.com", "openai"),
+        ("generativelanguage.googleapis.com", "google"),
+        ("api.anthropic.com", "anthropic"),
+        ("api.minimaxi.com", "minimax"),
+        ("127.0.0.1:8045", "antigravity"),
+        ("localhost:8045", "antigravity"),
+        ("127.0.0.1:11434", "ollama"),
+        ("localhost:11434", "ollama"),
+    ]
+    for marker, provider_id in base_markers:
+        if marker in base:
+            return provider_id
+
+    model_markers = [
+        (("deepseek",), "deepseek"),
+        (("claude",), "anthropic"),
+        (("gemini",), "google"),
+        (("minimax", "abab"), "minimax"),
+        (("gpt-", "o1", "o3", "o4"), "openai"),
+    ]
+    for markers, provider_id in model_markers:
+        if any(model_name.startswith(marker) for marker in markers):
+            return provider_id
+
+    return "openai"
+
+
+def _provider_is_local_keyless(provider_id, base_url=""):
+    """判断 provider 是否允许本地无 key 运行。"""
+    provider = (provider_id or "").strip().lower()
+    base = (base_url or "").strip().lower()
+    if provider == "ollama":
+        return True
+    return "127.0.0.1:11434" in base or "localhost:11434" in base
+
+
+def _openclaw_provider_api(provider_id):
+    """将 TeamClaw provider 映射到 OpenClaw provider API 类型。"""
+    provider = (provider_id or "").strip().lower()
+    if provider == "anthropic":
+        return "anthropic-messages"
+    if provider == "google":
+        return "google-generative-ai"
+    return "openai-completions"
+
+
+def _strip_base_url_suffixes(base_url):
+    """去掉常见 endpoint 后缀，保留 provider base URL。"""
+    value = (base_url or "").strip().rstrip("/")
+    if not value:
+        return ""
+
+    suffixes = (
+        "/chat/completions",
+        "/models",
+        "/messages",
+        "/responses",
+    )
+    lowered = value.lower()
+    for suffix in suffixes:
+        if lowered.endswith(suffix):
+            value = value[: -len(suffix)]
+            lowered = value.lower()
+            break
+    return value.rstrip("/")
+
+
+def _normalize_openclaw_base_url(provider_id, base_url):
+    """将 TeamClaw 的 base URL 规范为 OpenClaw provider 所需格式。"""
+    value = _strip_base_url_suffixes(base_url)
+    if not value:
+        return ""
+
+    api_type = _openclaw_provider_api(provider_id)
+    if api_type == "openai-completions":
+        if not re.search(r"/v\d+(?:[a-z0-9._-]+)?$", value, re.IGNORECASE):
+            value = value.rstrip("/") + "/v1"
+    return value
+
+
+def _looks_like_reasoning_model(model_id):
+    model = (model_id or "").strip().lower()
+    markers = (
+        "reasoner",
+        "reasoning",
+        "r1",
+        "o1",
+        "o3",
+        "o4",
+        "think",
+    )
+    return any(marker in model for marker in markers)
+
+
+def _looks_like_vision_model(provider_id, model_id):
+    provider = (provider_id or "").strip().lower()
+    model = (model_id or "").strip().lower()
+
+    if provider in {"google", "anthropic"}:
+        return True
+
+    markers = (
+        "vision",
+        "image",
+        "multimodal",
+        "gpt-4o",
+        "gpt-4.1",
+        "gpt-5",
+        "gemini",
+        "claude",
+        "o1",
+        "o3",
+        "o4",
+    )
+    return any(marker in model for marker in markers)
+
+
+def _build_openclaw_model_entry(model_id, provider_id, existing=None):
+    """构造 OpenClaw provider.models 中的模型描述。"""
+    entry = existing.copy() if isinstance(existing, dict) else {}
+    entry["id"] = model_id
+    entry.setdefault("name", model_id)
+    entry.setdefault("reasoning", _looks_like_reasoning_model(model_id))
+    entry.setdefault(
+        "input",
+        ["text", "image"] if _looks_like_vision_model(provider_id, model_id) else ["text"],
+    )
+    entry.setdefault("contextWindow", 128000)
+    entry.setdefault("maxTokens", 8192)
+    return entry
+
+
+def _write_openclaw_config(config):
+    os.makedirs(os.path.dirname(OPENCLAW_CONFIG_PATH), exist_ok=True)
+    with open(OPENCLAW_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def export_llm_config_to_openclaw(api_key, base_url, model, provider=""):
+    """将 TeamClaw 当前 LLM 设置写回 OpenClaw 默认模型配置。"""
+    api_key = (api_key or "").strip()
+    base_url = (base_url or "").strip()
+    model = (model or "").strip()
+    provider_id = _infer_teamclaw_provider(provider, base_url, model)
+    is_local_keyless = _provider_is_local_keyless(provider_id, base_url)
+
+    if not api_key and not is_local_keyless:
+        raise ValueError("LLM_API_KEY 不能为空")
+    if not base_url:
+        raise ValueError("LLM_BASE_URL 不能为空")
+    if not model:
+        raise ValueError("LLM_MODEL 不能为空")
+    if not api_key and is_local_keyless:
+        api_key = "ollama"
+
+    config = load_openclaw_config()
+    if not isinstance(config, dict):
+        config = {}
+    original_config = copy.deepcopy(config)
+
+    agents_cfg = config.setdefault("agents", {})
+    defaults_cfg = agents_cfg.setdefault("defaults", {})
+    model_defaults = defaults_cfg.setdefault("model", {})
+    default_models = defaults_cfg.setdefault("models", {})
+
+    models_cfg = config.setdefault("models", {})
+    providers_cfg = models_cfg.setdefault("providers", {})
+
+    provider_cfg = providers_cfg.get(provider_id)
+    if not isinstance(provider_cfg, dict):
+        provider_cfg = {}
+
+    provider_cfg["baseUrl"] = _normalize_openclaw_base_url(provider_id, base_url)
+    provider_cfg["apiKey"] = api_key
+    provider_cfg["api"] = _openclaw_provider_api(provider_id)
+
+    models_list = provider_cfg.get("models")
+    if not isinstance(models_list, list):
+        models_list = []
+
+    existing_entry = None
+    existing_index = None
+    for index, entry in enumerate(models_list):
+        if isinstance(entry, dict) and entry.get("id") == model:
+            existing_entry = entry
+            existing_index = index
+            break
+
+    updated_entry = _build_openclaw_model_entry(model, provider_id, existing=existing_entry)
+    if existing_index is None:
+        models_list.append(updated_entry)
+    else:
+        models_list[existing_index] = updated_entry
+    provider_cfg["models"] = models_list
+    providers_cfg[provider_id] = provider_cfg
+
+    if provider_id == "openai":
+        env_cfg = config.get("env")
+        if not isinstance(env_cfg, dict):
+            env_cfg = {}
+            config["env"] = env_cfg
+        # OpenClaw 的 openai provider 可能优先读取 env.OPENAI_API_KEY。
+        # 这里必须和 provider.apiKey 一并写，避免实际运行继续命中旧凭据。
+        env_cfg["OPENAI_API_KEY"] = api_key
+
+    model_ref = f"{provider_id}/{model}"
+    if not isinstance(default_models, dict):
+        default_models = {}
+        defaults_cfg["models"] = default_models
+    default_models.setdefault(model_ref, {})
+    if not isinstance(model_defaults, dict):
+        model_defaults = {}
+        defaults_cfg["model"] = model_defaults
+    model_defaults["primary"] = model_ref
+
+    changed = config != original_config
+    if changed:
+        _write_openclaw_config(config)
+
+    gateway_runtime = detect_gateway_runtime()
+    gateway_running = gateway_runtime == "running"
+    gateway_restarted = False
+    restart_error = ""
+    if changed and gateway_running:
+        rc, out, err = run_cmd(["openclaw", "gateway", "restart"], timeout=30)
+        gateway_restarted = rc == 0
+        if rc != 0:
+            restart_error = err or out or "gateway restart failed"
+
+    return {
+        "ok": True,
+        "provider": provider_id,
+        "model": model,
+        "model_ref": model_ref,
+        "config_path": OPENCLAW_CONFIG_PATH,
+        "changed": changed,
+        "gateway_running": gateway_running,
+        "gateway_restarted": gateway_restarted,
+        "restart_error": restart_error,
+    }
+
+
+def read_teamclaw_llm_config():
+    """读取 TeamClaw 当前 LLM 配置。"""
+    _, kvs = read_env()
+    return {
+        "LLM_API_KEY": (kvs.get("LLM_API_KEY") or "").strip(),
+        "LLM_BASE_URL": (kvs.get("LLM_BASE_URL") or "").strip(),
+        "LLM_MODEL": (kvs.get("LLM_MODEL") or "").strip(),
+        "LLM_PROVIDER": (kvs.get("LLM_PROVIDER") or "").strip(),
+    }
+
+
+def sync_teamclaw_llm_to_openclaw():
+    """将 TeamClaw 当前 LLM 配置回写到 OpenClaw。"""
+    config = read_teamclaw_llm_config()
+    provider_id = _infer_teamclaw_provider(
+        config.get("LLM_PROVIDER", ""),
+        config.get("LLM_BASE_URL", ""),
+        config.get("LLM_MODEL", ""),
+    )
+    missing = []
+    if not config.get("LLM_BASE_URL"):
+        missing.append("LLM_BASE_URL")
+    if not config.get("LLM_MODEL"):
+        missing.append("LLM_MODEL")
+    if not config.get("LLM_API_KEY") and not _provider_is_local_keyless(
+        provider_id,
+        config.get("LLM_BASE_URL", ""),
+    ):
+        missing.append("LLM_API_KEY")
+    if missing:
+        raise ValueError(
+            "TeamClaw 当前 LLM 配置不完整，缺少: " + ", ".join(missing)
+        )
+
+    return export_llm_config_to_openclaw(
+        api_key=config["LLM_API_KEY"],
+        base_url=config["LLM_BASE_URL"],
+        model=config["LLM_MODEL"],
+        provider=config.get("LLM_PROVIDER", ""),
+    )
 
 
 def auto_detect_and_configure():
@@ -1413,6 +1815,22 @@ def main():
 
     if cmd == "--auto-detect":
         auto_detect_and_configure()
+    elif cmd == "--sync-teamclaw-llm":
+        try:
+            print("🔄 将 TeamClaw 当前 LLM 配置同步到 OpenClaw...")
+            result = sync_teamclaw_llm_to_openclaw()
+            print(f"   Provider: {result.get('provider')}")
+            print(f"   Model: {result.get('model_ref')}")
+            print(f"   Config: {result.get('config_path')}")
+            if result.get("gateway_running"):
+                if result.get("gateway_restarted"):
+                    print("   ✅ OpenClaw gateway 已自动重载")
+                elif result.get("restart_error"):
+                    print(f"   ⚠️ 已写入配置，但 gateway 重载失败: {result['restart_error']}")
+            print("✅ TeamClaw → OpenClaw LLM 同步完成")
+        except Exception as e:
+            print(f"❌ 同步失败: {e}", file=sys.stderr)
+            sys.exit(1)
     elif cmd == "--status":
         show_status()
     elif cmd == "--install-guide":

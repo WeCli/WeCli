@@ -3,6 +3,7 @@ import re
 import json
 import copy
 import asyncio
+import contextlib
 import sys
 import logging
 from typing import Annotated, TypedDict, Optional
@@ -21,6 +22,80 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import ToolNode
 
 from agent_runtime_state import TaskRegistry, ThreadStateRegistry
+from teambot_policy import (
+    ToolPolicyDecision,
+    get_tool_policy,
+    run_tool_policy_hooks,
+)
+from teambot_context import (
+    budget_user_messages,
+    budget_tool_messages,
+    compact_history_messages,
+    render_runtime_context_block,
+)
+from teambot_memory import ensure_memory_state
+from teambot_permission_context import (
+    create_or_reuse_permission_request,
+    resolve_permission_context,
+)
+from teambot_profiles import get_agent_profile, parse_subagent_session_id, render_profile_system_prompt
+from teambot_runtime import (
+    build_session_mode_message,
+    build_turn_limit_message,
+    filter_tools_for_mode,
+    normalize_session_mode,
+    resolve_max_turns,
+    should_stop_for_turn_limit,
+)
+from teambot_bridge import get_bridge_runtime_payload
+from teambot_buddy import serialize_buddy_state
+from teambot_runtime_store import (
+    get_session_state,
+    get_session_mode,
+    list_inbox_messages,
+    list_runtime_artifacts,
+    list_runs_for_session,
+    get_session_plan,
+    get_session_todos,
+    list_tool_approvals,
+    list_verification_records,
+    update_tool_approval_status,
+)
+from teambot_voice import get_voice_state as get_teambot_voice_state
+from teambot_workspace import describe_session_workspace
+
+# --- New feature modules (ported from Claude Code / openclaw / oh-my-codex) ---
+from streaming_tool_executor import (
+    StreamingToolExecutor, get_streaming_executor,
+    classify_tool_access, ToolAccessMode, ToolExecutionResult,
+)
+from token_budget import get_session_budget, SessionTokenBudget
+from context_compressor import compress_context, CompressionStats
+from cache_boundary import SystemPromptCacheManager
+from bash_safety import analyze_command, is_command_blocked, RiskLevel
+from lazy_tool_discovery import LazyToolRegistry
+from agent_orchestrator import (
+    create_fork, complete_fork, get_fork, list_forks, ForkMode,
+    start_coordinator_run, advance_coordinator_phase, get_coordinator_run,
+    create_council_session, submit_council_vote, evaluate_council_consensus,
+)
+from cost_tracker import get_cost_tracker
+from effort_controller import resolve_effort, get_effort_config, EffortLevel
+from workflow_engines import (
+    get_ralph_loop, create_ralph_loop, get_ralph_prompt,
+    create_deep_interview, get_interview_prompt,
+    get_autopilot, AutopilotConfig,
+    check_context_gate,
+    get_hud, update_hud,
+    fork_session, get_session_fork,
+)
+from notification_system import (
+    send_notification, get_notifications, NotificationLevel,
+    run_ttl_cleanup, register_ttl,
+    get_pending_model_swap, consume_model_swap,
+    save_session_checkpoint, get_session_checkpoint, build_resume_prompt,
+    create_broadcast,
+)
 
 
 # --- Tools that need automatic username injection ---
@@ -45,16 +120,58 @@ USER_INJECTED_TOOLS = {
     "call_llm_api", "send_internal_message",
     # Group chat tools
     "send_to_group",
+    # TeamBot subagent tools
+    "list_teambot_agent_profiles", "spawn_subagent", "list_subagents",
+    "send_subagent_message", "get_subagent_history", "cancel_subagent",
+    "session_send_to", "session_inbox", "session_deliver_inbox",
+    "claude_session_send_to", "claude_session_inbox", "claude_session_deliver_inbox",
+    "ultraplan_start", "ultraplan_status",
+    "ultrareview_start", "ultrareview_status",
+    "enter_plan_mode", "exit_plan_mode", "get_session_mode",
 }
 
 # Tools that need session_id auto-injected (in addition to username)
 SESSION_INJECTED_TOOLS = {
+    "list_files": "session_id",
+    "read_file": "session_id",
+    "write_file": "session_id",
+    "append_file": "session_id",
+    "delete_file": "session_id",
+    "run_command": "session_id",
+    "run_python_code": "session_id",
     "add_alarm": "session_id",
     "post_to_oasis": "notify_session",
     "get_current_session": "current_session_id",
     "send_telegram_message": "source_session",
     "send_internal_message": "source_session",
     "send_to_group": "source_session",
+    "spawn_subagent": "parent_session",
+    "send_subagent_message": "source_session",
+    "cancel_subagent": "source_session",
+    "write_session_plan": "source_session",
+    "read_session_plan": "source_session",
+    "clear_session_plan": "source_session",
+    "write_session_todos": "source_session",
+    "read_session_todos": "source_session",
+    "clear_session_todos": "source_session",
+    "record_verification": "source_session",
+    "list_verifications": "source_session",
+    "run_verification": "source_session",
+    "list_tool_approvals": "source_session",
+    "resolve_tool_approval": "source_session",
+    "session_send_to": "source_session",
+    "session_inbox": "source_session",
+    "session_deliver_inbox": "source_session",
+    "claude_session_send_to": "source_session",
+    "claude_session_inbox": "source_session",
+    "claude_session_deliver_inbox": "source_session",
+    "ultraplan_start": "source_session",
+    "ultraplan_status": "source_session",
+    "ultrareview_start": "source_session",
+    "ultrareview_status": "source_session",
+    "enter_plan_mode": "source_session",
+    "exit_plan_mode": "source_session",
+    "get_session_mode": "source_session",
 }
 
 # --- State definition ---
@@ -64,12 +181,15 @@ class AgentState(TypedDict):
     enabled_tools: Optional[list[str]]
     user_id: Optional[str]
     session_id: Optional[str]
+    max_turns: Optional[int]
+    turn_count: Optional[int]
     # 外部调用方传入的 tools 定义（OpenAI function calling 格式）
     # 当 LLM 选择调用这些工具时，中断图执行并以 tool_calls 格式返回给调用方
     external_tools: Optional[list[dict]]
     # Per-request LLM model override (from OASIS SessionExpert per-expert config)
     # Dict with optional keys: model, api_key, base_url, provider
     llm_override: Optional[dict]
+    max_tokens: Optional[int]
 
 
 class UserAwareToolNode:
@@ -82,10 +202,31 @@ class UserAwareToolNode:
         self.tool_node = ToolNode(tools)
         self._get_mcp_tools = get_mcp_tools_fn
 
+    @staticmethod
+    def _format_policy_block_message(
+        tool_name: str,
+        reason: str,
+        requires_approval: bool,
+        approval_id: str = "",
+    ) -> str:
+        if requires_approval:
+            approval_hint = f"\napproval_id: {approval_id}" if approval_id else ""
+            return (
+                f"⏸️ 工具 '{tool_name}' 当前需要人工批准。\n"
+                f"原因：{reason or '当前 tool approval policy 未自动放行该调用。'}\n\n"
+                f"如需继续，请先批准该请求后再重试。{approval_hint}"
+            )
+        return (
+            f"❌ 工具 '{tool_name}' 被当前 TeamBot tool policy 拒绝。\n"
+            f"原因：{reason or '该工具调用不满足当前策略要求。'}"
+        )
+
     async def __call__(self, state, config: RunnableConfig):
         # Get user_id directly from state (injected by mainagent) instead of
         # parsing thread_id, because user_id itself may contain the separator.
         user_id = state.get("user_id") or "anonymous"
+        session_id = state.get("session_id") or "default"
+        runtime_mode_name = normalize_session_mode(get_session_mode(user_id, session_id).get("mode"))
 
         last_message = state["messages"][-1]
         if not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
@@ -100,30 +241,185 @@ class UserAwareToolNode:
 
         # Separate blocked and allowed calls
         modified_message = copy.deepcopy(last_message)
-        blocked_calls = []
+        blocked_calls: list[tuple[dict, str, bool, str]] = []
         allowed_calls = []
+        allowed_call_meta: dict[str, tuple[str, dict, object, str]] = {}
         for tc in modified_message.tool_calls:
+            if runtime_mode_name == "plan":
+                requested_agent_type = str(tc.get("args", {}).get("agent_type") or "").strip().lower()
+                if tc["name"] in PLAN_MODE_BLOCKED_TOOLS or (
+                    tc["name"] == "spawn_subagent" and requested_agent_type in {"general", "coder"}
+                ):
+                    blocked_calls.append((
+                        tc,
+                        "当前会话处于 plan 模式。请先完成调研、计划和 todo，再退出 plan 模式后执行改动。",
+                        False,
+                        "",
+                    ))
+                    continue
+            elif runtime_mode_name == "review":
+                if tc["name"] in REVIEW_MODE_BLOCKED_TOOLS:
+                    blocked_calls.append((
+                        tc,
+                        "当前会话处于 review 模式。请保持只读审查，避免直接修改文件或外部状态。",
+                        False,
+                        "",
+                    ))
+                    continue
             if enabled_set is not None and tc["name"] not in enabled_set:
-                blocked_calls.append(tc)
+                blocked_calls.append((
+                    tc,
+                    "该工具当前未在会话的 enabled_tools 列表中。",
+                    False,
+                    "",
+                ))
                 print(f">>> [tools] 🚫 拦截禁用工具调用: {tc['name']}")
             else:
+                # --- Bash safety check (deny invariants) ---
+                if tc["name"] == "run_command":
+                    cmd_text = str(tc.get("args", {}).get("command", ""))
+                    if cmd_text and is_command_blocked(cmd_text):
+                        cmd_analysis = analyze_command(cmd_text)
+                        blocked_calls.append((
+                            tc,
+                            f"DENY INVARIANT: {'; '.join(cmd_analysis.reasons)}",
+                            False,
+                            "",
+                        ))
+                        print(f">>> [tools] 🛡️ bash safety blocked: {cmd_text[:80]}")
+                        continue
+                    # High-risk commands need approval
+                    cmd_analysis = analyze_command(cmd_text)
+                    if cmd_analysis.risk_level == RiskLevel.HIGH:
+                        blocked_calls.append((
+                            tc,
+                            f"高风险命令需要人工批准: {'; '.join(cmd_analysis.reasons)}",
+                            True,
+                            "",
+                        ))
+                        print(f">>> [tools] ⚠️ bash high-risk: {cmd_text[:80]}")
+                        continue
+
                 if tc["name"] in USER_INJECTED_TOOLS:
                     tc["args"]["username"] = user_id
                 # Auto-inject session_id for tools that need it (only if not already set by LLM)
                 if tc["name"] in SESSION_INJECTED_TOOLS:
                     param_name = SESSION_INJECTED_TOOLS[tc["name"]]
                     if not tc["args"].get(param_name):
-                        tc["args"][param_name] = state.get("session_id") or "default"
+                        tc["args"][param_name] = session_id
+
+                permission = resolve_permission_context(
+                    user_id=user_id,
+                    session_id=session_id,
+                    tool_name=tc["name"],
+                    args=tc["args"],
+                )
+                base_decision = ToolPolicyDecision(
+                    allowed=permission.allowed,
+                    requires_approval=permission.requires_approval,
+                    reason=permission.reason,
+                    matched_rule=permission.matched_rule,
+                )
+                hook_outcome = run_tool_policy_hooks(
+                    permission.policy,
+                    event="before",
+                    user_id=user_id,
+                    session_id=session_id,
+                    tool_name=tc["name"],
+                    args=tc["args"],
+                    decision=base_decision,
+                )
+                tc["args"] = dict(hook_outcome.args)
+                if hook_outcome.decision is not None:
+                    final_decision = hook_outcome.decision
+                else:
+                    refreshed_permission = resolve_permission_context(
+                        user_id=user_id,
+                        session_id=session_id,
+                        tool_name=tc["name"],
+                        args=tc["args"],
+                        policy=permission.policy,
+                    )
+                    permission = refreshed_permission
+                    final_decision = ToolPolicyDecision(
+                        allowed=permission.allowed,
+                        requires_approval=permission.requires_approval,
+                        reason=permission.reason,
+                        matched_rule=permission.matched_rule,
+                    )
+                approval_id = permission.approval.approval_id if permission.approval else ""
+                if not final_decision.allowed:
+                    if getattr(final_decision, "requires_approval", False):
+                        approval = permission.approval or create_or_reuse_permission_request(
+                            user_id=user_id,
+                            session_id=session_id,
+                            tool_name=tc["name"],
+                            args=tc["args"],
+                            reason=getattr(final_decision, "reason", "") or permission.reason,
+                        )
+                        approval_id = approval.approval_id
+                        try:
+                            run_tool_policy_hooks(
+                                permission.policy,
+                                event="permission_request",
+                                user_id=user_id,
+                                session_id=session_id,
+                                tool_name=tc["name"],
+                                args=tc["args"],
+                                decision=final_decision,
+                                result={"approval_id": approval_id},
+                            )
+                        except Exception as exc:
+                            print(f">>> [tools] ⚠️ tool policy permission_request hook failed: {exc}")
+                    else:
+                        try:
+                            run_tool_policy_hooks(
+                                permission.policy,
+                                event="deny",
+                                user_id=user_id,
+                                session_id=session_id,
+                                tool_name=tc["name"],
+                                args=tc["args"],
+                                decision=final_decision,
+                            )
+                        except Exception as exc:
+                            print(f">>> [tools] ⚠️ tool policy deny hook failed: {exc}")
+                    blocked_calls.append(
+                        (
+                            tc,
+                            getattr(final_decision, "reason", "") or permission.reason,
+                            getattr(final_decision, "requires_approval", False),
+                            approval_id,
+                        )
+                    )
+                    print(f">>> [tools] 🚫 policy blocked: {tc['name']} reason={permission.reason}")
+                    continue
+                try:
+                    if permission.approval is not None and permission.approval.status == "approved":
+                        update_tool_approval_status(
+                            permission.approval.approval_id,
+                            user_id,
+                            status="used",
+                            resolution_reason=permission.approval.resolution_reason,
+                        )
+                except Exception:
+                    pass
                 allowed_calls.append(tc)
+                allowed_call_meta[tc["id"]] = (tc["name"], dict(tc["args"]), permission.policy, approval_id)
                 print(f">>> [tools] ✅ 调用工具: {tc['name']}")
 
         result_messages = []
 
         # For blocked tools, return error ToolMessages directly
-        for tc in blocked_calls:
+        for tc, reason, requires_approval, approval_id in blocked_calls:
             result_messages.append(
                 ToolMessage(
-                    content=f"❌ 工具 '{tc['name']}' 当前已被禁用。这通常是为了保护您的系统安全或优化当前会话资源。如果您确实需要此功能，请在管理面板中将其开启。同时，您可以告诉我您的最终目标，我会尝试用其他已启用的工具为您寻找替代方案。",
+                    content=self._format_policy_block_message(
+                        tc["name"],
+                        reason,
+                        requires_approval,
+                        approval_id,
+                    ),
                     tool_call_id=tc["id"],
                 )
             )
@@ -132,8 +428,60 @@ class UserAwareToolNode:
         if allowed_calls:
             modified_message.tool_calls = allowed_calls
             modified_state = {**state, "messages": state["messages"][:-1] + [modified_message]}
-            tool_result = await self.tool_node.ainvoke(modified_state, config)
-            result_messages.extend(tool_result.get("messages", []))
+            try:
+                tool_result = await self.tool_node.ainvoke(modified_state, config)
+            except Exception as exc:
+                for tc in allowed_calls:
+                    meta = allowed_call_meta.get(tc["id"])
+                    if meta is None:
+                        continue
+                    tool_name, tool_args, tool_policy, _approval_id = meta
+                    with contextlib.suppress(Exception):
+                        run_tool_policy_hooks(
+                            tool_policy,
+                            event="after_error",
+                            user_id=user_id,
+                            session_id=session_id,
+                            tool_name=tool_name,
+                            args=tool_args,
+                            result=str(exc),
+                        )
+                raise
+            tool_messages = tool_result.get("messages", [])
+            result_messages.extend(tool_messages)
+            for msg in tool_messages:
+                tool_call_id = getattr(msg, "tool_call_id", "")
+                meta = allowed_call_meta.get(tool_call_id)
+                if meta is None:
+                    continue
+                tool_name, tool_args, tool_policy, approval_id = meta
+                result_text = getattr(msg, "content", "")
+                try:
+                    run_tool_policy_hooks(
+                        tool_policy,
+                        event="after",
+                        user_id=user_id,
+                        session_id=session_id,
+                        tool_name=tool_name,
+                        args=tool_args,
+                        result=result_text,
+                    )
+                except Exception as exc:
+                    print(f">>> [tools] ⚠️ tool policy after hook failed: {exc}")
+                try:
+                    result_preview = str(result_text)
+                    if result_preview.startswith(("❌", "⚠️")):
+                        run_tool_policy_hooks(
+                            tool_policy,
+                            event="after_error",
+                            user_id=user_id,
+                            session_id=session_id,
+                            tool_name=tool_name,
+                            args=tool_args,
+                            result=result_text,
+                        )
+                except Exception as exc:
+                    print(f">>> [tools] ⚠️ tool policy after_error hook failed: {exc}")
 
         return {"messages": result_messages}
 
@@ -160,12 +508,17 @@ class TeamAgent:
         self._memory = None
         self._memory_ctx = None
 
-        # Per-user state
+        # Per-thread tool-state cache
         self._task_registry = TaskRegistry()
-        self._user_last_tool_state: dict[str, frozenset[str]] = {}
+        self._tool_state_cache: dict[str, frozenset[str]] = {}
 
         # Per-thread lock: 防止 system_trigger 和用户对话并发操作同一 checkpoint
         self._thread_state_registry = ThreadStateRegistry()
+
+        # --- New feature instances ---
+        self._streaming_executor = get_streaming_executor()
+        self._tool_registry = LazyToolRegistry()
+        self._cache_manager = SystemPromptCacheManager()
 
         # 启动时一次性加载 prompt 模板
         self._prompts = self._load_prompts()
@@ -538,10 +891,23 @@ class TeamAgent:
                 "args": [os.path.join(self._src_dir, "mcp_llmapi.py")],
                 "transport": "stdio",
             },
+            "teambot_service": {
+                "command": python_command,
+                "args": [os.path.join(self._src_dir, "mcp_teambot.py")],
+                "transport": "stdio",
+            },
         })
 
         # 3. Fetch tool definitions (new API: no context manager needed)
         self._mcp_tools = await self._mcp_client.get_tools()
+
+        # 3.5 Register tools in lazy discovery registry (new)
+        self._tool_registry.register_tools(self._mcp_tools)
+        # Mark essential tools as always-loaded
+        self._tool_registry.set_always_loaded({
+            "read_file", "write_file", "list_files", "run_command",
+            "search_files", "run_python_code",
+        })
 
         # 4. Build LangGraph workflow
         # 收集所有内部 MCP 工具名称，用于条件路由
@@ -555,7 +921,17 @@ class TeamAgent:
         workflow.add_edge("tools", "chatbot")
 
         self._agent_app = workflow.compile(checkpointer=self._memory)
+
+        # 5. Run initial TTL cleanup (new)
+        with contextlib.suppress(Exception):
+            cleanup_counts = run_ttl_cleanup()
+            if cleanup_counts:
+                print(f"[startup] TTL cleanup: {cleanup_counts}")
+
         print("--- Agent 服务已启动，外部定时/用户输入双兼容就绪 ---")
+        print(f"    工具注册: {self._tool_registry.tool_count} tools"
+              f" ({len(self._tool_registry._always_loaded)} always-loaded)")
+
 
     async def shutdown(self):
         """Clean up MCP client and checkpoint DB."""
@@ -584,8 +960,10 @@ class TeamAgent:
     # 模型名 -> 厂商 映射已移至 src/llm_factory.py（全局共享）
 
     @staticmethod
-    def _get_model() -> BaseChatModel:
+    def _get_model(max_tokens: int | None = None) -> BaseChatModel:
         from llm_factory import create_chat_model
+        if max_tokens is not None and max_tokens > 0:
+            return create_chat_model(max_tokens=max_tokens)
         return create_chat_model()
 
     # ------------------------------------------------------------------
@@ -615,13 +993,69 @@ class TeamAgent:
     async def _call_model(self, state: AgentState):
         """LangGraph node: invoke LLM with dynamic tool binding & tool-state notification."""
 
+        user_id = state.get("user_id", "__global__")
+        session_id = state.get("session_id", "")
+        subagent_meta = parse_subagent_session_id(session_id) if session_id else None
+        subagent_profile = (
+            get_agent_profile(subagent_meta["agent_type"], user_id=user_id) if subagent_meta else None
+        )
+        is_subagent = bool(subagent_meta) or (session_id.startswith("oasis_") if session_id else False)
+        response_max_tokens = state.get("max_tokens")
+        effective_max_turns = resolve_max_turns(
+            state.get("max_turns"),
+            subagent_profile.max_turns if subagent_profile else None,
+        )
+        current_turn_count = state.get("turn_count") or 0
+        runtime_mode = get_session_state(user_id, session_id)
+        runtime_mode_name = normalize_session_mode(
+            runtime_mode.get("mode") if isinstance(runtime_mode, dict) else getattr(runtime_mode, "mode", "execute")
+        )
+        runtime_mode_payload = {
+            "mode": runtime_mode_name,
+            "status": runtime_mode.get("status", "active") if isinstance(runtime_mode, dict) else getattr(runtime_mode, "status", "active"),
+            "reason": runtime_mode.get("summary", "") if isinstance(runtime_mode, dict) else getattr(runtime_mode, "summary", ""),
+        }
+        session_policy = get_tool_policy(user_id)
+        if current_turn_count == 0 or len(state.get("messages") or []) <= 1:
+            with contextlib.suppress(Exception):
+                run_tool_policy_hooks(
+                    session_policy,
+                    event="session_start",
+                    user_id=user_id,
+                    session_id=session_id,
+                    tool_name="__session__",
+                    args={
+                        "mode": runtime_mode_name,
+                        "is_subagent": is_subagent,
+                    },
+                )
+        last_input_message = state["messages"][-1] if state.get("messages") else None
+        if isinstance(last_input_message, HumanMessage):
+            with contextlib.suppress(Exception):
+                run_tool_policy_hooks(
+                    session_policy,
+                    event="user_prompt_submit",
+                    user_id=user_id,
+                    session_id=session_id,
+                    tool_name="__session__",
+                    args={
+                        "mode": runtime_mode_name,
+                        "trigger_source": state.get("trigger_source") or "user",
+                        "content": str(last_input_message.content)[:500],
+                    },
+                )
+
         # Dynamic tool binding based on enabled_tools + external_tools
         all_tools = self._mcp_tools
         enabled_names = state.get("enabled_tools")
-        if enabled_names is not None:
-            filtered_tools = [t for t in all_tools if t.name in enabled_names]
-        else:
-            filtered_tools = all_tools
+        effective_enabled_names = enabled_names
+        if effective_enabled_names is None and subagent_profile and subagent_profile.allowed_tools is not None:
+            effective_enabled_names = list(subagent_profile.allowed_tools)
+        if effective_enabled_names is None:
+            effective_enabled_names = [tool.name for tool in all_tools]
+        effective_enabled_names = filter_tools_for_mode(list(effective_enabled_names), runtime_mode_name)
+
+        filtered_tools = [t for t in all_tools if t.name in set(effective_enabled_names)]
 
         # 将外部工具定义（OpenAI function format）转为 LangChain 可绑定的格式
         external_tools_defs = state.get("external_tools") or []
@@ -645,7 +1079,17 @@ class TeamAgent:
                     },
                 })
 
-        base_model = self._get_model()
+        base_model = self._get_model(response_max_tokens)
+
+        # --- Model hot-swap: check for pending model swap request ---
+        model_swap = consume_model_swap(user_id, session_id)
+        if model_swap:
+            from llm_factory import create_chat_model as _create
+            base_model = _create(
+                model=model_swap.target_model,
+                max_tokens=response_max_tokens or 2048,
+            )
+            print(f">>> [model] 🔄 hot-swap to {model_swap.target_model} reason={model_swap.reason}")
 
         # Per-request LLM model override: if state carries llm_override from
         # OASIS SessionExpert, create a temporary LLM instance with those params
@@ -657,56 +1101,121 @@ class TeamAgent:
                 api_key=llm_ov.get("api_key"),
                 base_url=llm_ov.get("base_url"),
                 provider=llm_ov.get("provider"),
+                max_tokens=response_max_tokens or 2048,
+            )
+        elif subagent_profile and subagent_profile.preferred_model:
+            from llm_factory import create_chat_model as _create
+            base_model = _create(
+                model=subagent_profile.preferred_model,
+                max_tokens=response_max_tokens or 2048,
             )
 
         llm = base_model.bind_tools(bind_tools_list) if bind_tools_list else base_model
 
-        # --- KV-Cache-friendly tool state management ---
         all_names = sorted(t.name for t in all_tools)
-        all_tool_list_str = ", ".join(all_names)
-
-        # 判断是否为 subagent 会话（session_id 以 "oasis_" 开头）
-        session_id = state.get("session_id", "")
-        is_subagent = session_id.startswith("oasis_") if session_id else False
+        visible_names = sorted(t.name for t in filtered_tools)
+        visible_tool_list_str = ", ".join(visible_names)
 
         if is_subagent:
-            # Subagent 模式：精简 prompt，无用户画像/技能，只列工具
-            base_prompt = (
-                self._prompts["base_system_subagent"] + "\n\n"
-                f"【可用工具列表】\n{all_tool_list_str}\n"
-            )
+            profile_prompt = render_profile_system_prompt(subagent_profile) if subagent_profile else ""
+            base_prompt = self._prompts["base_system_subagent"]
+            if profile_prompt:
+                base_prompt += "\n\n" + profile_prompt
+            base_prompt += f"\n\n【可用工具列表】\n{visible_tool_list_str}\n"
         else:
             # 检测最后消息是否来自群聊，用于选择不同的聊天行为规则
             chat_rules = self._build_chat_rules(state)
             base_system_text = self._prompts["base_system"].replace("{chat_rules}", chat_rules)
             base_prompt = (
                 base_system_text + "\n\n"
-                f"【默认可用工具列表】\n{all_tool_list_str}\n"
+                f"【默认可用工具列表】\n{visible_tool_list_str}\n"
                 "以上工具默认全部启用。如果后续有工具状态变更，系统会另行通知。\n"
             )
+        base_prompt += f"\n【Session Mode】\n{build_session_mode_message(runtime_mode_name, runtime_mode_payload.get('reason', ''))}\n"
 
         # Detect tool state change
-        current_enabled = frozenset(enabled_names) if enabled_names is not None else frozenset(all_names)
         user_id = state.get("user_id", "__global__")
+        current_enabled = frozenset(visible_names)
+        tool_state_key = f"{user_id}#{session_id or 'default'}"
         session_persona_prompt = self._get_internal_session_persona_prompt(
             user_id,
             session_id or "",
         ) if (not is_subagent and user_id and session_id) else ""
 
-        # 仅主 agent 会话注入用户画像和技能列表
-        if not is_subagent:
-            if session_persona_prompt:
-                base_prompt += f"\n{session_persona_prompt}\n"
+        if not is_subagent and session_persona_prompt:
+            base_prompt += f"\n{session_persona_prompt}\n"
 
+        if (not is_subagent) or (subagent_profile and subagent_profile.include_user_profile):
             # 注入用户专属画像
             user_profile = self._get_user_profile(user_id)
             if user_profile:
                 base_prompt += f"\n{user_profile}\n"
 
+        if (not is_subagent) or (subagent_profile and subagent_profile.include_user_skills):
             # 注入用户技能列表（总是显示位置信息）
             base_prompt += self._get_user_skills(user_id) + "\n"
 
-        last_state = self._user_last_tool_state.get(user_id)
+        runtime_plan = get_session_plan(user_id, session_id)
+        runtime_todos = get_session_todos(user_id, session_id)
+        runtime_verifications = list_verification_records(user_id, session_id, limit=5)
+        runtime_inbox = [
+            {
+                "message_id": item.message_id,
+                "source_session": item.source_session,
+                "source_label": item.source_label,
+                "body": item.body,
+                "status": item.status,
+            }
+            for item in list_inbox_messages(user_id, session_id, status="queued", limit=5)
+        ]
+        runtime_artifacts = [
+            {
+                "artifact_kind": item.kind,
+                "title": item.title,
+                "path": item.path,
+                "summary": item.summary,
+            }
+            for item in list_runtime_artifacts(user_id, session_id, limit=5)
+        ]
+        runtime_runs = [
+            {
+                "run_id": item.run_id,
+                "run_kind": item.run_kind,
+                "status": item.status,
+                "title": item.title,
+            }
+            for item in list_runs_for_session(user_id, session_id, limit=5)
+        ]
+        pending_approvals = [
+            {
+                "approval_id": approval.approval_id,
+                "tool_name": approval.tool_name,
+                "status": approval.status,
+            }
+            for approval in list_tool_approvals(user_id, session_id, status="pending", limit=5)
+        ]
+        memory_state = ensure_memory_state(user_id, session_id)
+        bridge_state = get_bridge_runtime_payload(user_id, session_id)
+        voice_state = get_teambot_voice_state(user_id, session_id or "default")
+        buddy_state = serialize_buddy_state(user_id)
+        runtime_context_block = render_runtime_context_block(
+            workspace=describe_session_workspace(user_id, session_id),
+            mode=runtime_mode_payload,
+            plan=runtime_plan,
+            todos=runtime_todos,
+            verifications=runtime_verifications,
+            pending_approvals=pending_approvals,
+            inbox=runtime_inbox,
+            recent_artifacts=runtime_artifacts,
+            recent_runs=runtime_runs,
+            memory=memory_state,
+            bridge=bridge_state,
+            voice=voice_state,
+            buddy=buddy_state,
+        )
+        base_prompt += f"\n{runtime_context_block}\n"
+
+        last_state = self._tool_state_cache.get(tool_state_key)
 
         tool_status_prompt = ""
         if last_state is not None and current_enabled != last_state:
@@ -717,7 +1226,7 @@ class TeamAgent:
                 enabled_tools=', '.join(sorted(enabled_set & all_names_set)) if (enabled_set & all_names_set) else '无',
                 disabled_tools=', '.join(sorted(disabled_names_set)) if disabled_names_set else '无',
             )
-        elif last_state is None and enabled_names is not None:
+        elif last_state is None and effective_enabled_names is not None:
             all_names_set = set(all_names)
             enabled_set = set(current_enabled)
             disabled_names_set = all_names_set - enabled_set
@@ -728,7 +1237,7 @@ class TeamAgent:
                 )
 
         # Update cache
-        self._user_last_tool_state[user_id] = current_enabled
+        self._tool_state_cache[tool_state_key] = current_enabled
 
         history_messages = list(state["messages"])
 
@@ -749,6 +1258,81 @@ class TeamAgent:
         # 注意：保留最后一条 HumanMessage 的多模态内容（当前轮用户输入）
         if len(history_messages) > 1:
             history_messages = self._strip_multimodal_parts(history_messages[:-1]) + [history_messages[-1]]
+
+        history_messages = budget_user_messages(
+            user_id=user_id,
+            session_id=session_id,
+            messages=history_messages,
+        )
+        history_messages = budget_tool_messages(
+            user_id=user_id,
+            session_id=session_id,
+            messages=history_messages,
+        )
+        with contextlib.suppress(Exception):
+            run_tool_policy_hooks(
+                session_policy,
+                event="pre_compact",
+                user_id=user_id,
+                session_id=session_id,
+                tool_name="__session__",
+                args={
+                    "mode": runtime_mode_name,
+                    "message_count": len(history_messages),
+                },
+                result={
+                    "context_token_budget": 8000 if is_subagent else 12000,
+                },
+            )
+        history_messages = compact_history_messages(
+            history_messages,
+            max_messages=24 if is_subagent else 32,
+            preserve_recent=8 if is_subagent else 12,
+            context_token_budget=8000 if is_subagent else 12000,
+            user_id=user_id,
+            session_id=session_id,
+        )
+
+        # --- 5-level compression pipeline (new) ---
+        token_budget_val = 8000 if is_subagent else 12000
+        effort_config = resolve_effort(user_id, session_id)
+        if effort_config.max_context_tokens > 0:
+            token_budget_val = min(token_budget_val, effort_config.max_context_tokens)
+        history_messages, compression_stats = compress_context(
+            history_messages,
+            token_budget=token_budget_val,
+            preserve_recent=effort_config.compress_threshold // 4 if effort_config else 8,
+        )
+        if compression_stats.level_applied != "none":
+            print(f">>> [compress] applied level={compression_stats.level_applied} "
+                  f"{compression_stats.original_messages}→{compression_stats.final_messages} msgs")
+
+        # --- Token budget tracking (new) ---
+        session_budget = get_session_budget(user_id, session_id)
+        budget_notice = session_budget.format_budget_notice()
+        if budget_notice:
+            base_prompt += f"\n{budget_notice}\n"
+
+        # --- Cost tracking notice (new) ---
+        cost_tracker = get_cost_tracker(user_id, session_id)
+        cost_notice = cost_tracker.format_cost_notice()
+        if cost_notice:
+            base_prompt += f"\n{cost_notice}\n"
+
+        # --- HUD update (new) ---
+        hud = get_hud(user_id, session_id)
+        if hud.active:
+            hud.update(
+                turns_completed=current_turn_count,
+                turns_remaining=max(0, (effective_max_turns or 50) - current_turn_count),
+            )
+
+        # --- Session resume prompt (new) ---
+        if current_turn_count == 0:
+            checkpoint = get_session_checkpoint(user_id, session_id)
+            if checkpoint:
+                resume_prompt = build_resume_prompt(checkpoint)
+                base_prompt += f"\n{resume_prompt}\n"
 
         # 如果是系统触发，且最后一条不是 ToolMessage（非工具回调轮），给它加上系统触发说明
         is_system = state.get("trigger_source") == "system"
@@ -805,6 +1389,61 @@ class TeamAgent:
         # # === END DEBUG ===
 
         response = await llm.ainvoke(input_messages)
+        next_turn_count = current_turn_count + 1
+
+        # --- Record token usage for budget tracking (new) ---
+        usage_meta = getattr(response, "usage_metadata", None) or {}
+        if isinstance(usage_meta, dict) and usage_meta:
+            session_budget.record_turn(
+                input_tokens=usage_meta.get("input_tokens", 0),
+                output_tokens=usage_meta.get("output_tokens", 0),
+                cache_creation_tokens=usage_meta.get("cache_creation_input_tokens", 0),
+                cache_read_tokens=usage_meta.get("cache_read_input_tokens", 0),
+            )
+            model_name = getattr(llm, "model_name", "") or getattr(llm, "model", "") or ""
+            cost_tracker.record(
+                model=model_name,
+                input_tokens=usage_meta.get("input_tokens", 0),
+                output_tokens=usage_meta.get("output_tokens", 0),
+                cache_read_tokens=usage_meta.get("cache_read_input_tokens", 0),
+                cache_write_tokens=usage_meta.get("cache_creation_input_tokens", 0),
+            )
+
+        # --- Auto-continue check based on token budget (new) ---
+        if not session_budget.should_auto_continue(min_utility=0.15):
+            print(f">>> [budget] ⚡ marginal utility low ({session_budget.marginal_utility():.2f}), "
+                  f"pressure={session_budget.context_pressure:.1%}")
+
+        if should_stop_for_turn_limit(
+            next_turn_count,
+            effective_max_turns,
+            getattr(response, "tool_calls", None),
+            self._internal_tool_names,
+        ):
+            with contextlib.suppress(Exception):
+                run_tool_policy_hooks(
+                    session_policy,
+                    event="stop",
+                    user_id=user_id,
+                    session_id=session_id,
+                    tool_name="__session__",
+                    args={
+                        "mode": runtime_mode_name,
+                        "reason": "max_turns",
+                    },
+                    result={
+                        "next_turn_count": next_turn_count,
+                        "max_turns": effective_max_turns,
+                    },
+                )
+            from llm_factory import extract_text as _extract_text
+
+            response = AIMessage(
+                content=build_turn_limit_message(
+                    _extract_text(response.content),
+                    effective_max_turns,
+                )
+            )
 
         # --- 检测 tool_calls arguments 是否为合法 JSON（截断/超长会导致不完整）---
         import json as _json
@@ -836,9 +1475,26 @@ class TeamAgent:
                             tool_call_id=_tc_id,
                         )
                         # 保留原始 AIMessage（带 tool_calls），后跟错误 ToolMessage
-                        return {"messages": [response, error_tool_msg]}
+                        return {"messages": [response, error_tool_msg], "turn_count": next_turn_count}
 
-        return {"messages": [response]}
+        with contextlib.suppress(Exception):
+            run_tool_policy_hooks(
+                session_policy,
+                event="session_end",
+                user_id=user_id,
+                session_id=session_id,
+                tool_name="__session__",
+                args={
+                    "mode": runtime_mode_name,
+                    "turn_count": next_turn_count,
+                    "has_tool_calls": bool(getattr(response, "tool_calls", None)),
+                },
+                result={
+                    "content": self._extract_text(response.content)[:500],
+                },
+            )
+
+        return {"messages": [response], "turn_count": next_turn_count}
 
     # ------------------------------------------------------------------
     # Public interface: tools info

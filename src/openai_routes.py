@@ -1,3 +1,11 @@
+"""
+OpenAI 兼容 API 路由模块
+
+提供 OpenAI Chat Completions API 的 FastAPI 路由：
+- /v1/chat/completions：聊天补全接口
+- /v1/models：可用模型列表
+"""
+
 from typing import Any, Callable
 
 from fastapi import APIRouter, Header

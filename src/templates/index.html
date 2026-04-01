@@ -21,13 +21,14 @@
     <!-- iOS splash screens -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="/manifest.json">
-    <link rel="icon" href="https://img.icons8.com/fluency/32/robot-2.png" type="image/png">
+    <link rel="icon" href="/static/assets/teamclaw-mark.svg" type="image/svg+xml">
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
 
+    <link rel="stylesheet" href="/static/css/markdown-shared.css">
     <link rel="stylesheet" href="/static/css/style.css?v=20260330-team-rename2">
 </head>
 <body class="bg-gray-100 font-sans leading-normal tracking-normal">
@@ -40,13 +41,25 @@
 
     <!-- Splash Screen -->
     <div id="app-splash">
-        <img class="splash-icon" src="https://img.icons8.com/fluency/180/robot-2.png" alt="">
-        <div class="splash-title">Teamclaw</div>
-        <div class="splash-sub">TeamBot AI Agent</div>
+        <img class="splash-icon splash-logo" src="/static/assets/teamclaw-mark.svg" alt="TeamClaw logo">
+        <div class="splash-title">TeamClaw</div>
+        <div class="splash-sub">Multi-Agent Workspace</div>
     </div>
 
     <!-- Offline Banner -->
     <div id="offline-banner" data-i18n="offline_banner">⚠️ 网络已断开，请检查连接</div>
+
+    <!-- Local Login Hint Banner -->
+    <div id="local-login-banner" class="local-login-banner" style="display:none;">
+        <div class="local-login-banner-copy">
+            <div id="local-login-banner-title" class="local-login-banner-title">已使用本机免密登录</div>
+            <div id="local-login-banner-text" class="local-login-banner-text"></div>
+        </div>
+        <div class="local-login-banner-actions">
+            <button id="local-login-banner-action" class="local-login-banner-btn" onclick="openSettingsToPassword()">去设置</button>
+            <button class="local-login-banner-close" onclick="dismissLocalLoginBanner(); event.stopPropagation();" aria-label="Close">✕</button>
+        </div>
+    </div>
 
     <!-- Page Loading Overlay (delayed show for smooth transitions) -->
     <div id="page-loading-overlay">
@@ -60,8 +73,8 @@
     <div id="login-screen" class="min-h-screen flex items-center justify-center safe-top safe-bottom px-4" style="width:100%;height:100%;overflow:auto;">
         <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-md border">
             <div class="flex items-center justify-center space-x-3 mb-6">
-                <div class="bg-blue-600 p-3 rounded-xl text-white font-bold text-2xl">X</div>
-                <h1 class="text-2xl font-bold text-gray-800" data-i18n="login_title">Teamclaw</h1>
+                <img class="login-brand-mark" src="/static/assets/teamclaw-mark.svg" alt="TeamClaw logo">
+                <h1 class="text-2xl font-bold text-gray-800" data-i18n="login_title">TeamClaw</h1>
             </div>
             <p class="text-center text-gray-500 text-sm mb-8" data-i18n="login_subtitle">请登录以开始对话</p>
             <div class="space-y-4">
@@ -88,7 +101,7 @@
 
         <!-- ===== 历史会话侧边栏 ===== -->
         <div id="session-sidebar" class="session-sidebar" style="display:none;">
-            <div class="p-3 border-b bg-gray-50 flex flex-col gap-2 flex-shrink-0">
+            <div id="session-sidebar-header" class="p-3 border-b bg-gray-50 flex flex-col gap-2 flex-shrink-0">
                 <div class="flex justify-between items-center">
                     <span class="text-sm font-bold text-gray-700" data-i18n="history_title">🤖 Agents</span>
                     <button onclick="closeSessionSidebar()" class="text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
@@ -106,6 +119,50 @@
             </div>
             <div id="session-list" class="flex-1 overflow-y-auto p-2 space-y-1">
                 <div class="text-xs text-gray-400 text-center py-4" data-i18n="loading">加载中...</div>
+            </div>
+            <div id="session-panel-divider" class="session-panel-divider" role="separator" aria-orientation="horizontal" title="拖动调整 Runtime 高度"></div>
+            <div id="teambot-subagent-panel" class="teambot-subagent-panel">
+                <div class="teambot-subagent-header">
+                    <div>
+                        <div class="teambot-subagent-kicker">TeamBot Runtime</div>
+                        <div class="teambot-subagent-title" data-i18n="subagents_title">🧵 Subagents</div>
+                    </div>
+                    <button id="teambot-subagent-refresh" class="teambot-subagent-refresh" type="button" onclick="refreshSubagentPanel()" data-i18n="refresh">刷新</button>
+                </div>
+                <div id="teambot-subagent-list" class="teambot-subagent-list">
+                    <div class="teambot-subagent-empty" data-i18n="subagents_loading">加载子 Agent...</div>
+                </div>
+                <div id="teambot-subagent-detail" class="teambot-subagent-detail" style="display:none;"></div>
+                <div id="teambot-policy-panel" class="teambot-policy-panel">
+                    <div class="teambot-policy-header">
+                        <div>
+                            <div class="teambot-subagent-kicker">Policy</div>
+                            <div class="teambot-subagent-title" data-i18n="policy_panel_title">🛡️ Tool Policy</div>
+                        </div>
+                        <div class="teambot-policy-actions">
+                            <button id="teambot-policy-toggle" class="teambot-subagent-refresh" type="button" onclick="toggleTeamBotPolicyEditor()" data-i18n="policy_panel_edit">编辑</button>
+                            <button id="teambot-policy-reload" class="teambot-subagent-refresh" type="button" onclick="reloadTeamBotPolicy(true)" data-i18n="refresh">刷新</button>
+                        </div>
+                    </div>
+                    <div id="teambot-policy-summary" class="teambot-policy-summary" data-i18n="policy_panel_loading">加载策略中...</div>
+                    <div id="teambot-policy-editor-wrap" class="teambot-policy-editor-wrap" style="display:none;">
+                        <div class="teambot-policy-row">
+                            <label for="teambot-policy-default-approval" class="teambot-policy-label" data-i18n="policy_default_approval">默认审批</label>
+                            <select id="teambot-policy-default-approval" class="teambot-policy-select" onchange="markTeamBotPolicyDirty()">
+                                <option value="allow">allow</option>
+                                <option value="manual">manual</option>
+                                <option value="deny">deny</option>
+                            </select>
+                        </div>
+                        <textarea id="teambot-policy-editor" class="teambot-policy-editor" spellcheck="false" oninput="markTeamBotPolicyDirty()" placeholder='{\n  "default_approval": "allow",\n  "tools": {}\n}'></textarea>
+                        <div id="teambot-policy-meta" class="teambot-policy-meta"></div>
+                        <div class="teambot-policy-actions teambot-policy-actions-footer">
+                            <button class="teambot-subagent-btn" type="button" onclick="formatTeamBotPolicyEditor()" data-i18n="policy_panel_format">格式化</button>
+                            <button class="teambot-subagent-btn danger" type="button" onclick="saveTeamBotPolicyEditor()" data-i18n="policy_panel_save">保存</button>
+                        </div>
+                        <div id="teambot-policy-status" class="teambot-policy-status"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -178,20 +235,20 @@
                     </div>
                 </div>
                 <div class="tab-bar-brand">
-                    <div class="bg-blue-600 p-1 rounded-lg text-white font-bold text-sm">X</div>
+                    <img class="tab-bar-logo-mark" src="/static/assets/teamclaw-mark.svg" alt="TeamClaw logo">
                     <div class="tab-bar-brand-text">
-                        <span class="text-xs font-bold text-gray-800 leading-tight">Teamclaw</span>
+                        <span class="text-xs font-bold text-gray-800 leading-tight">TeamClaw</span>
                         <span class="text-[9px] text-green-500 flex items-center" data-i18n="encrypted">● 已加密</span>
                     </div>
                 </div>
                 <div class="page-tab" id="uid-display" style="display:none;"></div>
-                <div class="page-tab" id="tab-chat" onclick="switchPage('chat')" data-i18n="tab_chat">💬 Chat</div>
-                <div class="page-tab active" id="tab-group" onclick="switchPage('group')" data-i18n="tab_group">👥 Team</div>
+                <div class="page-tab active" id="tab-chat" onclick="switchPage('chat')" data-i18n="tab_chat">💬 Chat</div>
+                <div class="page-tab" id="tab-group" onclick="switchPage('group')" data-i18n="tab_group">👥 Team</div>
                 <div class="page-tab" id="tab-orchestrate" onclick="switchPage('orchestrate')" data-i18n="tab_orchestrate">🤝 Workflow</div>
                 <div class="page-tab" id="tab-groupchat" onclick="window.open('/mobile_group_chat', '_blank')" data-i18n="tab_groupchat" data-i18n-title="tip_open_msgcenter" title="打开消息中心">📨 消息中心</div>
             </div>
             <!-- === Chat Page === -->
-            <div id="page-chat" class="chat-page hidden-page" style="display:none;">
+            <div id="page-chat" class="chat-page" style="display:flex;">
             <div id="oasis-chat-town-shell" class="oasis-chat-town-shell hud-hidden">
                 <div id="oasis-chat-town-hud" class="oasis-chat-town-hud">
                     <div class="oasis-chat-town-panel">
@@ -212,7 +269,14 @@
                     <button id="oasis-chat-town-hide-btn" onclick="toggleOasisTownHudVisibility()" class="oasis-chat-town-top-btn">SHOW UI</button>
                     <button onclick="toggleOasisTownMode()" class="oasis-chat-town-top-btn danger">CHAT MODE</button>
                 </div>
-                <div id="oasis-chat-town-host" class="oasis-chat-town-host"></div>
+                <div id="oasis-chat-workspace-switcher" class="oasis-chat-workspace-switcher" style="display:none;">
+                    <button id="oasis-chat-view-town-btn" onclick="setOasisTownWorkspaceView('town')" class="oasis-chat-workspace-btn is-active" type="button">TOWN</button>
+                    <button id="oasis-chat-view-graph-btn" onclick="setOasisTownWorkspaceView('graph')" class="oasis-chat-workspace-btn" type="button">GRAPH</button>
+                </div>
+                <div class="oasis-chat-workspace-shell">
+                    <div id="oasis-chat-town-host" class="oasis-chat-town-host"></div>
+                    <div id="oasis-chat-graph-host" class="oasis-chat-graph-host" style="display:none;"></div>
+                </div>
             </div>
 
             <div id="chat-standard-shell" class="chat-standard-shell flex flex-col flex-1 min-h-0">
@@ -306,7 +370,7 @@
         <!-- end of chat-page -->
 
         <!-- === Group Chat Page === -->
-        <div id="page-group" class="group-page active">
+        <div id="page-group" class="group-page">
             <div style="display:flex; flex:1; overflow:hidden;">
                 <!-- Group list sidebar -->
                 <div class="group-list-sidebar">
@@ -370,9 +434,9 @@
     </div>
     <div style="padding:16px;">
       <div style="font-size:13px;color:#6b7280;margin-bottom:8px;">粘贴从 Hub 复制的下载命令或 URL：</div>
-      <textarea id="hub-curl-input" placeholder="curl -L 'https://flowhub-mu.vercel.app/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:72px;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;font-family:'SF Mono',Menlo,Consolas,monospace;background:#f9fafb;color:#374151;resize:none;box-sizing:border-box;"></textarea>
+      <textarea id="hub-curl-input" placeholder="curl -L 'https://teamclawhub.com/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:72px;padding:10px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;font-family:'SF Mono',Menlo,Consolas,monospace;background:#f9fafb;color:#374151;resize:none;box-sizing:border-box;"></textarea>
       <div style="display:flex;gap:8px;margin-top:12px;">
-        <button onclick="window.open('https://flowhub-mu.vercel.app','_blank')" style="flex:1;padding:10px;background:#fff;color:#7c3aed;border:1px solid #c4b5fd;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">🌐 前往 Hub</button>
+        <button onclick="openTeamHub()" style="flex:1;padding:10px;background:#fff;color:#7c3aed;border:1px solid #c4b5fd;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">🌐 前往 Hub</button>
         <button onclick="importFromHub()" style="flex:1;padding:10px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">📥 下载并导入</button>
       </div>
     </div>
@@ -550,6 +614,7 @@
                         <button onclick="orchRefreshSessions()" class="orch-btn" data-i18n-title="orch_tip_status" title="刷新 session 状态"><span data-i18n="orch_btn_status">🔄 状态</span></button>
                         <button onclick="orchClearCanvas()" class="orch-btn orch-btn-danger" data-i18n-title="orch_tip_clear" title="清空工作流"><span data-i18n="orch_btn_clear">🗑️ 清空工作流</span></button>
                         <button onclick="toggleOrchFocusMode()" id="orch-focus-btn" class="orch-btn" title="专注模式：隐藏两侧面板"><span data-i18n="orch_btn_focus">🎯 专注</span></button>
+                        <button onclick="orchGenerateTeam()" class="orch-btn orch-btn-primary" data-i18n-title="orch_tip_generate_team" title="将画布中的角色自动加入团队"><span data-i18n="orch_btn_generate_team">📤 生成团队</span></button>
                         <span class="orch-toolbar-sep" style="border-left:1px solid #d1d5db;height:20px;margin:0 4px;"></span>
                         <label class="text-xs text-gray-600 whitespace-nowrap">选择team:</label>
                         <select id="orch-team-select" class="px-2 py-1 text-xs border border-gray-300 rounded" style="width:120px;" onchange="orchTeamSelectChanged()">
@@ -737,6 +802,50 @@
                                     </div>
                                 </div>
                             </div>
+                            <div id="oasis-detail-graph-dock" class="oasis-detail-graph-dock">
+                                <div id="oasis-swarm-panel" class="oasis-swarm-panel" style="display:none;">
+                                    <div class="oasis-swarm-toolbar">
+                                        <div>
+                                            <div class="oasis-swarm-kicker">TOWN GENESIS</div>
+                                            <div id="oasis-swarm-title" class="oasis-swarm-title">Swarm Graph</div>
+                                        </div>
+                                        <div class="oasis-swarm-actions">
+                                            <button id="oasis-swarm-labels-btn" onclick="toggleOasisSwarmEdgeLabels()" class="oasis-swarm-action-btn" type="button">LABELS</button>
+                                            <button onclick="zoomOasisSwarm(-0.16)" class="oasis-swarm-action-btn oasis-swarm-mini-btn" type="button">-</button>
+                                            <button onclick="resetOasisSwarmViewport()" class="oasis-swarm-action-btn oasis-swarm-mini-btn" type="button">RESET</button>
+                                            <button onclick="zoomOasisSwarm(0.16)" class="oasis-swarm-action-btn oasis-swarm-mini-btn" type="button">+</button>
+                                            <button id="oasis-swarm-refresh-btn" onclick="refreshOasisSwarm()" class="oasis-swarm-action-btn" type="button">REFORGE</button>
+                                        </div>
+                                    </div>
+                                    <div class="oasis-swarm-filters">
+                                        <button id="oasis-swarm-filter-all" onclick="setOasisSwarmFilter('all')" class="oasis-swarm-filter-btn is-active" type="button">ALL</button>
+                                        <button id="oasis-swarm-filter-agent" onclick="setOasisSwarmFilter('agent')" class="oasis-swarm-filter-btn" type="button">AGENTS</button>
+                                        <button id="oasis-swarm-filter-entity" onclick="setOasisSwarmFilter('entity')" class="oasis-swarm-filter-btn" type="button">ENTITIES</button>
+                                        <button id="oasis-swarm-filter-memory" onclick="setOasisSwarmFilter('memory')" class="oasis-swarm-filter-btn" type="button">MEMORY</button>
+                                        <button id="oasis-swarm-filter-scenario" onclick="setOasisSwarmFilter('scenario')" class="oasis-swarm-filter-btn" type="button">OUTCOMES</button>
+                                    </div>
+                                    <div class="oasis-swarm-workbench">
+                                        <div class="oasis-swarm-graph-stack">
+                                            <div class="oasis-swarm-canvas-toolbar">
+                                                <span class="oasis-swarm-canvas-hint">Drag blank space to pan. Click nodes or links to inspect.</span>
+                                            </div>
+                                            <div id="oasis-swarm-canvas" class="oasis-swarm-canvas"></div>
+                                        </div>
+                                        <div class="oasis-swarm-inspector">
+                                            <div id="oasis-swarm-summary" class="oasis-swarm-summary"></div>
+                                            <div id="oasis-swarm-detail" class="oasis-swarm-detail"></div>
+                                            <div class="oasis-report-box">
+                                                <div class="oasis-report-toolbar">
+                                                    <div class="oasis-report-title">REPORT AGENT</div>
+                                                    <button id="oasis-report-ask-btn" onclick="askOasisReport()" class="oasis-swarm-action-btn" type="button">EXPLAIN</button>
+                                                </div>
+                                                <textarea id="oasis-report-input" class="oasis-report-input" rows="2" placeholder="Why is the current prediction leaning this way?" onkeydown="handleOasisReportComposerKeydown(event)"></textarea>
+                                                <div id="oasis-report-answer" class="oasis-report-answer"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div id="oasis-detail-sidebar" class="oasis-detail-sidebar">
@@ -756,7 +865,7 @@
                                         </div>
                                         <span id="oasis-conclusion-toggle" class="oasis-conclusion-toggle" style="display:inline-block;">▼</span>
                                     </div>
-                                    <p id="oasis-conclusion-text" class="oasis-conclusion-text"></p>
+                                    <div id="oasis-conclusion-text" class="oasis-conclusion-text markdown-body tc-markdown"></div>
                                 </div>
                             </div>
                         </div>
@@ -946,8 +1055,7 @@
 
                 <!-- Password setup hint -->
                 <div id="wizard-password-hint" style="margin-top:14px;padding:12px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#854d0e;">
-                    🔐 <b>安全提示：</b>当前使用本机免密登录。如需远程访问，请在 Settings 中添加密码用户：
-                    <code style="font-size:11px;background:#fff;padding:2px 6px;border-radius:4px;margin-left:4px;">add-user &lt;用户名&gt; &lt;密码&gt;</code>
+                    🔐 <b>安全提示：</b>当前使用本机免密登录。如需后续使用密码登录或远程访问，请在 Settings 的“当前用户密码”里填写密码、确认密码，并点击“保存为用户”。
                 </div>
             </div>
             <div class="settings-footer">
@@ -1085,6 +1193,8 @@
     <script src="/static/js/snapshot_zip_progress.js?v=20260331-progress"></script>
     <!-- ===== Orchestration Page JavaScript (load first for shared utils like orchToast) ===== -->
     <script src="/static/js/orchestration.js?v=20260329-snapshot"></script>
+    <script src="/static/js/markdown-shared.js"></script>
+    <script src="/static/js/tinyfish-live-shared.js"></script>
     <script src="/static/js/main.js?v=20260330-team-onclick-fix"></script>
     <script src="/static/js/oasis-town.bundle.js?v=20260327-humanfix"></script>
     <script src="/static/js/app.js?v=20260327-humanfix"></script>

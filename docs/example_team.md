@@ -1,7 +1,6 @@
-
 # Example Team: demo_team
 
-This document describes the folder structure and file contents of an example team (`demo_team`), which can be used as a reference for creating or understanding team configurations.
+This document describes the folder structure and file contents of an example team (`demo_team`), which serves as a reference for creating or understanding team configurations.
 
 ## Folder Structure
 

@@ -1,5 +1,11 @@
-# 
+"""
+定时任务调度服务模块
 
+提供基于 cron 表达式的定时任务管理：
+- 添加/删除/列出定时任务
+- 持久化任务到 JSON 文件
+- 调度时间到达时向 Agent 发送 HTTP 触发请求
+"""
 
 import os
 import uuid
@@ -25,7 +31,7 @@ load_dotenv(dotenv_path=os.path.join(root_dir, "config", ".env"))
 
 
 def _server_host() -> str:
-    """Bind address for the scheduler. Default localhost; set TEAMCLAW_SERVER_HOST=0.0.0.0 to expose on all interfaces."""
+    """获取调度器绑定地址。默认为 localhost；设置 TEAMCLAW_SERVER_HOST=0.0.0.0 可暴露到所有接口。"""
     explicit_host = os.getenv("TEAMCLAW_SERVER_HOST", "").strip()
     if explicit_host:
         return explicit_host
@@ -36,25 +42,27 @@ os.makedirs(os.path.dirname(TASKS_FILE), exist_ok=True)
 
 # --- JSON 持久化 ---
 def load_tasks() -> dict:
-    """从 JSON 文件加载任务配置"""
+    """从 JSON 文件加载任务配置。"""
     if os.path.exists(TASKS_FILE):
         with open(TASKS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
 def save_tasks(tasks: dict):
-    """保存任务配置到 JSON 文件"""
+    """保存任务配置到 JSON 文件。"""
     with open(TASKS_FILE, "w", encoding="utf-8") as f:
         json.dump(tasks, f, ensure_ascii=False, indent=4)
 
 # --- 数据模型 ---
 class CronTask(BaseModel):
+    """Cron 定时任务模型"""
     user_id: str
     cron: str  # 格式: "分 时 日 月 周"
     text: str
     session_id: str = "default"
 
 class TaskResponse(BaseModel):
+    """任务响应模型"""
     task_id: str
     user_id: str
     cron: str
@@ -71,9 +79,17 @@ scheduler = AsyncIOScheduler(job_defaults={
 PORT_AGENT = int(os.getenv("PORT_AGENT", "51200"))
 AGENT_URL = f"http://127.0.0.1:{PORT_AGENT}/system_trigger"
 INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN", "")
+TINYFISH_MONITOR_JOB_ID = "__tinyfish_monitor__"
+
+
+def _parse_cron(cron_expr: str) -> list[str]:
+    parts = cron_expr.split()
+    if len(parts) != 5:
+        raise ValueError("Cron must have 5 fields: minute hour day month day_of_week")
+    return parts
 
 async def trigger_agent(user_id: str, text: str, session_id: str = "default"):
-    """到达定时时间，向 Agent 发送 HTTP 请求"""
+    """到达定时时间，向 Agent 发送 HTTP 请求。"""
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(AGENT_URL, json={
@@ -86,16 +102,16 @@ async def trigger_agent(user_id: str, text: str, session_id: str = "default"):
             print(f"[{datetime.now()}] 任务触发失败: {e}")
 
 def restore_tasks():
-    """从 JSON 文件恢复所有定时任务到调度器"""
+    """从 JSON 文件恢复所有定时任务到调度器。"""
     tasks = load_tasks()
     if not tasks:
         print("📭 无已保存的定时任务")
         return
-    
+
     restored = 0
     for task_id, info in tasks.items():
         try:
-            c = info["cron"].split()
+            c = _parse_cron(info["cron"])
             scheduler.add_job(
                 trigger_agent,
                 'cron',
@@ -108,8 +124,46 @@ def restore_tasks():
             print(f"   - [ID: {task_id}] 用户: {info['user_id']}, cron: {info['cron']}, session: {info.get('session_id', 'default')}, 内容: {info['text']}")
         except Exception as e:
             print(f"   ⚠️ 恢复任务 {task_id} 失败: {e}")
-    
+
     print(f"✅ 已从 {TASKS_FILE} 恢复 {restored} 个定时任务")
+
+
+def trigger_tinyfish_monitor():
+    """到达定时时间，执行 TinyFish 竞品价格监控。"""
+    try:
+        from tinyfish_monitor_service import run_scheduled_monitor_job
+
+        result = run_scheduled_monitor_job()
+        submitted = result.get("submitted", 0)
+        completed = len(result.get("results", []))
+        print(f"[{datetime.now()}] TinyFish monitor 完成: submitted={submitted}, completed={completed}")
+    except Exception as e:
+        print(f"[{datetime.now()}] TinyFish monitor 执行失败: {e}")
+
+
+def restore_tinyfish_monitor_task():
+    enabled = os.getenv("TINYFISH_MONITOR_ENABLED", "").strip().lower() in {"1", "true", "yes", "on"}
+    cron_expr = os.getenv("TINYFISH_MONITOR_CRON", "").strip()
+
+    if not enabled:
+        print("📭 TinyFish monitor 未启用")
+        return
+    if not cron_expr:
+        print("📭 TinyFish monitor 未配置 cron")
+        return
+
+    try:
+        c = _parse_cron(cron_expr)
+        scheduler.add_job(
+            trigger_tinyfish_monitor,
+            'cron',
+            minute=c[0], hour=c[1], day=c[2], month=c[3], day_of_week=c[4],
+            id=TINYFISH_MONITOR_JOB_ID,
+            replace_existing=True,
+        )
+        print(f"✅ 已恢复 TinyFish monitor 任务: cron={cron_expr}")
+    except Exception as e:
+        print(f"⚠️ TinyFish monitor 任务恢复失败: {e}")
 
 # --- 生命周期 ---
 @asynccontextmanager
@@ -117,6 +171,7 @@ async def lifespan(app: FastAPI):
     print("定时调度中心启动...")
     scheduler.start()
     restore_tasks()
+    restore_tinyfish_monitor_task()
     yield
     print("定时调度中心关闭...")
     scheduler.shutdown()
@@ -127,7 +182,7 @@ app = FastAPI(title="TeamBot Scheduler", lifespan=lifespan)
 async def add_task(task: CronTask):
     task_id = str(uuid.uuid4())[:8]
     try:
-        c = task.cron.split()
+        c = _parse_cron(task.cron)
         scheduler.add_job(
             trigger_agent,
             'cron',
@@ -161,7 +216,7 @@ async def list_tasks():
             "text": j.args[1], 
             "cron": tasks.get(j.id, {}).get("cron", str(j.trigger)),
             "next_run": str(j.next_run_time)
-        } for j in scheduler.get_jobs()
+        } for j in scheduler.get_jobs() if j.id != TINYFISH_MONITOR_JOB_ID
     ]
 
 @app.delete("/tasks/{task_id}")

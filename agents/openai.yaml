@@ -1,0 +1,4 @@
+interface:
+  display_name: "TeamClaw"
+  short_description: "Operate the TeamClaw multi-agent platform"
+  default_prompt: "Use $TeamClaw to install, configure, debug, or modify the TeamClaw repository."

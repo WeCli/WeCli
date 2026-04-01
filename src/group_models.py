@@ -1,3 +1,14 @@
+"""
+群聊相关的数据模型模块
+
+定义群聊消息、成员管理、创建群聊等请求模型：
+- Attachment：群聊消息附件
+- GroupCreateRequest：创建群聊请求
+- GroupUpdateRequest：更新群聊请求
+- GroupMessageRequest：发送群聊消息请求
+- GroupAddMemberRequest：添加群聊成员请求
+"""
+
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -12,16 +23,19 @@ class Attachment(BaseModel):
 
 
 class GroupCreateRequest(BaseModel):
+    """创建群聊请求"""
     name: str
     team_name: Optional[str] = None  # 用于从 team 快速加载成员，不存库
     custom_name: Optional[str] = None  # 自定义群聊标识
 
 
 class GroupUpdateRequest(BaseModel):
+    """更新群聊请求"""
     name: Optional[str] = None
 
 
 class GroupMessageRequest(BaseModel):
+    """发送群聊消息请求"""
     content: str
     sender: Optional[str] = None       # 人类发消息时可省略（自动取 owner）
     sender_display: Optional[str] = ""  # agent 发言显示名: tag#type#short_name
@@ -30,6 +44,7 @@ class GroupMessageRequest(BaseModel):
 
 
 class GroupAddMemberRequest(BaseModel):
+    """添加群聊成员请求"""
     short_name: str                     # agent 短名 (如 testtool, xl1)
     global_id: str                      # 唯一标识 (内部=session, 外部=global_name)
     member_type: str = "oasis"          # "oasis" (内部) 或 "ext" (外部)

@@ -43,6 +43,33 @@ echo "📦 安装依赖 (config/requirements.txt)..."
 uv pip install -r config/requirements.txt
 echo "✅ 依赖安装完成"
 
+# --- 4.5. 检查并安装 acpx (ACP 通信插件) ---
+if command -v acpx &>/dev/null; then
+    echo "✅ acpx 已安装: $(acpx --version 2>/dev/null || echo 'unknown')"
+else
+    echo "📦 未检测到 acpx，正在安装..."
+    if command -v npm &>/dev/null; then
+        npm install -g acpx@latest 2>/dev/null || true
+        # npm 全局安装后可能需要手动链接
+        if ! command -v acpx &>/dev/null; then
+            ACPX_BIN=$(find "$(npm prefix -g 2>/dev/null)/lib/node_modules/acpx" -name "cli.js" 2>/dev/null | head -1)
+            if [ -n "$ACPX_BIN" ] && [ -f "$ACPX_BIN" ]; then
+                ln -sf "$ACPX_BIN" /usr/local/bin/acpx 2>/dev/null || true
+                chmod +x "$ACPX_BIN" 2>/dev/null || true
+            fi
+        fi
+        if command -v acpx &>/dev/null; then
+            echo "✅ acpx 安装成功: $(acpx --version 2>/dev/null || echo 'unknown')"
+        else
+            echo "⚠️  acpx 安装后未在 PATH 中找到，群聊 ACP 广播功能可能不可用"
+            echo "   手动安装: npm install -g acpx@latest"
+        fi
+    else
+        echo "⚠️  npm 未安装，跳过 acpx 安装（群聊 ACP 广播功能不可用）"
+        echo "   安装 Node.js 后执行: npm install -g acpx@latest"
+    fi
+fi
+
 # --- 5. 检查配置文件 ---
 echo ""
 echo "--- 配置检查 ---"
