@@ -65,6 +65,39 @@ The page then shows:
 
 `POST /api/team-creator/download` uses the same snapshot-style ZIP format as the regular Team export flow.
 
+### 4. Import Colleague / Mentor Skills
+
+Team Creator also supports browser-native import flows for external role distillation projects:
+
+- `colleague-skill` → import `meta.json + persona.md + work.md`
+- `supervisor` / `distill-mentor` → import `{name}.json + SKILL.md`
+
+Both flows support:
+
+- file upload from the browser
+- local path input for files already generated on the same machine as TeamClaw
+- direct in-app generation without touching the upstream repos:
+  - `ArXiv -> mentor JSON -> import mentor`
+  - `Feishu -> messages -> auto distill persona/work -> import colleague`
+
+Import uses the upstream artifact files as the source of truth. The full upstream `persona.md` / generated mentor `SKILL.md` is preserved as the final TeamClaw expert persona instead of being compressed into the short `_build_persona()` summary.
+
+### 5. Python-Native Quick-Create Helpers
+
+Two backend helpers already cover the Phase 3 collection step without relying on the upstream Node.js tools:
+
+- `POST /api/team-creator/arxiv-search`
+  - searches ArXiv in pure Python
+  - returns a supervisor-compatible mentor JSON
+  - can optionally auto-import that JSON into Team Creator
+  - this is the backend used by the Team Creator "搜索 ArXiv 并生成导师" button
+- `POST /api/team-creator/feishu-collect`
+  - collects Feishu messages in pure Python
+  - returns colleague-compatible `meta.json` plus the collected message corpus
+  - can optionally auto-distill `persona.md + work.md`
+  - can optionally auto-import the distilled colleague directly into Team Creator
+  - this is the backend used by the Team Creator "采集并生成同事" button
+
 ## Bilingual and Dynamic Translation Behavior
 
 Team Creator has two layers of localization:
@@ -116,6 +149,10 @@ Use this when the workflow graph already exists and you want to materialize the 
 | Route | Purpose |
 |---|---|
 | `GET /creator` | render the Team Creator page |
+| `POST /api/team-creator/import-colleague` | import `colleague-skill` artifacts into Team Creator |
+| `POST /api/team-creator/import-mentor` | import `supervisor` mentor artifacts into Team Creator |
+| `POST /api/team-creator/arxiv-search` | generate mentor JSON from ArXiv search, optionally auto-import |
+| `POST /api/team-creator/feishu-collect` | collect Feishu messages, optionally auto-distill persona/work, optionally auto-import |
 | `POST /api/team-creator/discover` | stream discovery events for relevant pages |
 | `POST /api/team-creator/extract` | stream extraction events for one page |
 | `POST /api/team-creator/smart-select` | rank extracted roles and match presets |

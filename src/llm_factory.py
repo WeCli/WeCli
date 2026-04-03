@@ -46,7 +46,7 @@ _MODEL_PROVIDER_PATTERNS: dict[str, str] = {
     "o3": "openai",
     "o4": "openai",
     "qwen": "openai",
-    "minimax": "openai",
+    "minimax": "minimax",
     "glm": "openai",
     "moonshot": "openai",
     "yi-": "openai",
@@ -67,7 +67,7 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "deepseek": "deepseek",
     "ollama": "ollama",
     "antigravity": "openai",  # Antigravity reverse-proxy → OpenAI-compatible
-    "minimax": "openai",      # MiniMax API → OpenAI-compatible
+    "minimax": "minimax",    # MiniMax API → OpenAI-compatible (handled as its own provider)
 }
 
 _BASE_URL_PROVIDER_PATTERNS: tuple[tuple[str, str], ...] = (
@@ -80,7 +80,7 @@ _BASE_URL_PROVIDER_PATTERNS: tuple[tuple[str, str], ...] = (
     ("localhost:8045", "openai"),   # Antigravity-Manager default endpoint
     ("127.0.0.1:11434", "ollama"),  # Ollama OpenAI-compatible endpoint
     ("localhost:11434", "ollama"),  # Ollama OpenAI-compatible endpoint
-    ("api.minimaxi.com", "openai"),  # MiniMax API endpoint
+    ("api.minimaxi.com", "minimax"),  # MiniMax API endpoint
 )
 
 _AUDIO_DEFAULTS: dict[str, dict[str, str]] = {
@@ -98,6 +98,12 @@ _AUDIO_DEFAULTS: dict[str, dict[str, str]] = {
         "tts_model": "",
         "tts_voice": "",
         "stt_model": "",
+    },
+    # MiniMax is OpenAI-compatible, so reuse OpenAI audio defaults.
+    "minimax": {
+        "tts_model": "gpt-4o-mini-tts",
+        "tts_voice": "alloy",
+        "stt_model": "whisper-1",
     },
 }
 
@@ -141,6 +147,38 @@ def _normalize_openai_base_url(base_url: str) -> str:
     return cleaned
 
 
+def _normalize_minimax_base_url(base_url: str) -> str:
+    """
+    MiniMax anthropic endpoint normalization.
+
+    规则：
+    - baseUrl 末尾已是 /anthropic：保持不变
+    - baseUrl 只提供 host（路径为空或 /）：补上 /anthropic
+    - 其他路径：原样保留（让用户自己提供完整端点）
+    """
+    u = (base_url or "").strip().rstrip("/")
+    if not u:
+        return u
+
+    # 允许 base_url 只写 host:port
+    if "://" not in u:
+        u = "https://" + u
+
+    parsed = urlparse(u)
+    scheme = parsed.scheme
+    netloc = parsed.netloc
+    path = (parsed.path or "").rstrip("/")
+
+    if not path or path == "/":
+        return f"{scheme}://{netloc}/anthropic"
+
+    if path.endswith("/anthropic"):
+        return f"{scheme}://{netloc}{path}"
+
+    # 其他路径：保持原路径，避免破坏用户提供的兼容端点
+    return f"{scheme}://{netloc}{path}"
+
+
 def _is_native_openai_host(base_url: str) -> bool:
     parsed = urlparse(base_url)
     host = (parsed.netloc or parsed.path).lower()
@@ -170,7 +208,7 @@ def infer_provider(
     :param base_url: API base URL
     :param provider: 显式指定的 provider
     :param api_key: API key（用于通过前缀推断）
-    :return: provider 名称（openai/anthropic/google/deepseek/ollama）
+    :return: provider 名称（openai/anthropic/google/deepseek/ollama/minimax）
     """
     normalized_provider = _normalize_provider_name(provider)
     if normalized_provider:
@@ -326,6 +364,23 @@ def create_chat_model(
         if supports_temp:
             kwargs["temperature"] = temperature
         return ChatDeepSeek(**kwargs)
+
+    if provider == "minimax":
+        from langchain_anthropic import ChatAnthropic
+
+        anthropic_base = _normalize_minimax_base_url(base_url)
+        kwargs = {
+            "model": model,
+            "api_key": api_key,
+            "max_tokens": max_tokens,
+            "timeout": timeout,
+            "max_retries": max_retries,
+        }
+        if supports_temp:
+            kwargs["temperature"] = temperature
+        if anthropic_base:
+            kwargs["base_url"] = anthropic_base
+        return ChatAnthropic(**kwargs)
 
     from langchain_openai import ChatOpenAI
 

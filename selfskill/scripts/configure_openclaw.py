@@ -30,6 +30,9 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 ENV_PATH = os.path.join(PROJECT_ROOT, "config", ".env")
 OPENCLAW_HOME = os.path.expanduser(os.getenv("OPENCLAW_HOME", "~/.openclaw"))
 OPENCLAW_CONFIG_PATH = os.path.join(OPENCLAW_HOME, "openclaw.json")
+OPENCLAW_AGENT_MODELS_PATH = os.path.join(
+    OPENCLAW_HOME, "agents", "main", "agent", "models.json"
+)
 DEFAULT_GATEWAY_PORT = 18789
 DEFAULT_WORKSPACE_PATH = os.path.join(OPENCLAW_HOME, "workspace")
 DEFAULT_SESSIONS_FILE = os.path.join(
@@ -118,13 +121,88 @@ def mask_secret(value):
     return value[:4] + "****" + value[-4:]
 
 
+def _read_teamclaw_env_kvs():
+    """Read TeamClaw config/.env using this module's ENV_PATH (tests patch ENV_PATH).
+
+    When configure.read_env is imported, it reads configure.ENV_PATH instead; path
+    resolution for OpenClaw must follow configure_openclaw.ENV_PATH.
+    """
+    if not os.path.isfile(ENV_PATH):
+        return {}
+    kvs = {}
+    try:
+        with open(ENV_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                s = line.strip()
+                if s and not s.startswith("#") and "=" in s:
+                    k, v = s.split("=", 1)
+                    kvs[k.strip()] = v.strip()
+    except Exception:
+        return {}
+    return kvs
+
+
+def _infer_openclaw_home_from_sessions_file(sessions_file):
+    """Infer OpenClaw home from OPENCLAW_SESSIONS_FILE when path shape matches."""
+    raw = (sessions_file or "").strip()
+    if not raw:
+        return None
+    p = os.path.abspath(os.path.expanduser(raw))
+    # expected: <home>/agents/main/sessions/sessions.json
+    if os.path.basename(p) != "sessions.json":
+        return None
+    sessions_dir = os.path.dirname(p)
+    if os.path.basename(sessions_dir) != "sessions":
+        return None
+    main_dir = os.path.dirname(sessions_dir)
+    if os.path.basename(main_dir) != "main":
+        return None
+    agents_dir = os.path.dirname(main_dir)
+    if os.path.basename(agents_dir) != "agents":
+        return None
+    return os.path.dirname(agents_dir) or None
+
+
+def _resolve_openclaw_paths():
+    """Resolve openclaw.json/models.json paths, preferring OPENCLAW_SESSIONS_FILE inference."""
+    config_path = OPENCLAW_CONFIG_PATH
+    models_path = OPENCLAW_AGENT_MODELS_PATH
+    try:
+        kvs = _read_teamclaw_env_kvs()
+        inferred_home = _infer_openclaw_home_from_sessions_file(
+            (kvs.get("OPENCLAW_SESSIONS_FILE") or "").strip()
+        )
+        if inferred_home:
+            config_path = os.path.join(inferred_home, "openclaw.json")
+            models_path = os.path.join(
+                inferred_home, "agents", "main", "agent", "models.json"
+            )
+    except Exception:
+        pass
+    return config_path, models_path
+
+
 def load_openclaw_config():
     """读取 ~/.openclaw/openclaw.json。"""
-    if not os.path.isfile(OPENCLAW_CONFIG_PATH):
+    config_path, _ = _resolve_openclaw_paths()
+    if not os.path.isfile(config_path):
         return {}
 
     try:
-        with open(OPENCLAW_CONFIG_PATH, "r", encoding="utf-8") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def load_openclaw_agent_models():
+    """读取 ~/.openclaw/agents/main/agent/models.json。"""
+    _, models_path = _resolve_openclaw_paths()
+    if not os.path.isfile(models_path):
+        return {}
+    try:
+        with open(models_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return data if isinstance(data, dict) else {}
     except Exception:
@@ -681,62 +759,143 @@ def detect_llm_config_from_openclaw():
         {"LLM_API_KEY": "...", "LLM_BASE_URL": "...", "LLM_MODEL": "...", "LLM_PROVIDER": "..."}
     仅包含成功探测到的字段。
     """
-    result = {}
+    result: dict[str, str] = {}
+
+    def _strip_openclaw_base_url_suffix(base_url: str) -> str:
+        """OpenClaw baseUrl 常带 /v1；TeamClaw LLM_BASE_URL 不带末尾 /v1。"""
+        u = (base_url or "").strip()
+        if not u:
+            return u
+        stripped = u.rstrip("/")
+        if stripped.endswith("/v1"):
+            stripped = stripped[:-3]
+        return stripped
+
+    # Step 1: always use openclaw.json defaults.model.primary to decide provider/model.
     config = load_openclaw_config()
     if not config:
         return result
 
-    # 1. 从 agents.defaults.model.primary 获取默认模型（格式: provider/model）
     default_model = get_config_value("agents", "defaults", "model", "primary")
     provider_id = None
     model_id = None
     if isinstance(default_model, str) and "/" in default_model:
         provider_id, model_id = default_model.split("/", 1)
+    provider_id = (provider_id or "").strip() or None
+    model_id = (model_id or "").strip() or None
 
-    # 2. 如果没有从 defaults 获取到，尝试直接从 env.OPENAI_API_KEY 推断
-    providers = get_config_value("models", "providers") or {}
+    # Also load legacy providers map for fallback.
+    providers_legacy = get_config_value("models", "providers") or {}
 
-    # 3. 从 provider 配置中获取 apiKey 和 baseUrl
-    if provider_id and provider_id in providers:
-        provider_cfg = providers[provider_id]
-    elif providers:
-        # 选第一个非 openai 的 provider（openai 通常是 env fallback）
-        provider_id = next(
-            (k for k in providers if k != "openai"),
-            next(iter(providers), None),
-        )
-        provider_cfg = providers.get(provider_id, {}) if provider_id else {}
-    else:
-        provider_cfg = {}
+    # Step 2: read agent models.json to fill apiKey/baseUrl (preferred).
+    models_doc = load_openclaw_agent_models()
+    providers_doc = models_doc.get("providers") if isinstance(models_doc, dict) else None
 
-    provider_name = (provider_id or "").strip().lower()
-    api_key = ""
-    if isinstance(provider_cfg, dict):
-        api_key = (provider_cfg.get("apiKey") or "").strip()
-    # OpenClaw 的 openai provider 会优先读取 env.OPENAI_API_KEY。
-    # 导入 TeamClaw 时必须按实际生效值返回，避免“看起来已同步、实际仍在用旧 key”。
-    if provider_name == "openai":
-        api_key = ((config.get("env") or {}).get("OPENAI_API_KEY") or "").strip() or api_key
-    elif not api_key and not provider_name:
-        # fallback: 未识别出 provider 时，尽量返回 env 中的 OpenAI key
-        api_key = ((config.get("env") or {}).get("OPENAI_API_KEY") or "").strip()
+    provider_cfg_doc = None
+    if isinstance(providers_doc, dict) and provider_id and provider_id in providers_doc:
+        provider_cfg_doc = providers_doc.get(provider_id)
 
-    base_url = provider_cfg.get("baseUrl") or ""
-    # OpenClaw baseUrl 通常带 /v1，TeamClaw 的 LLM_BASE_URL 不带
-    if base_url:
-        stripped = base_url.rstrip("/")
-        if stripped.endswith("/v1"):
-            stripped = stripped[:-3]
-        result["LLM_BASE_URL"] = stripped
+    # If defaults didn't provide provider/model, fall back to first provider in models.json.
+    if provider_cfg_doc is None and isinstance(providers_doc, dict) and providers_doc:
+        for pid, cfg in providers_doc.items():
+            if not isinstance(cfg, dict):
+                continue
+            models_list = cfg.get("models")
+            if isinstance(models_list, list) and models_list:
+                provider_id = str(pid).strip()
+                provider_cfg_doc = cfg
+                if not model_id:
+                    first = models_list[0]
+                    if isinstance(first, dict) and first.get("id"):
+                        model_id = str(first.get("id") or "").strip() or None
+                break
+        # last resort: pick the first provider cfg
+        if provider_cfg_doc is None:
+            for pid, cfg in providers_doc.items():
+                if isinstance(cfg, dict):
+                    provider_id = str(pid).strip()
+                    provider_cfg_doc = cfg
+                    break
 
-    if api_key:
-        result["LLM_API_KEY"] = api_key
+    # Fill from models.json provider cfg
+    if isinstance(provider_cfg_doc, dict) and provider_cfg_doc:
+        api_key = str(provider_cfg_doc.get("apiKey") or "").strip()
+        base_url = str(provider_cfg_doc.get("baseUrl") or "").strip()
 
-    if model_id:
-        result["LLM_MODEL"] = model_id
+        # Ensure model_id is valid if we can match it.
+        models_list = provider_cfg_doc.get("models")
+        if isinstance(models_list, list) and models_list:
+            if model_id:
+                matched = False
+                for m in models_list:
+                    if isinstance(m, dict) and str(m.get("id") or "").strip() == model_id:
+                        matched = True
+                        break
+                if not matched:
+                    # Sometimes caller might pass "name"; try to map it back to id.
+                    for m in models_list:
+                        if isinstance(m, dict) and str(m.get("name") or "").strip() == model_id:
+                            mid = str(m.get("id") or "").strip()
+                            if mid:
+                                model_id = mid
+                            break
+            else:
+                first = models_list[0]
+                if isinstance(first, dict) and first.get("id"):
+                    model_id = str(first.get("id") or "").strip() or None
 
+        if base_url:
+            result["LLM_BASE_URL"] = _strip_openclaw_base_url_suffix(base_url)
+        if api_key:
+            result["LLM_API_KEY"] = api_key
+        if model_id:
+            result["LLM_MODEL"] = model_id
+        if provider_id:
+            result["LLM_PROVIDER"] = provider_id
+
+    # Step 3: fallback to openclaw.json providers map if apiKey/baseUrl missing.
     if provider_id:
-        result["LLM_PROVIDER"] = provider_id
+        provider_cfg_legacy = providers_legacy.get(provider_id, {}) if isinstance(providers_legacy, dict) else {}
+        if isinstance(provider_cfg_legacy, dict):
+            provider_name = str(provider_id).strip().lower()
+
+            if "LLM_API_KEY" not in result or not result.get("LLM_API_KEY"):
+                api_key = str(provider_cfg_legacy.get("apiKey") or "").strip()
+                # OpenClaw openai provider prefers env.OPENAI_API_KEY.
+                if provider_name == "openai":
+                    api_key = ((config.get("env") or {}).get("OPENAI_API_KEY") or "").strip() or api_key
+                elif not api_key and not provider_name:
+                    api_key = ((config.get("env") or {}).get("OPENAI_API_KEY") or "").strip()
+                if api_key:
+                    result["LLM_API_KEY"] = api_key
+
+            if "LLM_BASE_URL" not in result or not result.get("LLM_BASE_URL"):
+                base_url = str(provider_cfg_legacy.get("baseUrl") or "").strip()
+                if base_url:
+                    result["LLM_BASE_URL"] = _strip_openclaw_base_url_suffix(base_url)
+
+            # No agent models.json (or empty): still emit model/provider from
+            # agents.defaults.model.primary + openclaw.json models.providers.
+            if model_id and not result.get("LLM_MODEL"):
+                mid = model_id
+                models_list = provider_cfg_legacy.get("models")
+                if isinstance(models_list, list) and models_list:
+                    matched = False
+                    for m in models_list:
+                        if isinstance(m, dict) and str(m.get("id") or "").strip() == mid:
+                            matched = True
+                            break
+                    if not matched:
+                        for m in models_list:
+                            if isinstance(m, dict) and str(m.get("name") or "").strip() == mid:
+                                resolved = str(m.get("id") or "").strip()
+                                if resolved:
+                                    mid = resolved
+                                break
+                result["LLM_MODEL"] = mid
+
+            if not result.get("LLM_PROVIDER"):
+                result["LLM_PROVIDER"] = provider_id
 
     return result
 
@@ -1830,6 +1989,15 @@ def main():
             print("✅ TeamClaw → OpenClaw LLM 同步完成")
         except Exception as e:
             print(f"❌ 同步失败: {e}", file=sys.stderr)
+            sys.exit(1)
+    elif cmd == "--import-teamclaw-llm-from-openclaw":
+        # UI / operator automation: read OpenClaw LLM config and write into TeamClaw config/.env
+        try:
+            print("🔄 从 OpenClaw 导入 LLM 配置到 TeamClaw（写入 config/.env）...")
+            synced = sync_llm_config_from_openclaw()
+            print(f"✅ 导入完成：已同步 {synced} 项配置")
+        except Exception as e:
+            print(f"❌ 导入失败: {e}", file=sys.stderr)
             sys.exit(1)
     elif cmd == "--status":
         show_status()

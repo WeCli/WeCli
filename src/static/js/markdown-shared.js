@@ -8,11 +8,28 @@
             .replace(/'/g, '&#39;');
     }
 
+    /**
+     * API / LLM 有时把换行打成字面量反斜杠+n（两个字符），界面会原样显示「\n」。
+     * 在 Markdown 或纯文本展示前转成真实换行（不处理已含真实换行的正常字符串）。
+     */
+    function normalizeEscapedNewlines(s) {
+        const str = s == null ? '' : String(s);
+        if (str.indexOf('\\') === -1) return str;
+        return str
+            .replace(/\\r\\n/g, '\n')
+            .replace(/\\n/g, '\n')
+            .replace(/\\r/g, '\n')
+            .replace(/\\t/g, '\t');
+    }
+
     function configureMarked() {
         if (typeof global.marked === 'undefined') return;
         if (global.marked.__teamclawConfigured) return;
 
         global.marked.setOptions({
+            gfm: true,
+            // LLM 常用「单行换行」分段；开启后单 \n 转为 <br>，移动端可读性更好
+            breaks: true,
             highlight(code, lang) {
                 if (typeof global.hljs === 'undefined') {
                     return escapeHtml(code);
@@ -27,7 +44,7 @@
     }
 
     function render(content) {
-        const raw = content == null ? '' : String(content);
+        const raw = normalizeEscapedNewlines(content == null ? '' : String(content));
         configureMarked();
         if (!raw) return '';
         if (typeof global.marked === 'undefined') {
@@ -57,6 +74,7 @@
     global.TeamClawMarkdown = {
         configure: configureMarked,
         escapeHtml,
+        normalizeEscapedNewlines,
         render,
         highlight,
         renderInto,

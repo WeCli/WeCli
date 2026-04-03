@@ -32,6 +32,46 @@ function Invoke-TeamClawPython {
     }
 }
 
+function Write-MagicLinks {
+    $mlUser = $env:TEAMCLAW_MAGIC_LINK_USER
+    if ([string]::IsNullOrWhiteSpace($mlUser)) { $mlUser = "default" }
+    $python = Ensure-VenvPython -ProjectRoot $projectRoot
+    Push-Location $projectRoot
+    try {
+        $raw = & $python "scripts\cli.py" "token" "generate" "-u" $mlUser "--valid-hours" "24" 2>&1
+    } finally {
+        Pop-Location
+    }
+    $token = $null
+    foreach ($line in @($raw)) {
+        if ($line -match "Token:\s*(\S+)") {
+            $token = $Matches[1]
+            break
+        }
+    }
+    $ports = Get-TeamClawPortMap -EnvPath $envPath
+    $fe = $ports["PORT_FRONTEND"]
+    Write-Host ""
+    Write-Host "Magic link (passwordless login; do not share publicly):"
+    Write-Host "  Login user_id=$mlUser (must match ?user= in URL). Override: `$env:TEAMCLAW_MAGIC_LINK_USER='your_id'"
+    if (-not $token) {
+        Write-Host "  Could not generate token (set INTERNAL_TOKEN in config\.env)."
+        Write-Host "  Manual: uv run scripts\cli.py token generate -u $mlUser --valid-hours 24"
+        return
+    }
+    Write-Host "  Local:  http://127.0.0.1:$fe/login-link/${token}?user=$mlUser"
+    $pd = Get-EnvValue -Key "PUBLIC_DOMAIN"
+    if ($pd -and $pd -ne "wait to set") {
+        Write-Host "  Remote: ${pd}/login-link/${token}?user=$mlUser"
+        Write-Host "Mobile group chat: $pd/mobile_group_chat"
+    } else {
+        Write-Host "  Remote: (Tunnel not ready — PUBLIC_DOMAIN not set yet)"
+        Write-Host "  When ready: powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 tunnel-status"
+    }
+    Write-Host ""
+    Write-Host "FOR AI ASSISTANTS: Copy the Local/Remote URLs above verbatim into your reply to the user. Do not omit them. Prefer Remote for phone/HTTPS when present."
+}
+
 function Get-EnvValue {
     param(
         [Parameter(Mandatory = $true)]
@@ -428,9 +468,20 @@ switch ($Command) {
             Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
         }
 
-        # NOTE: startup now warms an installed OpenClaw gateway and refreshes
-        # OPENCLAW_* runtime values, but it still does not silently import
-        # OpenClaw / Antigravity LLM settings into TeamClaw.
+        # Auto-import LLM config:
+        # If config/.env has no real LLM_API_KEY (missing/placeholder), try to read it from OpenClaw.
+        $envValues = Read-TeamClawEnvFile -Path $envPath
+        $llmKey = ""
+        if ($envValues.ContainsKey("LLM_API_KEY")) { $llmKey = $envValues["LLM_API_KEY"] }
+        if ([string]::IsNullOrWhiteSpace($llmKey) -or $llmKey -eq "your_api_key_here") {
+            Write-Host ""
+            Write-Host "🔄 Detected LLM_API_KEY not configured (or placeholder), importing from OpenClaw..."
+            try {
+                Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-teamclaw-llm-from-openclaw") | Out-Null
+            } catch {
+                Write-Host "⚠️ OpenClaw import failed, continuing startup."
+            }
+        }
 
         Stop-TeamClawServiceProcesses | Out-Null
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
@@ -534,6 +585,8 @@ switch ($Command) {
             }
         }
 
+        Write-MagicLinks
+
         Write-Host ""
         Write-Host "Docs (read before creating/managing Teams):"
         Write-Host "  docs/build_team.md       - Create/configure Team (members, personas, JSON)"
@@ -551,6 +604,20 @@ switch ($Command) {
         if (-not (Test-Path $envPath)) {
             Write-Host "config/.env is missing, auto-initializing from template..."
             Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
+        }
+
+        # Same auto-import behavior in foreground start.
+        $envValues = Read-TeamClawEnvFile -Path $envPath
+        $llmKey = ""
+        if ($envValues.ContainsKey("LLM_API_KEY")) { $llmKey = $envValues["LLM_API_KEY"] }
+        if ([string]::IsNullOrWhiteSpace($llmKey) -or $llmKey -eq "your_api_key_here") {
+            Write-Host ""
+            Write-Host "🔄 Detected LLM_API_KEY not configured (or placeholder), importing from OpenClaw..."
+            try {
+                Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-teamclaw-llm-from-openclaw") | Out-Null
+            } catch {
+                Write-Host "⚠️ OpenClaw import failed, continuing startup."
+            }
         }
 
         Stop-TeamClawServiceProcesses | Out-Null
@@ -640,6 +707,8 @@ switch ($Command) {
         Write-Host "  docs/openclaw-commands.md - OpenClaw agent integration commands"
         Write-Host ""
         Write-Host "Tip: Use 'uv run scripts/cli.py <command> --help' for detailed usage"
+
+        Write-MagicLinks
 
         exit 0
     }
@@ -866,6 +935,11 @@ switch ($Command) {
         if (Test-TrackedProcessRunning -PidFile $tunnelPidFile) {
             $existingPid = Get-TrackedProcessId -PidFile $tunnelPidFile
             Write-Host "Tunnel is already running. PID: $existingPid"
+            $envValues = Read-TeamClawEnvFile -Path $envPath
+            if ($envValues.ContainsKey("PUBLIC_DOMAIN") -and -not [string]::IsNullOrWhiteSpace($envValues["PUBLIC_DOMAIN"]) -and $envValues["PUBLIC_DOMAIN"] -ne "wait to set") {
+                Write-Host "Public URL: $($envValues["PUBLIC_DOMAIN"])"
+            }
+            Write-MagicLinks
             exit 0
         }
 
@@ -884,6 +958,22 @@ switch ($Command) {
         Write-Host "Logs:"
         Write-Host "  stdout: $stdoutLog"
         Write-Host "  stderr: $stderrLog"
+        Write-Host "Waiting for PUBLIC_DOMAIN (up to ~40s)..."
+        $ready = $false
+        for ($i = 0; $i -lt 20; $i++) {
+            Start-Sleep -Seconds 2
+            $envValues = Read-TeamClawEnvFile -Path $envPath
+            $pd = if ($envValues.ContainsKey("PUBLIC_DOMAIN")) { $envValues["PUBLIC_DOMAIN"] } else { "" }
+            if ($pd -and $pd -ne "wait to set" -and $pd -match "trycloudflare\.com") {
+                Write-Host "Public URL: $pd"
+                $ready = $true
+                break
+            }
+        }
+        if (-not $ready) {
+            Write-Host "Tunnel may still be starting; check logs or run tunnel-status later."
+        }
+        Write-MagicLinks
         exit 0
     }
 
@@ -909,6 +999,8 @@ switch ($Command) {
         if ($envValues.ContainsKey("PUBLIC_DOMAIN") -and -not [string]::IsNullOrWhiteSpace($envValues["PUBLIC_DOMAIN"])) {
             Write-Host "Public URL: $($envValues["PUBLIC_DOMAIN"])"
         }
+
+        Write-MagicLinks
 
         exit 0
     }

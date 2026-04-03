@@ -851,3 +851,71 @@ test('studio teambot runtime sidebar shows runtime state and resolves approvals'
 
   expect(pageErrors).toEqual([]);
 });
+
+test('studio oasis swarm uses pretext-backed multiline labels', async ({ page }) => {
+  const calls = {
+    importOpenClaw: 0,
+    exportOpenClaw: 0,
+    tinyfishRun: 0,
+    lastExportPayload: null,
+    approvalActions: [],
+  };
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  await installMockWebSocket(page);
+  await stubStudioNetwork(page, calls);
+  await page.addInitScript(() => {
+    window.alert = () => {};
+    window.confirm = () => true;
+  });
+
+  await page.goto('/studio');
+
+  const metrics = await page.evaluate(() => {
+    const node = buildOasisSwarmNodeMetrics({
+      id: 'objective-1',
+      label: 'A multilingual objective label 春天到了 بدأت الرحلة with extra context for wrapping',
+      type: 'objective',
+      degree: 3,
+      activity: { posts: 0, events: 0 },
+    });
+    renderOasisSwarmPanel({
+      topic_id: 'topic-pretext',
+      swarm: {
+        status: 'ready',
+        summary: 'Swarm layout preview',
+        prediction: 'Testing label geometry.',
+        mode: 'prediction',
+        graph: {
+          nodes: [
+            { id: 'objective-1', label: 'A multilingual objective label 春天到了 بدأت الرحلة with extra context for wrapping', type: 'objective', degree: 3 },
+            { id: 'agent-1', label: 'Planner', type: 'agent', degree: 2 },
+          ],
+          edges: [
+            { id: 'edge-1', source: 'objective-1', target: 'agent-1', label: 'Long relationship label for pretext truncation check', weight: 0.8 },
+          ],
+        },
+        scenarios: [],
+        nudges: [],
+        signals: [],
+        graphrag: { provider: 'local', memory_count: 0, collections: [] },
+      },
+      participants: [{ name: 'Planner', posts: 2, events: 1 }],
+    });
+    return {
+      ready: Boolean(window.TeamClawTextLayout && typeof window.TeamClawTextLayout.measureDisplay === 'function'),
+      labelLineCount: node.labelLineCount,
+      labelLines: node.labelLines,
+      edgeLabels: Array.from(document.querySelectorAll('#oasis-swarm-canvas text')).map((el) => el.textContent || ''),
+      tspanCount: document.querySelectorAll('#oasis-swarm-canvas tspan').length,
+    };
+  });
+
+  expect(metrics.ready).toBeTruthy();
+  expect(metrics.labelLineCount).toBeGreaterThan(1);
+  expect(metrics.labelLines.length).toBeGreaterThan(1);
+  expect(metrics.tspanCount).toBeGreaterThan(1);
+  expect(metrics.edgeLabels.join(' ')).toContain('Long relationship');
+  expect(pageErrors).toEqual([]);
+});

@@ -113,15 +113,40 @@ print_wsl_access_hint() {
     echo "   If Windows localhost forwarding does not work, open these WSL IP URLs from Windows."
 }
 
-print_magic_link() {
-    # 生成 default 用户的 magic link (使用 CLI 生成正确的 HMAC 签名 token)
-    local cli_output
-    cli_output=$(cd "$PROJECT_ROOT" && uv run scripts/cli.py token generate -u default --valid-hours 24 2>/dev/null)
-    local token=$(echo "$cli_output" | grep "Token:" | awk '{print $2}')
+# 从 cli.py token generate 输出中解析 token（兼容 "Token: xxx" / 前导空格）
+_magic_token_from_cli_output() {
+    echo "$1" | grep -F "Token:" | head -1 | sed 's/.*[Tt]oken:[[:space:]]*//' | tr -d '\r' | sed 's/[[:space:]].*//'
+}
 
-    if [ -n "$token" ] && [ -n "$PUBLIC_DOMAIN" ]; then
-        echo "🔗 远程访问链接: ${PUBLIC_DOMAIN}/login-link/${token}?user=default"
+# 打印本机 +（若已就绪）远程 Magic Link；启动/Tunnel 就绪后必须调用，便于手机 HTTPS 免密登录
+# 登录用户 id 默认 default，可用环境变量 TEAMCLAW_MAGIC_LINK_USER 覆盖（执行前 export）
+print_magic_links() {
+    source config/.env 2>/dev/null || true
+    local ml_user="${TEAMCLAW_MAGIC_LINK_USER:-default}"
+    local port="${PORT_FRONTEND:-51209}"
+    local cli_output token pub
+    cli_output=$(cd "$PROJECT_ROOT" && uv run scripts/cli.py token generate -u "$ml_user" --valid-hours 24 2>/dev/null)
+    token=$(_magic_token_from_cli_output "$cli_output")
+    pub="${PUBLIC_DOMAIN:-}"
+    echo ""
+    echo "🔗 Magic link（免密登录；勿转发到不可信渠道）"
+    echo "   👤 绑定的登录用户 user_id=${ml_user}（与 URL 中 ?user= 一致）"
+    if [ -z "$token" ]; then
+        echo "   ⚠️  未能生成 token（请确认 config/.env 中已配置 INTERNAL_TOKEN）"
+        echo "      手动生成: uv run scripts/cli.py token generate -u ${ml_user} --valid-hours 24"
+        return 1
     fi
+    echo "   本机: http://127.0.0.1:${port}/login-link/${token}?user=${ml_user}"
+    if [ -n "$pub" ] && [ "$pub" != "wait to set" ]; then
+        echo "   远程: ${pub}/login-link/${token}?user=${ml_user}"
+        echo "📱 消息中心（手机）: ${pub}/mobile_group_chat"
+    else
+        echo "   远程: （Cloudflare Tunnel 尚未写入 PUBLIC_DOMAIN）"
+        echo "      Tunnel 就绪后执行: bash selfskill/scripts/run.sh tunnel-status"
+    fi
+    echo ""
+    echo "🤖 给 AI / 助手（必读）: 请把上方「本机」「远程」里的完整 URL 原样写入你对用户的回复；不要只写「已启动」而省略链接。公网/手机请优先给出「远程」那一行（若已有）。"
+    return 0
 }
 
 print_teamclaw_docs_hint() {
@@ -300,6 +325,17 @@ case "${1:-help}" in
             python selfskill/scripts/configure.py --init
         fi
 
+        # Auto-import LLM config:
+        # If config/.env has no real LLM_API_KEY (missing/placeholder), try to read it from OpenClaw.
+        # This reduces first-start friction while keeping user-provided keys unchanged.
+        source config/.env 2>/dev/null || true
+        if [ -z "${LLM_API_KEY:-}" ] || [ "${LLM_API_KEY:-}" = "your_api_key_here" ]; then
+            echo ""
+            echo "🔄 检测到 LLM_API_KEY 未配置（或为占位符），尝试从 OpenClaw 导入 LLM 配置..."
+            python selfskill/scripts/configure_openclaw.py --import-teamclaw-llm-from-openclaw || true
+            source config/.env 2>/dev/null || true
+        fi
+
         # NOTE: 启动时会自动预热已安装的 OpenClaw gateway，并刷新 OPENCLAW_*
         # runtime 配置，但不会静默改写 TeamClaw 的 LLM 配置。导入 OpenClaw /
         # 切换 Antigravity 仍然由首次登录向导和设置页按钮负责。
@@ -338,7 +374,6 @@ case "${1:-help}" in
         fi
 
         print_wsl_access_hint
-        print_magic_link
         echo ""
         echo "═══════════════════════════════════════════════════"
         python scripts/cli.py status
@@ -377,6 +412,7 @@ case "${1:-help}" in
             fi
         fi
 
+        print_magic_links
         echo ""
         print_teamclaw_docs_hint
         exit 0
@@ -387,6 +423,15 @@ case "${1:-help}" in
         if [ ! -f config/.env ]; then
             echo "📋 config/.env 不存在，自动从模板初始化..."
             python selfskill/scripts/configure.py --init
+        fi
+
+        # Same auto-import behavior in foreground start.
+        source config/.env 2>/dev/null || true
+        if [ -z "${LLM_API_KEY:-}" ] || [ "${LLM_API_KEY:-}" = "your_api_key_here" ]; then
+            echo ""
+            echo "🔄 检测到 LLM_API_KEY 未配置（或为占位符），尝试从 OpenClaw 导入 LLM 配置..."
+            python selfskill/scripts/configure_openclaw.py --import-teamclaw-llm-from-openclaw || true
+            source config/.env 2>/dev/null || true
         fi
 
         stop_teamclaw_service_processes || true
@@ -451,7 +496,7 @@ case "${1:-help}" in
             echo "  🦞 OpenClaw 未安装"
         fi
         print_wsl_access_hint
-        print_magic_link
+        print_magic_links
         echo ""
         print_teamclaw_docs_hint
         exit 0
@@ -734,8 +779,8 @@ case "${1:-help}" in
             source config/.env 2>/dev/null || true
             if [ -n "$PUBLIC_DOMAIN" ] && [ "$PUBLIC_DOMAIN" != "wait to set" ]; then
                 echo "🌍 公网地址: $PUBLIC_DOMAIN"
-                print_magic_link
             fi
+            print_magic_links
             exit 0
         fi
 
@@ -752,6 +797,7 @@ case "${1:-help}" in
             if [ -n "$PUBLIC_DOMAIN" ] && [ "$PUBLIC_DOMAIN" != "wait to set" ] && echo "$PUBLIC_DOMAIN" | grep -q "trycloudflare.com"; then
                 echo " ✅"
                 echo "🌍 公网地址: $PUBLIC_DOMAIN"
+                print_magic_links
                 exit 0
             fi
             echo -n "."
@@ -759,6 +805,7 @@ case "${1:-help}" in
         done
         echo ""
         echo "⚠️  Tunnel 可能仍在启动中，请查看日志: $PROJECT_ROOT/logs/tunnel.log"
+        print_magic_links
         exit 0
         ;;
 
@@ -803,13 +850,14 @@ case "${1:-help}" in
             source config/.env 2>/dev/null || true
             if [ -n "$PUBLIC_DOMAIN" ] && [ "$PUBLIC_DOMAIN" != "wait to set" ]; then
                 echo "🌍 公网地址: $PUBLIC_DOMAIN"
-                print_magic_link
             else
                 echo "⏳ 公网地址尚未就绪"
             fi
+            print_magic_links
         else
             echo "❌ Tunnel 未运行"
             rm -f "$TUNNEL_PIDFILE" 2>/dev/null
+            print_magic_links
         fi
         exit 0
         ;;

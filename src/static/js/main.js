@@ -1581,7 +1581,11 @@ function applyTranslations() {
 
 function renderMarkdown(content) {
     if (window.TeamClawMarkdown) return window.TeamClawMarkdown.render(content);
-    return (typeof marked !== 'undefined' && content) ? marked.parse(content) : '';
+    let raw = content == null ? '' : String(content);
+    if (raw.indexOf('\\') !== -1) {
+        raw = raw.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n').replace(/\\t/g, '\t');
+    }
+    return (typeof marked !== 'undefined' && raw) ? marked.parse(raw) : '';
 }
 
 function highlightMarkdownIn(root) {
@@ -3783,9 +3787,10 @@ async function deleteAllSessions() {
     }
 }
 
-async function switchToSession(sessionId, force = false) {
+async function switchToSession(sessionId, force = false, options = {}) {
+    const quiet = options.quiet === true;
     if (!force && sessionId === currentSessionId) { closeSessionSidebar(); return; }
-    showPageLoading();
+    if (!quiet) showPageLoading();
     hideNewMsgBanner();
     // 切换前先重置按钮到 idle 状态（避免旧 session 的 streaming/busy 状态残留）
     setStreamingUI(false);
@@ -3894,7 +3899,7 @@ async function switchToSession(sessionId, force = false) {
             setSystemBusyUI(false);
         }
     } catch(e) {} finally {
-        hidePageLoading();
+        if (!quiet) hidePageLoading();
     }
 }
 
@@ -4401,16 +4406,16 @@ function _renderLlmGroup(settings) {
     html += `<input class="settings-input" data-key="LLM_BASE_URL" id="settings-llm-url" type="text" value="${escapeHtml(curUrl)}" placeholder="https://api.deepseek.com" autocomplete="off" />`;
     html += `</div>`;
 
-    // Model — dropdown + detect button
+    // Model — datalist (manual input) + detect button
     html += `<div class="settings-field">`;
     html += `<label class="settings-label">LLM_MODEL</label>`;
     html += `<div style="display:flex;gap:8px;align-items:center;">`;
-    html += `<select class="settings-input" data-key="LLM_MODEL" id="settings-llm-model" style="flex:1;">`;
+    html += `<input class="settings-input" data-key="LLM_MODEL" id="settings-llm-model" type="text" list="settings-llm-model-list" style="flex:1;" value="${escapeHtml(curModel)}" placeholder="（点击&quot;检测模型&quot;获取列表，或手动输入）" autocomplete="off" />`;
+    html += `<datalist id="settings-llm-model-list">`;
     if (curModel) {
-        html += `<option value="${escapeHtml(curModel)}" selected>${escapeHtml(curModel)}</option>`;
+        html += `<option value="${escapeHtml(curModel)}"></option>`;
     }
-    html += `<option value="">（点击"检测模型"获取列表）</option>`;
-    html += `</select>`;
+    html += `</datalist>`;
     html += `<button id="settings-detect-models-btn" onclick="settingsDetectModels()" style="padding:7px 14px;border-radius:7px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">🔍 检测模型</button>`;
     html += `</div>`;
     html += `<div id="settings-detect-status" style="margin-top:4px;font-size:11px;color:#6b7280;"></div>`;
@@ -4628,7 +4633,8 @@ function _applySettingsImportedLlmConfig(data) {
     const providerSel = document.getElementById('settings-llm-provider');
     const keyInput = document.getElementById('settings-llm-key');
     const urlInput = document.getElementById('settings-llm-url');
-    const modelSel = document.getElementById('settings-llm-model');
+    const modelInput = document.getElementById('settings-llm-model');
+    const modelDatalist = document.getElementById('settings-llm-model-list');
 
     const providerValue = data.provider ? (_SETTINGS_OPENCLAW_PROVIDER_MAP[data.provider] || data.provider) : '';
     if (providerSel && providerValue) {
@@ -4648,15 +4654,15 @@ function _applySettingsImportedLlmConfig(data) {
     if (urlInput && data.base_url) {
         urlInput.value = data.base_url;
     }
-    if (modelSel && data.model) {
-        const exists = Array.from(modelSel.options).some((option) => option.value === data.model);
-        if (!exists) {
+    if (modelInput && data.model) {
+        modelInput.value = data.model;
+        if (modelDatalist) {
+            modelDatalist.innerHTML = '';
             const opt = document.createElement('option');
             opt.value = data.model;
             opt.textContent = data.model;
-            modelSel.insertBefore(opt, modelSel.firstChild || null);
+            modelDatalist.appendChild(opt);
         }
-        modelSel.value = data.model;
     }
 }
 
@@ -4814,18 +4820,11 @@ function settingsLlmProviderChanged() {
         keyInput.type = 'password';
     }
 
-    // Reset model dropdown
-    const modelSel = document.getElementById('settings-llm-model');
-    const curModel = modelSel.value;
-    modelSel.innerHTML = '';
-    if (curModel) {
-        const opt = document.createElement('option');
-        opt.value = curModel; opt.textContent = curModel; opt.selected = true;
-        modelSel.appendChild(opt);
-    }
-    const placeholder = document.createElement('option');
-    placeholder.value = ''; placeholder.textContent = '（点击"检测模型"获取列表）';
-    modelSel.appendChild(placeholder);
+    // Reset model input/datalist
+    const modelInput = document.getElementById('settings-llm-model');
+    const modelDatalist = document.getElementById('settings-llm-model-list');
+    if (modelInput) modelInput.value = '';
+    if (modelDatalist) modelDatalist.innerHTML = '';
     document.getElementById('settings-detect-status').textContent = '';
 }
 
@@ -4835,7 +4834,8 @@ async function settingsDetectModels() {
     const apiKey = llmConfig.api_key;
     const baseUrl = llmConfig.base_url;
     const statusEl = document.getElementById('settings-detect-status');
-    const modelSel = document.getElementById('settings-llm-model');
+    const modelInput = document.getElementById('settings-llm-model');
+    const modelDatalist = document.getElementById('settings-llm-model-list');
     const detectBtn = document.getElementById('settings-detect-models-btn');
     const provider = llmConfig.provider;
     const isLocalKeyless = _isLocalKeylessProvider(provider, baseUrl);
@@ -4843,7 +4843,7 @@ async function settingsDetectModels() {
     if (!apiKey && !llmConfig.has_saved_api_key && !isLocalKeyless) { statusEl.textContent = '⚠️ 请先输入 API Key'; return; }
     if (!baseUrl) { statusEl.textContent = '⚠️ 请先输入 Base URL'; return; }
 
-    const curModel = modelSel.value;
+    const curModel = modelInput ? modelInput.value : '';
     detectBtn.disabled = true;
     detectBtn.textContent = '⏳ 检测中...';
     statusEl.textContent = '正在连接 API...';
@@ -4867,17 +4867,20 @@ async function settingsDetectModels() {
             return;
         }
 
-        modelSel.innerHTML = '';
-        for (const mid of models) {
-            const opt = document.createElement('option');
-            opt.value = mid; opt.textContent = mid;
-            modelSel.appendChild(opt);
+        if (modelDatalist) {
+            modelDatalist.innerHTML = '';
+            for (const mid of models) {
+                const opt = document.createElement('option');
+                opt.value = mid;
+                opt.textContent = mid;
+                modelDatalist.appendChild(opt);
+            }
         }
         statusEl.textContent = `✅ 检测到 ${models.length} 个可用模型`;
 
         // Auto-select: prefer current model, then smart defaults
-        if (curModel && models.includes(curModel)) {
-            modelSel.value = curModel;
+        if (modelInput && curModel && models.includes(curModel)) {
+            modelInput.value = curModel;
         } else {
             const preferredModels = {
                 deepseek: ['deepseek-chat', 'deepseek-coder'],
@@ -4889,7 +4892,7 @@ async function settingsDetectModels() {
             };
             const preferred = preferredModels[provider] || [];
             for (const pm of preferred) {
-                if (models.includes(pm)) { modelSel.value = pm; break; }
+                if (modelInput && models.includes(pm)) { modelInput.value = pm; break; }
             }
         }
     } catch (e) {
@@ -5420,13 +5423,54 @@ function checkRedirectAfterLogin() {
     return false;
 }
 
+/** Normalize FastAPI/OpenAPI error fields (detail may be string | object | array) for UI strings. */
+function formatApiErrorField(value) {
+    if (value == null || value === '') return '';
+    if (typeof value === 'string') return value.trim();
+    if (Array.isArray(value)) {
+        const parts = value.map(function (item) {
+            if (typeof item === 'string') return item;
+            if (item && typeof item === 'object') {
+                if (typeof item.msg === 'string') return item.msg;
+                if (typeof item.message === 'string') return item.message;
+                if (Array.isArray(item.loc) && typeof item.msg === 'string') {
+                    return item.loc.join('.') + ': ' + item.msg;
+                }
+            }
+            try {
+                return JSON.stringify(item);
+            } catch (e) {
+                return String(item);
+            }
+        }).filter(Boolean);
+        return parts.join('; ');
+    }
+    if (typeof value === 'object') {
+        if (typeof value.msg === 'string') return value.msg;
+        if (typeof value.message === 'string') return value.message;
+        try {
+            return JSON.stringify(value);
+        } catch (e) {
+            return String(value);
+        }
+    }
+    return String(value);
+}
+
 async function extractErrorMessageFromResponse(response, fallback = 'Agent error') {
     try {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
             const data = await response.json();
             if (data && typeof data === 'object') {
-                return data.error || data.detail || data.message || `${fallback} (${response.status})`;
+                const fromErr = formatApiErrorField(data.error);
+                const fromDetail = formatApiErrorField(data.detail);
+                const fromMsg = formatApiErrorField(data.message);
+                const msg = fromErr || fromDetail || fromMsg;
+                if (msg) {
+                    return msg.length > 500 ? msg.slice(0, 500) + '…' : msg;
+                }
+                return `${fallback} (${response.status})`;
             }
         }
         const text = (await response.text()).trim();
@@ -5732,10 +5776,11 @@ function wizardProviderChanged() {
         keyInput.type = 'password';
     }
 
-    // Reset model dropdown
-    const modelSel = document.getElementById('wizard-model');
-    modelSel.innerHTML = '<option value="">先点击"检测模型"</option>';
-    modelSel.disabled = true;
+    // Reset model input/datalist
+    const modelInput = document.getElementById('wizard-model');
+    const modelDatalist = document.getElementById('wizard-model-list');
+    if (modelInput) modelInput.value = '';
+    if (modelDatalist) modelDatalist.innerHTML = '';
     document.getElementById('wizard-detect-status').textContent = '';
     document.getElementById('wizard-error').style.display = 'none';
 }
@@ -5746,7 +5791,8 @@ async function wizardDetectModels() {
     const baseUrl = document.getElementById('wizard-base-url').value.trim();
     const statusEl = document.getElementById('wizard-detect-status');
     const errorEl = document.getElementById('wizard-error');
-    const modelSel = document.getElementById('wizard-model');
+    const modelInput = document.getElementById('wizard-model');
+    const modelDatalist = document.getElementById('wizard-model-list');
     const detectBtn = document.getElementById('wizard-detect-btn');
     const isLocalKeyless = _isLocalKeylessProvider(provider, baseUrl);
 
@@ -5766,6 +5812,7 @@ async function wizardDetectModels() {
     detectBtn.disabled = true;
     detectBtn.textContent = '⏳ 检测中...';
     statusEl.textContent = '正在连接 API 并获取模型列表...';
+    const curModel = modelInput ? modelInput.value : '';
 
     try {
         const resp = await fetch('/api/discover_models', {
@@ -5789,30 +5836,35 @@ async function wizardDetectModels() {
             return;
         }
 
-        modelSel.innerHTML = '';
-        for (const mid of models) {
-            const opt = document.createElement('option');
-            opt.value = mid;
-            opt.textContent = mid;
-            modelSel.appendChild(opt);
+        if (modelDatalist) {
+            modelDatalist.innerHTML = '';
+            for (const mid of models) {
+                const opt = document.createElement('option');
+                opt.value = mid;
+                opt.textContent = mid;
+                modelDatalist.appendChild(opt);
+            }
         }
-        modelSel.disabled = false;
         statusEl.textContent = `✅ 检测到 ${models.length} 个可用模型`;
 
         // Auto-select smart defaults
-        const preferredModels = {
-            deepseek: ['deepseek-chat', 'deepseek-coder'],
-            openai: ['gpt-4o', 'gpt-4.1', 'gpt-4-turbo'],
-            google: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-pro'],
-            anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022'],
-            antigravity: ['gemini-2.5-pro', 'claude-sonnet-4-20250514', 'gpt-4o'],
-            minimax: ['MiniMax-M2.7', 'MiniMax-M2.7-highspeed'],
-        };
-        const preferred = preferredModels[provider] || [];
-        for (const pm of preferred) {
-            if (models.includes(pm)) {
-                modelSel.value = pm;
-                break;
+        if (modelInput && curModel && models.includes(curModel)) {
+            modelInput.value = curModel;
+        } else {
+            const preferredModels = {
+                deepseek: ['deepseek-chat', 'deepseek-coder'],
+                openai: ['gpt-4o', 'gpt-4.1', 'gpt-4-turbo'],
+                google: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-pro'],
+                anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022'],
+                antigravity: ['gemini-2.5-pro', 'claude-sonnet-4-20250514', 'gpt-4o'],
+                minimax: ['MiniMax-M2.7', 'MiniMax-M2.7-highspeed'],
+            };
+            const preferred = preferredModels[provider] || [];
+            for (const pm of preferred) {
+                if (modelInput && models.includes(pm)) {
+                    modelInput.value = pm;
+                    break;
+                }
             }
         }
     } catch (e) {
@@ -6408,7 +6460,18 @@ async function handleSend() {
                 appendMessage(t('thinking_stopped'), false);
             }
         } else {
-            appendMessage(t('agent_error') + ': ' + error.message, false);
+            let errText = '';
+            if (error instanceof Error && error.message && error.message !== '[object Object]') {
+                errText = error.message;
+            } else if (error != null) {
+                errText = formatApiErrorField(error);
+            }
+            if (!errText || errText === '[object Object]') {
+                errText = (typeof currentLang !== 'undefined' && currentLang === 'zh-CN')
+                    ? '请求失败，请在开发者工具 Network 中查看接口返回内容'
+                    : 'Request failed; inspect the Network tab for the API response';
+            }
+            appendMessage(t('agent_error') + ': ' + errText, false);
         }
     } finally {
         currentAbortController = null;
@@ -6583,6 +6646,8 @@ var _ocChatMode = 'internal';       // 'internal' | 'openclaw'
 var _ocSelectedAgent = null;        // { name: string } — currently selected OpenClaw agent
 var _ocAgentsCache = [];            // cached list of OpenClaw agents from /proxy_openclaw_sessions
 var _ocAvailable = false;           // whether OpenClaw is available (detected at init)
+/** Per–OpenClaw-agent chat HTML while switching away from OpenClaw tab (TeamBot uses server history). */
+var _ocTranscriptByAgent = Object.create(null);
 
 function getLocalizedExpertName(expert) {
     if (!expert) return '';
@@ -7624,6 +7689,11 @@ function clampOasisSwarmNumber(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
+function getTeamClawTextLayout() {
+    if (typeof window === 'undefined') return null;
+    return window.TeamClawTextLayout || null;
+}
+
 function oasisSwarmStableHash(value) {
     return Array.from(String(value || '')).reduce((acc, ch) => ((acc * 33) + ch.charCodeAt(0)) >>> 0, 5381);
 }
@@ -7669,19 +7739,39 @@ function buildOasisSwarmNodeMetrics(node) {
             : node.type === 'agent'
                 ? { radius: 13.4, maxUnits: 11.3, labelFontSize: 10.2, minLabelWidth: 50, maxLabelWidth: 120, labelGap: 13 }
                 : { radius: 12.4, maxUnits: 10.4, labelFontSize: 9.8, minLabelWidth: 46, maxLabelWidth: 112, labelGap: 12 };
-    const labelText = truncateOasisSwarmLabelText(node.label, typeConfig.maxUnits);
-    const labelUnits = measureOasisSwarmTextUnits(labelText);
-    const labelWidth = Math.round(clampOasisSwarmNumber(18 + (labelUnits * 7.1), typeConfig.minLabelWidth, typeConfig.maxLabelWidth));
-    const labelHeight = Math.round(typeConfig.labelFontSize + 10);
+    const textLayout = getTeamClawTextLayout();
+    const labelLineHeight = Math.round(typeConfig.labelFontSize + 4);
+    let labelLines = [truncateOasisSwarmLabelText(node.label, typeConfig.maxUnits)];
+    let labelText = labelLines[0];
+    let labelWidth = Math.round(clampOasisSwarmNumber(18 + (measureOasisSwarmTextUnits(labelText) * 7.1), typeConfig.minLabelWidth, typeConfig.maxLabelWidth));
+    let labelHeight = Math.round(typeConfig.labelFontSize + 10);
+    let labelLineCount = 1;
+    if (textLayout && typeof textLayout.measureDisplay === 'function') {
+        const measured = textLayout.measureDisplay(node.label || 'Untitled', {
+            font: `700 ${typeConfig.labelFontSize}px Arial`,
+            lineHeight: labelLineHeight,
+            maxWidth: Math.max(typeConfig.minLabelWidth, typeConfig.maxLabelWidth - 8),
+            maxLines: node.type === 'agent' ? 1 : 2,
+            suffix: '…',
+        });
+        labelLines = measured.lines && measured.lines.length ? measured.lines : [measured.text || 'Untitled'];
+        labelText = measured.text || 'Untitled';
+        labelWidth = Math.round(clampOasisSwarmNumber(Math.ceil(measured.width) + 18, typeConfig.minLabelWidth, typeConfig.maxLabelWidth));
+        labelHeight = Math.round(Math.max(labelLineHeight, Math.ceil(measured.height) + 4));
+        labelLineCount = Math.max(1, measured.lineCount || labelLines.length || 1);
+    }
     const boxWidth = Math.round((typeConfig.radius * 2) + typeConfig.labelGap + labelWidth + 28);
     const boxHeight = Math.round(Math.max((typeConfig.radius * 2) + 18, labelHeight + 14));
     const collisionRadius = Math.sqrt(((boxWidth / 2) ** 2) + ((boxHeight / 2) ** 2)) + 14;
     return {
         ...node,
         labelText,
-        labelUnits,
+        labelLines,
+        labelUnits: measureOasisSwarmTextUnits(labelText),
         labelWidth,
         labelHeight,
+        labelLineHeight,
+        labelLineCount,
         labelFontSize: typeConfig.labelFontSize,
         baseRadius: typeConfig.radius,
         labelGap: typeConfig.labelGap,
@@ -7990,9 +8080,14 @@ function buildOasisSwarmNodeSvg(node, selected, muted) {
     const opacity = muted ? 0.28 : 1;
     const shadowId = selected ? 'oasisSwarmGlow' : 'oasisSwarmShadow';
     const labelX = node.x + (node.labelOffsetX || (radius + 12));
-    const labelY = node.y + ((node.labelFontSize || 10) * 0.34);
+    const labelLineHeight = node.labelLineHeight || Math.round((node.labelFontSize || 10) + 4);
+    const labelY = node.y - (((node.labelHeight || labelLineHeight) - labelLineHeight) / 2) + ((node.labelFontSize || 10) * 0.34);
     const labelFill = selected ? '#fff6bf' : '#fff1e8';
     const labelStroke = selected ? 'rgba(92,68,10,0.92)' : 'rgba(8,12,26,0.9)';
+    const textLayout = getTeamClawTextLayout();
+    const labelMarkup = textLayout && typeof textLayout.renderSvgTspans === 'function'
+        ? textLayout.renderSvgTspans(node.labelLines || [node.labelText || node.label || ''], labelX, labelY, labelLineHeight, escapeHtml)
+        : escapeHtml(node.labelText || node.label || '');
     const badge = node.badgeValue
         ? `<g opacity="${opacity}">
             <circle cx="${node.x + (radius * 0.7)}" cy="${node.y - (radius * 0.74)}" r="${node.badgeRadius || 8.5}" fill="#111827" stroke="#fff1e8" stroke-width="1.4"></circle>
@@ -8008,7 +8103,7 @@ function buildOasisSwarmNodeSvg(node, selected, muted) {
             ${selectedHalo}
             <circle cx="${node.x}" cy="${node.y}" r="${radius + 1.4}" fill="rgba(255,255,255,0.04)" stroke="${outlineStroke}" stroke-width="${selected ? 2.4 : 1.4}"></circle>
             <circle cx="${node.x}" cy="${node.y}" r="${radius}" fill="${node.fill}" stroke="${node.stroke}" stroke-width="${selected ? 2.7 : 2.1}" filter="url(#${shadowId})"></circle>
-            <text x="${labelX}" y="${labelY}" text-anchor="start" font-size="${node.labelFontSize || 10}" font-weight="${selected ? 700 : 600}" fill="${labelFill}" stroke="${labelStroke}" stroke-width="2.6" paint-order="stroke fill" stroke-linejoin="round">${escapeHtml(node.labelText || node.label || '')}</text>
+            <text text-anchor="start" font-size="${node.labelFontSize || 10}" font-weight="${selected ? 700 : 600}" fill="${labelFill}" stroke="${labelStroke}" stroke-width="2.6" paint-order="stroke fill" stroke-linejoin="round">${labelMarkup}</text>
             ${badge}
         </g>
     `;
@@ -8026,12 +8121,16 @@ function buildOasisSwarmEdgeSvg(edge, graphState, muted, selected) {
     const labelY = ctrlY - 8;
     const stroke = selected ? '#f9c74f' : '#c2c3c7';
     const strokeWidth = selected ? (2.6 + (edge.weight || 0.5) * 2.4) : (1.2 + (edge.weight || 0.5) * 1.9);
+    const textLayout = getTeamClawTextLayout();
+    const edgeLabel = textLayout && typeof textLayout.fitSingleLine === 'function'
+        ? textLayout.fitSingleLine(edge.label || '', 118, { font: '600 8px Arial', lineHeight: 10, suffix: '…' }).text
+        : (edge.label || '').slice(0, 18);
     return `
         <g opacity="${opacity}">
             <path d="${path}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" marker-end="url(#oasisSwarmArrow)"></path>
             <path data-swarm-edge="${escapeHtml(edge.id)}" d="${path}" fill="none" stroke="transparent" stroke-width="18" onclick="selectOasisSwarmEdge('${escapeHtml(edge.id)}')"></path>
             ${oasisSwarmEdgeLabelsVisible
-                ? `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-size="8" fill="#fff1e8">${escapeHtml((edge.label || '').slice(0, 18))}</text>`
+                ? `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-size="8" fill="#fff1e8">${escapeHtml(edgeLabel)}</text>`
                 : ''}
         </g>
     `;
@@ -8516,9 +8615,17 @@ function showDiscussionOverview() {
     const barColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16'];
     const evIcons = {start:'🚀',round:'📢',agent_call:'⏳',agent_done:'✅',conclude:'🏁',manual_post:'📝',if_branch:'🔀',post:'💬'};
 
-    // Layout constants
-    const labelW = 130;    // left label column width
-    const chartW = 700;    // timeline chart width (scrollable)
+    const textLayout = getTeamClawTextLayout();
+    const overviewNames = rowKeys.map((key) => key === '__system__' ? (currentLang === 'zh-CN' ? '系统' : 'System') : key);
+    const labelW = textLayout && typeof textLayout.measureLabelGutter === 'function'
+        ? textLayout.measureLabelGutter(overviewNames, {
+            font: '600 10px Arial',
+            lineHeight: 12,
+            minWidth: 118,
+            maxWidth: 196,
+            padding: 28,
+        })
+        : 130;
     const rowH = 42;       // row height
     const markerR = 7;     // event marker radius
     const headerH = 30;    // time axis header height
@@ -8529,6 +8636,8 @@ function showDiscussionOverview() {
     const niceStep = tickStep < 5 ? 5 : tickStep < 10 ? 10 : tickStep < 15 ? 15 : tickStep < 30 ? 30 : tickStep < 60 ? 60 : Math.ceil(tickStep/60)*60;
     const ticks = [];
     for (let t = 0; t <= maxTime + niceStep*0.5; t += niceStep) ticks.push(t);
+    const preferredViewportWidth = Math.max(620, Math.min(960, Math.round((window.innerWidth || 1280) * 0.58)));
+    const chartW = Math.max(preferredViewportWidth, 420 + (allEvents.length * 18), ticks.length * 52);
 
     const tToX = (t) => (t / maxTime) * chartW;
 
@@ -12041,10 +12150,78 @@ async function ocLoadAgents() {
     }
 }
 
+function ocSaveOpenClawTranscript() {
+    const agent = _ocSelectedAgent && _ocSelectedAgent.name;
+    const chatBox = document.getElementById('chat-box');
+    if (!agent || !chatBox) return;
+    _ocTranscriptByAgent[agent] = chatBox.innerHTML;
+}
+
+function ocRefreshTtsButtonsIn(chatBox) {
+    if (!chatBox) return;
+    chatBox.querySelectorAll('.message-agent .tts-btn').forEach((btn) => btn.remove());
+    chatBox.querySelectorAll('.message-agent.tc-markdown').forEach((div) => {
+        const text = extractTtsTextFromElement(div);
+        if (text && String(text).trim()) {
+            div.appendChild(createTtsButton(() => extractTtsTextFromElement(div)));
+        }
+    });
+    highlightMarkdownIn(chatBox);
+}
+
+function ocRenderOpenClawWelcomeForAgent(name) {
+    const chatBox = document.getElementById('chat-box');
+    if (!chatBox) return;
+    const safe = escapeHtml(name);
+    chatBox.innerHTML =
+        '<div class="flex justify-start">' +
+        '<div class="message-agent bg-white border p-4 max-w-[85%] shadow-sm text-gray-700">' +
+        t('oc_chatting_with', { name: safe }) +
+        '<br><span style="font-size:0.85em;color:#6b7280;">OpenClaw Agent — ' +
+        safe +
+        '</span></div></div>';
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function ocRenderOpenClawSelectPrompt() {
+    const chatBox = document.getElementById('chat-box');
+    if (!chatBox) return;
+    chatBox.innerHTML =
+        '<div class="flex justify-start">' +
+        '<div class="message-agent bg-white border p-4 max-w-[85%] shadow-sm text-gray-700">' +
+        escapeHtml(t('oc_select_agent_hint')) +
+        '<br><span style="font-size:0.85em;color:#6b7280;">OpenClaw</span></div></div>';
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function ocPaintOpenClawChatFromCache() {
+    const chatBox = document.getElementById('chat-box');
+    if (!chatBox) return;
+    const agent = _ocSelectedAgent && _ocSelectedAgent.name;
+    if (agent) {
+        if (_ocTranscriptByAgent[agent]) {
+            chatBox.innerHTML = _ocTranscriptByAgent[agent];
+            ocRefreshTtsButtonsIn(chatBox);
+        } else {
+            ocRenderOpenClawWelcomeForAgent(agent);
+        }
+    } else {
+        ocRenderOpenClawSelectPrompt();
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
 /**
  * Switch between 'internal' (TeamBot) and 'openclaw' chat modes.
+ * TeamBot history comes from the server; OpenClaw uses per-agent in-memory transcripts so the two do not mix.
  */
-function ocSwitchTo(mode) {
+async function ocSwitchTo(mode) {
+    if (mode === _ocChatMode) return;
+
+    if (_ocChatMode === 'openclaw' && mode === 'internal') {
+        ocSaveOpenClawTranscript();
+    }
+
     _ocChatMode = mode;
 
     const tabInternal = document.getElementById('oc-tab-internal');
@@ -12056,17 +12233,18 @@ function ocSwitchTo(mode) {
 
     if (mode === 'openclaw') {
         if (agentSelector) agentSelector.style.display = 'flex';
-        // Load agents if cache is empty
         if (_ocAgentsCache.length === 0) {
-            ocLoadAgents();
+            await ocLoadAgents();
         }
+        const select = document.getElementById('oc-agent-select');
+        if (select && select.value) {
+            _ocSelectedAgent = { name: select.value };
+        }
+        ocPaintOpenClawChatFromCache();
     } else {
         if (agentSelector) agentSelector.style.display = 'none';
-        _ocSelectedAgent = null;
+        await switchToSession(currentSessionId, true, { quiet: true });
     }
-
-    // Update chat box hint
-    ocUpdateChatHint();
 }
 
 /**
@@ -12076,30 +12254,28 @@ function ocOnAgentChange() {
     const select = document.getElementById('oc-agent-select');
     if (!select) return;
 
+    const prevName = _ocSelectedAgent && _ocSelectedAgent.name;
+    const chatBox = document.getElementById('chat-box');
+    if (_ocChatMode === 'openclaw' && prevName && chatBox) {
+        _ocTranscriptByAgent[prevName] = chatBox.innerHTML;
+    }
+
     const agentName = select.value;
     if (agentName) {
         _ocSelectedAgent = { name: agentName };
+        if (_ocChatMode === 'openclaw' && chatBox) {
+            if (_ocTranscriptByAgent[agentName]) {
+                chatBox.innerHTML = _ocTranscriptByAgent[agentName];
+                ocRefreshTtsButtonsIn(chatBox);
+            } else {
+                ocRenderOpenClawWelcomeForAgent(agentName);
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
     } else {
         _ocSelectedAgent = null;
-    }
-
-    ocUpdateChatHint();
-}
-
-/**
- * Update the welcome/hint message in chat box based on current OpenClaw state.
- */
-function ocUpdateChatHint() {
-    const chatBox = document.getElementById('chat-box');
-    if (!chatBox) return;
-
-    // Only show hint when switching modes (don't clear ongoing conversations)
-    if (_ocChatMode === 'openclaw' && _ocSelectedAgent) {
-        // If chat box only has the welcome message, update it
-        const firstMsg = chatBox.querySelector('.message-agent');
-        if (firstMsg && chatBox.children.length <= 1) {
-            firstMsg.innerHTML = t('oc_chatting_with', { name: _ocSelectedAgent.name }) +
-                '<br><span style="font-size:0.85em;color:#6b7280;">OpenClaw Agent — ' + escapeHtml(_ocSelectedAgent.name) + '</span>';
+        if (_ocChatMode === 'openclaw') {
+            ocRenderOpenClawSelectPrompt();
         }
     }
 }

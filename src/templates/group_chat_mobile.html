@@ -21,6 +21,8 @@
 <link rel="stylesheet" href="/static/css/markdown-shared.css">
 <script src="/static/js/markdown-shared.js"></script>
 <script src="/static/js/tinyfish-live-shared.js"></script>
+<script src="/static/vendor/pretext.global.js?v=20260402-pretext"></script>
+<script src="/static/js/pretext_text_core.js?v=20260402-pretext"></script>
 <style>
   /* ── Reset & Variables ── */
   :root {
@@ -369,6 +371,7 @@
     overflow-wrap: break-word;
     overflow: hidden;
     position: relative;
+    min-width: 0;
   }
   /* Markdown 渲染内容样式 */
   .msg-bubble.markdown-body {
@@ -380,6 +383,8 @@
     background: #1e1e1e; color: #d4d4d4; border-radius: 6px;
     padding: 8px 10px; overflow-x: auto; font-size: 13px; margin: 6px 0;
     max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
   }
   .msg-bubble.markdown-body code {
     background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px;
@@ -398,10 +403,13 @@
   }
   .msg-bubble.markdown-body table {
     border-collapse: collapse; margin: 6px 0; font-size: 13px;
-    max-width: 100%; display: block; overflow-x: auto;
+    display: table; width: max-content; max-width: none;
   }
   .msg-bubble.markdown-body th, .msg-bubble.markdown-body td {
     border: 1px solid #ddd; padding: 4px 8px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    vertical-align: top;
   }
   .msg-bubble.markdown-body th { background: #f5f5f5; font-weight: 600; }
   .msg-bubble.markdown-body h1, .msg-bubble.markdown-body h2,
@@ -411,6 +419,11 @@
   .msg-bubble.markdown-body h1 { font-size: 1.2em; }
   .msg-bubble.markdown-body h2 { font-size: 1.1em; }
   .msg-bubble.markdown-body h3 { font-size: 1.05em; }
+  .msg-bubble.markdown-body.tc-markdown {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
   .msg-bubble:not(.markdown-body) { white-space: pre-wrap; }
   .msg-row:not(.self) .msg-bubble { background: var(--msg-other); }
   .msg-row.self .msg-bubble { background: var(--msg-self); }
@@ -4772,12 +4785,12 @@ function renderOneMsgHTML(m) {
   const colorClass = isSelf ? 'self' : '';
 
   if (isSystem) {
-    const content = esc(m.content || '');
+    const content = esc(tcNormalizeEscapedText(m.content || ''));
     return `<div class="msg-row system"><span class="msg-system-text">${content}</span></div>`;
   }
 
   // 非自己的消息使用 markdown 渲染，自己的消息纯文本
-  const rawContent = m.content || '';
+  const rawContent = tcNormalizeEscapedText(m.content || '');
   let contentHTML;
   let bubbleClass = 'msg-bubble';
   if (!isSelf) {
@@ -5931,8 +5944,17 @@ function showDiscussionOverview() {
   const barColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16'];
   const evIconsMap = {start:'🚀',round:'📢',agent_call:'⏳',agent_done:'✅',conclude:'🏁',manual_post:'📝',if_branch:'🔀',post:'💬'};
 
-  const labelW = 110;
-  const chartW = 600;
+  const textLayout = (typeof window !== 'undefined' && window.TeamClawTextLayout) ? window.TeamClawTextLayout : null;
+  const overviewNames = rowKeys.map((key) => key === '__system__' ? t('oasis_system') : key);
+  const labelW = textLayout && typeof textLayout.measureLabelGutter === 'function'
+    ? textLayout.measureLabelGutter(overviewNames, {
+        font: '600 10px Arial',
+        lineHeight: 12,
+        minWidth: 108,
+        maxWidth: 176,
+        padding: 26,
+      })
+    : 110;
   const rowH = 42;
   const markerR = 7;
   const headerH = 30;
@@ -5942,6 +5964,8 @@ function showDiscussionOverview() {
   const niceStep = tickStep < 5 ? 5 : tickStep < 10 ? 10 : tickStep < 15 ? 15 : tickStep < 30 ? 30 : tickStep < 60 ? 60 : Math.ceil(tickStep/60)*60;
   const ticks = [];
   for (let tt = 0; tt <= maxTime + niceStep*0.5; tt += niceStep) ticks.push(tt);
+  const preferredViewportWidth = Math.max(520, Math.min(820, Math.round((window.innerWidth || 480) * 0.7)));
+  const chartW = Math.max(preferredViewportWidth, 360 + (allEvents.length * 16), ticks.length * 46);
 
   const tToX = (t) => (t / maxTime) * chartW;
 
@@ -6888,6 +6912,20 @@ async function removeMemberFromGroup(globalId, name) {
 function getCurrentUser() {
   // Inferred from cookie/session — the Flask proxy handles auth
   return window.__currentUser || '';
+}
+
+/** 与 markdown-shared 一致：把字面量 \\n 转成真换行（系统消息 / 自己发的纯文本也会用到） */
+function tcNormalizeEscapedText(s) {
+  if (typeof window.TeamClawMarkdown !== 'undefined' && TeamClawMarkdown.normalizeEscapedNewlines) {
+    return TeamClawMarkdown.normalizeEscapedNewlines(s);
+  }
+  const str = s == null ? '' : String(s);
+  if (str.indexOf('\\') === -1) return str;
+  return str
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '\n')
+    .replace(/\\t/g, '\t');
 }
 
 function esc(s) {
@@ -8315,16 +8353,16 @@ function _renderLlmGroup(settings) {
     html += '<input class="settings-input" data-key="LLM_BASE_URL" id="settings-llm-url" type="text" value="' + escapeHtml(curUrl) + '" placeholder="https://api.deepseek.com" autocomplete="off" />';
     html += '</div>';
 
-    // ── Model — dropdown + detect button ──
+    // ── Model — datalist (manual input) + detect button ──
     html += '<div class="settings-field">';
     html += '<label class="settings-label">LLM_MODEL</label>';
     html += '<div style="display:flex;gap:8px;align-items:center;">';
-    html += '<select class="settings-input" data-key="LLM_MODEL" id="settings-llm-model" style="flex:1;">';
+    html += '<input class="settings-input" data-key="LLM_MODEL" id="settings-llm-model" type="text" list="settings-llm-model-list" style="flex:1;" value="' + escapeHtml(curModel) + '" placeholder="（点击&quot;检测模型&quot;获取列表，或手动输入）" autocomplete="off" />';
+    html += '<datalist id="settings-llm-model-list">';
     if (curModel) {
-        html += '<option value="' + escapeHtml(curModel) + '" selected>' + escapeHtml(curModel) + '</option>';
+        html += '<option value="' + escapeHtml(curModel) + '"></option>';
     }
-    html += '<option value="">（点击"检测模型"获取列表）</option>';
-    html += '</select>';
+    html += '</datalist>';
     html += '<button id="settings-detect-models-btn" onclick="settingsDetectModels()" style="padding:10px 14px;border-radius:8px;border:none;background:#07c160;color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">检测模型</button>';
     html += '</div>';
     html += '<div id="settings-detect-status" style="margin-top:4px;font-size:11px;color:var(--text-secondary);"></div>';
@@ -8537,7 +8575,8 @@ function _applySettingsImportedLlmConfig(data) {
     const providerSel = document.getElementById('settings-llm-provider');
     const keyInput = document.getElementById('settings-llm-key');
     const urlInput = document.getElementById('settings-llm-url');
-    const modelSel = document.getElementById('settings-llm-model');
+    const modelInput = document.getElementById('settings-llm-model');
+    const modelDatalist = document.getElementById('settings-llm-model-list');
 
     const providerValue = data.provider ? (_SETTINGS_OPENCLAW_PROVIDER_MAP[data.provider] || data.provider) : '';
     if (providerSel && providerValue) {
@@ -8557,15 +8596,15 @@ function _applySettingsImportedLlmConfig(data) {
     if (urlInput && data.base_url) {
         urlInput.value = data.base_url;
     }
-    if (modelSel && data.model) {
-        const exists = Array.from(modelSel.options).some(function(option) { return option.value === data.model; });
-        if (!exists) {
+    if (modelInput && data.model) {
+        modelInput.value = data.model;
+        if (modelDatalist) {
+            modelDatalist.innerHTML = '';
             const opt = document.createElement('option');
             opt.value = data.model;
             opt.textContent = data.model;
-            modelSel.insertBefore(opt, modelSel.firstChild || null);
+            modelDatalist.appendChild(opt);
         }
-        modelSel.value = data.model;
     }
 }
 
@@ -8648,18 +8687,11 @@ function settingsLlmProviderChanged() {
         keyInput.type = 'password';
     }
 
-    // Reset model dropdown
-    const modelSel = document.getElementById('settings-llm-model');
-    const curModel = modelSel.value;
-    modelSel.innerHTML = '';
-    if (curModel) {
-        const opt = document.createElement('option');
-        opt.value = curModel; opt.textContent = curModel;
-        modelSel.appendChild(opt);
-    }
-    const defaultOpt = document.createElement('option');
-    defaultOpt.value = ''; defaultOpt.textContent = '（点击"检测模型"获取列表）';
-    modelSel.appendChild(defaultOpt);
+    // Reset model input/datalist
+    const modelInput = document.getElementById('settings-llm-model');
+    const modelDatalist = document.getElementById('settings-llm-model-list');
+    if (modelInput) modelInput.value = '';
+    if (modelDatalist) modelDatalist.innerHTML = '';
 }
 
 /** 检测模型 */
@@ -8668,7 +8700,8 @@ async function settingsDetectModels() {
     const apiKey = llmConfig.api_key;
     const baseUrl = llmConfig.base_url;
     const statusEl = document.getElementById('settings-detect-status');
-    const modelSel = document.getElementById('settings-llm-model');
+    const modelInput = document.getElementById('settings-llm-model');
+    const modelDatalist = document.getElementById('settings-llm-model-list');
     const detectBtn = document.getElementById('settings-detect-models-btn');
     const provider = llmConfig.provider;
     const isLocalKeyless = _isLocalKeylessProvider(provider, baseUrl);
@@ -8676,7 +8709,7 @@ async function settingsDetectModels() {
     if (!apiKey && !llmConfig.has_saved_api_key && !isLocalKeyless) { statusEl.textContent = '⚠️ 请先输入 API Key'; return; }
     if (!baseUrl) { statusEl.textContent = '⚠️ 请先输入 Base URL'; return; }
 
-    const curModel = modelSel.value;
+    const curModel = modelInput ? modelInput.value : '';
     detectBtn.disabled = true;
     detectBtn.textContent = '⏳ 检测中...';
     statusEl.textContent = '正在连接 API...';
@@ -8700,17 +8733,20 @@ async function settingsDetectModels() {
             return;
         }
 
-        modelSel.innerHTML = '';
-        for (const mid of models) {
-            const opt = document.createElement('option');
-            opt.value = mid; opt.textContent = mid;
-            modelSel.appendChild(opt);
+        if (modelDatalist) {
+            modelDatalist.innerHTML = '';
+            for (const mid of models) {
+                const opt = document.createElement('option');
+                opt.value = mid;
+                opt.textContent = mid;
+                modelDatalist.appendChild(opt);
+            }
         }
         statusEl.textContent = '✅ 检测到 ' + models.length + ' 个可用模型';
 
         // Auto-select: prefer current model, then smart defaults
-        if (curModel && models.includes(curModel)) {
-            modelSel.value = curModel;
+        if (modelInput && curModel && models.includes(curModel)) {
+            modelInput.value = curModel;
         } else {
             const preferredModels = {
                 deepseek: ['deepseek-chat', 'deepseek-coder'],
@@ -8722,7 +8758,7 @@ async function settingsDetectModels() {
             };
             const preferred = preferredModels[provider] || [];
             for (const pm of preferred) {
-                if (models.includes(pm)) { modelSel.value = pm; break; }
+                if (modelInput && models.includes(pm)) { modelInput.value = pm; break; }
             }
         }
     } catch (e) {
