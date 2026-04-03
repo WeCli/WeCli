@@ -1606,6 +1606,146 @@
     color: var(--text-secondary);
     white-space: nowrap;
   }
+  /* Agent source tabs: list/internal | Ext | OpenClaw (add-member drawer + create-agent modal) */
+  #add-agent-mode-bar,
+  #create-agent-mode-bar {
+    display: flex;
+    gap: 4px;
+    padding: 6px 10px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+    flex-shrink: 0;
+  }
+  #add-agent-mode-bar .add-agent-mode-btn,
+  #create-agent-mode-bar .add-agent-mode-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 4px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    line-height: 1.2;
+  }
+  #add-agent-mode-bar .add-agent-mode-btn.active,
+  #create-agent-mode-bar .add-agent-mode-btn.active {
+    border-color: #07c160;
+    background: rgba(7, 193, 96, 0.12);
+    color: #059669;
+  }
+  #add-agent-mode-bar .add-agent-mode-btn:active,
+  #create-agent-mode-bar .add-agent-mode-btn:active { opacity: 0.85; }
+  /* 添加成员侧栏：避免 flex + overflow 导致中间列表高度为 0（内容“不显示”） */
+  #add-agent-modal.side-drawer.drawer {
+    display: flex;
+    flex-direction: column;
+  }
+  #add-agent-modal .drawer-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+  #add-agent-modal #add-agent-team-switcher {
+    flex-shrink: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  #add-agent-modal #add-agent-team-switcher select {
+    width: 100%;
+    min-width: 0;
+  }
+  #add-agent-modal #add-agent-mode-bar {
+    flex-shrink: 0;
+  }
+  #add-agent-modal #add-agent-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #add-agent-modal #add-agent-footer {
+    flex-shrink: 0;
+  }
+  /* 创建 Agent 侧栏：与添加成员相同的分段 + 可滚动内容区 */
+  #create-agent-modal.side-drawer.drawer {
+    display: flex;
+    flex-direction: column;
+  }
+  #create-agent-modal .create-agent-drawer-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+  #create-agent-modal #create-agent-team-row {
+    flex-shrink: 0;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-card);
+  }
+  #create-agent-modal #create-agent-panels-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #create-agent-modal #create-agent-mode-bar {
+    flex-shrink: 0;
+  }
+  .mobile-add-agent-form {
+    padding: 12px;
+    font-size: 13px;
+  }
+  .mobile-add-agent-form label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+  .mobile-add-agent-form label:first-child { margin-top: 0; }
+  .mobile-add-agent-form input,
+  .mobile-add-agent-form select,
+  .mobile-add-agent-form textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+    background: var(--bg-card);
+    color: var(--text);
+  }
+  .mobile-add-agent-form .form-hint {
+    font-size: 11px;
+    color: var(--text-hint);
+    margin: 6px 0 0;
+    line-height: 1.35;
+  }
+  .mobile-add-agent-form .form-submit {
+    width: 100%;
+    margin-top: 16px;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    background: #07c160;
+    color: #fff;
+    cursor: pointer;
+  }
+  .mobile-add-agent-form .form-submit:disabled { opacity: 0.6; }
   .contact-section-title {
     padding: 6px 16px;
     font-size: 12px; font-weight: 600; color: var(--text-secondary);
@@ -2331,31 +2471,42 @@
     </button>
     <span class="drawer-header-title" data-i18n="create_new_agent">创建新Agent</span>
   </div>
-  <div class="drawer-body">
-    <div class="side-panel-form">
-      <div class="side-panel-section">
-        <div class="side-panel-field">
-          <label class="side-panel-label" data-i18n="agent_tag_label">Tag 标签（人设prompt） <span style="color:var(--text-hint);" data-i18n="custom_name_optional">(可选)</span></label>
-          <input type="hidden" id="create-agent-tag" value="">
-          <div id="create-agent-tag-list" class="side-panel-tag-list">
-            <div class="side-panel-tag-empty" data-i18n="loading">加载中...</div>
+  <div class="drawer-body create-agent-drawer-body">
+    <div id="create-agent-team-row">
+      <label class="side-panel-label" data-i18n="agent_team_label">所属团队 <span style="color:var(--text-hint);" data-i18n="custom_name_optional">(可选)</span></label>
+      <select id="create-agent-team" class="side-panel-input" onchange="onCreateAgentTeamChange()" style="width:100%;margin-top:6px;">
+        <option value="" data-i18n="public_agent">公共 Agent</option>
+      </select>
+    </div>
+    <div id="create-agent-mode-bar" role="tablist">
+      <button type="button" class="add-agent-mode-btn active" data-mode="internal" id="create-agent-mode-internal" data-i18n="mobile_create_agent_mode_internal" onclick="setCreateAgentMode('internal')">内部</button>
+      <button type="button" class="add-agent-mode-btn" data-mode="ext" data-i18n="mobile_add_agent_mode_ext" onclick="setCreateAgentMode('ext')">Ext</button>
+      <button type="button" class="add-agent-mode-btn" data-mode="oc" data-i18n="mobile_add_agent_mode_oc" onclick="setCreateAgentMode('oc')">OpenClaw</button>
+    </div>
+    <div id="create-agent-panels-scroll">
+      <div id="create-agent-panel-internal">
+        <div class="side-panel-form">
+          <div class="side-panel-section">
+            <div class="side-panel-field">
+              <label class="side-panel-label" data-i18n="agent_tag_label">Tag 标签（人设prompt） <span style="color:var(--text-hint);" data-i18n="custom_name_optional">(可选)</span></label>
+              <input type="hidden" id="create-agent-tag" value="">
+              <div id="create-agent-tag-list" class="side-panel-tag-list">
+                <div class="side-panel-tag-empty" data-i18n="loading">加载中...</div>
+              </div>
+            </div>
+            <div class="side-panel-field">
+              <label class="side-panel-label" data-i18n="agent_name_label">Agent 名称</label>
+              <input type="text" id="create-agent-name" class="side-panel-input" placeholder="my_agent" onkeydown="if(event.key==='Enter')submitCreateAgent()">
+            </div>
           </div>
-        </div>
-        <div class="side-panel-field">
-          <label class="side-panel-label" data-i18n="agent_name_label">Agent 名称</label>
-          <input type="text" id="create-agent-name" class="side-panel-input" placeholder="my_agent" onkeydown="if(event.key==='Enter')submitCreateAgent()">
-        </div>
-        <div class="side-panel-field">
-          <label class="side-panel-label" data-i18n="agent_team_label">所属团队 <span style="color:var(--text-hint);" data-i18n="custom_name_optional">(可选)</span></label>
-          <select id="create-agent-team" class="side-panel-input" onchange="onCreateAgentTeamChange()">
-            <option value="" data-i18n="public_agent">公共 Agent</option>
-          </select>
+          <div class="side-panel-section">
+            <div class="side-panel-hint" data-i18n="create_agent_hint">💡 创建后将自动开启与该 Agent 的私聊对话</div>
+          </div>
+          <button onclick="submitCreateAgent()" class="side-panel-primary-btn" data-i18n="create_agent_btn">🤖 创建 Agent</button>
         </div>
       </div>
-      <div class="side-panel-section">
-        <div class="side-panel-hint" data-i18n="create_agent_hint">💡 创建后将自动开启与该 Agent 的私聊对话</div>
-      </div>
-      <button onclick="submitCreateAgent()" class="side-panel-primary-btn" data-i18n="create_agent_btn">🤖 创建 Agent</button>
+      <div id="create-agent-panel-ext" style="display:none;"></div>
+      <div id="create-agent-panel-oc" style="display:none;"></div>
     </div>
   </div>
 </div>
@@ -2453,11 +2604,16 @@
     <div class="drawer-body" style="padding:0;display:flex;flex-direction:column;">
       <div id="add-agent-team-switcher" class="contacts-team-switcher" style="padding:8px 12px;border-bottom:1px solid var(--border);">
       <span class="contacts-team-label" data-i18n="select_team_label">选择team</span>
-      <select id="add-agent-team-select" onchange="loadAddAgentMembers()" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:14px;">
+      <select id="add-agent-team-select" onchange="onAddAgentTeamChanged()" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);font-size:14px;">
         <option value="" data-i18n="loading">加载中...</option>
       </select>
       </div>
-    <div class="agent-detail-body" id="add-agent-body" style="flex:1;overflow-y:auto;">
+      <div id="add-agent-mode-bar" role="tablist" aria-label="add agent source">
+        <button type="button" class="add-agent-mode-btn active" data-mode="list" id="add-agent-mode-btn-list" data-i18n="mobile_add_agent_mode_list" onclick="setAddAgentMode('list')">列表</button>
+        <button type="button" class="add-agent-mode-btn" data-mode="ext" id="add-agent-mode-btn-ext" data-i18n="mobile_add_agent_mode_ext" onclick="setAddAgentMode('ext')">Ext</button>
+        <button type="button" class="add-agent-mode-btn" data-mode="oc" id="add-agent-mode-btn-oc" data-i18n="mobile_add_agent_mode_oc" onclick="setAddAgentMode('oc')">OpenClaw</button>
+      </div>
+      <div class="agent-detail-body" id="add-agent-body">
       <div class="agent-detail-loading" data-i18n="loading">加载中...</div>
     </div>
     <div id="add-agent-footer" style="padding:12px;border-top:1px solid var(--border);display:none;">
@@ -2733,6 +2889,41 @@ const I18N = {
     agent_added: '✅ 已添加 Agent',
     add_failed: '添加失败',
     no_members: '暂无成员',
+
+    mobile_add_agent_mode_list: '列表',
+    mobile_add_agent_mode_ext: 'Ext',
+    mobile_add_agent_mode_oc: 'OpenClaw',
+    mobile_create_agent_mode_internal: '内部',
+    mobile_create_ext_submit: '保存并开始私聊',
+    mobile_create_oc_submit: '创建并开始私聊',
+    mobile_create_agent_team_hint: '顶部可选团队：会写入该团队的 external；不选也可直接开始私聊。',
+    mobile_add_agent_team_optional: '团队可选：不选时只加入本群，不会写入某团队的 external_agents.json。HTTP API 类 Ext 若要稳定收到群消息，建议选择团队以保存 URL/Key。',
+    mobile_add_ext_title: '新建外部成员（Ext / API）',
+    mobile_add_oc_title: '新建 OpenClaw Agent',
+    mobile_add_ext_name: '显示名称',
+    mobile_add_ext_global: 'Global Name',
+    mobile_add_ext_tag: 'Tag',
+    mobile_add_ext_platform: '平台',
+    mobile_add_ext_url: 'API URL',
+    mobile_add_ext_key: 'API Key（可选）',
+    mobile_add_ext_model: '模型（可选）',
+    mobile_add_ext_headers: 'Headers JSON（可选）',
+    mobile_add_ext_advanced: '高级',
+    mobile_add_ext_submit: '保存并加入本群',
+    mobile_add_oc_short: 'Agent 短名',
+    mobile_add_oc_ws: 'Workspace 目录',
+    mobile_add_oc_ws_reset: '重置路径',
+    mobile_add_oc_submit: '创建并加入本群',
+    mobile_add_team_prefix_hint: '实际 Agent 名将为：{prefix}_短名',
+    mobile_add_oc_global_hint: '完整名称：{name}',
+    mobile_add_enter_name: '请填写名称与 Global Name',
+    mobile_add_ext_url_required: 'HTTP 平台需要填写 API URL（openclaw tag 除外）',
+    mobile_add_headers_json_err: 'Headers 不是合法 JSON',
+    mobile_add_oc_name_invalid: '仅允许字母、数字、下划线与连字符',
+    mobile_add_oc_workspace_required: '请填写 Workspace 路径',
+    mobile_add_oc_exists: '该名称已存在',
+    mobile_add_oc_failed: '创建 OpenClaw 失败',
+    mobile_add_member_ok: '已加入团队与本群',
 
     // ── Create menu ──
     create_new_agent: '创建新Agent',
@@ -3216,6 +3407,41 @@ const I18N = {
     agent_added: '✅ Agent added',
     add_failed: 'Add failed',
     no_members: 'No members',
+
+    mobile_add_agent_mode_list: 'Pick',
+    mobile_add_agent_mode_ext: 'Ext',
+    mobile_add_agent_mode_oc: 'OpenClaw',
+    mobile_create_agent_mode_internal: 'Internal',
+    mobile_create_ext_submit: 'Save & start DM',
+    mobile_create_oc_submit: 'Create & start DM',
+    mobile_create_agent_team_hint: 'Optional team above saves to that team\x27s externals; you can start a DM without a team.',
+    mobile_add_agent_team_optional: 'Team is optional: without a team, the member is only added to this chat (no external_agents.json under a team). For HTTP API Ext agents, pick a team if you need URL/Key saved for group delivery.',
+    mobile_add_ext_title: 'New external member (Ext / API)',
+    mobile_add_oc_title: 'New OpenClaw agent',
+    mobile_add_ext_name: 'Display name',
+    mobile_add_ext_global: 'Global name',
+    mobile_add_ext_tag: 'Tag',
+    mobile_add_ext_platform: 'Platform',
+    mobile_add_ext_url: 'API URL',
+    mobile_add_ext_key: 'API key (optional)',
+    mobile_add_ext_model: 'Model (optional)',
+    mobile_add_ext_headers: 'Headers JSON (optional)',
+    mobile_add_ext_advanced: 'Advanced',
+    mobile_add_ext_submit: 'Save & add to this chat',
+    mobile_add_oc_short: 'Short name',
+    mobile_add_oc_ws: 'Workspace path',
+    mobile_add_oc_ws_reset: 'Reset path',
+    mobile_add_oc_submit: 'Create & add to this chat',
+    mobile_add_team_prefix_hint: 'Agent name will be: {prefix}_short',
+    mobile_add_oc_global_hint: 'Full name: {name}',
+    mobile_add_enter_name: 'Enter display name and global name',
+    mobile_add_ext_url_required: 'HTTP platform requires API URL (except openclaw tag)',
+    mobile_add_headers_json_err: 'Headers must be valid JSON',
+    mobile_add_oc_name_invalid: 'Only letters, digits, underscore and hyphen',
+    mobile_add_oc_workspace_required: 'Workspace path is required',
+    mobile_add_oc_exists: 'That agent name already exists',
+    mobile_add_oc_failed: 'Failed to create OpenClaw agent',
+    mobile_add_member_ok: 'Added to team and this group',
 
     create_new_agent: 'Create New Agent',
     create_new_group: 'Create New Group',
@@ -4516,10 +4742,310 @@ function selectCreateAgentTag(tag) {
   renderCreateAgentTagOptions(hiddenInput.value);
 }
 
+/** @type {'internal'|'ext'|'oc'} */
+let mobileCreateAgentMode = 'internal';
+
+function mobileGetCreateAgentTeam() {
+  const sel = document.getElementById('create-agent-team');
+  return sel ? String(sel.value || '').trim() : '';
+}
+
+function _syncCreateAgentModeButtons() {
+  document.querySelectorAll('#create-agent-mode-bar .add-agent-mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === mobileCreateAgentMode);
+  });
+}
+
+function setCreateAgentMode(mode) {
+  if (!['internal', 'ext', 'oc'].includes(mode)) return;
+  mobileCreateAgentMode = mode;
+  _syncCreateAgentModeButtons();
+  const pInt = document.getElementById('create-agent-panel-internal');
+  const pExt = document.getElementById('create-agent-panel-ext');
+  const pOc = document.getElementById('create-agent-panel-oc');
+  if (pInt) pInt.style.display = mode === 'internal' ? '' : 'none';
+  if (pExt) {
+    pExt.style.display = mode === 'ext' ? '' : 'none';
+    if (mode === 'ext') renderCreateAgentExtPanel();
+  }
+  if (pOc) {
+    pOc.style.display = mode === 'oc' ? '' : 'none';
+    if (mode === 'oc') renderCreateAgentOpenClawPanel();
+  }
+}
+
+async function renderCreateAgentExtPanel() {
+  const panel = document.getElementById('create-agent-panel-ext');
+  if (!panel) return;
+  panel.innerHTML = `<div class="agent-detail-loading">${t('loading')}</div>`;
+  const tagOpts = await _mobileBuildAcpxTagOptionsHtml();
+  panel.innerHTML = `
+    <div class="mobile-add-agent-form">
+      <p class="form-hint">${esc(t('mobile_create_agent_team_hint'))}</p>
+      <div style="font-weight:700;margin-bottom:6px;color:var(--text);">${esc(t('mobile_add_ext_title'))}</div>
+      <label>${esc(t('mobile_add_ext_name'))}</label>
+      <input type="text" id="ca-ext-name" placeholder="my_agent" autocomplete="off">
+      <label>${esc(t('mobile_add_ext_global'))}</label>
+      <input type="text" id="ca-ext-global" placeholder="global_id" autocomplete="off">
+      <label>${esc(t('mobile_add_ext_tag'))}</label>
+      <select id="ca-ext-tag">${tagOpts}</select>
+      <input type="text" id="ca-ext-tag-custom" placeholder="${esc(t('agent_tag_placeholder'))}" style="margin-top:6px;display:none;">
+      <label>${esc(t('mobile_add_ext_platform'))}</label>
+      <select id="ca-ext-platform">
+        <option value="">${esc(_currentLang === 'zh' ? '默认 / ACP' : 'Default / ACP')}</option>
+        <option value="http">HTTP API</option>
+        <option value="acp">ACP</option>
+      </select>
+      <label>${esc(t('mobile_add_ext_url'))}</label>
+      <input type="text" id="ca-ext-url" placeholder="https://..." autocomplete="off">
+      <label>${esc(t('mobile_add_ext_key'))}</label>
+      <input type="text" id="ca-ext-key" placeholder="sk-..." autocomplete="off">
+      <label>${esc(t('mobile_add_ext_model'))}</label>
+      <input type="text" id="ca-ext-model" placeholder="gpt-4o" autocomplete="off">
+      <details style="margin-top:8px;">
+        <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer;">${esc(t('mobile_add_ext_advanced'))}</summary>
+        <label style="margin-top:8px;">${esc(t('mobile_add_ext_headers'))}</label>
+        <textarea id="ca-ext-headers" rows="3" placeholder='{"X-Custom":"v"}'></textarea>
+      </details>
+      <button type="button" class="form-submit" id="ca-ext-submit" onclick="mobileSubmitCreateExtAgent()">${esc(t('mobile_create_ext_submit'))}</button>
+    </div>`;
+  const tagSel = document.getElementById('ca-ext-tag');
+  const tagCust = document.getElementById('ca-ext-tag-custom');
+  if (tagSel && tagCust) {
+    tagSel.onchange = () => {
+      tagCust.style.display = tagSel.value === 'custom' ? 'block' : 'none';
+    };
+  }
+}
+
+async function mobileSubmitCreateExtAgent() {
+  const team = mobileGetCreateAgentTeam();
+  const btn = document.getElementById('ca-ext-submit');
+  const name = (document.getElementById('ca-ext-name') || {}).value.trim();
+  const globalName = (document.getElementById('ca-ext-global') || {}).value.trim();
+  const apiUrl = (document.getElementById('ca-ext-url') || {}).value.trim();
+  const apiKey = (document.getElementById('ca-ext-key') || {}).value.trim();
+  const model = (document.getElementById('ca-ext-model') || {}).value.trim();
+  const headersStr = (document.getElementById('ca-ext-headers') || {}).value.trim();
+  const platform = (document.getElementById('ca-ext-platform') || {}).value || '';
+  const tagSel = document.getElementById('ca-ext-tag');
+  const tagCustom = (document.getElementById('ca-ext-tag-custom') || {}).value.trim();
+  const tagSelect = tagSel ? tagSel.value : '';
+  const tag = tagCustom || (tagSelect !== 'custom' ? tagSelect : '');
+  if (!name || !globalName) {
+    toast(t('mobile_add_enter_name'));
+    return;
+  }
+  const tagLower = String(tag || '').toLowerCase();
+  if (platform === 'http' && !apiUrl && tagLower !== 'openclaw') {
+    toast(t('mobile_add_ext_url_required'));
+    return;
+  }
+  let headers = {};
+  if (headersStr) {
+    try {
+      headers = JSON.parse(headersStr);
+    } catch (e) {
+      toast(t('mobile_add_headers_json_err'));
+      return;
+    }
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.dataset.orig = btn.textContent;
+    btn.textContent = t('adding');
+  }
+  try {
+    if (team) {
+      await api('POST', `/teams/${encodeURIComponent(team)}/members/external`, {
+        name,
+        tag,
+        global_name: globalName,
+        platform,
+        api_url: apiUrl,
+        api_key: apiKey,
+        model,
+        headers,
+      });
+    } else {
+      await api('POST', '/public_external_agents', {
+        name,
+        tag,
+        global_name: globalName,
+        platform,
+        api_url: apiUrl,
+        api_key: apiKey,
+        model,
+        headers,
+      });
+    }
+    const ok = await startPrivateChat({
+      name: name,
+      short_name: name,
+      type: 'ext',
+      global_id: globalName,
+      tag: tag || '',
+    });
+    if (ok) {
+      closeCreateAgentModal();
+      if (typeof loadContactsForTeam === 'function') loadContactsForTeam();
+    }
+  } catch (e) {
+    toast((e && e.message) ? e.message : t('add_failed'));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (btn.dataset.orig) btn.textContent = btn.dataset.orig;
+    }
+  }
+}
+
+async function renderCreateAgentOpenClawPanel() {
+  const panel = document.getElementById('create-agent-panel-oc');
+  if (!panel) return;
+  const team = mobileGetCreateAgentTeam();
+  panel.innerHTML = `
+    <div class="mobile-add-agent-form">
+      <p class="form-hint">${esc(t('mobile_create_agent_team_hint'))}</p>
+      <div style="font-weight:700;margin-bottom:6px;color:var(--text);">${esc(t('mobile_add_oc_title'))}</div>
+      ${team ? `<p class="form-hint">${esc(t('mobile_add_team_prefix_hint', { prefix: team + '_' }))}</p>` : ''}
+      <label>${esc(t('mobile_add_oc_short'))}</label>
+      <input type="text" id="ca-oc-short" placeholder="work / research" pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+      <p class="form-hint" id="ca-oc-global-hint"></p>
+      <label>${esc(t('mobile_add_oc_ws'))}</label>
+      <div style="display:flex;gap:6px;align-items:stretch;">
+        <input type="text" id="ca-oc-ws" style="flex:1;" placeholder="..." autocomplete="off">
+        <button type="button" id="ca-oc-ws-reset" style="padding:0 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;">${esc(t('mobile_add_oc_ws_reset'))}</button>
+      </div>
+      <button type="button" class="form-submit" id="ca-oc-submit" onclick="mobileSubmitCreateOpenClawAgent()">${esc(t('mobile_create_oc_submit'))}</button>
+    </div>`;
+  const shortInp = document.getElementById('ca-oc-short');
+  const wsInp = document.getElementById('ca-oc-ws');
+  const hintEl = document.getElementById('ca-oc-global-hint');
+  let parentDir = '';
+  let wsManual = false;
+
+  function fullGlobalName() {
+    const s = shortInp && shortInp.value.trim();
+    if (!s) return '';
+    const tm = mobileGetCreateAgentTeam();
+    return tm ? (tm + '_' + s) : s;
+  }
+
+  function syncWsFromName() {
+    if (!wsInp || wsManual) return;
+    const gn = fullGlobalName();
+    if (gn && parentDir) wsInp.value = parentDir + '/workspace-' + gn;
+    else if (!gn) wsInp.value = '';
+  }
+
+  function syncHint() {
+    const gn = fullGlobalName();
+    if (hintEl) hintEl.textContent = gn ? t('mobile_add_oc_global_hint', { name: gn }) : '';
+  }
+
+  try {
+    const wr = await fetch('/proxy_openclaw_default_workspace');
+    const j = await wr.json().catch(() => ({}));
+    if (j && j.ok && j.parent_dir) {
+      parentDir = j.parent_dir;
+      if (wsInp) wsInp.placeholder = parentDir + '/workspace-...';
+    }
+  } catch (_) { /* ignore */ }
+
+  if (shortInp) {
+    shortInp.addEventListener('input', () => {
+      syncWsFromName();
+      syncHint();
+    });
+  }
+  if (wsInp) {
+    wsInp.addEventListener('input', () => { wsManual = true; });
+  }
+  const resetBtn = document.getElementById('ca-oc-ws-reset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      wsManual = false;
+      syncWsFromName();
+    });
+  }
+  syncHint();
+  syncWsFromName();
+}
+
+async function mobileSubmitCreateOpenClawAgent() {
+  const team = mobileGetCreateAgentTeam();
+  const shortName = (document.getElementById('ca-oc-short') || {}).value.trim();
+  const workspace = (document.getElementById('ca-oc-ws') || {}).value.trim();
+  const globalName = team ? (team + '_' + shortName) : shortName;
+  if (!shortName) {
+    toast(t('agent_name_required'));
+    return;
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(globalName)) {
+    toast(t('mobile_add_oc_name_invalid'));
+    return;
+  }
+  if (!workspace) {
+    toast(t('mobile_add_oc_workspace_required'));
+    return;
+  }
+  const btn = document.getElementById('ca-oc-submit');
+  if (btn) {
+    btn.disabled = true;
+    btn.dataset.orig = btn.textContent;
+    btn.textContent = t('adding');
+  }
+  try {
+    const r = await fetch('/proxy_openclaw_add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: globalName, workspace }),
+    });
+    const res = await r.json().catch(() => ({}));
+    if (!r.ok || !res.ok) {
+      if (r.status === 409) toast(t('mobile_add_oc_exists'));
+      else toast(res.error || t('mobile_add_oc_failed'));
+      return;
+    }
+    if (team) {
+      try {
+        await api('POST', `/teams/${encodeURIComponent(team)}/members/external`, {
+          name: shortName,
+          tag: 'openclaw',
+          global_name: globalName,
+        });
+      } catch (e) {
+        console.warn('team external record:', e);
+      }
+    }
+    const ok = await startPrivateChat({
+      name: shortName,
+      short_name: shortName,
+      type: 'ext',
+      global_id: globalName,
+      tag: 'openclaw',
+    });
+    if (ok) {
+      closeCreateAgentModal();
+      if (typeof loadContactsForTeam === 'function') loadContactsForTeam();
+    }
+  } catch (e) {
+    toast((e && e.message) ? e.message : t('mobile_add_oc_failed'));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (btn.dataset.orig) btn.textContent = btn.dataset.orig;
+    }
+  }
+}
+
 async function onCreateAgentTeamChange() {
   const select = document.getElementById('create-agent-team');
   const currentTag = (document.getElementById('create-agent-tag') || {}).value || '';
   await loadCreateAgentTags(select ? select.value : '', currentTag);
+  if (mobileCreateAgentMode === 'ext') await renderCreateAgentExtPanel();
+  else if (mobileCreateAgentMode === 'oc') renderCreateAgentOpenClawPanel();
 }
 
 async function showCreateAgentModal(preferredTeam = '') {
@@ -4527,6 +5053,14 @@ async function showCreateAgentModal(preferredTeam = '') {
   document.getElementById('create-agent-modal').classList.add('show');
   document.getElementById('create-agent-overlay').classList.add('show');
   createAgentTagOptions = [];
+  mobileCreateAgentMode = 'internal';
+  _syncCreateAgentModeButtons();
+  const pInt = document.getElementById('create-agent-panel-internal');
+  const pExt = document.getElementById('create-agent-panel-ext');
+  const pOc = document.getElementById('create-agent-panel-oc');
+  if (pInt) pInt.style.display = '';
+  if (pExt) { pExt.style.display = 'none'; pExt.innerHTML = ''; }
+  if (pOc) { pOc.style.display = 'none'; pOc.innerHTML = ''; }
   // Load teams first, then tags based on selected team
   const loadTeams = async () => {
     try {
@@ -4540,11 +5074,9 @@ async function showCreateAgentModal(preferredTeam = '') {
     }
   };
   await loadTeams();
-  if (preferredTeam) {
-    const select = document.getElementById('create-agent-team');
-    if (select) select.value = preferredTeam;
-  }
-  await loadCreateAgentTags(preferredTeam || '');
+  const createTeamSel = document.getElementById('create-agent-team');
+  if (preferredTeam && createTeamSel) createTeamSel.value = preferredTeam;
+  await loadCreateAgentTags(createTeamSel ? createTeamSel.value : '', '');
 }
 
 function closeCreateAgentModal() {
@@ -4556,6 +5088,14 @@ function closeCreateAgentModal() {
   const list = document.getElementById('create-agent-tag-list');
   if (list) list.innerHTML = `<div class="side-panel-tag-empty">${t('loading')}</div>`;
   createAgentTagOptions = [];
+  mobileCreateAgentMode = 'internal';
+  _syncCreateAgentModeButtons();
+  const pInt = document.getElementById('create-agent-panel-internal');
+  const pExt = document.getElementById('create-agent-panel-ext');
+  const pOc = document.getElementById('create-agent-panel-oc');
+  if (pInt) pInt.style.display = '';
+  if (pExt) { pExt.style.display = 'none'; pExt.innerHTML = ''; }
+  if (pOc) { pOc.style.display = 'none'; pOc.innerHTML = ''; }
 }
 
 async function submitCreateAgent() {
@@ -6515,13 +7055,344 @@ async function syncMembers() {
 
 // ── Add Agents (multi-select by team) ──
 let addAgentSelected = new Set(); // session_id set
+/** @type {'list'|'ext'|'oc'} */
+let mobileAddAgentMode = 'list';
+
+function _syncAddAgentModeButtons() {
+  document.querySelectorAll('#add-agent-mode-bar .add-agent-mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === mobileAddAgentMode);
+  });
+}
+
+function onAddAgentTeamChanged() {
+  if (mobileAddAgentMode === 'list') loadAddAgentMembers();
+  else if (mobileAddAgentMode === 'ext') renderMobileAddAgentExtForm();
+  else renderMobileAddAgentOpenClawForm();
+}
+
+function setAddAgentMode(mode) {
+  if (!['list', 'ext', 'oc'].includes(mode)) return;
+  mobileAddAgentMode = mode;
+  _syncAddAgentModeButtons();
+  const footer = document.getElementById('add-agent-footer');
+  if (mode === 'list') {
+    addAgentSelected.clear();
+    if (footer) footer.style.display = 'none';
+    loadAddAgentMembers();
+  } else {
+    addAgentSelected.clear();
+    if (footer) footer.style.display = 'none';
+    if (mode === 'ext') renderMobileAddAgentExtForm();
+    else renderMobileAddAgentOpenClawForm();
+  }
+}
+
+async function _mobileBuildAcpxTagOptionsHtml() {
+  const tools = [];
+  try {
+    const j = await api('GET', '/proxy_acpx_status');
+    if (j && j.available && Array.isArray(j.tools)) {
+      for (const x of j.tools) {
+        const v = String(x || '').trim().toLowerCase();
+        if (v) tools.push(v);
+      }
+    }
+  } catch (_) { /* ignore */ }
+  tools.sort();
+  const extras = ['openclaw', 'aider'];
+  const seen = new Set();
+  let opts = `<option value="">${esc(t('tag_none'))}</option>`;
+  const addOpt = (v) => {
+    if (seen.has(v)) return;
+    seen.add(v);
+    opts += `<option value="${esc(v)}">${esc(v)}</option>`;
+  };
+  for (const x of tools) addOpt(x);
+  for (const x of extras) addOpt(x);
+  opts += `<option value="custom">${esc(_currentLang === 'zh' ? '自定义' : 'Custom')}</option>`;
+  return opts;
+}
+
+function mobileGetAddAgentTeam() {
+  const sel = document.getElementById('add-agent-team-select');
+  return sel ? String(sel.value || '').trim() : '';
+}
+
+async function renderMobileAddAgentExtForm() {
+  const body = document.getElementById('add-agent-body');
+  if (!body) return;
+  body.innerHTML = `<div class="agent-detail-loading">${t('loading')}</div>`;
+  const tagOpts = await _mobileBuildAcpxTagOptionsHtml();
+  body.innerHTML = `
+    <div class="mobile-add-agent-form">
+      <div style="font-weight:700;margin-bottom:6px;color:var(--text);">${esc(t('mobile_add_ext_title'))}</div>
+      <p class="form-hint">${esc(t('mobile_add_agent_team_optional'))}</p>
+      <label>${esc(t('mobile_add_ext_name'))}</label>
+      <input type="text" id="mobile-ext-name" placeholder="my_agent" autocomplete="off">
+      <label>${esc(t('mobile_add_ext_global'))}</label>
+      <input type="text" id="mobile-ext-global" placeholder="global_id" autocomplete="off">
+      <label>${esc(t('mobile_add_ext_tag'))}</label>
+      <select id="mobile-ext-tag">${tagOpts}</select>
+      <input type="text" id="mobile-ext-tag-custom" placeholder="${esc(t('agent_tag_placeholder'))}" style="margin-top:6px;display:none;">
+      <label>${esc(t('mobile_add_ext_platform'))}</label>
+      <select id="mobile-ext-platform">
+        <option value="">${esc(_currentLang === 'zh' ? '默认 / ACP' : 'Default / ACP')}</option>
+        <option value="http">HTTP API</option>
+        <option value="acp">ACP</option>
+      </select>
+      <label>${esc(t('mobile_add_ext_url'))}</label>
+      <input type="text" id="mobile-ext-url" placeholder="https://..." autocomplete="off">
+      <label>${esc(t('mobile_add_ext_key'))}</label>
+      <input type="text" id="mobile-ext-key" placeholder="sk-..." autocomplete="off">
+      <label>${esc(t('mobile_add_ext_model'))}</label>
+      <input type="text" id="mobile-ext-model" placeholder="gpt-4o" autocomplete="off">
+      <details style="margin-top:8px;">
+        <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer;">${esc(t('mobile_add_ext_advanced'))}</summary>
+        <label style="margin-top:8px;">${esc(t('mobile_add_ext_headers'))}</label>
+        <textarea id="mobile-ext-headers" rows="3" placeholder='{"X-Custom":"v"}'></textarea>
+      </details>
+      <button type="button" class="form-submit" id="mobile-ext-submit" onclick="mobileSubmitAddExtAgent()">${esc(t('mobile_add_ext_submit'))}</button>
+    </div>`;
+  const tagSel = document.getElementById('mobile-ext-tag');
+  const tagCust = document.getElementById('mobile-ext-tag-custom');
+  if (tagSel && tagCust) {
+    tagSel.onchange = () => {
+      tagCust.style.display = tagSel.value === 'custom' ? 'block' : 'none';
+    };
+  }
+}
+
+async function mobileSubmitAddExtAgent() {
+  const team = mobileGetAddAgentTeam();
+  const btn = document.getElementById('mobile-ext-submit');
+  const name = (document.getElementById('mobile-ext-name') || {}).value.trim();
+  const globalName = (document.getElementById('mobile-ext-global') || {}).value.trim();
+  const apiUrl = (document.getElementById('mobile-ext-url') || {}).value.trim();
+  const apiKey = (document.getElementById('mobile-ext-key') || {}).value.trim();
+  const model = (document.getElementById('mobile-ext-model') || {}).value.trim();
+  const headersStr = (document.getElementById('mobile-ext-headers') || {}).value.trim();
+  const platform = (document.getElementById('mobile-ext-platform') || {}).value || '';
+  const tagSel = document.getElementById('mobile-ext-tag');
+  const tagCustom = (document.getElementById('mobile-ext-tag-custom') || {}).value.trim();
+  const tagSelect = tagSel ? tagSel.value : '';
+  const tag = tagCustom || (tagSelect !== 'custom' ? tagSelect : '');
+  if (!name || !globalName) {
+    toast(t('mobile_add_enter_name'));
+    return;
+  }
+  const tagLower = String(tag || '').toLowerCase();
+  if (platform === 'http' && !apiUrl && tagLower !== 'openclaw') {
+    toast(t('mobile_add_ext_url_required'));
+    return;
+  }
+  let headers = {};
+  if (headersStr) {
+    try {
+      headers = JSON.parse(headersStr);
+    } catch (e) {
+      toast(t('mobile_add_headers_json_err'));
+      return;
+    }
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.dataset.orig = btn.textContent;
+    btn.textContent = t('adding');
+  }
+  try {
+    if (team) {
+      await api('POST', `/teams/${encodeURIComponent(team)}/members/external`, {
+        name,
+        tag,
+        global_name: globalName,
+        platform,
+        api_url: apiUrl,
+        api_key: apiKey,
+        model,
+        headers,
+      });
+    } else {
+      await api('POST', '/public_external_agents', {
+        name,
+        tag,
+        global_name: globalName,
+        platform,
+        api_url: apiUrl,
+        api_key: apiKey,
+        model,
+        headers,
+      });
+    }
+    if (currentGroupId) {
+      await api('POST', `/proxy_groups/${encodeURIComponent(currentGroupId)}/members`, {
+        short_name: name,
+        global_id: globalName,
+        member_type: 'ext',
+        tag: tag || '',
+      });
+    }
+    toast(t('mobile_add_member_ok'));
+    closeAddAgentModal();
+    if (currentGroupId) {
+      const groupData = await api('GET', `/proxy_groups/${encodeURIComponent(currentGroupId)}`);
+      renderMembers(groupData.members || []);
+    }
+  } catch (e) {
+    toast((e && e.message) ? e.message : t('add_failed'));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (btn.dataset.orig) btn.textContent = btn.dataset.orig;
+    }
+  }
+}
+
+async function renderMobileAddAgentOpenClawForm() {
+  const body = document.getElementById('add-agent-body');
+  if (!body) return;
+  const team = mobileGetAddAgentTeam();
+  body.innerHTML = `
+    <div class="mobile-add-agent-form">
+      <div style="font-weight:700;margin-bottom:6px;color:var(--text);">${esc(t('mobile_add_oc_title'))}</div>
+      <p class="form-hint">${esc(t('mobile_add_agent_team_optional'))}</p>
+      ${team ? `<p class="form-hint">${esc(t('mobile_add_team_prefix_hint', { prefix: team + '_' }))}</p>` : ''}
+      <label>${esc(t('mobile_add_oc_short'))}</label>
+      <input type="text" id="mobile-oc-short" placeholder="work / research" pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+      <p class="form-hint" id="mobile-oc-global-hint"></p>
+      <label>${esc(t('mobile_add_oc_ws'))}</label>
+      <div style="display:flex;gap:6px;align-items:stretch;">
+        <input type="text" id="mobile-oc-ws" style="flex:1;" placeholder="..." autocomplete="off">
+        <button type="button" id="mobile-oc-ws-reset" style="padding:0 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:12px;">${esc(t('mobile_add_oc_ws_reset'))}</button>
+      </div>
+      <button type="button" class="form-submit" id="mobile-oc-submit" onclick="mobileSubmitAddOpenClawAgent()">${esc(t('mobile_add_oc_submit'))}</button>
+    </div>`;
+  const shortInp = document.getElementById('mobile-oc-short');
+  const wsInp = document.getElementById('mobile-oc-ws');
+  const hintEl = document.getElementById('mobile-oc-global-hint');
+  let parentDir = '';
+  let wsManual = false;
+
+  function fullGlobalName() {
+    const s = shortInp && shortInp.value.trim();
+    if (!s) return '';
+    const tm = mobileGetAddAgentTeam();
+    return tm ? (tm + '_' + s) : s;
+  }
+
+  function syncWsFromName() {
+    if (!wsInp || wsManual) return;
+    const gn = fullGlobalName();
+    if (gn && parentDir) wsInp.value = parentDir + '/workspace-' + gn;
+    else if (!gn) wsInp.value = '';
+  }
+
+  function syncHint() {
+    const gn = fullGlobalName();
+    if (hintEl) hintEl.textContent = gn ? t('mobile_add_oc_global_hint', { name: gn }) : '';
+  }
+
+  try {
+    const wr = await fetch('/proxy_openclaw_default_workspace');
+    const j = await wr.json().catch(() => ({}));
+    if (j && j.ok && j.parent_dir) {
+      parentDir = j.parent_dir;
+      if (wsInp) wsInp.placeholder = parentDir + '/workspace-...';
+    }
+  } catch (_) { /* ignore */ }
+
+  if (shortInp) {
+    shortInp.addEventListener('input', () => {
+      syncWsFromName();
+      syncHint();
+    });
+  }
+  if (wsInp) {
+    wsInp.addEventListener('input', () => { wsManual = true; });
+  }
+  document.getElementById('mobile-oc-ws-reset').addEventListener('click', () => {
+    wsManual = false;
+    syncWsFromName();
+  });
+  syncHint();
+  syncWsFromName();
+}
+
+async function mobileSubmitAddOpenClawAgent() {
+  const team = mobileGetAddAgentTeam();
+  const shortName = (document.getElementById('mobile-oc-short') || {}).value.trim();
+  const workspace = (document.getElementById('mobile-oc-ws') || {}).value.trim();
+  const globalName = team ? (team + '_' + shortName) : shortName;
+  if (!shortName) {
+    toast(t('agent_name_required'));
+    return;
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(globalName)) {
+    toast(t('mobile_add_oc_name_invalid'));
+    return;
+  }
+  if (!workspace) {
+    toast(t('mobile_add_oc_workspace_required'));
+    return;
+  }
+  const btn = document.getElementById('mobile-oc-submit');
+  if (btn) {
+    btn.disabled = true;
+    btn.dataset.orig = btn.textContent;
+    btn.textContent = t('adding');
+  }
+  try {
+    const r = await fetch('/proxy_openclaw_add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: globalName, workspace }),
+    });
+    const res = await r.json().catch(() => ({}));
+    if (!r.ok || !res.ok) {
+      if (r.status === 409) toast(t('mobile_add_oc_exists'));
+      else toast(res.error || t('mobile_add_oc_failed'));
+      return;
+    }
+    if (team) {
+      try {
+        await api('POST', `/teams/${encodeURIComponent(team)}/members/external`, {
+          name: shortName,
+          tag: 'openclaw',
+          global_name: globalName,
+        });
+      } catch (e) {
+        console.warn('team external record:', e);
+      }
+    }
+    if (currentGroupId) {
+      await api('POST', `/proxy_groups/${encodeURIComponent(currentGroupId)}/members`, {
+        short_name: shortName,
+        global_id: globalName,
+        member_type: 'ext',
+        tag: 'openclaw',
+      });
+    }
+    toast(t('mobile_add_member_ok'));
+    closeAddAgentModal();
+    if (currentGroupId) {
+      const groupData = await api('GET', `/proxy_groups/${encodeURIComponent(currentGroupId)}`);
+      renderMembers(groupData.members || []);
+    }
+  } catch (e) {
+    toast((e && e.message) ? e.message : t('mobile_add_oc_failed'));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      if (btn.dataset.orig) btn.textContent = btn.dataset.orig;
+    }
+  }
+}
 
 // ── Private Chat ──────────────────────────────────────────────────
 // agentInfo: { name, type, global_id, short_name, tag }
 async function startPrivateChat(agentInfo) {
   closeAgentDetail();
   const userId = window.__currentUser;
-  if (!userId) { toast(t('not_logged_in')); return; }
+  if (!userId) { toast(t('not_logged_in')); return false; }
 
   const agentName = agentInfo.short_name || agentInfo.name;
   const memberType = agentInfo.type;
@@ -6559,8 +7430,10 @@ async function startPrivateChat(agentInfo) {
     await openChat(actualGroupId, groupName);
     switchTab('chats');
     toast(createResp.exists ? `${t('private_chat_opened')}: ${agentName}` : `${t('private_chat_created')}: ${agentName}`);
+    return true;
   } catch (e) {
     toast(t('private_chat_failed') + ': ' + e.message);
+    return false;
   }
 }
 
@@ -6645,6 +7518,8 @@ async function showAddAgentModal() {
   body.innerHTML = `<div class="agent-detail-loading">${t('load_teams_for_group')}</div>`;
   footer.style.display = 'none';
   addAgentSelected.clear();
+  mobileAddAgentMode = 'list';
+  _syncAddAgentModeButtons();
 
   // Load teams
   try {
@@ -6662,6 +7537,14 @@ async function showAddAgentModal() {
 async function loadAddAgentMembers() {
   const body = document.getElementById('add-agent-body');
   const footer = document.getElementById('add-agent-footer');
+  if (mobileAddAgentMode === 'ext') {
+    renderMobileAddAgentExtForm();
+    return;
+  }
+  if (mobileAddAgentMode === 'oc') {
+    renderMobileAddAgentOpenClawForm();
+    return;
+  }
   const team = document.getElementById('add-agent-team-select').value;
   body.innerHTML = `<div class="agent-detail-loading">${t('loading')}</div>`;
   addAgentSelected.clear();
@@ -6873,6 +7756,8 @@ async function confirmAddAgents() {
 function closeAddAgentModal() {
   document.getElementById('add-agent-overlay').classList.remove('show');
   document.getElementById('add-agent-modal').classList.remove('show');
+  mobileAddAgentMode = 'list';
+  _syncAddAgentModeButtons();
 }
 
 async function addAgentToGroup(globalId, shortName, memberType, tag) {
@@ -7272,10 +8157,11 @@ async function loadAllContactsForSearch() {
 
   try {
     // Load public agents
-    const [intData, extData, publicExperts] = await Promise.all([
+    const [intData, extData, publicExperts, pubExtData] = await Promise.all([
       api('GET', '/internal_agents').catch(() => ({agents: []})),
       api('GET', '/proxy_openclaw_sessions').catch(() => ({agents: []})),
-      api('GET', '/proxy_visual/experts').catch(() => [])
+      api('GET', '/proxy_visual/experts').catch(() => []),
+      api('GET', '/public_external_agents').catch(() => ({ agents: [] }))
     ]);
 
     (intData.agents || []).forEach(a => allAgents.push({
@@ -7293,6 +8179,20 @@ async function loadAllContactsForSearch() {
       global_name: s.global_name || s.name || '',
       team: ''
     }));
+
+    (pubExtData.agents || []).forEach(a => {
+      if (!a || typeof a !== 'object') return;
+      if (String(a.tag || '').toLowerCase() === 'openclaw') return;
+      const gn = String(a.global_name || '').trim();
+      if (!gn) return;
+      allAgents.push({
+        name: a.name || gn || t('unnamed'),
+        type: 'ext',
+        tag: a.tag || '',
+        global_name: gn,
+        team: ''
+      });
+    });
 
     (Array.isArray(publicExperts) ? publicExperts : []).forEach(exp => {
       allExperts.push({...exp, team: ''});
@@ -7496,21 +8396,19 @@ async function loadContactsForTeam() {
     let customExperts = [];
 
     if (team) {
-      // Load team members (both internal + external)
-      const data = await api('GET', `/teams/${encodeURIComponent(team)}/members`);
+      const [data, expertData] = await Promise.all([
+        api('GET', `/teams/${encodeURIComponent(team)}/members`),
+        api('GET', `/proxy_visual/experts?team=${encodeURIComponent(team)}`).catch(() => [])
+      ]);
       const members = data.members || [];
       internalAgents = members.filter(m => m.type === 'oasis');
       externalAgents = members.filter(m => m.type === 'ext');
-      // Also load experts for this team
-      try {
-        const expertData = await api('GET', `/proxy_visual/experts?team=${encodeURIComponent(team)}`);
-        const experts = Array.isArray(expertData) ? expertData : [];
-        experts.forEach(exp => {
-          if (exp.source === 'custom' || exp.source === 'team') {
-            customExperts.push(exp);
-          }
-        });
-      } catch(e) { /* experts load failed, not critical */ }
+      const experts = Array.isArray(expertData) ? expertData : [];
+      experts.forEach(exp => {
+        if (exp.source === 'custom' || exp.source === 'team') {
+          customExperts.push(exp);
+        }
+      });
     } else {
       // Public agents (no team) — load internal + external + experts in parallel
       // First render section headers with placeholder containers
@@ -7540,20 +8438,94 @@ async function loadContactsForTeam() {
         }).join('');
       };
 
-      // Helper to render external agents
-      const renderExternalAgents = (agents) => {
-        document.getElementById('ext-count').textContent = agents.length;
-        if (agents.length === 0) {
+      // Helper to render external agents by platform (collapsible; reuse contacts-cat-*).
+      // OpenClaw default expanded; each ACP platform default collapsed.
+      const renderExternalAgents = (groups) => {
+        const all = [];
+        if (groups && Array.isArray(groups.openclaw)) all.push(...groups.openclaw);
+        if (groups && groups.acpByTool) {
+          Object.values(groups.acpByTool).forEach((arr) => {
+            if (Array.isArray(arr)) all.push(...arr);
+          });
+        }
+        document.getElementById('ext-count').textContent = all.length;
+        if (all.length === 0) {
           document.getElementById('ext-agents-list').innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-secondary)">${t('no_agents')}</div>`;
           return;
         }
-        document.getElementById('ext-agents-list').innerHTML = agents.map(a => {
+
+        const renderOne = (a) => {
           const name = a.name || a.global_name || t('unnamed');
           const initial = (name[0] || '?').toUpperCase();
-          const info = JSON.stringify({name: a.name, type: a.type, global_id: a.global_name || '', short_name: a.name || '', tag: a.tag || ''}).replace(/"/g, '&quot;');
+          const info = JSON.stringify({
+            name: a.name,
+            type: 'ext',
+            global_id: a.global_name || '',
+            short_name: a.name || '',
+            tag: a.tag || ''
+          }).replace(/"/g, '&quot;');
           return `<div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}"><div class="contact-avatar ext">${initial}</div><div class="contact-name">${esc(name)}</div>${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}</div>`;
-        }).join('');
+        };
+
+        const escId = (s) => String(s || '').replace(/[^a-zA-Z0-9]/g, '_');
+        const toggleFn = (uid) =>
+          `(function(h){var l=document.getElementById('${uid}');if(!l)return;h.classList.toggle('expanded');l.classList.toggle('expanded');})(this)`;
+
+        let html = '';
+        const oc = (groups && Array.isArray(groups.openclaw)) ? groups.openclaw : [];
+        if (oc.length > 0) {
+          const uid = 'contacts-ext-openclaw';
+          html += `<div class="contacts-cat-group"><div class="contacts-cat-header expanded" onclick="${toggleFn(uid)}"><span class="cat-icon">🦞</span><span class="cat-name">OpenClaw</span><span class="cat-count">${oc.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list expanded">${oc.map(renderOne).join('')}</div></div>`;
+        }
+
+        const acpByTool = (groups && groups.acpByTool) ? groups.acpByTool : {};
+        Object.keys(acpByTool).sort((a, b) => {
+          if (a === '_') return 1;
+          if (b === '_') return -1;
+          return a.localeCompare(b);
+        }).forEach((tool) => {
+          const items = acpByTool[tool] || [];
+          if (!items.length) return;
+          const uid = 'contacts-ext-acp-' + escId(tool);
+          const label = tool === '_' ? t('tag_none') : tool;
+          html += `<div class="contacts-cat-group"><div class="contacts-cat-header" onclick="${toggleFn(uid)}"><span class="cat-icon">🔌</span><span class="cat-name">${esc(label)}</span><span class="cat-count">${items.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list">${items.map(renderOne).join('')}</div></div>`;
+        });
+
+        document.getElementById('ext-agents-list').innerHTML = html;
       };
+
+      /** OpenClaw 仍走 sessions；其它 Ext 走用户级 external_agents.json（单次 GET，按 tag 分组） */
+      async function loadPublicExternalAgentGroups() {
+        const [ocRes, pubRes] = await Promise.all([
+          api('GET', '/proxy_openclaw_sessions').catch(() => ({ agents: [] })),
+          api('GET', '/public_external_agents').catch(() => ({ agents: [] }))
+        ]);
+        const ocList = (ocRes.agents || []).map(s => ({
+          name: s.name || s.global_name || t('unnamed'),
+          type: 'ext',
+          tag: s.tag || 'openclaw',
+          global_name: s.global_name || s.name || ''
+        }));
+        const acpByTool = {};
+        const rows = (pubRes && Array.isArray(pubRes.agents)) ? pubRes.agents : [];
+        rows.forEach((row) => {
+          if (!row || typeof row !== 'object') return;
+          const tagRaw = String(row.tag || '').trim().toLowerCase();
+          if (tagRaw === 'openclaw') return;
+          const gn = String(row.global_name || '').trim();
+          if (!gn) return;
+          const key = tagRaw || '_';
+          const item = {
+            name: row.name || row.global_name || t('unnamed'),
+            type: 'ext',
+            tag: row.tag || '',
+            global_name: gn
+          };
+          if (!acpByTool[key]) acpByTool[key] = [];
+          acpByTool[key].push(item);
+        });
+        return { openclaw: ocList, acpByTool };
+      }
 
       // Load internal agents
       api('GET', '/internal_agents').then(intData => {
@@ -7566,16 +8538,10 @@ async function loadContactsForTeam() {
         renderInternalAgents(internalAgents);
       }).catch(() => renderInternalAgents([]));
 
-      // Load external agents
-      api('GET', '/proxy_openclaw_sessions').then(extData => {
-        externalAgents = (extData.agents || []).map(s => ({
-          name: s.name || s.global_name || t('unnamed'),
-          type: 'ext',
-          tag: s.tag || 'openclaw',
-          global_name: s.global_name || s.name || ''
-        }));
-        renderExternalAgents(externalAgents);
-      }).catch(() => renderExternalAgents([]));
+      loadPublicExternalAgentGroups().then((g) => {
+        externalAgents = g.openclaw || [];
+        renderExternalAgents(g);
+      }).catch(() => renderExternalAgents({ openclaw: [], acpByTool: {} }));
 
       // Load experts
       api('GET', '/proxy_visual/experts').then(expertData => {

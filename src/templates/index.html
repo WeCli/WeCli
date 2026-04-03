@@ -283,19 +283,33 @@
                 <!-- OpenClaw Agent Switcher Bar -->
                 <div id="openclaw-chat-switcher" class="openclaw-chat-switcher" style="display:none;">
                     <div class="oc-switcher-inner">
-                        <div class="oc-switcher-tabs">
-                            <button class="oc-switcher-tab active" id="oc-tab-internal" onclick="ocSwitchTo('internal')" data-i18n="oc_tab_internal">
-                                🤖 TeamBot
-                            </button>
-                            <button class="oc-switcher-tab" id="oc-tab-openclaw" onclick="ocSwitchTo('openclaw')" data-i18n="oc_tab_openclaw">
-                                🦞 OpenClaw
-                            </button>
+                        <div class="oc-switcher-row-main">
+                            <div class="oc-switcher-tabs">
+                                <button class="oc-switcher-tab active" id="oc-tab-internal" onclick="ocSwitchTo('internal')" data-i18n="oc_tab_internal">
+                                    🤖 TeamBot
+                                </button>
+                                <button class="oc-switcher-tab" id="oc-tab-openclaw" onclick="ocSwitchTo('openclaw')" data-i18n="oc_tab_openclaw">
+                                    🦞 OpenClaw
+                                </button>
+                                <span id="oc-acp-tabs" class="oc-acp-tabs" style="display:none;"></span>
+                            </div>
+                            <div id="oc-agent-selector" class="oc-agent-selector" style="display:none;">
+                                <select id="oc-agent-select" class="oc-agent-select" onchange="ocOnAgentChange()">
+                                    <option value="" data-i18n="oc_select_agent">-- 选择 Agent --</option>
+                                </select>
+                                <button class="oc-refresh-btn" onclick="ocLoadAgents()" title="刷新">🔄</button>
+                            </div>
                         </div>
-                        <div id="oc-agent-selector" class="oc-agent-selector" style="display:none;">
-                            <select id="oc-agent-select" class="oc-agent-select" onchange="ocOnAgentChange()">
-                                <option value="" data-i18n="oc_select_agent">-- 选择 Agent --</option>
+                        <div id="oc-acp-session-row" class="oc-acp-session-row" style="display:none;">
+                            <label for="oc-acp-session-pick" class="oc-acp-session-label" data-i18n="oc_acp_session_pick_label">已有会话</label>
+                            <select id="oc-acp-session-pick" class="oc-acp-session-select" onchange="acpOnSessionPickChange()">
+                                <option value="" data-i18n="oc_acp_session_pick_none">— 选择已有会话 —</option>
                             </select>
-                            <button class="oc-refresh-btn" onclick="ocLoadAgents()" title="刷新">🔄</button>
+                            <button type="button" class="oc-acp-session-refresh" onclick="acpLoadSessionsList()" data-i18n="oc_acp_session_refresh" data-i18n-title="oc_acp_session_refresh_title" title="从 acpx 刷新列表">刷新</button>
+                            <span class="oc-acp-session-or" data-i18n="oc_acp_session_or_new">或新建</span>
+                            <label for="oc-acp-session-name" class="oc-acp-session-label oc-acp-session-label-sub" data-i18n="oc_acp_session_label">名称</label>
+                            <input type="text" id="oc-acp-session-name" class="oc-acp-session-input" maxlength="80" autocomplete="off" data-i18n-placeholder="oc_acp_session_placeholder" onblur="acpOnSessionNameBlur()" placeholder="可选；留空则按左侧会话区分" />
+                            <button type="button" class="oc-acp-session-ensure" onclick="acpEnsureSession()" data-i18n="oc_acp_session_ensure" data-i18n-title="oc_acp_session_ensure_title" title="仅创建/预热 ACP 会话，不发送消息">预热</button>
                         </div>
                     </div>
                 </div>

@@ -45,6 +45,58 @@ class AcpxAdapter:
             allow_nonzero=True,
         )
 
+    async def list_sessions(self, *, tool: str) -> list[dict[str, Any]]:
+        """Run `acpx <tool> sessions list --format json` and return slim session rows."""
+        aliases = {
+            "claude-code": "claude",
+            "gemini-cli": "gemini",
+        }
+        tool_n = aliases.get((tool or "").strip().lower(), (tool or "").strip().lower())
+        if tool_n == "openclaw":
+            raise AcpxError("sessions list is not supported for openclaw agent mode")
+        raw = await self._run_json([tool_n, "sessions", "list"], timeout_sec=45, allow_nonzero=False)
+        text = raw.strip()
+        if not text:
+            return []
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            # NDJSON or trailing noise: take first JSON array line
+            rows: list[Any] = []
+            for line in text.splitlines():
+                line = line.strip()
+                if line.startswith("["):
+                    try:
+                        rows = json.loads(line)
+                        break
+                    except json.JSONDecodeError:
+                        continue
+            data = rows
+        if isinstance(data, dict) and "sessions" in data:
+            items = data["sessions"]
+        elif isinstance(data, list):
+            items = data
+        else:
+            items = []
+        out: list[dict[str, Any]] = []
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            name = it.get("name")
+            if not isinstance(name, str) or not name.strip():
+                continue
+            out.append(
+                {
+                    "name": name.strip(),
+                    "acpxRecordId": it.get("acpxRecordId"),
+                    "closed": bool(it.get("closed")),
+                    "lastUsedAt": it.get("lastUsedAt"),
+                    "cwd": it.get("cwd"),
+                    "title": it.get("title"),
+                }
+            )
+        return out
+
     async def prompt(
         self,
         *,
@@ -145,15 +197,34 @@ class AcpxAdapter:
 
     async def _run_json(self, args: list[str], *, timeout_sec: int, allow_nonzero: bool) -> str:
         assert self._acpx_bin is not None
-        cmd = [
+        # Headless subprocess: no TTY for permission prompts — default --approve-all so tool/exec turns can finish.
+        # Opt out: ACPX_APPROVE_ALL=0|false|no|off. Optional: ACPX_NON_INTERACTIVE_PERMISSIONS=<policy>.
+        approve_all = (os.getenv("ACPX_APPROVE_ALL", "1") or "").strip().lower() not in (
+            "0",
+            "false",
+            "no",
+            "off",
+        )
+        nip = (os.getenv("ACPX_NON_INTERACTIVE_PERMISSIONS", "") or "").strip()
+        cmd: list[str] = [
             self._acpx_bin,
             "--cwd",
             self._cwd,
-            "--format",
-            "json",
-            "--json-strict",
-            *args,
+            "--ttl",
+            "86400",
         ]
+        if approve_all:
+            cmd.append("--approve-all")
+        if nip:
+            cmd.extend(["--non-interactive-permissions", nip])
+        cmd.extend(
+            [
+                "--format",
+                "json",
+                "--json-strict",
+                *args,
+            ]
+        )
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
@@ -175,6 +246,11 @@ class AcpxAdapter:
 
     @staticmethod
     def _command_prefix(*, tool: str, session_key: str) -> list[str]:
+        aliases = {
+            "claude-code": "claude",
+            "gemini-cli": "gemini",
+        }
+        tool = aliases.get((tool or "").strip().lower(), (tool or "").strip().lower())
         # openclaw must use raw --agent command in this environment.
         if tool == "openclaw":
             raw = f"openclaw acp --session {shlex.quote(session_key)}"
@@ -182,9 +258,33 @@ class AcpxAdapter:
         return [tool]
 
     @staticmethod
+    def _extract_acpx_agent_message_chunks(obj: Any) -> str | None:
+        """ACP JSON-RPC line: assistant-visible text from session/update agent_message_chunk."""
+        if not isinstance(obj, dict) or obj.get("jsonrpc") != "2.0":
+            return None
+        if obj.get("method") != "session/update":
+            return None
+        params = obj.get("params")
+        if not isinstance(params, dict):
+            return None
+        upd = params.get("update")
+        if not isinstance(upd, dict):
+            return None
+        if upd.get("sessionUpdate") != "agent_message_chunk":
+            return None
+        content = upd.get("content")
+        if not isinstance(content, dict):
+            return ""
+        if content.get("type") != "text":
+            return ""
+        t = content.get("text")
+        return t if isinstance(t, str) else ""
+
+    @staticmethod
     def _extract_text(output: str) -> str | None:
-        # acpx may emit one or multiple JSON lines. Pick the last line with textual payload.
-        text: str | None = None
+        """Parse acpx stdout: JSON-RPC stream (session/update … agent_message_chunk) or legacy summary JSON."""
+        message_parts: list[str] = []
+        legacy: str | None = None
         for line in output.splitlines():
             line = line.strip()
             if not line.startswith("{"):
@@ -193,10 +293,16 @@ class AcpxAdapter:
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            part = AcpxAdapter._extract_acpx_agent_message_chunks(obj)
+            if part is not None:
+                message_parts.append(part)
             cand = AcpxAdapter._pick_text(obj)
             if cand:
-                text = cand
-        return text
+                legacy = cand
+        assembled = "".join(message_parts).strip()
+        if assembled:
+            return assembled
+        return legacy
 
     @staticmethod
     def _pick_text(obj: Any) -> str | None:

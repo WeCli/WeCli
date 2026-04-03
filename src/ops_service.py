@@ -19,7 +19,10 @@ logger = get_logger("ops_service")
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 
 # Known ACP-compatible tool binaries (must match CLI status platforms list)
-_ACP_KNOWN_TOOLS: frozenset = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
+_ACP_KNOWN_TOOLS: frozenset = frozenset({
+    "openclaw", "codex", "claude", "gemini", "aider",
+    "claude-code", "gemini-cli",
+})
 
 # ACP protocol support (optional)
 try:

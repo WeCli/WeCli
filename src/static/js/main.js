@@ -292,6 +292,18 @@ const i18n = {
         group_agent: 'Agent',
         group_msg_count: '条消息',
         group_member_count: '人',
+        group_ext_platform: '连接方式',
+        group_ext_platform_auto: '自动（按标签：openclaw→HTTP，其余 acpx→ACP）',
+        group_ext_platform_acp: '本地 ACP（acpx，可不填 API URL）',
+        group_ext_platform_http: 'OpenAI 兼容 HTTP（需 API URL；OpenClaw 可用环境变量）',
+        group_ext_tag_none: '（无标签）',
+        group_ext_tag_custom: '自定义…',
+        group_ext_url_optional: 'API URL（可选）',
+        group_ext_url_optional_acp: 'API URL（ACP 模式可不填）',
+        group_ext_url_required_http: 'API URL（HTTP 模式必填，OpenClaw 除外）',
+        group_ext_url_hint_generic: '仅在使用 HTTP 网关时需要；纯 acpx 外部成员可留空。',
+        group_ext_url_hint_http: 'OpenClaw 标签可留空，将使用 OPENCLAW_API_URL。',
+        group_ext_url_required_toast: 'HTTP 模式需要填写 API URL（OpenClaw 标签可用环境变量）',
 
         // 离线提示
         offline_banner: '⚠️ 网络已断开，请检查连接',
@@ -760,12 +772,27 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         // OpenClaw 对话切换
         oc_tab_internal: '🤖 TeamBot',
         oc_tab_openclaw: '🦞 OpenClaw',
+        oc_tab_codex: 'Codex',
+        oc_tab_claude: 'Claude',
+        oc_tab_gemini: 'Gemini',
         oc_select_agent: '-- 选择 Agent --',
         oc_no_agents: '没有可用的 OpenClaw Agent',
         oc_chatting_with: '正在与 {name} 对话',
         oc_load_failed: '加载 OpenClaw Agent 失败',
         oc_not_configured: 'OpenClaw 未配置',
         oc_select_agent_hint: '请先选择一个 OpenClaw Agent',
+        oc_select_acp_hint: '请先选择一个 ACP 工具标签',
+        oc_acp_unavailable: '未检测到 acpx（请安装并加入 PATH）',
+        oc_acp_via: '经 acpx（ACP）连接本地 CLI；上下文由该会话内的 CLI 保持。',
+        oc_acp_session_pick_label: '已有会话',
+        oc_acp_session_pick_none: '— 选择已有会话（不选则新建）—',
+        oc_acp_session_refresh: '刷新',
+        oc_acp_session_refresh_title: '执行 acpx（工具）sessions list 更新列表',
+        oc_acp_session_or_new: '或新建',
+        oc_acp_session_label: '名称',
+        oc_acp_session_placeholder: '可选；留空则按左侧 TeamClaw 会话区分',
+        oc_acp_session_ensure: '预热',
+        oc_acp_session_ensure_title: '仅创建/预热 ACP 会话，不发送消息',
     },
     'en': {
         // General
@@ -1013,6 +1040,18 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         group_agent: 'Agent',
         group_msg_count: 'messages',
         group_member_count: 'members',
+        group_ext_platform: 'Connection',
+        group_ext_platform_auto: 'Auto (openclaw→HTTP, other acpx tools→ACP)',
+        group_ext_platform_acp: 'Local ACP (acpx; API URL optional)',
+        group_ext_platform_http: 'OpenAI-compatible HTTP (URL required; OpenClaw can use env)',
+        group_ext_tag_none: '(no tag)',
+        group_ext_tag_custom: 'Custom…',
+        group_ext_url_optional: 'API URL (optional)',
+        group_ext_url_optional_acp: 'API URL (optional for ACP)',
+        group_ext_url_required_http: 'API URL (required for HTTP; except OpenClaw via env)',
+        group_ext_url_hint_generic: 'Only needed for HTTP routing; leave empty for acpx-only members.',
+        group_ext_url_hint_http: 'OpenClaw tag may be empty; OPENCLAW_API_URL is used.',
+        group_ext_url_required_toast: 'HTTP mode requires API URL (OpenClaw may use env)',
 
         // Offline
         offline_banner: '⚠️ Network disconnected, please check connection',
@@ -1489,12 +1528,27 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         // OpenClaw Chat Switcher
         oc_tab_internal: '🤖 TeamBot',
         oc_tab_openclaw: '🦞 OpenClaw',
+        oc_tab_codex: 'Codex',
+        oc_tab_claude: 'Claude',
+        oc_tab_gemini: 'Gemini',
         oc_select_agent: '-- Select Agent --',
         oc_no_agents: 'No OpenClaw agents available',
         oc_chatting_with: 'Chatting with {name}',
         oc_load_failed: 'Failed to load OpenClaw agents',
         oc_not_configured: 'OpenClaw not configured',
         oc_select_agent_hint: 'Please select an OpenClaw Agent first',
+        oc_select_acp_hint: 'Pick an ACP tool tab first',
+        oc_acp_unavailable: 'acpx not found (install and add to PATH)',
+        oc_acp_via: 'Via acpx (ACP); the local CLI keeps context for this chat session.',
+        oc_acp_session_pick_label: 'Existing session',
+        oc_acp_session_pick_none: '— Pick existing (or leave empty for new) —',
+        oc_acp_session_refresh: 'Refresh',
+        oc_acp_session_refresh_title: 'Run acpx (tool) sessions list',
+        oc_acp_session_or_new: 'or new',
+        oc_acp_session_label: 'Name',
+        oc_acp_session_placeholder: 'Optional; empty = scope by TeamClaw session',
+        oc_acp_session_ensure: 'Warm up',
+        oc_acp_session_ensure_title: 'Create/warm ACP session only (no message sent)',
     }
 };
 
@@ -3795,12 +3849,39 @@ async function switchToSession(sessionId, force = false, options = {}) {
     // 切换前先重置按钮到 idle 状态（避免旧 session 的 streaming/busy 状态残留）
     setStreamingUI(false);
     setSystemBusyUI(false);
+    if (_ocChatMode === 'acp' && _acpTool) {
+        acpSaveTranscript();
+    }
     currentSessionId = sessionId;
     cancelTargetSessionId = null;  // 重置终止目标
     personaInjectedSession = null;  // Reset persona injection flag for new session
     sessionStorage.setItem('sessionId', sessionId);
     updateSessionDisplay();
     closeSessionSidebar();
+
+    // ACP 模式：左侧会话只影响未命名时的 acpx 会话键与本地转写，不加载 TeamBot 历史
+    if (_ocChatMode === 'acp' && _acpTool) {
+        const chatBoxAcp = document.getElementById('chat-box');
+        if (chatBoxAcp) {
+            _acpLastTranscriptKey = acpComputeTranscriptKey();
+            acpPaintTranscript();
+        }
+        try {
+            const sr = await fetch('/proxy_session_status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId }),
+            });
+            const sd = await sr.json();
+            if (sd.busy) setSystemBusyUI(true);
+            else setSystemBusyUI(false);
+        } catch (e) {
+            /* ignore */
+        } finally {
+            if (!quiet) hidePageLoading();
+        }
+        return;
+    }
 
     // 加载该会话的历史消息
     const chatBox = document.getElementById('chat-box');
@@ -6209,6 +6290,10 @@ async function handleSend() {
         alert(t('oc_select_agent_hint'));
         return;
     }
+    if (_ocChatMode === 'acp' && !_acpTool) {
+        alert(t('oc_select_acp_hint'));
+        return;
+    }
 
     // Stop recording if active
     if (isRecording) stopRecording();
@@ -6299,20 +6384,42 @@ async function handleSend() {
         }
         messages.push({ role: 'user', content: msgContent });
 
-        // ── OpenClaw chat mode: route to /proxy_openclaw_chat with agent:<name> model ──
+        // ── OpenClaw: /proxy_openclaw_chat · ACP (Codex/Claude/Gemini): /proxy_acpx_chat · else TeamBot ──
         const isOpenClawChat = (_ocChatMode === 'openclaw' && _ocSelectedAgent);
-        const openaiPayload = isOpenClawChat ? {
-            model: 'agent:' + _ocSelectedAgent.name,
-            messages: messages,
-            stream: true,
-        } : {
-            model: 'teambot',
-            messages: messages,
-            stream: true,
-            session_id: currentSessionId,
-            enabled_tools: getEnabledTools(),
-        };
-        const chatEndpoint = isOpenClawChat ? '/proxy_openclaw_chat' : '/v1/chat/completions';
+        const isAcpChat = (_ocChatMode === 'acp' && _acpTool);
+        let openaiPayload;
+        let chatEndpoint;
+        if (isOpenClawChat) {
+            openaiPayload = {
+                model: 'agent:' + _ocSelectedAgent.name,
+                messages: messages,
+                stream: true,
+            };
+            chatEndpoint = '/proxy_openclaw_chat';
+        } else if (isAcpChat) {
+            openaiPayload = {
+                tool: _acpTool,
+                messages: messages,
+                stream: true,
+                session_id: currentSessionId,
+            };
+            const pickAcp = acpGetSessionPickValue();
+            if (pickAcp) openaiPayload.acp_session_pick = pickAcp;
+            else {
+                const acpNameRaw = document.getElementById('oc-acp-session-name') && String(document.getElementById('oc-acp-session-name').value || '').trim();
+                if (acpNameRaw) openaiPayload.acp_session_name = acpNameRaw;
+            }
+            chatEndpoint = '/proxy_acpx_chat';
+        } else {
+            openaiPayload = {
+                model: 'teambot',
+                messages: messages,
+                stream: true,
+                session_id: currentSessionId,
+                enabled_tools: getEnabledTools(),
+            };
+            chatEndpoint = '/v1/chat/completions';
+        }
 
         const response = await fetch(chatEndpoint, {
             method: 'POST',
@@ -6642,12 +6749,50 @@ var selectedPersona = null;  // { name, tag, persona, source }
 var personaInjectedSession = null;  // session ID where persona was already injected (avoid repeated prompt)
 
 // ── OpenClaw Chat Mode State ──
-var _ocChatMode = 'internal';       // 'internal' | 'openclaw'
+var _ocChatMode = 'internal';       // 'internal' | 'openclaw' | 'acp'
 var _ocSelectedAgent = null;        // { name: string } — currently selected OpenClaw agent
 var _ocAgentsCache = [];            // cached list of OpenClaw agents from /proxy_openclaw_sessions
 var _ocAvailable = false;           // whether OpenClaw is available (detected at init)
+var _acpAvailable = false;
+var _acpToolsCache = [];
+var _acpTool = null;                // selected acpx tool when _ocChatMode === 'acp'
+var _acpTranscriptByKey = Object.create(null);
+var _acpLastTranscriptKey = '';
 /** Per–OpenClaw-agent chat HTML while switching away from OpenClaw tab (TeamBot uses server history). */
 var _ocTranscriptByAgent = Object.create(null);
+
+function _acpDisplayLabel(tool) {
+    const tName = String(tool || '').trim();
+    if (!tName) return '';
+    return tName.charAt(0).toUpperCase() + tName.slice(1);
+}
+
+function _acpIconClass(tool) {
+    const tName = String(tool || '').toLowerCase();
+    if (tName === 'codex') return 'oc-acp-ico-codex';
+    if (tName === 'claude') return 'oc-acp-ico-claude';
+    if (tName === 'gemini') return 'oc-acp-ico-gemini';
+    return 'oc-acp-ico-generic';
+}
+
+function ocRenderAcpTabs(tools) {
+    const acpTabs = document.getElementById('oc-acp-tabs');
+    if (!acpTabs) return;
+    acpTabs.innerHTML = '';
+    for (const tool of (tools || [])) {
+        const tName = String(tool || '').trim().toLowerCase();
+        if (!tName) continue;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'oc-switcher-tab oc-tab-with-acp-ico';
+        btn.dataset.acpTool = tName;
+        btn.onclick = () => ocSwitchTo('acp', tName);
+        btn.innerHTML =
+            '<span class="oc-acp-ico ' + _acpIconClass(tName) + '" aria-hidden="true"></span>' +
+            '<span>' + escapeHtml(_acpDisplayLabel(tName)) + '</span>';
+        acpTabs.appendChild(btn);
+    }
+}
 
 function getLocalizedExpertName(expert) {
     if (!expert) return '';
@@ -10587,6 +10732,51 @@ async function deleteTeamMember(type, globalName, name, tag) {
     }
 }
 
+function addExtOnPlatformChange() {
+    const pl = (document.getElementById('add-ext-platform') || {}).value || '';
+    const lab = document.getElementById('add-ext-url-label');
+    const hint = document.getElementById('add-ext-url-hint');
+    if (lab) {
+        if (pl === 'acp') lab.textContent = t('group_ext_url_optional_acp');
+        else if (pl === 'http') lab.textContent = t('group_ext_url_required_http');
+        else lab.textContent = t('group_ext_url_optional');
+    }
+    if (hint) {
+        hint.textContent = pl === 'http' ? t('group_ext_url_hint_http') : t('group_ext_url_hint_generic');
+    }
+}
+
+async function populateAddExtTagSelectOptions() {
+    const sel = document.getElementById('add-ext-tag-select');
+    if (!sel) return;
+    let tools = [];
+    try {
+        const r = await fetch('/proxy_acpx_status');
+        const j = await r.json();
+        if (j && j.available && Array.isArray(j.tools)) {
+            tools = j.tools.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean);
+        }
+    } catch (e) {
+        /* ignore */
+    }
+    tools.sort();
+    const extras = ['openclaw', 'aider'];
+    const seen = new Set();
+    sel.innerHTML = '';
+    const addOpt = (v, text) => {
+        if (seen.has(v)) return;
+        seen.add(v);
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = text;
+        sel.appendChild(o);
+    };
+    addOpt('', t('group_ext_tag_none'));
+    for (const x of tools) addOpt(x, x);
+    for (const x of extras) addOpt(x, x);
+    addOpt('custom', t('group_ext_tag_custom'));
+}
+
 function showAddTeamMemberModal() {
     if (!currentGroupId) {
         alert('请先选择一个团队');
@@ -10649,17 +10839,21 @@ function showAddTeamMemberModal() {
                     <label style="font-size:11px;font-weight:600;color:#374151;">标签 (Tag)
                         <div style="display:flex;gap:4px;margin-top:2px;">
                             <select id="add-ext-tag-select" onchange="document.getElementById('add-ext-tag-custom').value=this.value" style="flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:white;">
-                                <option value="">(无标签)</option>
-                                <option value="codex">codex</option>
-                                <option value="claude-code">claude-code</option>
-                                <option value="gemini-cli">gemini-cli</option>
-                                <option value="aider">aider</option>
-                                <option value="custom">自定义...</option>
+                                <option value="" data-i18n="group_ext_tag_none">（无标签）</option>
                             </select>
-                            <input id="add-ext-tag-custom" type="text" placeholder="或输入自定义tag" style="flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
+                            <input id="add-ext-tag-custom" type="text" placeholder="或输入自定义 tag" style="flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
                         </div>
                     </label>
-                    <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">API URL *</label>
+                    <label style="font-size:11px;font-weight:600;color:#374151;">
+                        <span data-i18n="group_ext_platform">连接方式</span>
+                        <select id="add-ext-platform" onchange="addExtOnPlatformChange()" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:white;margin-top:2px;">
+                            <option value="" data-i18n="group_ext_platform_auto">自动</option>
+                            <option value="acp" data-i18n="group_ext_platform_acp">本地 ACP</option>
+                            <option value="http" data-i18n="group_ext_platform_http">HTTP</option>
+                        </select>
+                    </label>
+                    <label id="add-ext-url-label" style="font-size:11px;color:#6b7280;margin-bottom:2px;margin-top:8px;display:block;" data-i18n="group_ext_url_optional">API URL（可选）</label>
+                    <div id="add-ext-url-hint" style="font-size:10px;color:#9ca3af;margin:-4px 0 4px;line-height:1.35;" data-i18n="group_ext_url_hint_generic"></div>
                     <input id="add-ext-url" type="text" placeholder="https://api.example.com/v1" style="font-family:monospace;font-size:12px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">
                     <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">API Key</label>
                     <input id="add-ext-key" type="text" placeholder="sk-xxx (optional)" style="font-family:monospace;font-size:12px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">
@@ -10716,7 +10910,10 @@ function showAddTeamMemberModal() {
     `;
     
     document.body.appendChild(overlay);
-    
+    applyTranslations();
+    addExtOnPlatformChange();
+    void populateAddExtTagSelectOptions();
+
     // Load expert tags for Oasis Agent select options
     (async () => {
         try {
@@ -10966,6 +11163,7 @@ async function addExternalMember(event) {
     const apiKey = document.getElementById('add-ext-key').value.trim();
     const model = document.getElementById('add-ext-model').value.trim();
     const headersStr = document.getElementById('add-ext-headers').value.trim();
+    const platform = (document.getElementById('add-ext-platform') || {}).value || '';
 
     // Collect tag: custom input takes priority, then select
     const tagCustom = document.getElementById('add-ext-tag-custom').value.trim();
@@ -10980,12 +11178,13 @@ async function addExternalMember(event) {
         }
         return;
     }
-    
-    if (!apiUrl) {
+
+    const tagLower = String(tag || '').toLowerCase();
+    if (platform === 'http' && !apiUrl && tagLower !== 'openclaw') {
         if (typeof orchToast === 'function') {
-            orchToast('API URL 不能为空');
+            orchToast(t('group_ext_url_required_toast'));
         } else {
-            alert('API URL 不能为空');
+            alert(t('group_ext_url_required_toast'));
         }
         return;
     }
@@ -11020,6 +11219,7 @@ async function addExternalMember(event) {
                 name: name,
                 tag: tag,
                 global_name: globalName,
+                platform: platform,
                 api_url: apiUrl,
                 api_key: apiKey,
                 model: model,
@@ -12157,6 +12357,166 @@ function ocSaveOpenClawTranscript() {
     _ocTranscriptByAgent[agent] = chatBox.innerHTML;
 }
 
+function acpSanitizeSessionSlug(s) {
+    let t = String(s || '').trim();
+    if (!t) return '';
+    t = t.replace(/[^a-zA-Z0-9_.-]+/g, '_').replace(/^[._-]+|[._-]+$/g, '');
+    return t.length > 80 ? t.slice(0, 80) : t;
+}
+
+function acpGetSessionPickValue() {
+    const sel = document.getElementById('oc-acp-session-pick');
+    return sel && String(sel.value || '').trim();
+}
+
+/** Transcript + backend session: tool + list pick, custom slug, or TeamClaw session id. */
+function acpComputeTranscriptKey() {
+    const tool = _acpTool || '';
+    const pick = acpGetSessionPickValue();
+    if (pick) return tool + '|__pick__|' + pick;
+    const sid = (typeof currentSessionId !== 'undefined' && currentSessionId) ? String(currentSessionId) : 'default';
+    const inp = document.getElementById('oc-acp-session-name');
+    const raw = inp ? String(inp.value || '').trim() : '';
+    const slug = acpSanitizeSessionSlug(raw);
+    const suffix = slug || ('__sid__' + sid);
+    return tool + '|' + suffix;
+}
+
+function _acpTranscriptKey() {
+    return acpComputeTranscriptKey();
+}
+
+function acpSyncSessionInputFromStorage() {
+    const inp = document.getElementById('oc-acp-session-name');
+    if (!inp || !_acpTool) return;
+    inp.value = localStorage.getItem('teamclaw_acp_session_name_' + _acpTool) || '';
+}
+
+function acpUpdateSessionInputsDisabledState() {
+    const pick = acpGetSessionPickValue();
+    const inp = document.getElementById('oc-acp-session-name');
+    if (inp) inp.disabled = !!pick;
+}
+
+function acpNotifySessionContextChanged() {
+    if (_ocChatMode !== 'acp' || !_acpTool) return;
+    const newKey = acpComputeTranscriptKey();
+    if (newKey === _acpLastTranscriptKey) return;
+    const chatBox = document.getElementById('chat-box');
+    if (chatBox && _acpLastTranscriptKey) {
+        _acpTranscriptByKey[_acpLastTranscriptKey] = chatBox.innerHTML;
+    }
+    _acpLastTranscriptKey = newKey;
+    acpPaintTranscript();
+}
+
+function acpOnSessionNameBlur() {
+    if (_ocChatMode !== 'acp' || !_acpTool) return;
+    const inp = document.getElementById('oc-acp-session-name');
+    if (inp) localStorage.setItem('teamclaw_acp_session_name_' + _acpTool, String(inp.value || '').trim());
+    acpNotifySessionContextChanged();
+}
+
+function acpOnSessionPickChange() {
+    if (!_acpTool) return;
+    const v = acpGetSessionPickValue();
+    if (v) localStorage.setItem('teamclaw_acp_session_pick_' + _acpTool, v);
+    else localStorage.removeItem('teamclaw_acp_session_pick_' + _acpTool);
+    acpUpdateSessionInputsDisabledState();
+    acpNotifySessionContextChanged();
+}
+
+async function acpLoadSessionsList() {
+    if (!_acpTool) return;
+    const sel = document.getElementById('oc-acp-session-pick');
+    if (!sel) return;
+    const prev = sel.value;
+    sel.disabled = true;
+    try {
+        const r = await fetch('/proxy_acpx_sessions?tool=' + encodeURIComponent(_acpTool));
+        const j = await r.json();
+        if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
+        const sessions = j.sessions || [];
+        sel.innerHTML = '';
+        const o0 = document.createElement('option');
+        o0.value = '';
+        o0.textContent = t('oc_acp_session_pick_none');
+        sel.appendChild(o0);
+        for (const s of sessions) {
+            const name = s && s.name;
+            if (!name) continue;
+            const opt = document.createElement('option');
+            opt.value = name;
+            const ts = s.lastUsedAt ? String(s.lastUsedAt).replace('T', ' ').slice(0, 19) : '';
+            const closed = s.closed ? ' [×]' : '';
+            opt.textContent = name + (ts ? ' · ' + ts : '') + closed;
+            sel.appendChild(opt);
+        }
+        const stored = localStorage.getItem('teamclaw_acp_session_pick_' + _acpTool);
+        if (stored && Array.from(sel.options).some((o) => o.value === stored)) sel.value = stored;
+        else if (prev && Array.from(sel.options).some((o) => o.value === prev)) sel.value = prev;
+        else sel.value = '';
+        acpUpdateSessionInputsDisabledState();
+    } catch (e) {
+        console.error('acpLoadSessionsList', e);
+        alert(t('error') + ': ' + (e && e.message ? e.message : e));
+    } finally {
+        sel.disabled = false;
+    }
+}
+
+async function acpEnsureSession() {
+    if (_ocChatMode !== 'acp' || !_acpTool) {
+        alert(t('oc_select_acp_hint'));
+        return;
+    }
+    const payload = { tool: _acpTool, session_id: currentSessionId };
+    const pick = acpGetSessionPickValue();
+    if (pick) payload.acp_session_pick = pick;
+    else {
+        const raw = document.getElementById('oc-acp-session-name') && String(document.getElementById('oc-acp-session-name').value || '').trim();
+        if (raw) payload.acp_session_name = raw;
+    }
+    try {
+        const r = await fetch('/proxy_acpx_session_ensure', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    } catch (e) {
+        alert(t('error') + ': ' + (e && e.message ? e.message : e));
+    }
+}
+
+function acpSaveTranscript() {
+    const chatBox = document.getElementById('chat-box');
+    if (!chatBox || !_acpTool) return;
+    _acpTranscriptByKey[_acpTranscriptKey()] = chatBox.innerHTML;
+}
+
+function acpPaintTranscript() {
+    const chatBox = document.getElementById('chat-box');
+    if (!chatBox || !_acpTool) return;
+    const k = _acpTranscriptKey();
+    if (_acpTranscriptByKey[k]) {
+        chatBox.innerHTML = _acpTranscriptByKey[k];
+        ocRefreshTtsButtonsIn(chatBox);
+    } else {
+        const label = _acpDisplayLabel(_acpTool || '');
+        chatBox.innerHTML =
+            '<div class="flex justify-start">' +
+            '<div class="message-agent bg-white border p-4 max-w-[85%] shadow-sm text-gray-700">' +
+            escapeHtml(label) +
+            '<br><span style="font-size:0.85em;color:#6b7280;">' +
+            escapeHtml(t('oc_acp_via')) +
+            '</span></div></div>';
+    }
+    chatBox.scrollTop = chatBox.scrollHeight;
+    _acpLastTranscriptKey = acpComputeTranscriptKey();
+}
+
 function ocRefreshTtsButtonsIn(chatBox) {
     if (!chatBox) return;
     chatBox.querySelectorAll('.message-agent .tts-btn').forEach((btn) => btn.remove());
@@ -12212,24 +12572,40 @@ function ocPaintOpenClawChatFromCache() {
 }
 
 /**
- * Switch between 'internal' (TeamBot) and 'openclaw' chat modes.
- * TeamBot history comes from the server; OpenClaw uses per-agent in-memory transcripts so the two do not mix.
+ * Switch between TeamBot (internal), OpenClaw (HTTP gateway), and ACP local CLIs (codex / claude / gemini via acpx).
  */
-async function ocSwitchTo(mode) {
-    if (mode === _ocChatMode) return;
+async function ocSwitchTo(mode, acpTool) {
+    const nextAcp = (mode === 'acp' && acpTool) ? String(acpTool).toLowerCase() : null;
+    if (nextAcp && !_acpToolsCache.includes(nextAcp)) {
+        return;
+    }
 
-    if (_ocChatMode === 'openclaw' && mode === 'internal') {
+    if (mode === 'internal' && _ocChatMode === 'internal') return;
+    if (mode === 'openclaw' && _ocChatMode === 'openclaw') return;
+    if (mode === 'acp' && _ocChatMode === 'acp' && nextAcp === _acpTool) return;
+
+    if (_ocChatMode === 'openclaw' && mode !== 'openclaw') {
         ocSaveOpenClawTranscript();
+    }
+    if (_ocChatMode === 'acp' && (mode !== 'acp' || nextAcp !== _acpTool)) {
+        acpSaveTranscript();
     }
 
     _ocChatMode = mode;
+    _acpTool = nextAcp;
 
     const tabInternal = document.getElementById('oc-tab-internal');
     const tabOpenclaw = document.getElementById('oc-tab-openclaw');
+    const acpTabs = document.getElementById('oc-acp-tabs');
     const agentSelector = document.getElementById('oc-agent-selector');
 
     if (tabInternal) tabInternal.classList.toggle('active', mode === 'internal');
     if (tabOpenclaw) tabOpenclaw.classList.toggle('active', mode === 'openclaw');
+    if (acpTabs) {
+        acpTabs.querySelectorAll('.oc-switcher-tab[data-acp-tool]').forEach((btn) => {
+            btn.classList.toggle('active', mode === 'acp' && btn.dataset.acpTool === _acpTool);
+        });
+    }
 
     if (mode === 'openclaw') {
         if (agentSelector) agentSelector.style.display = 'flex';
@@ -12241,6 +12617,11 @@ async function ocSwitchTo(mode) {
             _ocSelectedAgent = { name: select.value };
         }
         ocPaintOpenClawChatFromCache();
+    } else if (mode === 'acp') {
+        if (agentSelector) agentSelector.style.display = 'none';
+        acpSyncSessionInputFromStorage();
+        await acpLoadSessionsList();
+        acpPaintTranscript();
     } else {
         if (agentSelector) agentSelector.style.display = 'none';
         await switchToSession(currentSessionId, true, { quiet: true });
@@ -12281,22 +12662,44 @@ function ocOnAgentChange() {
 }
 
 /**
- * Initialize the OpenClaw Chat Switcher on page load.
- * Detects if OpenClaw is available; if yes, shows the switcher bar.
+ * Initialize the chat backend switcher (TeamBot / OpenClaw / ACP CLIs).
+ * Shows the bar when OpenClaw agents exist or acpx is available on the server.
  */
 async function ocInitSwitcher() {
     const switcher = document.getElementById('openclaw-chat-switcher');
     if (!switcher) return;
 
-    try {
-        const resp = await fetch('/proxy_openclaw_sessions');
-        const data = await resp.json();
+    const acpTabs = document.getElementById('oc-acp-tabs');
 
-        if (data.available && data.agents && data.agents.length > 0) {
+    try {
+        const [ocResp, acpResp] = await Promise.all([
+            fetch('/proxy_openclaw_sessions'),
+            fetch('/proxy_acpx_status'),
+        ]);
+        const data = await ocResp.json();
+        let acpData = { available: false };
+        try {
+            acpData = await acpResp.json();
+        } catch (_) {
+            /* ignore */
+        }
+
+        _acpToolsCache = Array.isArray(acpData && acpData.tools)
+            ? acpData.tools.map((t) => String(t || '').trim().toLowerCase()).filter(Boolean)
+            : [];
+        _acpAvailable = !!(acpData && acpData.available && _acpToolsCache.length > 0);
+        if (_acpAvailable) {
+            ocRenderAcpTabs(_acpToolsCache);
+            if (_acpTool && !_acpToolsCache.includes(_acpTool)) _acpTool = null;
+            if (!_acpTool) _acpTool = _acpToolsCache[0] || null;
+        } else {
+            _acpTool = null;
+            ocRenderAcpTabs([]);
+        }
+        const ocOk = !!(data && data.available && data.agents && data.agents.length > 0);
+        if (ocOk) {
             _ocAvailable = true;
             _ocAgentsCache = data.agents;
-            switcher.style.display = '';
-            // Pre-populate agent dropdown
             const select = document.getElementById('oc-agent-select');
             if (select) {
                 select.innerHTML = '<option value="">' + t('oc_select_agent') + '</option>';
@@ -12309,12 +12712,31 @@ async function ocInitSwitcher() {
             }
         } else {
             _ocAvailable = false;
+            _ocAgentsCache = [];
+        }
+
+        const acpRow = document.getElementById('oc-acp-session-row');
+        if (ocOk || _acpAvailable) {
+            switcher.style.display = '';
+            if (acpTabs) {
+                acpTabs.style.display = _acpAvailable ? 'inline-flex' : 'none';
+            }
+            if (acpRow) acpRow.style.display = _acpAvailable ? 'flex' : 'none';
+        } else {
             switcher.style.display = 'none';
+            if (acpTabs) acpTabs.style.display = 'none';
+            if (acpRow) acpRow.style.display = 'none';
         }
     } catch (e) {
-        // OpenClaw not available, hide switcher
         _ocAvailable = false;
+        _acpAvailable = false;
+        _acpToolsCache = [];
+        _acpTool = null;
+        ocRenderAcpTabs([]);
         switcher.style.display = 'none';
-        console.log('OpenClaw not available for chat switcher:', e.message);
+        if (acpTabs) acpTabs.style.display = 'none';
+        const acpRowErr = document.getElementById('oc-acp-session-row');
+        if (acpRowErr) acpRowErr.style.display = 'none';
+        console.log('Chat switcher init failed:', e && e.message);
     }
 }
