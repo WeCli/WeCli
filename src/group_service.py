@@ -121,10 +121,10 @@ def _compose_acpx_prompt(message: str, attachments: list[Attachment] | None = No
     parts: list[str] = [message]
     for att in attachments or []:
         if att.type == "image":
-            parts.append(f"[附件: {att.name} ({att.mime_type}), image bytes(base64) omitted]")
+            parts.append(f"[附件: {att.name} ({att.mime_type}), 图片已随多模态附件发送]")
             continue
         if att.type == "audio":
-            parts.append(f"[附件: {att.name} ({att.mime_type}), audio bytes(base64) omitted]")
+            parts.append(f"[附件: {att.name} ({att.mime_type}), 音频已随多模态附件发送]")
             continue
         if _is_text_mime(att.mime_type):
             decoded = _decode_att_text(att.data)
@@ -317,12 +317,26 @@ class GroupService:
             adapter = get_acpx_adapter(cwd=_PROJECT_ROOT)
             acpx_session = adapter.to_acpx_session_name(tool=tag, session_key=acp_session)
             await adapter.ensure_session(tool=tag, session_key=acp_session, acpx_session=acpx_session)
+            
+            # Build attachment list for acpx
+            acpx_attachments = None
+            if attachments:
+                acpx_attachments = []
+                for att in attachments:
+                    acpx_attachments.append({
+                        "type": att.type,
+                        "mime_type": att.mime_type,
+                        "data": att.data,
+                        "name": att.name,
+                    })
+            
             reply = await adapter.prompt(
                 tool=tag,
                 session_key=acp_session,
                 prompt_text=prompt_text,
                 timeout_sec=180,
                 reset_session=bool(metadata and metadata.get("resetSession")),
+                attachments=acpx_attachments,
             )
             _acp_group_trace(
                 "acp_prompt_complete",

@@ -249,6 +249,8 @@ When changing code, check the nearest validation surface:
 | `test/test_openai_protocol.py` | OpenAI protocol unit tests |
 | `test/test_integration.py` | cross-service integration tests |
 | `test/test_team_creator_jobs.py` | Team Creator job persistence tests |
+| `test/test_team_creator_imports.py` | Team Creator colleague/mentor import and quick-create route tests |
+| `test/test_skill_import_tools.py` | ArXiv / Feishu helper conversion tests |
 | `test/test_team_creator_workflow.py` | Team Creator workflow/build tests |
 | `test/test_team_creator_zip.py` | Team Creator ZIP export tests |
 | `test/test_proxy_login_i18n.py` | frontend i18n and login proxy coverage |
@@ -256,6 +258,7 @@ When changing code, check the nearest validation surface:
 | `test/test_configure_openclaw_sync.py` | TeamClaw/OpenClaw LLM sync tests |
 | `test/test_oasis_swarm_engine.py` | swarm scaffold / blueprint normalization tests |
 | `test/test_oasis_graph_memory.py` | GraphRAG persistence, retrieval, and ReportAgent fallback tests |
+| `test/browser/creator-smoke.spec.js` | Playwright smoke for `/creator` direct mentor/colleague generation flows |
 | `test/browser/studio-smoke.spec.js` | Playwright smoke for `/studio` tabs, settings actions, and TeamBot runtime sidebar |
 | `test/llm_live_smoke.py` | opt-in real provider LLM smoke test |
 | `test/openclaw_live_smoke.py` | opt-in isolated OpenClaw gateway smoke test |

@@ -2,18 +2,19 @@
 
 This repository uses a **progressive-disclosure** documentation layout:
 
-1. `SKILL.md` is the entrypoint for agents and operators.
-2. This file routes the current task to the right doc.
-3. `repo-index.md` is the codebase map when you need to inspect or edit files.
-4. Topic docs hold the detailed reference material.
+1. `AGENTS.md` is the entrypoint for AI agents (behavior rules, task routing, progressive disclosure).
+2. `SKILL.md` is the complete install, configure, and debug guide.
+3. This file routes the current task to the right deep-dive doc.
+4. `repo-index.md` is the codebase map when you need to inspect or edit files.
 
-If you are an agent, do **not** load everything by default. Start here and read only the docs needed for the current task.
+If you are an agent, do **not** load everything by default. Start with `AGENTS.md` and read only the docs needed for the current task.
 
 ## Entry Points
 
 | File | Use It For |
 |---|---|
-| [`../SKILL.md`](../SKILL.md) | Installation, configuration, startup guardrails, task routing |
+| [`../AGENTS.md`](../AGENTS.md) | Agent behavior rules, task routing, progressive disclosure protocol |
+| [`../SKILL.md`](../SKILL.md) | Complete installation, configuration, debug, and troubleshooting guide |
 | [`../README.md`](../README.md) | Product overview, positioning, big-picture capabilities |
 | [`repo-index.md`](./repo-index.md) | Codebase indexing and file lookup before editing code |
 
@@ -21,7 +22,7 @@ If you are an agent, do **not** load everything by default. Start here and read 
 
 | Task | Read First | Then Read |
 |---|---|---|
-| Install / configure / start TeamClaw | [`../SKILL.md`](../SKILL.md) | [`ports.md`](./ports.md) if ports or routing matter |
+| Install / configure / start TeamClaw | [`../SKILL.md`](../SKILL.md) | [`ports.md`](./ports.md) if ports matter |
 | Understand the platform | [`overview.md`](./overview.md) | [`../README.md`](../README.md) |
 | Understand TeamBot agent runtime, subagents, delegated tool boundaries, runtime policy hooks, or the subagent panel | [`teambot-agent-runtime.md`](./teambot-agent-runtime.md) | [`runtime-reference.md`](./runtime-reference.md), [`repo-index.md`](./repo-index.md) |
 | Compare TeamBot with Claude Code and inspect the runtime feature matrix that drives parity work | [`teambot-claude-gap-analysis.md`](./teambot-claude-gap-analysis.md) | [`teambot-agent-runtime.md`](./teambot-agent-runtime.md), [`repo-index.md`](./repo-index.md) |
@@ -115,11 +116,10 @@ If you are an agent, do **not** load everything by default. Start here and read 
 
 The important split is:
 
-- `SKILL.md`: workflow and guardrails
-- `README.md`: product story
+- `AGENTS.md`: agent behavior rules, task routing, progressive disclosure protocol
+- `SKILL.md`: complete install, configure, debug, and troubleshooting guide
+- `README.md`: product story for human users
 - `docs/*.md`: task-specific reference
-- `docs/oasis-reference.md` / `docs/runtime-reference.md`: extracted deep dives that no longer need to bloat the README
-- `docs/teambot-agent-runtime.md`: TeamBot-specific delegated agent runtime reference
 - `docs/repo-index.md`: code and data index
 
-This keeps `SKILL.md` short enough for agents while still making the full repository discoverable.
+This keeps `AGENTS.md` short enough for agents while making the full repository discoverable via `SKILL.md` and topic docs.

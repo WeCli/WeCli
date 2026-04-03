@@ -4,6 +4,7 @@ import json
 import os
 import shlex
 import shutil
+import tempfile
 from typing import Any
 
 
@@ -52,22 +53,91 @@ class AcpxAdapter:
         prompt_text: str,
         timeout_sec: int = 180,
         reset_session: bool = False,
+        attachments: list[dict] | None = None,
     ) -> str:
+        """
+        Send a prompt to the agent.
+        
+        Args:
+            tool: Agent tool name (openclaw, claude, codex, etc.)
+            session_key: Session key
+            prompt_text: Text prompt
+            timeout_sec: Timeout in seconds
+            reset_session: Whether to reset the session
+            attachments: List of attachments with keys:
+                - type: "image" | "audio" | "text"
+                - mime_type: MIME type string
+                - data: base64-encoded content
+                - name: filename
+        """
         acpx_session = self.to_acpx_session_name(tool=tool, session_key=session_key)
         if reset_session:
             await self.close_session(tool=tool, session_key=session_key, acpx_session=acpx_session)
 
-        # Ensure transport session on every call: centralized concurrency/lifecycle belongs to acpx.
+        # Ensure transport session on every call
         await self.ensure_session(tool=tool, session_key=session_key, acpx_session=acpx_session)
 
-        payload = prompt_text.strip() or "(empty prompt)"
+        # Build multimodal prompt content (JSON array)
+        content_blocks = [{"type": "text", "text": prompt_text.strip() or "(empty prompt)"}]
+        
+        # Add attachment blocks for images
+        if attachments:
+            for att in attachments:
+                att_type = att.get("type", "")
+                mime_type = att.get("mime_type", "")
+                data = att.get("data", "")
+
+                # 处理带 data: 前缀的 base64（如前端 "data:image/png;base64,xxx"）
+                if data.startswith("data:"):
+                    # 提取 mime type 和纯 base64
+                    header, b64data = data.split(",", 1)
+                    if ";" in header:
+                        # 提取 mime type，如 "data:image/png;base64" → "image/png"
+                        incoming_mime = header.replace("data:", "").split(";")[0]
+                        if not mime_type:
+                            mime_type = incoming_mime
+                    data = b64data
+                
+                if att_type == "image" and data:
+                    content_blocks.append({
+                        "type": "image",
+                        "mimeType": mime_type or "image/png",
+                        "data": data,
+                    })
+                elif att_type == "audio" and data:
+                    content_blocks.append({
+                        "type": "input_audio",
+                        "mimeType": mime_type or "audio/wav",
+                        "data": data,
+                    })
+        
+        # Always use --file mode for multimodal content to avoid argument length limits
+        # Also use unique filename to avoid conflicts when multiple agents are running
+        json_content = json.dumps(content_blocks, ensure_ascii=False)
+        
+        # Generate unique temp file name with timestamp to avoid conflicts
+        import time
+        import uuid
+        unique_suffix = f"{int(time.time()*1000)}_{uuid.uuid4().hex[:8]}"
+        temp_path = os.path.join(tempfile.gettempdir(), f"acpx_prompt_{unique_suffix}.json")
+        
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            f.write(json_content)
+        
         prompt_args = self._command_prefix(tool=tool, session_key=session_key)
-        prompt_args += ["prompt", "-s", acpx_session, payload]
-        output = await self._run_json(
-            prompt_args,
-            timeout_sec=timeout_sec,
-            allow_nonzero=False,
-        )
+        prompt_args += ["prompt", "-s", acpx_session, "--file", temp_path]
+        try:
+            output = await self._run_json(
+                prompt_args,
+                timeout_sec=timeout_sec,
+                allow_nonzero=False,
+            )
+        finally:
+            try:
+                os.unlink(temp_path)
+            except Exception:
+                pass
+        
         text = self._extract_text(output)
         if text is None:
             return output.strip()

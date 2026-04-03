@@ -2396,3 +2396,583 @@ def build_from_roles(
 
     team_config = map_roles_to_team(roles, team_name, task_description)
     return team_config
+
+
+# ──────────────────────────────────────────────────────────────
+# External Skill Import — colleague-skill & supervisor (mentor)
+# ──────────────────────────────────────────────────────────────
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in items:
+        value = str(item or "").strip()
+        if not value:
+            continue
+        key = value.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(value)
+    return ordered
+
+
+def _coerce_str_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item or "").strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def _clean_markdown_item(line: str) -> str:
+    cleaned = re.sub(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)", "", str(line or "").strip())
+    return cleaned.strip()
+
+
+def _parse_markdown_sections(markdown: str) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {}
+    current_section = ""
+    for raw_line in str(markdown or "").splitlines():
+        line = raw_line.strip()
+        if not line or line == "---":
+            continue
+        if line.startswith("## "):
+            current_section = line[3:].strip()
+            sections.setdefault(current_section, [])
+            continue
+        if current_section:
+            sections.setdefault(current_section, []).append(line)
+    return sections
+
+
+def _extract_colleague_responsibilities(work_md: str) -> list[str]:
+    sections = _parse_markdown_sections(work_md)
+    responsibilities: list[str] = []
+
+    for line in sections.get("职责范围", []):
+        if line.startswith("### "):
+            continue
+        item = _clean_markdown_item(line)
+        if not item or item.endswith("："):
+            continue
+        if line.lstrip().startswith(("-", "*")) or "负责" in item or "维护" in item or "边界" in item:
+            responsibilities.append(item)
+
+    for line in sections.get("工作流程", []):
+        if line.startswith("### "):
+            continue
+        item = _clean_markdown_item(line)
+        if not item or item.endswith("："):
+            continue
+        if re.match(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)", line):
+            responsibilities.append(item)
+
+    if responsibilities:
+        return _dedupe_preserve_order(responsibilities)[:8]
+
+    fallback: list[str] = []
+    for raw_line in str(work_md or "").splitlines():
+        line = raw_line.strip()
+        if not line or line == "---" or line.startswith("#"):
+            continue
+        item = _clean_markdown_item(line)
+        if not item or item.endswith("："):
+            continue
+        if re.match(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)", raw_line):
+            fallback.append(item)
+    return _dedupe_preserve_order(fallback)[:8]
+
+
+def _mentor_source_url(mentor_json: dict[str, Any]) -> str:
+    profile = mentor_json.get("profile") or {}
+    website = str(profile.get("website") or "").strip()
+    if website:
+        return website
+    source_materials = mentor_json.get("source_materials") or {}
+    for key in ("websites_visited", "source_urls", "websites"):
+        for item in _coerce_str_list(source_materials.get(key)):
+            if item:
+                return item
+    return "supervisor-mentor"
+
+
+_COLLEAGUE_DISTILL_PROMPT = (
+    "You are converting Feishu/Lark chat materials into colleague-skill artifacts for TeamClaw Team Creator.\n\n"
+    "Return ONLY valid JSON with this schema:\n"
+    '{{'
+    '"persona_md": "# ...",'
+    '"work_md": "# ...",'
+    '"personality_tags": ["..."],'
+    '"culture_tags": ["..."],'
+    '"impression": "...",'
+    '"evidence_summary": "..."'
+    '}}\n\n'
+    "Rules:\n"
+    "- Infer only from the supplied evidence. Do not fabricate unknown background details.\n"
+    "- Keep the output in Chinese unless the source material is clearly dominated by another language.\n"
+    "- persona_md must be markdown and include these sections in order:\n"
+    "  1. # {name} — Persona\n"
+    "  2. ## Layer 0：核心性格\n"
+    "  3. ## Layer 1：沟通风格\n"
+    "  4. ## Layer 2：决策偏好\n"
+    "  5. ## Layer 3：协作模式\n"
+    "  6. ## Layer 4：压力与边界\n"
+    "- work_md must be markdown and include these sections in order:\n"
+    "  1. # {name} — Work Skill\n"
+    "  2. ## 职责范围\n"
+    "  3. ## 关键上下文\n"
+    "  4. ## 工作流程\n"
+    "  5. ## 交付偏好\n"
+    "- Each section should be concise, practical, and import-ready.\n"
+    "- personality_tags and culture_tags should each contain 1-6 short items.\n"
+    "- impression should be one sentence that a teammate can read quickly.\n"
+    "- evidence_summary should mention what evidence the distillation relied on.\n\n"
+    "meta_json:\n{meta_json}\n\n"
+    "messages_text:\n{messages_text}"
+)
+
+
+def _truncate_colleague_messages(messages_text: str, limit: int = 16000) -> str:
+    cleaned = str(messages_text or "").strip()
+    if len(cleaned) <= limit:
+        return cleaned
+    head = cleaned[: int(limit * 0.7)].rstrip()
+    tail = cleaned[-int(limit * 0.2):].lstrip()
+    return f"{head}\n\n[... truncated ...]\n\n{tail}"
+
+
+def _message_evidence_lines(messages_text: str, *, limit: int = 6) -> list[str]:
+    evidence: list[str] = []
+    for raw_line in str(messages_text or "").splitlines():
+        line = str(raw_line or "").strip()
+        if not line or line.startswith("#"):
+            continue
+        line = re.sub(r"^\[[^\]]+\]\s*", "", line)
+        line = re.sub(r"^\d{1,2}:\d{2}\s*", "", line)
+        line = re.sub(r"^\d+[.)]\s*", "", line)
+        if len(line) < 6:
+            continue
+        evidence.append(line[:180])
+    return _dedupe_preserve_order(evidence)[:limit]
+
+
+def _fallback_colleague_distillation(meta_json: dict[str, Any], messages_text: str) -> dict[str, Any]:
+    profile = meta_json.get("profile") or {}
+    tags = meta_json.get("tags") or {}
+    name = str(meta_json.get("name") or "同事").strip() or "同事"
+    role = str(profile.get("role") or "").strip()
+    company = str(profile.get("company") or "").strip()
+    level = str(profile.get("level") or "").strip()
+    impression = str(meta_json.get("impression") or "").strip()
+    personality_tags = _dedupe_preserve_order(
+        _coerce_str_list(tags.get("personality")) or ["直接", "重执行"]
+    )[:6]
+    culture_tags = _dedupe_preserve_order(
+        _coerce_str_list(tags.get("culture")) or ["先解决问题", "对结果负责"]
+    )[:6]
+    evidence_lines = _message_evidence_lines(messages_text)
+
+    persona_md = "\n\n".join([
+        f"# {name} — Persona",
+        "## Layer 0：核心性格\n" + "\n".join(
+            [f"- {personality_tags[0]}，先给结论再展开。"] +
+            ([f"- {impression}"] if impression else ["- 说话和做事都围绕交付结果。"])
+        ),
+        "## Layer 1：沟通风格\n" + "\n".join([
+            "- 信息密度高，不喜欢空话。",
+            "- 遇到模糊需求会先追问边界、优先级和可落地方案。",
+        ]),
+        "## Layer 2：决策偏好\n" + "\n".join([
+            "- 更看重直接证据、线上影响和交付风险。",
+            "- 倾向先把最关键的问题拆出来，再决定要不要扩展范围。",
+        ]),
+        "## Layer 3：协作模式\n" + "\n".join([
+            f"- 默认以{role or '本职工作'}为中心推进，和上下游快速对齐。",
+            "- 需要其他人配合时，会明确输入、截止时间和验收标准。",
+        ]),
+        "## Layer 4：压力与边界\n" + "\n".join([
+            "- 反感重复解释已经明确过的背景和约束。",
+            "- 面对紧急问题时优先止血，再补根因和后续优化。",
+        ]),
+    ])
+
+    context_lines = []
+    if company:
+        context_lines.append(f"- 公司/团队：{company}")
+    if role:
+        context_lines.append(f"- 岗位：{role}")
+    if level:
+        context_lines.append(f"- 层级：{level}")
+    context_lines.extend(f"- 对话证据：{line}" for line in evidence_lines[:3])
+    if not context_lines:
+        context_lines.append("- 关键上下文主要来自飞书消息语料。")
+
+    workflow_lines = [f"{idx}. {line}" for idx, line in enumerate(evidence_lines[:4], 1)]
+    if not workflow_lines:
+        workflow_lines = [
+            "1. 先确认背景、边界条件和优先级。",
+            "2. 给出能落地的短期方案，再补长期优化。",
+        ]
+
+    work_md = "\n\n".join([
+        f"# {name} — Work Skill",
+        "## 职责范围\n" + "\n".join([
+            f"- 负责与{role or '当前岗位'}相关的核心交付与协作推进。",
+            "- 在信息不完整时补齐上下文，推动问题收敛到可执行方案。",
+        ]),
+        "## 关键上下文\n" + "\n".join(context_lines),
+        "## 工作流程\n" + "\n".join(workflow_lines),
+        "## 交付偏好\n" + "\n".join([
+            "- 输出偏向结论先行，必要时补充证据和风险。",
+            "- 交付物要可执行、可验收，而不是只给方向性建议。",
+        ]),
+    ])
+
+    return {
+        "persona_md": persona_md,
+        "work_md": work_md,
+        "personality_tags": personality_tags,
+        "culture_tags": culture_tags,
+        "impression": impression or f"{name} 说话直接，执行导向明显。",
+        "evidence_summary": f"Fallback distillation based on {len(evidence_lines)} extracted chat evidence lines.",
+    }
+
+
+def distill_colleague_skill_artifacts(
+    meta_json: dict[str, Any],
+    messages_text: str,
+) -> dict[str, Any]:
+    """Distill colleague persona/work artifacts from collected chat materials."""
+    if not isinstance(meta_json, dict) or not meta_json:
+        raise ValueError("meta_json is required")
+    name = str(meta_json.get("name") or "").strip()
+    if not name:
+        raise ValueError("meta_json.name is required")
+
+    prompt = _COLLEAGUE_DISTILL_PROMPT.format(
+        name=name,
+        meta_json=_json_dumps(meta_json),
+        messages_text=_truncate_colleague_messages(messages_text),
+    )
+
+    try:
+        from llm_factory import create_chat_model
+
+        llm = create_chat_model(temperature=0.2, max_tokens=4096, timeout=120)
+        response = llm.invoke(prompt)
+        raw_text = _llm_content_to_text(response.content if hasattr(response, "content") else str(response))
+        payload = _extract_json_payload(raw_text)
+        if not isinstance(payload, dict):
+            raise ValueError("LLM did not return a valid JSON object")
+
+        persona_md = str(payload.get("persona_md") or "").strip()
+        work_md = str(payload.get("work_md") or "").strip()
+        if not persona_md or not work_md:
+            raise ValueError("LLM distillation payload missing persona_md/work_md")
+
+        return {
+            "persona_md": persona_md,
+            "work_md": work_md,
+            "personality_tags": _dedupe_preserve_order(_coerce_str_list(payload.get("personality_tags")))[:6],
+            "culture_tags": _dedupe_preserve_order(_coerce_str_list(payload.get("culture_tags")))[:6],
+            "impression": str(payload.get("impression") or "").strip(),
+            "evidence_summary": str(payload.get("evidence_summary") or "").strip(),
+        }
+    except Exception as exc:
+        _log.warning("Colleague distillation failed, using fallback: %s", exc)
+        return _fallback_colleague_distillation(meta_json, messages_text)
+
+def import_colleague_skill(
+    meta_json: dict,
+    persona_md: str,
+    work_md: str = "",
+    team_name: str = "",
+    task_description: str = "",
+) -> dict[str, Any]:
+    """Import a colleague-skill output into TeamClaw's Team Creator.
+
+    Accepts the output files from https://github.com/titanwings/colleague-skill:
+      - meta.json   (parsed dict)
+      - persona.md  (raw markdown string — the 5-layer persona)
+      - work.md     (raw markdown string — optional work skill)
+
+    Returns a team_config dict identical to what build_from_roles() returns,
+    but with the *full* persona.md content used directly (not compressed by
+    _build_persona()).
+    """
+    if not meta_json or not isinstance(meta_json, dict):
+        raise ValueError("meta_json is required and must be a dict")
+
+    name = str(meta_json.get("name", "")).strip()
+    if not name:
+        raise ValueError("meta_json.name is required")
+
+    slug = str(meta_json.get("slug", "")).strip() or _slugify(name)
+    profile = meta_json.get("profile") or {}
+    tags = meta_json.get("tags") or {}
+
+    # Build personality traits from tags
+    personality_traits: list[str] = []
+    for tag_list in [tags.get("personality", []), tags.get("culture", [])]:
+        if isinstance(tag_list, list):
+            personality_traits.extend(str(t) for t in tag_list if t)
+
+    # Build responsibilities from work.md, favoring real duty/process sections
+    responsibilities = _extract_colleague_responsibilities(work_md)
+
+    # Build identity string
+    identity_parts = []
+    if profile.get("company"):
+        identity_parts.append(str(profile["company"]))
+    if profile.get("level"):
+        identity_parts.append(str(profile["level"]))
+    if profile.get("role"):
+        identity_parts.append(str(profile["role"]))
+    identity = " ".join(identity_parts) if identity_parts else "同事"
+
+    # Create the ExtractedRole — this is the standard TeamClaw data model
+    role = ExtractedRole(
+        role_name=name,
+        personality_traits=_dedupe_preserve_order(personality_traits)[:8],
+        primary_responsibilities=responsibilities[:8],
+        depends_on=[],
+        tools_used=[],
+        source_url=f"colleague-skill:{slug}",
+    )
+
+    # Build team config via map_roles_to_team, then **override** the persona
+    # with the full colleague-skill persona.md content (not the compressed version)
+    effective_team_name = team_name or f"{name} 团队"
+    effective_task = task_description or f"{name} 的工作能力与人物性格"
+
+    team_config = map_roles_to_team([role], effective_team_name, effective_task)
+
+    # Override persona: use full persona.md + work.md (the key design decision)
+    if team_config.get("oasis_experts") and persona_md:
+        full_persona_parts = []
+        if work_md:
+            full_persona_parts.append(f"## PART A：工作能力\n\n{work_md.strip()}")
+            full_persona_parts.append("---")
+        full_persona_parts.append(f"## PART B：人物性格\n\n{persona_md.strip()}")
+        full_persona_parts.append("---")
+        full_persona_parts.append(
+            "## 运行规则\n\n"
+            "1. 先由 PART B 判断：用什么态度接这个任务？\n"
+            "2. 再由 PART A 执行：用你的技术能力完成任务\n"
+            "3. 输出时始终保持 PART B 的表达风格\n"
+            "4. PART B Layer 0 的规则优先级最高，任何情况下不得违背"
+        )
+
+        team_config["oasis_experts"][0]["persona"] = "\n\n".join(full_persona_parts)
+        team_config["oasis_experts"][0]["source"] = "colleague-skill"
+        team_config["oasis_experts"][0]["name"] = name
+
+    # Enrich summary
+    if team_config.get("summary"):
+        team_config["summary"]["import_source"] = "colleague-skill"
+        team_config["summary"]["colleague_meta"] = {
+            "name": name,
+            "slug": slug,
+            "identity": identity,
+            "version": meta_json.get("version", "v1"),
+            "company": str(profile.get("company") or ""),
+            "level": str(profile.get("level") or ""),
+            "role": str(profile.get("role") or ""),
+            "gender": str(profile.get("gender") or ""),
+            "mbti": profile.get("mbti", ""),
+            "impression": str(meta_json.get("impression", "")),
+            "knowledge_sources": meta_json.get("knowledge_sources") or [],
+            "corrections_count": int(meta_json.get("corrections_count") or 0),
+        }
+
+    return team_config
+
+
+def import_mentor_skill(
+    mentor_json: dict,
+    skill_md: str = "",
+    team_name: str = "",
+    task_description: str = "",
+) -> dict[str, Any]:
+    """Import a supervisor (mentor) skill output into TeamClaw's Team Creator.
+
+    Accepts the output files from https://github.com/ybq22/supervisor:
+      - {name}.json  (parsed dict — the mentor profile JSON)
+      - SKILL.md     (raw markdown string — the generated mentor skill)
+
+    Returns a team_config dict identical to what build_from_roles() returns,
+    but with the *full* SKILL.md / JSON-derived persona used directly.
+    """
+    if not mentor_json or not isinstance(mentor_json, dict):
+        raise ValueError("mentor_json is required and must be a dict")
+
+    # Extract profile info from the nested JSON structure
+    profile = mentor_json.get("profile") or {}
+    meta = mentor_json.get("meta") or {}
+    research = mentor_json.get("research") or {}
+    style = mentor_json.get("style") or {}
+    achievements = mentor_json.get("achievements") or {}
+    source_materials = mentor_json.get("source_materials") or {}
+
+    name = (
+        str(profile.get("name_zh", "")).strip()
+        or str(profile.get("name_en", "")).strip()
+        or str(meta.get("mentor_name", "")).strip()
+    )
+    if not name:
+        raise ValueError("Cannot determine mentor name from JSON")
+
+    name_en = str(profile.get("name_en", "")).strip()
+    institution = str(profile.get("institution") or meta.get("affiliation", "")).strip()
+    position = str(profile.get("position", "")).strip()
+
+    # Build personality traits from research style + academic values
+    personality_traits: list[str] = []
+    rs = style.get("research_style") or {}
+    if rs.get("type"):
+        personality_traits.append(str(rs["type"]))
+    if rs.get("keywords") and isinstance(rs["keywords"], list):
+        personality_traits.extend(str(k) for k in rs["keywords"][:5])
+    if style.get("academic_values") and isinstance(style["academic_values"], list):
+        personality_traits.extend(str(v) for v in style["academic_values"][:5])
+    communication_style = style.get("communication_style") or {}
+    if communication_style.get("tone"):
+        personality_traits.append(str(communication_style["tone"]))
+
+    # Build responsibilities from research fields
+    responsibilities: list[str] = []
+    for field in research.get("primary_fields", []):
+        responsibilities.append(f"研究方向：{field}")
+    if research.get("research_summary"):
+        responsibilities.append(str(research["research_summary"]))
+    for area in style.get("expertise_areas") or []:
+        responsibilities.append(f"专长领域：{area}")
+    for pub in (research.get("key_publications") or [])[:3]:
+        if isinstance(pub, dict) and pub.get("summary"):
+            responsibilities.append(str(pub["summary"])[:100])
+
+    # Create the ExtractedRole
+    role = ExtractedRole(
+        role_name=name,
+        personality_traits=_dedupe_preserve_order(personality_traits)[:8],
+        primary_responsibilities=_dedupe_preserve_order(responsibilities)[:8],
+        depends_on=[],
+        tools_used=[],
+        source_url=_mentor_source_url(mentor_json),
+    )
+
+    effective_team_name = team_name or f"{name} 导师团队"
+    effective_task = task_description or f"{name} 的学术指导与研究风格"
+
+    team_config = map_roles_to_team([role], effective_team_name, effective_task)
+
+    # Override persona: use full SKILL.md or build rich persona from JSON
+    if team_config.get("oasis_experts"):
+        if skill_md:
+            # Use the full SKILL.md content as persona (it contains the system prompt)
+            # Strip the YAML frontmatter if present
+            persona_content = skill_md.strip()
+            fm_match = re.match(r"^---\s*\n[\s\S]*?\n---\s*\n", persona_content)
+            if fm_match:
+                persona_content = persona_content[fm_match.end():].strip()
+            team_config["oasis_experts"][0]["persona"] = persona_content
+        else:
+            # Build persona from JSON fields
+            persona_parts = [f"# {name} AI Mentor\n"]
+            persona_parts.append(f"你是 {name}")
+            if institution:
+                persona_parts[-1] += f"（{institution}"
+                if position:
+                    persona_parts[-1] += f" {position}"
+                persona_parts[-1] += "）"
+            persona_parts[-1] += "的 AI 助手，专注于提供与其研究风格和学术观点一致的指导。\n"
+
+            if research.get("research_summary"):
+                persona_parts.append(f"## 研究背景\n\n{research['research_summary']}\n")
+
+            if research.get("primary_fields"):
+                persona_parts.append("## 研究领域\n\n" + "、".join(research["primary_fields"]) + "\n")
+
+            if rs.get("description"):
+                persona_parts.append(f"## 研究风格\n\n{rs['description']}\n")
+
+            cs = style.get("communication_style") or {}
+            if cs.get("tone") or cs.get("characteristics"):
+                persona_parts.append("## 沟通风格\n")
+                if cs.get("tone"):
+                    persona_parts.append(f"- 语气：{cs['tone']}")
+                if cs.get("characteristics"):
+                    persona_parts.append(f"- 特点：{cs['characteristics']}")
+                persona_parts.append("")
+
+            if style.get("academic_values"):
+                persona_parts.append("## 学术价值观\n\n" + "\n".join(
+                    f"- {v}" for v in style["academic_values"]
+                ) + "\n")
+
+            academic_service = achievements.get("academic_service") or []
+            if academic_service:
+                persona_parts.append("## 学术职务\n\n" + "\n".join(
+                    f"- {item}" for item in academic_service if str(item or "").strip()
+                ) + "\n")
+
+            honors = achievements.get("honors") or []
+            if honors:
+                persona_parts.append("## 主要荣誉\n\n" + "\n".join(
+                    f"- {item}" for item in honors if str(item or "").strip()
+                ) + "\n")
+
+            pubs = research.get("key_publications") or []
+            if pubs:
+                persona_parts.append("## 代表性贡献\n")
+                for i, pub in enumerate(pubs[:5], 1):
+                    if isinstance(pub, dict):
+                        title = pub.get("title", "")
+                        venue = pub.get("venue", "")
+                        year = pub.get("year", "")
+                        summary = pub.get("summary", "")
+                        persona_parts.append(f"{i}. **{title}** ({venue} {year})")
+                        if summary:
+                            persona_parts.append(f"   - {summary}")
+                persona_parts.append("")
+
+            source_urls = []
+            for key in ("websites_visited", "source_urls", "websites"):
+                source_urls.extend(_coerce_str_list(source_materials.get(key)))
+            if source_urls:
+                persona_parts.append("## 参考来源\n\n" + "\n".join(
+                    f"- {item}" for item in _dedupe_preserve_order(source_urls)[:8]
+                ) + "\n")
+
+            persona_parts.append(
+                "## 约束条件\n\n"
+                "- 不编造导师未发表的观点\n"
+                "- 超出专业领域时明确说明\n"
+                "- 保持学术严谨性\n"
+                "- 优先引用导师的真实研究"
+            )
+
+            team_config["oasis_experts"][0]["persona"] = "\n".join(persona_parts)
+
+        team_config["oasis_experts"][0]["source"] = "supervisor-mentor"
+        team_config["oasis_experts"][0]["name"] = name
+        if name_en:
+            team_config["oasis_experts"][0]["name_en"] = name_en
+
+    # Enrich summary
+    if team_config.get("summary"):
+        team_config["summary"]["import_source"] = "supervisor-mentor"
+        team_config["summary"]["mentor_meta"] = {
+            "name": name,
+            "name_en": name_en,
+            "institution": institution,
+            "position": position,
+            "primary_fields": research.get("primary_fields", []),
+            "papers_count": len(research.get("key_publications", [])),
+            "languages": profile.get("languages", []),
+            "website": str(profile.get("website") or ""),
+            "source_materials": source_materials,
+        }
+
+    return team_config

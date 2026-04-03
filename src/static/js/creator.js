@@ -84,6 +84,65 @@
             creator_example_btn: '💡 使用示例指令',
             creator_mode_direct: '✏️ 直接定义角色',
             creator_mode_discover: '🔍 AI 智能发现',
+            creator_mode_import_colleague: '👥 从同事导入',
+            creator_mode_import_mentor: '🎓 从导师导入',
+            creator_import_colleague_title: '导入同事 Skill',
+            creator_import_colleague_hint: '可以直接从飞书采集并生成同事，或者导入 colleague-skill 已生成的文件。',
+            creator_generate_colleague_kicker: '🪶 直接生成',
+            creator_generate_colleague_hint: '填写飞书应用信息和同事基本资料，Team Creator 会采集消息、自动蒸馏 persona/work，并直接导入为团队角色。',
+            creator_feishu_app_id_label: '飞书 App ID',
+            creator_feishu_app_id_placeholder: '例如: cli_xxx',
+            creator_feishu_app_secret_label: '飞书 App Secret',
+            creator_feishu_app_secret_placeholder: '例如: xxxxx',
+            creator_feishu_target_name_label: '同事姓名',
+            creator_feishu_target_name_placeholder: '例如: 张三',
+            creator_feishu_role_label: '岗位',
+            creator_feishu_role_placeholder: '例如: 后端工程师',
+            creator_feishu_company_label: '公司 / 团队',
+            creator_feishu_company_placeholder: '例如: TeamClaw',
+            creator_feishu_level_label: '层级',
+            creator_feishu_level_placeholder: '例如: L4 / P6',
+            creator_feishu_personality_tags_label: '性格标签（逗号分隔）',
+            creator_feishu_personality_tags_placeholder: '例如: 直接, 数据驱动',
+            creator_feishu_msg_limit_label: '消息上限',
+            creator_generate_colleague_btn: '🪶 采集并生成同事',
+            creator_generate_colleague_loading: '正在从飞书采集并蒸馏同事...',
+            creator_generate_colleague_success: '同事生成成功：{name}',
+            creator_import_colleague_repo: '📦 仓库地址',
+            creator_import_colleague_repo_url: 'https://github.com/titanwings/colleague-skill',
+            creator_import_colleague_steps: '生成步骤：① 克隆仓库 → ② 在 Claude Code / Cursor 中运行 /create-colleague → ③ 按提示填写同事信息并提供原材料 → ④ 生成的文件在 colleagues/{slug}/ 目录下',
+            creator_import_colleague_files: '上传以下文件（位于 colleagues/{slug}/ 目录中）：',
+            creator_import_mentor_title: '导入导师 Skill',
+            creator_import_mentor_hint: '可以直接从 ArXiv 搜索生成导师，或者导入 supervisor 已生成的文件。',
+            creator_generate_mentor_kicker: '📚 直接生成',
+            creator_generate_mentor_hint: '输入导师姓名后，Team Creator 会搜索 ArXiv、生成导师档案，并直接导入为团队角色。',
+            creator_arxiv_author_name_label: '导师姓名',
+            creator_arxiv_author_name_placeholder: '例如: Geoffrey Hinton',
+            creator_arxiv_affiliation_label: '机构（可选）',
+            creator_arxiv_affiliation_placeholder: '例如: University of Toronto',
+            creator_arxiv_max_results_label: '论文上限',
+            creator_generate_mentor_btn: '📚 搜索 ArXiv 并生成导师',
+            creator_generate_mentor_loading: '正在搜索 ArXiv 并生成导师...',
+            creator_generate_mentor_success: '导师生成成功：{name}（{count} 篇论文）',
+            creator_import_mentor_repo: '📦 仓库地址',
+            creator_import_mentor_repo_url: 'https://github.com/ybq22/supervisor',
+            creator_import_mentor_steps: '生成步骤：① 克隆仓库 → ② 在 Claude Code / Cursor 中运行 /distill-mentor <导师名> → ③ 自动搜索 ArXiv 论文并分析风格 → ④ 生成的文件在 ~/.claude/mentors/ 和 ~/.claude/skills/ 下',
+            creator_import_mentor_files: '上传以下文件：',
+            creator_import_meta_json: 'meta.json — 同事基础信息（必需）',
+            creator_import_persona_md: 'persona.md — 5 层性格画像（必需）',
+            creator_import_work_md: 'work.md — 工作能力（可选，推荐上传）',
+            creator_import_or_local_path: '或者填写本机路径：',
+            creator_import_colleague_dir: 'colleagues/{slug} 目录路径（自动读取 meta.json / persona.md / work.md）',
+            creator_import_colleague_dir_placeholder: '例如: ~/.claude/skills/create-colleague/colleagues/zhangsan',
+            creator_import_mentor_json: '{name}.json — 导师档案 JSON（必需）',
+            creator_import_skill_md: 'SKILL.md — 导师完整 Skill（可选，推荐上传）',
+            creator_import_mentor_json_path: '{name}.json 路径（未上传时必需）',
+            creator_import_mentor_json_path_placeholder: '例如: ~/.claude/mentors/Geoffrey_Hinton.json',
+            creator_import_skill_md_path: 'SKILL.md 路径（可选）',
+            creator_import_skill_md_path_placeholder: '例如: ~/.claude/skills/geoffrey-hinton/SKILL.md',
+            creator_import_btn: '📥 导入到 Team Creator',
+            creator_import_success: '导入成功！',
+            creator_import_error: '导入失败',
             creator_step2_manual_kicker: 'Step 2 · 手动定义',
             creator_step2_manual_title: '定义团队角色',
             creator_roles_hint: '添加你的团队角色。每个角色包含名称、职责和依赖关系。',
@@ -230,6 +289,65 @@
             creator_example_btn: '💡 Use Example Prompt',
             creator_mode_direct: '✏️ Define Roles Directly',
             creator_mode_discover: '🔍 AI Discovery',
+            creator_mode_import_colleague: '👥 Import Colleague',
+            creator_mode_import_mentor: '🎓 Import Mentor',
+            creator_import_colleague_title: 'Import Colleague Skill',
+            creator_import_colleague_hint: 'Generate a colleague directly from Feishu or import artifacts from colleague-skill.',
+            creator_generate_colleague_kicker: '🪶 Direct Generate',
+            creator_generate_colleague_hint: 'Provide Feishu app credentials and basic colleague info. Team Creator will collect messages, distill persona/work, and import the role directly.',
+            creator_feishu_app_id_label: 'Feishu App ID',
+            creator_feishu_app_id_placeholder: 'e.g. cli_xxx',
+            creator_feishu_app_secret_label: 'Feishu App Secret',
+            creator_feishu_app_secret_placeholder: 'e.g. xxxxx',
+            creator_feishu_target_name_label: 'Colleague Name',
+            creator_feishu_target_name_placeholder: 'e.g. Alice',
+            creator_feishu_role_label: 'Role',
+            creator_feishu_role_placeholder: 'e.g. Backend Engineer',
+            creator_feishu_company_label: 'Company / Team',
+            creator_feishu_company_placeholder: 'e.g. TeamClaw',
+            creator_feishu_level_label: 'Level',
+            creator_feishu_level_placeholder: 'e.g. L4 / P6',
+            creator_feishu_personality_tags_label: 'Personality Tags (comma separated)',
+            creator_feishu_personality_tags_placeholder: 'e.g. direct, data-driven',
+            creator_feishu_msg_limit_label: 'Message Limit',
+            creator_generate_colleague_btn: '🪶 Collect & Generate Colleague',
+            creator_generate_colleague_loading: 'Collecting Feishu messages and distilling colleague artifacts...',
+            creator_generate_colleague_success: 'Colleague generated: {name}',
+            creator_import_colleague_repo: '📦 Repository',
+            creator_import_colleague_repo_url: 'https://github.com/titanwings/colleague-skill',
+            creator_import_colleague_steps: 'Steps: ① Clone the repo → ② Run /create-colleague in Claude Code / Cursor → ③ Fill in colleague info & provide source materials → ④ Generated files are in colleagues/{slug}/',
+            creator_import_colleague_files: 'Upload the following files (from colleagues/{slug}/ directory):',
+            creator_import_mentor_title: 'Import Mentor Skill',
+            creator_import_mentor_hint: 'Generate a mentor directly from ArXiv or import artifacts from supervisor.',
+            creator_generate_mentor_kicker: '📚 Direct Generate',
+            creator_generate_mentor_hint: 'Enter a mentor name and Team Creator will search ArXiv, build the mentor profile, and import it directly.',
+            creator_arxiv_author_name_label: 'Mentor Name',
+            creator_arxiv_author_name_placeholder: 'e.g. Geoffrey Hinton',
+            creator_arxiv_affiliation_label: 'Affiliation (optional)',
+            creator_arxiv_affiliation_placeholder: 'e.g. University of Toronto',
+            creator_arxiv_max_results_label: 'Paper Limit',
+            creator_generate_mentor_btn: '📚 Search ArXiv & Generate Mentor',
+            creator_generate_mentor_loading: 'Searching ArXiv and generating mentor...',
+            creator_generate_mentor_success: 'Mentor generated: {name} ({count} papers)',
+            creator_import_mentor_repo: '📦 Repository',
+            creator_import_mentor_repo_url: 'https://github.com/ybq22/supervisor',
+            creator_import_mentor_steps: 'Steps: ① Clone the repo → ② Run /distill-mentor <name> in Claude Code / Cursor → ③ Auto-searches ArXiv papers & analyzes style → ④ Generated files are in ~/.claude/mentors/ and ~/.claude/skills/',
+            creator_import_mentor_files: 'Upload the following files:',
+            creator_import_meta_json: 'meta.json — colleague profile (required)',
+            creator_import_persona_md: 'persona.md — 5-layer personality (required)',
+            creator_import_work_md: 'work.md — work capabilities (optional, recommended)',
+            creator_import_or_local_path: 'Or provide a local path:',
+            creator_import_colleague_dir: 'colleagues/{slug} directory (auto-reads meta.json / persona.md / work.md)',
+            creator_import_colleague_dir_placeholder: 'e.g. ~/.claude/skills/create-colleague/colleagues/zhangsan',
+            creator_import_mentor_json: '{name}.json — mentor profile JSON (required)',
+            creator_import_skill_md: 'SKILL.md — full mentor skill (optional, recommended)',
+            creator_import_mentor_json_path: '{name}.json path (required if not uploaded)',
+            creator_import_mentor_json_path_placeholder: 'e.g. ~/.claude/mentors/Geoffrey_Hinton.json',
+            creator_import_skill_md_path: 'SKILL.md path (optional)',
+            creator_import_skill_md_path_placeholder: 'e.g. ~/.claude/skills/geoffrey-hinton/SKILL.md',
+            creator_import_btn: '📥 Import to Team Creator',
+            creator_import_success: 'Import successful!',
+            creator_import_error: 'Import failed',
             creator_step2_manual_kicker: 'Step 2 · Manual Setup',
             creator_step2_manual_title: 'Define Team Roles',
             creator_roles_hint: 'Add the roles in your team. Each role includes a name, responsibilities, and dependencies.',
@@ -1588,12 +1706,20 @@
             state.mode = mode;
             var directBtn = $('builder-mode-direct');
             var discoverBtn = $('builder-mode-discover');
+            var importColleagueBtn = $('builder-mode-import-colleague');
+            var importMentorBtn = $('builder-mode-import-mentor');
             var rolesStep = $('builder-step-roles');
             var discoverStep = $('builder-step-discover');
+            var importColleagueStep = $('builder-step-import-colleague');
+            var importMentorStep = $('builder-step-import-mentor');
             if (directBtn) directBtn.classList.toggle('builder-mode-active', mode === 'direct');
             if (discoverBtn) discoverBtn.classList.toggle('builder-mode-active', mode === 'discover');
+            if (importColleagueBtn) importColleagueBtn.classList.toggle('builder-mode-active', mode === 'import-colleague');
+            if (importMentorBtn) importMentorBtn.classList.toggle('builder-mode-active', mode === 'import-mentor');
             if (rolesStep) rolesStep.classList.toggle('builder-hidden', mode !== 'direct');
             if (discoverStep) discoverStep.classList.toggle('builder-hidden', mode !== 'discover');
+            if (importColleagueStep) importColleagueStep.classList.toggle('builder-hidden', mode !== 'import-colleague');
+            if (importMentorStep) importMentorStep.classList.toggle('builder-hidden', mode !== 'import-mentor');
             schedulePersistBuilderState();
         }
 
@@ -2831,10 +2957,32 @@
             support: '🛡️', testing: '🧪',
         };
 
+        function getCreatorTextLayout() {
+            if (typeof window === 'undefined') return null;
+            return window.TeamClawTextLayout || null;
+        }
+
+        function getDagNodeLabel(node) {
+            var fallback = String((node && (node.name || node.role_name || node.tag)) || 'Untitled');
+            return compactText(fallback) || 'Untitled';
+        }
+
+        function getDagNodeTagLabel(node) {
+            if (!node) return 'expert';
+            if (node.type === 'manual') {
+                if (node.author === 'begin') return 'begin boundary';
+                if (node.author === 'bend') return 'end boundary';
+                return String(node.author || 'manual');
+            }
+            return String(node.tag || 'expert');
+        }
+
         function buildFallbackGraphLayout(experts, roles) {
-            var NW = 150, NH = 54, HGAP = 70, VGAP = 26, PAD = 30;
+            var HGAP = 74, VGAP = 26, PAD = 30;
             var nameToIdx = {};
+            var metricsByIdx = {};
             experts.forEach(function (e, i) { nameToIdx[e.name] = i; });
+            experts.forEach(function (e, i) { metricsByIdx[i] = getDagNodeMetrics(e); });
             var adj = {};
             var inDeg = {};
             experts.forEach(function (_, i) { adj[i] = []; inDeg[i] = 0; });
@@ -2878,24 +3026,38 @@
 
             var nodes = [];
             var cx = PAD;
-            var maxBottom = PAD;
+            var maxBottom = PAD, widestCol = 0;
             columns.forEach(function (col) {
+                var colWidth = 0;
+                col.forEach(function (idx) {
+                    colWidth = Math.max(colWidth, (metricsByIdx[idx] && metricsByIdx[idx].w) || 150);
+                });
+                widestCol = Math.max(widestCol, colWidth);
                 var startY = PAD;
                 col.forEach(function (idx, rowIdx) {
                     var e = experts[idx];
-                    var ny = startY + rowIdx * (NH + VGAP);
+                    var metrics = metricsByIdx[idx] || getDagNodeMetrics(e);
+                    var ny = startY;
                     nodes.push({
-                        id: idx, x: cx, y: ny, w: NW, h: NH,
+                        id: idx,
+                        x: cx + Math.round((colWidth - metrics.w) / 2),
+                        y: ny,
+                        w: metrics.w,
+                        h: metrics.h,
                         name: e.name, tag: e.tag, persona: e.persona || '',
                         temperature: e.temperature, source: e.source || '',
                         matched_preset: e.matched_preset || '',
+                        displayNameText: metrics.displayNameText,
+                        displayTagText: metrics.displayTagText,
+                        infoWidth: metrics.infoWidth,
                     });
-                    maxBottom = Math.max(maxBottom, ny + NH);
+                    maxBottom = Math.max(maxBottom, ny + metrics.h);
+                    startY += metrics.h + VGAP;
                 });
-                cx += NW + HGAP;
+                cx += colWidth + HGAP;
             });
 
-            if (maxBottom > PAD + NH) {
+            if (maxBottom > PAD + 54) {
                 var centerY = (maxBottom + PAD) / 2;
                 var colMap = {};
                 nodes.forEach(function (n) { if (!colMap[n.x]) colMap[n.x] = []; colMap[n.x].push(n); });
@@ -2916,14 +3078,52 @@
 
             var totalW = PAD, totalH = PAD;
             nodes.forEach(function (n) { totalW = Math.max(totalW, n.x + n.w + PAD); totalH = Math.max(totalH, n.y + n.h + PAD); });
+            totalW = Math.max(totalW, PAD + widestCol + PAD);
             return { width: totalW, height: totalH, nodes: nodes, edges: edges, conditionalEdges: [], selectorEdges: [] };
         }
 
         function getDagNodeMetrics(node) {
-            if (node && node.type === 'manual') return { w: 146, h: 70 };
-            if (node && node.isSelector) return { w: 192, h: 92 };
-            if (node && node.tag === 'all') return { w: 184, h: 86 };
-            return { w: 174, h: 84 };
+            var textLayout = getCreatorTextLayout();
+            var label = getDagNodeLabel(node);
+            var tagLabel = getDagNodeTagLabel(node);
+            var typeConfig = node && node.type === 'manual'
+                ? { minW: 146, maxW: 182, minH: 70, nameWidth: 118, maxLines: 1 }
+                : node && node.isSelector
+                    ? { minW: 192, maxW: 248, minH: 92, nameWidth: 166, maxLines: 2 }
+                    : node && node.tag === 'all'
+                        ? { minW: 184, maxW: 232, minH: 86, nameWidth: 154, maxLines: 2 }
+                        : { minW: 174, maxW: 224, minH: 84, nameWidth: 148, maxLines: 2 };
+            if (!textLayout || typeof textLayout.measureDisplay !== 'function') {
+                return {
+                    w: typeConfig.minW,
+                    h: typeConfig.minH,
+                    displayNameText: label,
+                    displayTagText: tagLabel,
+                    infoWidth: typeConfig.nameWidth,
+                };
+            }
+            var nameMeasure = textLayout.measureDisplay(label, {
+                font: '700 13px Arial',
+                lineHeight: 16,
+                maxWidth: typeConfig.nameWidth,
+                maxLines: typeConfig.maxLines,
+                suffix: '…',
+            });
+            var tagMeasure = textLayout.fitSingleLine(tagLabel, typeConfig.nameWidth, {
+                font: '10px Menlo',
+                lineHeight: 12,
+                suffix: '…',
+            });
+            var contentWidth = Math.max(Math.ceil(nameMeasure.width), Math.ceil(tagMeasure.width));
+            var w = Math.max(typeConfig.minW, Math.min(typeConfig.maxW, contentWidth + 58));
+            var infoWidth = Math.max(94, w - 58);
+            return {
+                w: Math.round(w),
+                h: Math.round(Math.max(typeConfig.minH, 44 + Math.ceil(nameMeasure.height) + 12)),
+                displayNameText: (nameMeasure.lines || [nameMeasure.text || label]).join('\n'),
+                displayTagText: tagMeasure.text || tagLabel,
+                infoWidth: infoWidth,
+            };
         }
 
         function buildWorkflowLayout(config) {
@@ -2931,12 +3131,15 @@
             if (workflowLayout && Array.isArray(workflowLayout.nodes) && workflowLayout.nodes.length) {
                 var nodes = workflowLayout.nodes.map(function (node) {
                     var metrics = getDagNodeMetrics(node || {});
-                    var normalizedNode = {};
-                    Object.keys(node || {}).forEach(function (key) { normalizedNode[key] = node[key]; });
-                    normalizedNode.w = metrics.w;
-                    normalizedNode.h = metrics.h;
-                    return normalizedNode;
-                });
+                var normalizedNode = {};
+                Object.keys(node || {}).forEach(function (key) { normalizedNode[key] = node[key]; });
+                normalizedNode.w = metrics.w;
+                normalizedNode.h = metrics.h;
+                normalizedNode.displayNameText = metrics.displayNameText;
+                normalizedNode.displayTagText = metrics.displayTagText;
+                normalizedNode.infoWidth = metrics.infoWidth;
+                return normalizedNode;
+            });
 
                 var totalW = 40;
                 var totalH = 40;
@@ -2985,8 +3188,16 @@
         }
 
         function edgeLabelSvg(x, y, text, kind) {
-            var label = String(text || '');
-            var width = Math.max(34, label.length * 7 + 16);
+            var textLayout = getCreatorTextLayout();
+            var measurement = textLayout && typeof textLayout.fitSingleLine === 'function'
+                ? textLayout.fitSingleLine(text || '', 150, {
+                    font: '600 11px Arial',
+                    lineHeight: 14,
+                    suffix: '…',
+                })
+                : { text: String(text || ''), width: Math.max(18, String(text || '').length * 7) };
+            var label = String(measurement.text || text || '');
+            var width = Math.max(34, Math.ceil(measurement.width || 0) + 16);
             var left = Math.round(x - width / 2);
             var top = Math.round(y - 11);
             return '<g class="fg-edge-label fg-edge-label-' + kind + '" transform="translate(' + left + ',' + top + ')">' +
@@ -3077,6 +3288,9 @@
                 var tagLabel = isManual
                     ? (node.author === 'begin' ? 'begin boundary' : (node.author === 'bend' ? 'end boundary' : (node.author || 'manual')))
                     : (node.tag || 'expert');
+                var displayNameText = node.displayNameText || node.name;
+                var displayTagText = node.displayTagText || tagLabel;
+                var infoWidth = node.infoWidth || Math.max(94, node.w - 58);
                 var nodeClass = 'fg-node' +
                     (isManual ? ' fg-node-manual' : '') +
                     (isSelector ? ' fg-node-selector' : '') +
@@ -3090,7 +3304,7 @@
                     '<div class="' + nodeClass + '" style="left:' + node.x + 'px;top:' + node.y + 'px;width:' + node.w + 'px;height:' + node.h + 'px;">' +
                         '<div class="fg-port port-in"></div>' +
                         '<span class="fg-emoji">' + emoji + '</span>' +
-                        '<div class="fg-info"><div class="fg-name">' + escapeHtml(node.name) + '</div><div class="fg-tag">' + escapeHtml(tagLabel) + '</div></div>' +
+                        '<div class="fg-info" style="max-width:' + infoWidth + 'px;"><div class="fg-name" style="max-width:' + infoWidth + 'px;">' + escapeHtml(displayNameText) + '</div><div class="fg-tag" style="max-width:' + infoWidth + 'px;">' + escapeHtml(displayTagText) + '</div></div>' +
                         badgeHtml +
                         '<div class="fg-port port-out"></div>' +
                         '<div class="fg-tooltip">' +
@@ -3529,11 +3743,248 @@
             }
         }
 
+        function applyImportedTeamConfig(teamConfig, successMessage) {
+            state.teamConfig = teamConfig;
+            if (teamConfig && teamConfig.oasis_experts) {
+                state.roles = teamConfig.oasis_experts.map(function (expert) {
+                    return {
+                        role_name: expert.name || '',
+                        personality_traits: [],
+                        primary_responsibilities: [],
+                        depends_on: [],
+                        tools_used: [],
+                        _expert_tag: expert.tag || '',
+                        _full_persona: expert.persona || '',
+                    };
+                });
+                setMode('direct');
+                renderRoles();
+            }
+            if (successMessage) {
+                setBuilderPill(t('creator_import_success'), 'success');
+                setBuilderStatus(successMessage, 'success');
+            }
+            renderTeamPreview(teamConfig);
+        }
+
+        // ── Import Colleague Skill ──
+        async function handleImportColleague() {
+            var metaInput = $('import-colleague-meta');
+            var personaInput = $('import-colleague-persona');
+            var workInput = $('import-colleague-work');
+            var dirInput = $('import-colleague-dir');
+            var statusEl = $('import-colleague-status');
+            var hasDirPath = !!(dirInput && String(dirInput.value || '').trim());
+
+            if ((!metaInput || !metaInput.files || !metaInput.files.length) && !hasDirPath) {
+                if (statusEl) statusEl.textContent = 'meta.json is required';
+                return;
+            }
+            if ((!personaInput || !personaInput.files || !personaInput.files.length) && !hasDirPath) {
+                if (statusEl) statusEl.textContent = 'persona.md is required';
+                return;
+            }
+
+            if (statusEl) statusEl.textContent = '正在导入...';
+            try {
+                var metaJson = null;
+                var personaMd = '';
+                var workMd = (workInput && workInput.files && workInput.files.length) ? await workInput.files[0].text() : '';
+                if (metaInput && metaInput.files && metaInput.files.length) {
+                    var metaText = await metaInput.files[0].text();
+                    metaJson = JSON.parse(metaText);
+                }
+                if (personaInput && personaInput.files && personaInput.files.length) {
+                    personaMd = await personaInput.files[0].text();
+                }
+
+                var teamName = (($('builder-team-name') || {}).value || '').trim();
+                var taskDesc = (($('builder-task-desc') || {}).value || '').trim();
+                var colleagueDirPath = hasDirPath ? String(dirInput.value || '').trim() : '';
+
+                var resp = await fetch('/api/team-creator/import-colleague', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        meta_json: metaJson,
+                        persona_md: personaMd,
+                        work_md: workMd,
+                        colleague_dir_path: colleagueDirPath,
+                        team_name: teamName,
+                        task_description: taskDesc,
+                    }),
+                });
+                var data = await resp.json();
+                if (!resp.ok || !data.ok) throw new Error(data.error || t('creator_import_error'));
+
+                if (statusEl) statusEl.textContent = t('creator_import_success');
+                var colleagueName = (metaJson && metaJson.name) || (((data.summary || {}).colleague_meta || {}).name) || '同事';
+                applyImportedTeamConfig(data.team_config, t('creator_import_success') + ' — ' + colleagueName + ' 已导入为团队角色');
+            } catch (err) {
+                if (statusEl) statusEl.textContent = t('creator_import_error') + ': ' + err.message;
+                setBuilderStatus(t('creator_import_error') + ': ' + err.message, 'error');
+            }
+        }
+
+        // ── Import Mentor Skill ──
+        async function handleImportMentor() {
+            var mentorInput = $('import-mentor-json');
+            var skillInput = $('import-mentor-skill');
+            var mentorPathInput = $('import-mentor-json-path');
+            var skillPathInput = $('import-mentor-skill-path');
+            var statusEl = $('import-mentor-status');
+            var hasMentorPath = !!(mentorPathInput && String(mentorPathInput.value || '').trim());
+
+            if ((!mentorInput || !mentorInput.files || !mentorInput.files.length) && !hasMentorPath) {
+                if (statusEl) statusEl.textContent = '{name}.json is required';
+                return;
+            }
+
+            if (statusEl) statusEl.textContent = '正在导入...';
+            try {
+                var mentorJson = null;
+                if (mentorInput && mentorInput.files && mentorInput.files.length) {
+                    var mentorText = await mentorInput.files[0].text();
+                    mentorJson = JSON.parse(mentorText);
+                }
+                var skillMd = (skillInput && skillInput.files && skillInput.files.length) ? await skillInput.files[0].text() : '';
+
+                var teamName = (($('builder-team-name') || {}).value || '').trim();
+                var taskDesc = (($('builder-task-desc') || {}).value || '').trim();
+                var mentorJsonPath = hasMentorPath ? String(mentorPathInput.value || '').trim() : '';
+                var skillMdPath = (skillPathInput && String(skillPathInput.value || '').trim()) ? String(skillPathInput.value || '').trim() : '';
+
+                var resp = await fetch('/api/team-creator/import-mentor', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mentor_json: mentorJson,
+                        skill_md: skillMd,
+                        mentor_json_path: mentorJsonPath,
+                        skill_md_path: skillMdPath,
+                        team_name: teamName,
+                        task_description: taskDesc,
+                    }),
+                });
+                var data = await resp.json();
+                if (!resp.ok || !data.ok) throw new Error(data.error || t('creator_import_error'));
+
+                if (statusEl) statusEl.textContent = t('creator_import_success');
+                var mentorName = (mentorJson && mentorJson.profile && (mentorJson.profile.name_zh || mentorJson.profile.name_en)) || (mentorJson && mentorJson.meta && mentorJson.meta.mentor_name) || (((data.summary || {}).mentor_meta || {}).name) || '导师';
+                applyImportedTeamConfig(data.team_config, t('creator_import_success') + ' — ' + mentorName + ' 已导入为导师角色');
+            } catch (err) {
+                if (statusEl) statusEl.textContent = t('creator_import_error') + ': ' + err.message;
+                setBuilderStatus(t('creator_import_error') + ': ' + err.message, 'error');
+            }
+        }
+
+        async function handleGenerateColleagueFromFeishu() {
+            var appId = (($('feishu-app-id') || {}).value || '').trim();
+            var appSecret = (($('feishu-app-secret') || {}).value || '').trim();
+            var targetName = (($('feishu-target-name') || {}).value || '').trim();
+            var role = (($('feishu-role') || {}).value || '').trim();
+            var company = (($('feishu-company') || {}).value || '').trim();
+            var level = (($('feishu-level') || {}).value || '').trim();
+            var personalityTags = (($('feishu-personality-tags') || {}).value || '').trim();
+            var msgLimit = parseInt((($('feishu-msg-limit') || {}).value || '500'), 10);
+            var statusEl = $('import-colleague-status');
+
+            if (!appId || !appSecret || !targetName) {
+                if (statusEl) statusEl.textContent = 'Feishu app_id / app_secret / target_name are required';
+                return;
+            }
+
+            if (statusEl) statusEl.textContent = t('creator_generate_colleague_loading');
+            try {
+                var resp = await fetch('/api/team-creator/feishu-collect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        app_id: appId,
+                        app_secret: appSecret,
+                        target_name: targetName,
+                        company: company,
+                        role: role,
+                        level: level,
+                        msg_limit: isNaN(msgLimit) ? 500 : msgLimit,
+                        personality_tags: personalityTags
+                            ? personalityTags.split(',').map(function (item) { return item.trim(); }).filter(Boolean)
+                            : [],
+                        auto_distill: true,
+                        auto_import: true,
+                        team_name: (($('builder-team-name') || {}).value || '').trim(),
+                        task_description: (($('builder-task-desc') || {}).value || '').trim(),
+                    }),
+                });
+                var data = await resp.json();
+                if (!resp.ok || !data.ok) throw new Error(data.error || t('creator_import_error'));
+
+                var colleagueName = (((data.summary || {}).colleague_meta || {}).name) || targetName;
+                var successText = t('creator_generate_colleague_success', { name: colleagueName }) +
+                    ' · ' + String(data.messages_length || 0) + ' chars collected';
+                if (statusEl) statusEl.textContent = successText;
+                applyImportedTeamConfig(data.team_config, successText);
+            } catch (err) {
+                if (statusEl) statusEl.textContent = t('creator_import_error') + ': ' + err.message;
+                setBuilderStatus(t('creator_import_error') + ': ' + err.message, 'error');
+            }
+        }
+
+        async function handleGenerateMentorFromArxiv() {
+            var authorName = (($('mentor-arxiv-name') || {}).value || '').trim();
+            var affiliation = (($('mentor-arxiv-affiliation') || {}).value || '').trim();
+            var maxResults = parseInt((($('mentor-arxiv-max-results') || {}).value || '20'), 10);
+            var statusEl = $('import-mentor-status');
+
+            if (!authorName) {
+                if (statusEl) statusEl.textContent = 'author_name is required';
+                return;
+            }
+
+            if (statusEl) statusEl.textContent = t('creator_generate_mentor_loading');
+            try {
+                var resp = await fetch('/api/team-creator/arxiv-search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        author_name: authorName,
+                        affiliation: affiliation,
+                        max_results: isNaN(maxResults) ? 20 : maxResults,
+                        auto_import: true,
+                        team_name: (($('builder-team-name') || {}).value || '').trim(),
+                        task_description: (($('builder-task-desc') || {}).value || '').trim(),
+                    }),
+                });
+                var data = await resp.json();
+                if (!resp.ok || !data.ok) throw new Error(data.error || t('creator_import_error'));
+
+                var mentorName = (((data.summary || {}).mentor_meta || {}).name) || authorName;
+                var successText = t('creator_generate_mentor_success', {
+                    name: mentorName,
+                    count: data.papers_count || 0,
+                });
+                if (statusEl) statusEl.textContent = successText;
+                applyImportedTeamConfig(data.team_config, successText);
+            } catch (err) {
+                if (statusEl) statusEl.textContent = t('creator_import_error') + ': ' + err.message;
+                setBuilderStatus(t('creator_import_error') + ': ' + err.message, 'error');
+            }
+        }
+
         // ── Init ──
         function init() {
             // Mode switch
             $('builder-mode-direct').addEventListener('click', function () { setMode('direct'); });
             $('builder-mode-discover').addEventListener('click', function () { setMode('discover'); });
+            $('builder-mode-import-colleague').addEventListener('click', function () { setMode('import-colleague'); });
+            $('builder-mode-import-mentor').addEventListener('click', function () { setMode('import-mentor'); });
+
+            // Import colleague handler
+            $('import-colleague-btn').addEventListener('click', handleImportColleague);
+            $('generate-colleague-btn').addEventListener('click', handleGenerateColleagueFromFeishu);
+            // Import mentor handler
+            $('import-mentor-btn').addEventListener('click', handleImportMentor);
+            $('generate-mentor-btn').addEventListener('click', handleGenerateMentorFromArxiv);
 
             // Example instruction
             $('builder-example-btn').addEventListener('click', function () {
@@ -3626,7 +4077,7 @@
             loadTinyfishStatus();
         }
 
-        return { init: init, refreshI18n: refreshI18n };
+        return { init: init, refreshI18n: refreshI18n, getDagNodeMetrics: getDagNodeMetrics };
     })();
 
     // ─── Bootstrap ───────────────────────────────────

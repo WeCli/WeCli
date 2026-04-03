@@ -30,10 +30,15 @@ class ConfigureOpenClawSyncTests(unittest.TestCase):
         self.original_env_path = co.ENV_PATH
         self.original_openclaw_home = co.OPENCLAW_HOME
         self.original_config_path = co.OPENCLAW_CONFIG_PATH
+        self.original_agent_models_path = co.OPENCLAW_AGENT_MODELS_PATH
 
         co.ENV_PATH = str(self.env_path)
         co.OPENCLAW_HOME = str(self.openclaw_home)
         co.OPENCLAW_CONFIG_PATH = str(self.config_path)
+        # Must track OPENCLAW_HOME: module-level path otherwise still points at real ~/.openclaw.
+        co.OPENCLAW_AGENT_MODELS_PATH = str(
+            self.openclaw_home / "agents" / "main" / "agent" / "models.json"
+        )
 
         self.addCleanup(self._restore_paths)
 
@@ -45,6 +50,7 @@ class ConfigureOpenClawSyncTests(unittest.TestCase):
         co.ENV_PATH = self.original_env_path
         co.OPENCLAW_HOME = self.original_openclaw_home
         co.OPENCLAW_CONFIG_PATH = self.original_config_path
+        co.OPENCLAW_AGENT_MODELS_PATH = self.original_agent_models_path
 
     def _write_openclaw_config(self, data):
         self.config_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -75,6 +81,47 @@ class ConfigureOpenClawSyncTests(unittest.TestCase):
         self.assertEqual(detected["LLM_API_KEY"], "env-openai-key")
         self.assertEqual(detected["LLM_BASE_URL"], "https://api.openai.com")
         self.assertEqual(detected["LLM_MODEL"], "gpt-5.4")
+        self.assertEqual(detected["LLM_PROVIDER"], "openai")
+
+    def test_detect_llm_config_infers_openclaw_home_from_sessions_file(self):
+        inferred_home = Path(self.tempdir.name) / ".openclaw_inferred"
+        inferred_home.mkdir(parents=True, exist_ok=True)
+        inferred_config = inferred_home / "openclaw.json"
+        inferred_config.write_text(
+            json.dumps(
+                {
+                    "env": {"OPENAI_API_KEY": "env-openai-key-2"},
+                    "models": {
+                        "providers": {
+                            "openai": {
+                                "baseUrl": "https://api.openai.com/v1",
+                                "apiKey": "provider-openai-key-2",
+                                "api": "openai-completions",
+                                "models": [{"id": "gpt-5.4-mini", "name": "gpt-5.4-mini"}],
+                            }
+                        }
+                    },
+                    "agents": {"defaults": {"model": {"primary": "openai/gpt-5.4-mini"}}},
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        sessions_file = inferred_home / "agents" / "main" / "sessions" / "sessions.json"
+        sessions_file.parent.mkdir(parents=True, exist_ok=True)
+        sessions_file.write_text("{}", encoding="utf-8")
+        self.env_path.write_text(
+            f"OPENCLAW_SESSIONS_FILE={sessions_file}\n",
+            encoding="utf-8",
+        )
+
+        detected = co.detect_llm_config_from_openclaw()
+
+        self.assertEqual(detected["LLM_API_KEY"], "env-openai-key-2")
+        self.assertEqual(detected["LLM_BASE_URL"], "https://api.openai.com")
+        self.assertEqual(detected["LLM_MODEL"], "gpt-5.4-mini")
         self.assertEqual(detected["LLM_PROVIDER"], "openai")
 
     def test_export_openai_config_updates_provider_and_env_key(self):

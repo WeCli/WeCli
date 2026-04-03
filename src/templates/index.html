@@ -336,32 +336,36 @@
                     <div id="audio-preview-area" class="image-preview-area" style="display:none;"></div>
                     <div id="workflow-preview-area"></div>
                     <div id="persona-preview-area"></div>
-                    <div class="flex items-end space-x-2 sm:space-x-3">
-                        <label class="image-upload-btn" title="上传图片/文件/音频">
-                            📎
-                            <input type="file" id="image-input" accept="image/*,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.log,.py,.js,.ts,.html,.css,.java,.c,.cpp,.h,.go,.rs,.sh,.bat,.ini,.toml,.cfg,.conf,.sql,.r,.rb,.mp3,.wav,.ogg,.m4a,.webm,.flac,.aac,.avi,.mp4,.mkv,.mov" multiple style="display:none;" onchange="handleFileSelect(event)">
-                        </label>
-                        <button id="record-btn" class="audio-record-btn" data-i18n-title="recording_title" title="录音" onclick="toggleRecording()">🎤</button>
-                        <button id="workflow-add-btn" class="workflow-add-btn" data-i18n-title="wf_btn_title" title="添加工作流" onclick="showWorkflowPopup()"><span class="wf-icon">📋</span><span class="wf-label" data-i18n="wf_btn_label">+ 工作流</span></button>
-                        <button id="persona-add-btn" class="persona-add-btn" data-i18n-title="persona_btn_title" title="引入专家人设" onclick="showPersonaPopup()"><span class="persona-icon">🎭</span><span class="persona-label" data-i18n="persona_btn_label">+ 人设</span></button>
-                        <div class="flex-grow">
-                            <textarea id="user-input" rows="1" 
-                                class="w-full p-2 sm:p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition-all text-sm sm:text-base"
-                                data-i18n-placeholder="input_placeholder" placeholder="输入指令...（可粘贴图片/上传文件/录音）"></textarea>
+                    <div class="chat-composer-stack">
+                        <div class="chat-composer-toolbar">
+                            <label class="image-upload-btn" title="上传图片/文件/音频">
+                                📎
+                                <input type="file" id="image-input" accept="image/*,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.log,.py,.js,.ts,.html,.css,.java,.c,.cpp,.h,.go,.rs,.sh,.bat,.ini,.toml,.cfg,.conf,.sql,.r,.rb,.mp3,.wav,.ogg,.m4a,.webm,.flac,.aac,.avi,.mp4,.mkv,.mov" multiple style="display:none;" onchange="handleFileSelect(event)">
+                            </label>
+                            <button id="record-btn" class="audio-record-btn" data-i18n-title="recording_title" title="录音" onclick="toggleRecording()">🎤</button>
+                            <button id="workflow-add-btn" class="workflow-add-btn" data-i18n-title="wf_btn_title" title="添加工作流" onclick="showWorkflowPopup()"><span class="wf-icon">📋</span><span class="wf-label" data-i18n="wf_btn_label">+ 工作流</span></button>
+                            <button id="persona-add-btn" class="persona-add-btn" data-i18n-title="persona_btn_title" title="引入专家人设" onclick="showPersonaPopup()"><span class="persona-icon">🎭</span><span class="persona-label" data-i18n="persona_btn_label">+ 人设</span></button>
                         </div>
-                        <button onclick="handleSend()" id="send-btn"
-                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl transition-all font-bold shadow-lg h-[42px] sm:h-[50px] text-sm sm:text-base flex-shrink-0"
-                            data-i18n="send_btn">发送
-                        </button>
-                        <button onclick="handleCancel()" id="cancel-btn"
-                            class="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl transition-all font-bold shadow-lg h-[42px] sm:h-[50px] text-sm sm:text-base flex-shrink-0"
-                            style="display:none;" data-i18n="cancel_btn">终止
-                        </button>
-                        <button id="busy-btn" disabled
-                            class="busy-indicator-btn h-[42px] sm:h-[50px] text-sm sm:text-base flex-shrink-0"
-                            style="display:none;" data-i18n="busy_btn">
-                            <span class="busy-spinner"></span>系统占用中
-                        </button>
+                        <div class="chat-composer-input-row">
+                            <div class="chat-composer-textarea-wrap">
+                                <textarea id="user-input" rows="1"
+                                    class="w-full p-2 sm:p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none transition-all text-sm sm:text-base"
+                                    data-i18n-placeholder="input_placeholder" placeholder="输入指令...（可粘贴图片/上传文件/录音）"></textarea>
+                            </div>
+                            <button onclick="handleSend()" id="send-btn"
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl transition-all font-bold shadow-lg h-[42px] sm:h-[50px] text-sm sm:text-base flex-shrink-0"
+                                data-i18n="send_btn">发送
+                            </button>
+                            <button onclick="handleCancel()" id="cancel-btn"
+                                class="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-xl transition-all font-bold shadow-lg h-[42px] sm:h-[50px] text-sm sm:text-base flex-shrink-0"
+                                style="display:none;" data-i18n="cancel_btn">终止
+                            </button>
+                            <button id="busy-btn" disabled
+                                class="busy-indicator-btn h-[42px] sm:h-[50px] text-sm sm:text-base flex-shrink-0"
+                                style="display:none;" data-i18n="busy_btn">
+                                <span class="busy-spinner"></span>系统占用中
+                            </button>
+                        </div>
                     </div>
                     <p class="text-[10px] text-center text-gray-400 mt-2 sm:mt-3 font-mono hidden sm:block" data-i18n="secure_footer">Secured by Nginx Reverse Proxy & SSH Tunnel</p>
                 </div>
@@ -1024,9 +1028,8 @@
                     <div style="margin-bottom:14px;">
                         <label style="display:block;font-size:13px;font-weight:600;color:#374151;margin-bottom:4px;">Model</label>
                         <div style="display:flex;gap:8px;">
-                            <select id="wizard-model" style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff;color:#1f2937;" disabled>
-                                <option value="">先点击"检测模型"</option>
-                            </select>
+                            <input id="wizard-model" type="text" list="wizard-model-list" placeholder="点击&quot;检测模型&quot;或手动输入模型名" style="flex:1;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px;background:#fff;color:#1f2937;box-sizing:border-box;" autocomplete="off">
+                            <datalist id="wizard-model-list"></datalist>
                             <button id="wizard-detect-btn" onclick="wizardDetectModels()" style="padding:10px 16px;border-radius:8px;border:none;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">🔍 检测模型</button>
                         </div>
                         <div id="wizard-detect-status" style="margin-top:6px;font-size:12px;color:#6b7280;"></div>
@@ -1192,6 +1195,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
     <script src="/static/js/snapshot_zip_progress.js?v=20260331-progress"></script>
     <!-- ===== Orchestration Page JavaScript (load first for shared utils like orchToast) ===== -->
+    <script src="/static/vendor/pretext.global.js?v=20260402-pretext"></script>
+    <script src="/static/js/pretext_text_core.js?v=20260402-pretext"></script>
     <script src="/static/js/orchestration.js?v=20260329-snapshot"></script>
     <script src="/static/js/markdown-shared.js"></script>
     <script src="/static/js/tinyfish-live-shared.js"></script>

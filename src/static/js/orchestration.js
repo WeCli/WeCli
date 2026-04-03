@@ -89,6 +89,11 @@ function orchCanDeleteOpenClawAgent(agentName) {
     return !!agentName && agentName.toLowerCase() !== 'main';
 }
 
+function orchGetTextLayout() {
+    if (typeof window === 'undefined') return null;
+    return window.TeamClawTextLayout || null;
+}
+
 async function orchDeleteOpenClawAgent(agentName, options = {}) {
     if (!orchCanDeleteOpenClawAgent(agentName)) {
         orchToast(t('orch_oc_delete_main_blocked'));
@@ -2116,10 +2121,12 @@ function orchRenderNode(node) {
     const _nodeIsZh = (typeof currentLang !== 'undefined' && currentLang === 'zh-CN');
     const nodeDisplayName = _nodeIsZh ? (node.name_zh || node.name) : (node.name_en || node.name);
     const instBadge = `<span style="display:inline-block;background:#2563eb;color:#fff;font-size:9px;font-weight:700;border-radius:50%;min-width:16px;height:16px;line-height:16px;text-align:center;margin-left:3px;flex-shrink:0;">${node.instance||1}</span>`;
-    let tagLine;
+    let tagTextPlain = '';
+    let tagLineStyle = '';
     if (isSession) {
         const tagLabel = node.tag ? `🏷️${node.tag} · ` : '';
-        tagLine = `<div class="orch-node-tag" style="color:#6366f1;font-family:monospace;">${tagLabel}#${(node.session_id||'').slice(-8)}</div>`;
+        tagTextPlain = `${tagLabel}#${(node.session_id||'').slice(-8)}`;
+        tagLineStyle = 'color:#6366f1;font-family:monospace;';
     } else if (isExternal) {
         let extDesc = '';
         if (node.api_url) {
@@ -2132,28 +2139,48 @@ function orchRenderNode(node) {
             const hdrParts = Object.entries(node.headers).map(([k,v]) => `${k}: ${v}`);
             if (hdrParts.length) extDesc += '\n' + hdrParts.join('\n');
         }
-        tagLine = `<div class="orch-node-tag" style="color:#2ecc71;white-space:pre-line;word-break:break-all;font-size:9px;">${escapeHtml(extDesc)}</div>`;
+        tagTextPlain = extDesc.replace(/\n+/g, ' · ');
+        tagLineStyle = 'color:#2ecc71;word-break:break-all;font-size:9px;';
     } else if (isScript) {
         const timeoutLabel = node.script_timeout ? ` · ⏱ ${node.script_timeout}s` : '';
         const cwdLabel = node.script_cwd ? ` · 📁 ${node.script_cwd}` : '';
-        tagLine = `<div class="orch-node-tag" style="color:#3b82f6;">script${escapeHtml(timeoutLabel + cwdLabel)}</div>`;
+        tagTextPlain = `script${timeoutLabel}${cwdLabel}`;
+        tagLineStyle = 'color:#3b82f6;';
     } else if (isHuman) {
         const authorLabel = node.human_author || t('orch_default_author');
         const replyLabel = node.human_reply_to !== '' && node.human_reply_to !== null && node.human_reply_to !== undefined
             ? ` · ↩ ${node.human_reply_to}`
             : '';
-        tagLine = `<div class="orch-node-tag" style="color:#8b5cf6;">${escapeHtml(authorLabel + replyLabel)}</div>`;
+        tagTextPlain = `${authorLabel}${replyLabel}`;
+        tagLineStyle = 'color:#8b5cf6;';
     } else {
-        tagLine = `<div class="orch-node-tag">${escapeHtml(node.tag)}</div>`;
+        tagTextPlain = String(node.tag || '');
+        tagLineStyle = '';
     }
     const previewText = orchNodePreviewText(node);
     const previewIcon = isScript ? '🧪' : (isHuman ? '💬' : '📋');
-    const instrPreview = (node.type !== 'manual' && previewText) ? `<div class="orch-node-instr" title="${escapeHtml(previewText)}" style="font-size:9px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px;margin-top:1px;">${previewIcon} ${escapeHtml(previewText.length > 20 ? previewText.slice(0,20)+'…' : previewText)}</div>` : '';
+    const textLayout = orchGetTextLayout();
+    const displayName = textLayout && typeof textLayout.fitSingleLine === 'function'
+        ? textLayout.fitSingleLine(nodeDisplayName, 148, { font: '600 12px Arial', lineHeight: 14, suffix: '…' })
+        : { text: nodeDisplayName, width: Math.min(148, nodeDisplayName.length * 8) };
+    const displayTag = textLayout && typeof textLayout.fitSingleLine === 'function'
+        ? textLayout.fitSingleLine(tagTextPlain, isExternal ? 164 : 148, { font: '10px Arial', lineHeight: 12, suffix: '…' })
+        : { text: tagTextPlain, width: Math.min(isExternal ? 164 : 148, String(tagTextPlain || '').length * 6.5) };
+    const displayInstr = (node.type !== 'manual' && previewText && textLayout && typeof textLayout.fitSingleLine === 'function')
+        ? textLayout.fitSingleLine(previewIcon + ' ' + previewText, 148, { font: '9px Arial', lineHeight: 12, suffix: '…' })
+        : { text: previewIcon + ' ' + (previewText.length > 20 ? previewText.slice(0, 20) + '…' : previewText), width: Math.min(148, previewText.length * 5.8) };
+    const infoWidth = Math.max(110, Math.min(isExternal ? 180 : 160, Math.ceil(Math.max(displayName.width || 0, displayTag.width || 0, displayInstr.width || 0)) + 12));
+    const nodeWidth = Math.max(126, Math.min(isExternal ? 252 : 224, infoWidth + 54));
+    const nodeHeight = previewText && node.type !== 'manual' ? 64 : 54;
+    el.style.width = nodeWidth + 'px';
+    el.style.minHeight = nodeHeight + 'px';
+    const tagLineHtml = `<div class="orch-node-tag" title="${escapeHtml(tagTextPlain)}" style="${tagLineStyle}max-width:${infoWidth}px;">${escapeHtml(displayTag.text || tagTextPlain)}</div>`;
+    const instrPreview = (node.type !== 'manual' && previewText) ? `<div class="orch-node-instr" title="${escapeHtml(previewText)}" style="font-size:9px;color:#6b7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:${infoWidth}px;margin-top:1px;">${escapeHtml(displayInstr.text || '')}</div>` : '';
     const statefulBadge = (node.stateful && !isExternal && !isScript && !isHuman) ? '<span style="display:inline-block;background:#8b5cf6;color:#fff;font-size:8px;font-weight:600;border-radius:3px;padding:0 3px;margin-left:3px;vertical-align:middle;" title="Stateful">⚡S</span>' : '';
     const selectorBadgeHtml = node.isSelector ? '<div class="orch-selector-badge">🎯 SELECTOR</div>' : '';
     el.innerHTML = `
         <span class="orch-node-emoji">${node.emoji}</span>
-        <div style="min-width:0;flex:1;"><div class="orch-node-name" style="display:flex;align-items:center;">${escapeHtml(nodeDisplayName)}${instBadge}${statefulBadge}</div>${tagLine}${instrPreview}</div>
+        <div style="min-width:0;flex:1;max-width:${infoWidth}px;"><div class="orch-node-name" style="display:flex;align-items:center;max-width:${infoWidth}px;" title="${escapeHtml(nodeDisplayName)}">${escapeHtml(displayName.text || nodeDisplayName)}${instBadge}${statefulBadge}</div>${tagLineHtml}${instrPreview}</div>
         <div class="orch-node-del" title="${t('orch_node_remove')}">×</div>
         <div class="orch-port port-in" data-node="${node.id}" data-dir="in"></div>
         <div class="orch-port port-out" data-node="${node.id}" data-dir="out"></div>
@@ -2322,6 +2349,7 @@ function orchRenderEdges() {
         // Label for conditional edges (use data flag, not position)
         if (isCond && edge.condition) {
             const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+            const edgeLayout = orchGetTextLayout();
             let lx, ly;
             if (isBackEdge) {
                 const bx1=sn.x+se.offsetWidth/2, bx2=tn.x+te.offsetWidth/2;
@@ -2332,14 +2360,17 @@ function orchRenderEdges() {
             lbl.setAttribute('text-anchor','middle');
             lbl.classList.add('orch-edge-label');
             lbl.classList.add(isElseBranch?'orch-else-label':'orch-then-label');
-            const dc = edge.condition.length>25 ? edge.condition.slice(0,22)+'...' : edge.condition;
-            lbl.textContent = (isElseBranch?'❌ ':'✅ ') + dc;
+            const conditionText = (isElseBranch ? '❌ ' : '✅ ') + edge.condition;
+            lbl.textContent = edgeLayout && typeof edgeLayout.fitSingleLine === 'function'
+                ? edgeLayout.fitSingleLine(conditionText, 176, { font: '600 10px Arial', lineHeight: 12, suffix: '…' }).text
+                : ((isElseBranch ? '❌ ' : '✅ ') + (edge.condition.length > 25 ? edge.condition.slice(0,22)+'...' : edge.condition));
             svg.appendChild(lbl);
         }
 
         // Label for selector edges: show choice number
         if (isSelectorEdge && choiceNum) {
             const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+            const edgeLayout = orchGetTextLayout();
             let lx, ly;
             if (isBackEdge) {
                 const bx1=sn.x+se.offsetWidth/2, bx2=tn.x+te.offsetWidth/2;
@@ -2350,7 +2381,10 @@ function orchRenderEdges() {
             lbl.setAttribute('text-anchor','middle');
             lbl.classList.add('orch-edge-label');
             lbl.classList.add('orch-selector-label');
-            lbl.textContent = '🎯 [' + choiceNum + '] → ' + tn.name;
+            const selectorText = '🎯 [' + choiceNum + '] → ' + tn.name;
+            lbl.textContent = edgeLayout && typeof edgeLayout.fitSingleLine === 'function'
+                ? edgeLayout.fitSingleLine(selectorText, 188, { font: '600 10px Arial', lineHeight: 12, suffix: '…' }).text
+                : selectorText;
             svg.appendChild(lbl);
         }
     });

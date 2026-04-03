@@ -4,6 +4,9 @@ import hashlib
 import requests
 import os
 import json
+from pathlib import Path
+from typing import Any
+from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
 from env_settings import read_env_all, write_env_settings
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
@@ -30,7 +33,10 @@ from team_creator_service import (
     build_team_zip,
     build_team_creator_download_name,
     create_job,
+    distill_colleague_skill_artifacts,
     get_job,
+    import_colleague_skill,
+    import_mentor_skill,
     list_jobs,
     map_roles_to_team,
     parse_extracted_roles,
@@ -457,6 +463,17 @@ def _read_saved_openclaw_runtime_config():
         "api_url": (settings.get("OPENCLAW_API_URL") or os.getenv("OPENCLAW_API_URL") or "").strip(),
         "api_key": gateway_token or api_key,
     }
+
+
+def _normalize_openclaw_chat_url(api_url: str) -> str:
+    """Point OPENCLAW_API_URL at /v1/chat/completions when only the gateway root was set."""
+    u = (api_url or "").strip().rstrip("/")
+    if not u:
+        return ""
+    path = (urlparse(u).path or "").lower()
+    if "chat/completions" in path:
+        return u
+    return urljoin(u + "/", "v1/chat/completions").rstrip("/")
 
 
 def _resolve_teamclaw_llm_config(data: dict | None):
@@ -1007,6 +1024,403 @@ def team_creator_presets():
         for v in PRESET_POOL.values()
     ]
     return jsonify({"ok": True, "presets": presets, "count": len(presets)})
+
+
+def _resolve_team_creator_import_path(raw_path: str) -> Path:
+    value = str(raw_path or "").strip()
+    if not value:
+        raise ValueError("import path is required")
+    candidate = Path(os.path.expanduser(value))
+    if not candidate.is_absolute():
+        candidate = (Path(root_dir) / candidate).resolve()
+    else:
+        candidate = candidate.resolve()
+    return candidate
+
+
+def _read_team_creator_import_text(raw_path: str, label: str) -> str:
+    path = _resolve_team_creator_import_path(raw_path)
+    if not path.is_file():
+        raise ValueError(f"{label} not found: {raw_path}")
+    return path.read_text(encoding="utf-8", errors="replace")
+
+
+def _read_team_creator_import_json(raw_path: str, label: str) -> dict:
+    try:
+        parsed = json.loads(_read_team_creator_import_text(raw_path, label))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} is not valid JSON: {raw_path}") from exc
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{label} must contain a JSON object: {raw_path}")
+    return parsed
+
+
+def _load_colleague_import_from_paths(
+    *,
+    colleague_dir_path: str = "",
+    meta_path: str = "",
+    persona_path: str = "",
+    work_path: str = "",
+) -> tuple[dict, str, str]:
+    base_dir: Path | None = None
+    if str(colleague_dir_path or "").strip():
+        base_dir = _resolve_team_creator_import_path(colleague_dir_path)
+        if not base_dir.is_dir():
+            raise ValueError(f"colleague directory not found: {colleague_dir_path}")
+
+    resolved_meta_path = meta_path or (str(base_dir / "meta.json") if base_dir else "")
+    resolved_persona_path = persona_path or (str(base_dir / "persona.md") if base_dir else "")
+    resolved_work_path = work_path or (str(base_dir / "work.md") if base_dir else "")
+
+    meta_json = _read_team_creator_import_json(resolved_meta_path, "meta.json")
+    persona_md = _read_team_creator_import_text(resolved_persona_path, "persona.md")
+    work_md = ""
+    if str(resolved_work_path or "").strip():
+        try:
+            work_md = _read_team_creator_import_text(resolved_work_path, "work.md")
+        except ValueError:
+            if not base_dir:
+                raise
+    return meta_json, persona_md, work_md
+
+
+def _load_mentor_import_from_paths(
+    *,
+    mentor_json_path: str = "",
+    skill_md_path: str = "",
+) -> tuple[dict, str]:
+    mentor_json = _read_team_creator_import_json(mentor_json_path, "mentor_json")
+    skill_md = ""
+    if str(skill_md_path or "").strip():
+        skill_md = _read_team_creator_import_text(skill_md_path, "skill_md")
+    return mentor_json, skill_md
+
+
+@app.route("/api/team-creator/import-colleague", methods=["POST"])
+def team_creator_import_colleague():
+    """Import a colleague-skill output (meta.json + persona.md + work.md) into Team Creator.
+
+    Accepts JSON body:
+      - meta_json: dict (parsed meta.json content)
+      - persona_md: string (raw persona.md content)
+      - work_md: string (raw work.md content, optional)
+      - team_name: string (optional)
+      - task_description: string (optional)
+
+    Or multipart form upload with files: meta_json, persona_md, work_md
+    """
+    try:
+        if request.is_json:
+            body = request.get_json(silent=True) or {}
+            meta_json = body.get("meta_json") or {}
+            persona_md = str(body.get("persona_md") or "").strip()
+            work_md = str(body.get("work_md") or "").strip()
+            colleague_dir_path = str(body.get("colleague_dir_path") or "").strip()
+            meta_path = str(body.get("meta_path") or "").strip()
+            persona_path = str(body.get("persona_path") or "").strip()
+            work_path = str(body.get("work_path") or "").strip()
+            team_name = str(body.get("team_name") or "").strip()
+            task_description = str(body.get("task_description") or "").strip()
+        else:
+            # Multipart form upload
+            import json as _json
+            meta_file = request.files.get("meta_json")
+            persona_file = request.files.get("persona_md")
+            work_file = request.files.get("work_md")
+
+            if meta_file:
+                meta_json = _json.loads(meta_file.read().decode("utf-8"))
+            else:
+                raw = request.form.get("meta_json", "{}")
+                meta_json = _json.loads(raw) if isinstance(raw, str) else raw
+
+            persona_md = persona_file.read().decode("utf-8") if persona_file else request.form.get("persona_md", "")
+            work_md = work_file.read().decode("utf-8") if work_file else request.form.get("work_md", "")
+            colleague_dir_path = request.form.get("colleague_dir_path", "")
+            meta_path = request.form.get("meta_path", "")
+            persona_path = request.form.get("persona_path", "")
+            work_path = request.form.get("work_path", "")
+            team_name = request.form.get("team_name", "")
+            task_description = request.form.get("task_description", "")
+
+        if colleague_dir_path or meta_path or persona_path or work_path:
+            loaded_meta_json, loaded_persona_md, loaded_work_md = _load_colleague_import_from_paths(
+                colleague_dir_path=colleague_dir_path,
+                meta_path=meta_path,
+                persona_path=persona_path,
+                work_path=work_path,
+            )
+            if not meta_json:
+                meta_json = loaded_meta_json
+            if not persona_md:
+                persona_md = loaded_persona_md
+            if not work_md:
+                work_md = loaded_work_md
+
+        if not meta_json:
+            return jsonify({"ok": False, "error": "meta_json is required"}), 400
+        if not persona_md:
+            return jsonify({"ok": False, "error": "persona_md is required"}), 400
+
+        team_config = import_colleague_skill(
+            meta_json=meta_json,
+            persona_md=persona_md,
+            work_md=work_md,
+            team_name=team_name,
+            task_description=task_description,
+        )
+
+        return jsonify({
+            "ok": True,
+            "team_config": team_config,
+            "summary": team_config.get("summary"),
+            "import_source": "colleague-skill",
+        })
+
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/team-creator/import-mentor", methods=["POST"])
+def team_creator_import_mentor():
+    """Import a supervisor/mentor skill output ({name}.json + SKILL.md) into Team Creator.
+
+    Accepts JSON body:
+      - mentor_json: dict (parsed {name}.json content)
+      - skill_md: string (raw SKILL.md content, optional)
+      - team_name: string (optional)
+      - task_description: string (optional)
+
+    Or multipart form upload with files: mentor_json, skill_md
+    """
+    try:
+        if request.is_json:
+            body = request.get_json(silent=True) or {}
+            mentor_json = body.get("mentor_json") or {}
+            skill_md = str(body.get("skill_md") or "").strip()
+            mentor_json_path = str(body.get("mentor_json_path") or "").strip()
+            skill_md_path = str(body.get("skill_md_path") or "").strip()
+            team_name = str(body.get("team_name") or "").strip()
+            task_description = str(body.get("task_description") or "").strip()
+        else:
+            import json as _json
+            mentor_file = request.files.get("mentor_json")
+            skill_file = request.files.get("skill_md")
+
+            if mentor_file:
+                mentor_json = _json.loads(mentor_file.read().decode("utf-8"))
+            else:
+                raw = request.form.get("mentor_json", "{}")
+                mentor_json = _json.loads(raw) if isinstance(raw, str) else raw
+
+            skill_md = skill_file.read().decode("utf-8") if skill_file else request.form.get("skill_md", "")
+            mentor_json_path = request.form.get("mentor_json_path", "")
+            skill_md_path = request.form.get("skill_md_path", "")
+            team_name = request.form.get("team_name", "")
+            task_description = request.form.get("task_description", "")
+
+        if mentor_json_path or skill_md_path:
+            loaded_mentor_json, loaded_skill_md = _load_mentor_import_from_paths(
+                mentor_json_path=mentor_json_path,
+                skill_md_path=skill_md_path,
+            )
+            if not mentor_json:
+                mentor_json = loaded_mentor_json
+            if not skill_md:
+                skill_md = loaded_skill_md
+
+        if not mentor_json:
+            return jsonify({"ok": False, "error": "mentor_json is required"}), 400
+
+        team_config = import_mentor_skill(
+            mentor_json=mentor_json,
+            skill_md=skill_md,
+            team_name=team_name,
+            task_description=task_description,
+        )
+
+        return jsonify({
+            "ok": True,
+            "team_config": team_config,
+            "summary": team_config.get("summary"),
+            "import_source": "supervisor-mentor",
+        })
+
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/team-creator/arxiv-search", methods=["POST"])
+def team_creator_arxiv_search():
+    """Search ArXiv for papers by author and return a ready-to-import mentor JSON.
+
+    Phase 3: Python-native ArXiv search, no Node.js required.
+
+    Body:
+      - author_name: string (required)
+      - affiliation: string (optional)
+      - max_results: int (optional, default 20)
+      - auto_import: bool (optional, default false — if true, also runs import_mentor_skill)
+    """
+    from skill_import_tools import search_arxiv, arxiv_papers_to_mentor_json
+
+    body = request.get_json(silent=True) or {}
+    author_name = str(body.get("author_name") or body.get("name") or "").strip()
+    if not author_name:
+        return jsonify({"ok": False, "error": "author_name is required"}), 400
+
+    affiliation = str(body.get("affiliation") or "").strip()
+    max_results = min(int(body.get("max_results") or 20), 100)
+    auto_import = bool(body.get("auto_import"))
+
+    try:
+        papers = search_arxiv(author_name, max_results=max_results)
+        if not papers:
+            return jsonify({"ok": True, "papers": [], "mentor_json": None,
+                            "message": f"No papers found for '{author_name}' on ArXiv"})
+
+        mentor_json = arxiv_papers_to_mentor_json(papers, author_name, affiliation)
+
+        result: dict[str, Any] = {
+            "ok": True,
+            "papers_count": len(papers),
+            "papers": [
+                {"title": p.title, "year": p.year, "authors": p.authors[:3], "arxiv_id": p.arxiv_id}
+                for p in papers[:10]
+            ],
+            "mentor_json": mentor_json,
+        }
+
+        if auto_import:
+            team_name = str(body.get("team_name") or "").strip()
+            task_description = str(body.get("task_description") or "").strip()
+            team_config = import_mentor_skill(
+                mentor_json=mentor_json,
+                team_name=team_name,
+                task_description=task_description,
+            )
+            result["team_config"] = team_config
+            result["summary"] = team_config.get("summary")
+            result["auto_imported"] = True
+
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/team-creator/feishu-collect", methods=["POST"])
+def team_creator_feishu_collect():
+    """Collect Feishu messages for a colleague and return colleague-compatible data.
+
+    Phase 3: Python-native Feishu API, no external tools required.
+
+    Body:
+      - app_id: string (Feishu App ID)
+      - app_secret: string (Feishu App Secret)
+      - target_name: string (colleague name to filter messages)
+      - msg_limit: int (optional, default 500)
+      - company/role/level/gender/mbti: string (optional profile info)
+      - personality_tags: list[str] (optional)
+      - culture_tags: list[str] (optional)
+      - impression: string (optional)
+      - auto_distill: bool (optional)
+      - auto_import: bool (optional; implies auto_distill)
+      - team_name / task_description: string (optional, used when auto_import=true)
+    """
+    from skill_import_tools import feishu_collect_user_messages, feishu_messages_to_colleague_meta
+
+    body = request.get_json(silent=True) or {}
+    app_id = str(body.get("app_id") or "").strip()
+    app_secret = str(body.get("app_secret") or "").strip()
+    target_name = str(body.get("target_name") or body.get("name") or "").strip()
+
+    if not app_id or not app_secret:
+        return jsonify({"ok": False, "error": "app_id and app_secret are required"}), 400
+    if not target_name:
+        return jsonify({"ok": False, "error": "target_name is required"}), 400
+
+    msg_limit = min(int(body.get("msg_limit") or 500), 5000)
+    auto_import = bool(body.get("auto_import"))
+    auto_distill = bool(body.get("auto_distill")) or auto_import
+
+    try:
+        messages_text = feishu_collect_user_messages(
+            app_id=app_id,
+            app_secret=app_secret,
+            target_name=target_name,
+            msg_limit=msg_limit,
+        )
+
+        meta_json = feishu_messages_to_colleague_meta(
+            target_name=target_name,
+            messages_text=messages_text,
+            company=str(body.get("company") or ""),
+            role=str(body.get("role") or ""),
+            level=str(body.get("level") or ""),
+            gender=str(body.get("gender") or ""),
+            mbti=str(body.get("mbti") or ""),
+            personality_tags=body.get("personality_tags"),
+            culture_tags=body.get("culture_tags"),
+            impression=str(body.get("impression") or ""),
+        )
+
+        result: dict[str, Any] = {
+            "ok": True,
+            "meta_json": meta_json,
+            "messages_text": messages_text,
+            "messages_length": len(messages_text),
+            "hint": "Use the returned meta_json + an LLM-generated persona.md with /api/team-creator/import-colleague",
+        }
+
+        if auto_distill:
+            distilled = distill_colleague_skill_artifacts(meta_json=meta_json, messages_text=messages_text)
+            tags = meta_json.setdefault("tags", {})
+            tags["personality"] = list(dict.fromkeys([
+                *(tags.get("personality") or []),
+                *(distilled.get("personality_tags") or []),
+            ]))
+            tags["culture"] = list(dict.fromkeys([
+                *(tags.get("culture") or []),
+                *(distilled.get("culture_tags") or []),
+            ]))
+            if not str(meta_json.get("impression") or "").strip():
+                meta_json["impression"] = distilled.get("impression") or ""
+
+            result["meta_json"] = meta_json
+            result["persona_md"] = distilled.get("persona_md") or ""
+            result["work_md"] = distilled.get("work_md") or ""
+            result["distillation"] = {
+                "personality_tags": tags.get("personality") or [],
+                "culture_tags": tags.get("culture") or [],
+                "impression": str(meta_json.get("impression") or ""),
+                "evidence_summary": str(distilled.get("evidence_summary") or ""),
+            }
+            result["hint"] = "persona.md / work.md generated and ready for import"
+
+        if auto_import:
+            team_name = str(body.get("team_name") or "").strip()
+            task_description = str(body.get("task_description") or "").strip()
+            team_config = import_colleague_skill(
+                meta_json=meta_json,
+                persona_md=str(result.get("persona_md") or ""),
+                work_md=str(result.get("work_md") or ""),
+                team_name=team_name,
+                task_description=task_description,
+            )
+            result["team_config"] = team_config
+            result["summary"] = team_config.get("summary")
+            result["auto_imported"] = True
+            result["hint"] = "Collected, distilled, and imported into Team Creator"
+
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/team-creator/jobs")
@@ -1789,13 +2203,27 @@ def proxy_openclaw_remove():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+def _openclaw_session_key_from_model(model_val: Any) -> str | None:
+    """Build x-openclaw-session-key: agent:<name>:teamclawchat (aligned with group/OASIS default suffix)."""
+    model_str = str(model_val or "").strip()
+    if not model_str.startswith("agent:"):
+        return None
+    rest = model_str[6:].strip()
+    if not rest:
+        return None
+    agent_name = rest.split(":", 1)[0].strip()
+    if not agent_name:
+        return None
+    return f"agent:{agent_name}:teamclawchat"
+
+
 @app.route("/proxy_openclaw_chat", methods=["POST", "OPTIONS"])
 def proxy_openclaw_chat():
-    """Proxy chat completions to OpenClaw gateway.
-    
-    Forwards OpenAI-compatible chat requests to the OpenClaw gateway,
-    allowing the frontend to chat directly with OpenClaw agents.
-    The model field should be 'agent:<agent_name>'.
+    """Proxy chat completions to OpenClaw gateway (HTTP OpenAI-compatible).
+
+    This path does not use acpx; it POSTs the same JSON body to OPENCLAW_API_URL.
+    The model field should be 'agent:<agent_name>' (see main.js isOpenClawChat).
+    Sets x-openclaw-session-key to agent:<name>:teamclawchat for gateway session routing.
     """
     if request.method == "OPTIONS":
         resp = Response("", status=204)
@@ -1805,20 +2233,27 @@ def proxy_openclaw_chat():
         return resp
 
     runtime_config = _read_saved_openclaw_runtime_config()
-    openclaw_api_url = runtime_config["api_url"]
+    openclaw_api_url = _normalize_openclaw_chat_url(runtime_config["api_url"])
     openclaw_api_key = runtime_config["api_key"]
 
     if not openclaw_api_url:
         return jsonify({"error": "OPENCLAW_API_URL not configured"}), 503
 
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "Invalid or empty JSON body"}), 400
+
     try:
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream, application/json"}
         if openclaw_api_key:
             headers["Authorization"] = f"Bearer {openclaw_api_key}"
+        oc_session = _openclaw_session_key_from_model(body.get("model"))
+        if oc_session:
+            headers["x-openclaw-session-key"] = oc_session
 
         r = requests.post(
             openclaw_api_url,
-            json=request.get_json(silent=True),
+            json=body,
             headers=headers,
             stream=True,
             timeout=120,

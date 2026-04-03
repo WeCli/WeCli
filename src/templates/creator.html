@@ -76,7 +76,129 @@
                         <div class="builder-mode-switch">
                             <button id="builder-mode-direct" class="creator-btn builder-mode-btn builder-mode-active" type="button" data-i18n="creator_mode_direct">✏️ 直接定义角色</button>
                             <button id="builder-mode-discover" class="creator-btn builder-mode-btn" type="button" data-i18n="creator_mode_discover">🔍 AI 智能发现</button>
+                            <button id="builder-mode-import-colleague" class="creator-btn builder-mode-btn" type="button" data-i18n="creator_mode_import_colleague">👥 从同事导入</button>
+                            <button id="builder-mode-import-mentor" class="creator-btn builder-mode-btn" type="button" data-i18n="creator_mode_import_mentor">🎓 从导师导入</button>
                         </div>
+                    </section>
+
+                    <!-- Step 2c: Import Colleague Skill -->
+                    <section class="creator-card builder-step builder-hidden" id="builder-step-import-colleague">
+                        <div class="creator-item-kicker">Step 2 · Import</div>
+                        <h3 class="creator-card-title" data-i18n="creator_import_colleague_title">导入同事 Skill</h3>
+                        <p class="creator-item-subtitle" data-i18n="creator_import_colleague_hint">可以直接从飞书采集并生成同事，或者导入 colleague-skill 已生成的文件。</p>
+                        <div class="builder-import-guide">
+                            <div class="creator-card-kicker" data-i18n="creator_generate_colleague_kicker">🪶 Direct Generate</div>
+                            <p class="builder-import-steps" data-i18n="creator_generate_colleague_hint">填写飞书应用信息和同事基本资料，Team Creator 会采集消息、自动蒸馏 persona/work，并直接导入为团队角色。</p>
+                        </div>
+                        <div class="builder-import-form">
+                            <div class="builder-import-grid">
+                                <label class="creator-field">
+                                    <span data-i18n="creator_feishu_app_id_label">飞书 App ID</span>
+                                    <input id="feishu-app-id" class="builder-input" type="text" data-i18n-placeholder="creator_feishu_app_id_placeholder" placeholder="例如: cli_xxx" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_feishu_app_secret_label">飞书 App Secret</span>
+                                    <input id="feishu-app-secret" class="builder-input" type="password" data-i18n-placeholder="creator_feishu_app_secret_placeholder" placeholder="例如: xxxxx" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_feishu_target_name_label">同事姓名</span>
+                                    <input id="feishu-target-name" class="builder-input" type="text" data-i18n-placeholder="creator_feishu_target_name_placeholder" placeholder="例如: 张三" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_feishu_role_label">岗位</span>
+                                    <input id="feishu-role" class="builder-input" type="text" data-i18n-placeholder="creator_feishu_role_placeholder" placeholder="例如: 后端工程师" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_feishu_company_label">公司 / 团队</span>
+                                    <input id="feishu-company" class="builder-input" type="text" data-i18n-placeholder="creator_feishu_company_placeholder" placeholder="例如: TeamClaw" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_feishu_level_label">层级</span>
+                                    <input id="feishu-level" class="builder-input" type="text" data-i18n-placeholder="creator_feishu_level_placeholder" placeholder="例如: L4 / P6" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_feishu_personality_tags_label">性格标签（逗号分隔）</span>
+                                    <input id="feishu-personality-tags" class="builder-input" type="text" data-i18n-placeholder="creator_feishu_personality_tags_placeholder" placeholder="例如: 直接, 数据驱动" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_feishu_msg_limit_label">消息上限</span>
+                                    <input id="feishu-msg-limit" class="builder-input" type="number" min="50" max="5000" value="500" autocomplete="off">
+                                </label>
+                            </div>
+                            <button id="generate-colleague-btn" class="creator-btn creator-btn-primary" type="button" data-i18n="creator_generate_colleague_btn">🪶 采集并生成同事</button>
+                        </div>
+                        <div class="builder-import-divider"></div>
+                        <div class="builder-import-guide">
+                            <a href="https://github.com/titanwings/colleague-skill" target="_blank" rel="noopener" class="builder-import-repo-link">
+                                <span data-i18n="creator_import_colleague_repo">📦 仓库地址</span>
+                                <code>github.com/titanwings/colleague-skill</code>
+                            </a>
+                            <p class="builder-import-steps" data-i18n="creator_import_colleague_steps">生成步骤：① 克隆仓库 → ② 在 Claude Code / Cursor 中运行 /create-colleague → ③ 按提示填写同事信息并提供原材料 → ④ 生成的文件在 colleagues/{slug}/ 目录下</p>
+                        </div>
+                        <div class="builder-import-form">
+                            <p class="builder-import-files-label" data-i18n="creator_import_colleague_files">上传以下文件（位于 colleagues/{slug}/ 目录中）：</p>
+                            <label class="builder-import-label" data-i18n="creator_import_meta_json">meta.json — 同事基础信息（必需）</label>
+                            <input type="file" id="import-colleague-meta" accept=".json" class="builder-import-file" />
+                            <label class="builder-import-label" data-i18n="creator_import_persona_md">persona.md — 5 层性格画像（必需）</label>
+                            <input type="file" id="import-colleague-persona" accept=".md,.txt" class="builder-import-file" />
+                            <label class="builder-import-label" data-i18n="creator_import_work_md">work.md — 工作能力（可选，推荐上传）</label>
+                            <input type="file" id="import-colleague-work" accept=".md,.txt" class="builder-import-file" />
+                            <p class="builder-import-files-label" data-i18n="creator_import_or_local_path">或者填写本机路径：</p>
+                            <label class="builder-import-label" data-i18n="creator_import_colleague_dir">colleagues/{slug} 目录路径（自动读取 meta.json / persona.md / work.md）</label>
+                            <input type="text" id="import-colleague-dir" class="builder-input" data-i18n-placeholder="creator_import_colleague_dir_placeholder" placeholder="例如: ~/.claude/skills/create-colleague/colleagues/zhangsan" autocomplete="off" />
+                            <button id="import-colleague-btn" class="creator-btn creator-btn-primary" type="button" data-i18n="creator_import_btn">📥 导入到 Team Creator</button>
+                        </div>
+                        <div id="import-colleague-status" class="builder-status-bar"></div>
+                    </section>
+
+                    <!-- Step 2d: Import Mentor Skill -->
+                    <section class="creator-card builder-step builder-hidden" id="builder-step-import-mentor">
+                        <div class="creator-item-kicker">Step 2 · Import</div>
+                        <h3 class="creator-card-title" data-i18n="creator_import_mentor_title">导入导师 Skill</h3>
+                        <p class="creator-item-subtitle" data-i18n="creator_import_mentor_hint">可以直接从 ArXiv 搜索生成导师，或者导入 supervisor 已生成的文件。</p>
+                        <div class="builder-import-guide">
+                            <div class="creator-card-kicker" data-i18n="creator_generate_mentor_kicker">📚 Direct Generate</div>
+                            <p class="builder-import-steps" data-i18n="creator_generate_mentor_hint">输入导师姓名后，Team Creator 会搜索 ArXiv、生成导师档案，并直接导入为团队角色。</p>
+                        </div>
+                        <div class="builder-import-form">
+                            <div class="builder-import-grid">
+                                <label class="creator-field">
+                                    <span data-i18n="creator_arxiv_author_name_label">导师姓名</span>
+                                    <input id="mentor-arxiv-name" class="builder-input" type="text" data-i18n-placeholder="creator_arxiv_author_name_placeholder" placeholder="例如: Geoffrey Hinton" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_arxiv_affiliation_label">机构（可选）</span>
+                                    <input id="mentor-arxiv-affiliation" class="builder-input" type="text" data-i18n-placeholder="creator_arxiv_affiliation_placeholder" placeholder="例如: University of Toronto" autocomplete="off">
+                                </label>
+                                <label class="creator-field">
+                                    <span data-i18n="creator_arxiv_max_results_label">论文上限</span>
+                                    <input id="mentor-arxiv-max-results" class="builder-input" type="number" min="5" max="100" value="20" autocomplete="off">
+                                </label>
+                            </div>
+                            <button id="generate-mentor-btn" class="creator-btn creator-btn-primary" type="button" data-i18n="creator_generate_mentor_btn">📚 搜索 ArXiv 并生成导师</button>
+                        </div>
+                        <div class="builder-import-divider"></div>
+                        <div class="builder-import-guide">
+                            <a href="https://github.com/ybq22/supervisor" target="_blank" rel="noopener" class="builder-import-repo-link">
+                                <span data-i18n="creator_import_mentor_repo">📦 仓库地址</span>
+                                <code>github.com/ybq22/supervisor</code>
+                            </a>
+                            <p class="builder-import-steps" data-i18n="creator_import_mentor_steps">生成步骤：① 克隆仓库 → ② 在 Claude Code / Cursor 中运行 /distill-mentor &lt;导师名&gt; → ③ 自动搜索 ArXiv 论文并分析风格 → ④ 生成的文件在 ~/.claude/mentors/ 和 ~/.claude/skills/ 下</p>
+                        </div>
+                        <div class="builder-import-form">
+                            <p class="builder-import-files-label" data-i18n="creator_import_mentor_files">上传以下文件：</p>
+                            <label class="builder-import-label" data-i18n="creator_import_mentor_json">{name}.json — 导师档案 JSON（必需）</label>
+                            <input type="file" id="import-mentor-json" accept=".json" class="builder-import-file" />
+                            <label class="builder-import-label" data-i18n="creator_import_skill_md">SKILL.md — 导师完整 Skill（可选，推荐上传）</label>
+                            <input type="file" id="import-mentor-skill" accept=".md,.txt" class="builder-import-file" />
+                            <p class="builder-import-files-label" data-i18n="creator_import_or_local_path">或者填写本机路径：</p>
+                            <label class="builder-import-label" data-i18n="creator_import_mentor_json_path">{name}.json 路径（未上传时必需）</label>
+                            <input type="text" id="import-mentor-json-path" class="builder-input" data-i18n-placeholder="creator_import_mentor_json_path_placeholder" placeholder="例如: ~/.claude/mentors/Geoffrey_Hinton.json" autocomplete="off" />
+                            <label class="builder-import-label" data-i18n="creator_import_skill_md_path">SKILL.md 路径（可选）</label>
+                            <input type="text" id="import-mentor-skill-path" class="builder-input" data-i18n-placeholder="creator_import_skill_md_path_placeholder" placeholder="例如: ~/.claude/skills/geoffrey-hinton/SKILL.md" autocomplete="off" />
+                            <button id="import-mentor-btn" class="creator-btn creator-btn-primary" type="button" data-i18n="creator_import_btn">📥 导入到 Team Creator</button>
+                        </div>
+                        <div id="import-mentor-status" class="builder-status-bar"></div>
                     </section>
 
                     <!-- Step 2a: Direct Role Editor -->
@@ -298,6 +420,8 @@
         </main>
     </div>
 
+    <script src="/static/vendor/pretext.global.js?v=20260402-pretext"></script>
+    <script src="/static/js/pretext_text_core.js?v=20260402-pretext"></script>
     <script src="/static/js/creator.js"></script>
 </body>
 </html>

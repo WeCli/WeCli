@@ -297,6 +297,7 @@ def _connect(db_path: str | os.PathLike | None = None) -> sqlite3.Connection:
             title TEXT NOT NULL DEFAULT '',
             status TEXT NOT NULL DEFAULT 'active',
             items_json TEXT NOT NULL DEFAULT '[]',
+            metadata_json TEXT NOT NULL DEFAULT '{}',
             updated_at TEXT NOT NULL,
             created_at TEXT NOT NULL,
             PRIMARY KEY (user_id, session_id)
@@ -390,6 +391,10 @@ def _connect(db_path: str | os.PathLike | None = None) -> sqlite3.Connection:
     if "status" not in existing_plan_columns:
         conn.execute(
             "ALTER TABLE teambot_session_plans ADD COLUMN status TEXT NOT NULL DEFAULT 'active'"
+        )
+    if "metadata_json" not in existing_plan_columns:
+        conn.execute(
+            "ALTER TABLE teambot_session_plans ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'"
         )
     conn.execute(
         """
@@ -1812,6 +1817,7 @@ def save_session_plan(
     title: str,
     status: str = "active",
     items: list[dict[str, Any]],
+    metadata: dict[str, Any] | None = None,
     db_path: str | os.PathLike | None = None,
 ) -> None:
     now = utc_now()
@@ -1823,12 +1829,13 @@ def save_session_plan(
         conn.execute(
             """
             INSERT INTO teambot_session_plans (
-                user_id, session_id, title, status, items_json, updated_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                user_id, session_id, title, status, items_json, metadata_json, updated_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, session_id) DO UPDATE SET
                 title=excluded.title,
                 status=excluded.status,
                 items_json=excluded.items_json,
+                metadata_json=excluded.metadata_json,
                 updated_at=excluded.updated_at
             """,
             (
@@ -1837,6 +1844,7 @@ def save_session_plan(
                 title.strip(),
                 normalized_status,
                 _json_dumps(normalized_items),
+                _json_dumps(metadata or {}),
                 now,
                 now,
             ),
@@ -1852,7 +1860,7 @@ def get_session_plan(
     with _connect(db_path) as conn:
         row = conn.execute(
             """
-            SELECT title, status, items_json, updated_at, created_at
+            SELECT title, status, items_json, metadata_json, updated_at, created_at
             FROM teambot_session_plans
             WHERE user_id = ? AND session_id = ?
             """,
@@ -1868,6 +1876,7 @@ def get_session_plan(
         "title": row["title"],
         "status": row["status"],
         "items": _normalize_plan_items(items),
+        "metadata": _json_loads_dict(row["metadata_json"]),
         "updated_at": row["updated_at"],
         "created_at": row["created_at"],
     }

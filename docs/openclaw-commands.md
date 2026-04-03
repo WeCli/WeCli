@@ -376,8 +376,8 @@ openclaw gateway restart                  # 重启 gateway 加载新配置
 
 > **踩坑记录**：
 > - MiniMax 的 `baseUrl` 必须带 `/v1` 后缀（`https://api.minimaxi.com/v1`），OpenClaw 的 `openai-completions` API 会在此基础上拼接 `/chat/completions`。
-> - TeamClaw 的 `LLM_BASE_URL` 不带 `/v1`（`https://api.minimaxi.com`），因为 `llm_factory.py` 的 `_normalize_openai_base_url` 会自动追加。
-> - `LLM_PROVIDER=minimax` 在 TeamClaw 内部会映射到 `openai` 兼容格式（通过 `llm_factory.py` 的 `_PROVIDER_ALIASES`）。
+> - TeamClaw 的 `LLM_BASE_URL` 可以不带路径（例如 `https://api.minimaxi.com`），因为 minimax 分支会在 baseUrl 仅包含 host 时自动补 `/anthropic`（通过 `llm_factory.py` 的 `_normalize_minimax_base_url`）。
+> - `LLM_PROVIDER=minimax` 现在走 minimax 独立分支，并使用 `ChatAnthropic` 来发请求。
 > - MiniMax API 错误码中 `billing error` 表示余额不足，需要在 [MiniMax 平台](https://platform.minimaxi.com/) 充值。
 > - MiniMax 模型名区分大小写：必须用 `MiniMax-M2.7` 而非 `minimax-m2.7`。
 

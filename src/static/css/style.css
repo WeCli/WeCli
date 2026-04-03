@@ -166,7 +166,7 @@ header {
 }
 
 .chat-container { flex: 1; min-height: 0; overflow-y: auto; }
-.markdown-body pre { background: #1e1e1e; padding: 1rem; border-radius: 0.5rem; margin: 0.5rem 0; overflow-x: auto; }
+.markdown-body pre { background: #1e1e1e; padding: 1rem; border-radius: 0.5rem; margin: 0.5rem 0; overflow-x: auto; -webkit-overflow-scrolling: touch; box-sizing: border-box; max-width: 100%; }
 .markdown-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.9em; }
 .message-user { border-radius: 1.25rem 1.25rem 0.2rem 1.25rem; max-width: min(85%, 800px); }
 .message-agent { border-radius: 1.25rem 1.25rem 1.25rem 0.2rem; max-width: min(85%, 800px); }
@@ -1998,7 +1998,7 @@ header {
 .group-msg-content.markdown-body { text-align: left; }
 .group-msg-content.markdown-body p { margin: 0 0 0.4em 0; }
 .group-msg-content.markdown-body p:last-child { margin-bottom: 0; }
-.group-msg-content.markdown-body pre { background: #1e1e1e; padding: 0.6rem; border-radius: 0.4rem; margin: 0.4rem 0; overflow-x: auto; }
+.group-msg-content.markdown-body pre { background: #1e1e1e; padding: 0.6rem; border-radius: 0.4rem; margin: 0.4rem 0; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .group-msg-content.markdown-body code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85em; }
 .group-msg-content.markdown-body ul, .group-msg-content.markdown-body ol { margin: 0.3em 0; padding-left: 1.5em; }
 .group-msg.self .group-msg-content.markdown-body pre { background: #1e40af; }
@@ -2311,6 +2311,11 @@ header {
     .page-tab { font-size: 12px; padding: 8px 0; }
     .tab-bar-brand-text { display: none; }
     .tab-bar-brand { padding: 0 6px; }
+    .group-msg-content.markdown-body.tc-markdown {
+        min-width: 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 
 /* === Orchestration Page (Light Theme) === */
@@ -3284,7 +3289,11 @@ body.session-panel-resizing * {
     .mobile-header-actions { flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
     /* Reduce padding on mobile */
     #chat-box { padding: 12px !important; }
-    .message-agent, .message-user { max-width: 92% !important; }
+    .message-agent, .message-user { max-width: 92% !important; min-width: 0 !important; }
+    /* Markdown 在 flex 行内需可收缩，否则表格/代码把布局撑破 */
+    .message-agent.markdown-body.tc-markdown {
+        min-width: 0 !important;
+    }
     /* Increase font size on mobile */
     .message-content, .message-agent, .message-user { font-size: 16px !important; }
     .message-content p, .message-content li { font-size: 16px !important; }
@@ -3338,6 +3347,50 @@ body.session-panel-resizing * {
 .file-preview-item .remove-btn { width: 16px; height: 16px; background: #ef4444; color: white; border: none; border-radius: 50%; font-size: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; flex-shrink: 0; }
 .chat-file-tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; background: rgba(255,255,255,0.15); font-size: 12px; margin-bottom: 4px; }
 /* Audio recording button */
+/* Main chat composer: narrow mobile — toolbar row + input row; desktop single row */
+.chat-composer-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+}
+.chat-composer-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.chat-composer-input-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+}
+.chat-composer-textarea-wrap {
+    flex: 1;
+    min-width: 0;
+}
+@media (min-width: 640px) {
+    .chat-composer-stack {
+        flex-direction: row;
+        align-items: flex-end;
+        gap: 10px;
+    }
+    .chat-composer-toolbar {
+        flex-wrap: nowrap;
+        width: auto;
+        flex-shrink: 0;
+    }
+    .chat-composer-input-row {
+        flex: 1;
+        width: auto;
+        min-width: 0;
+    }
+}
+
 .workflow-add-btn { cursor: pointer; color: #5b21b6; transition: all 0.2s; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 4px; height: 42px; padding: 0 12px; border-radius: 10px; border: 2px solid #c4b5fd; background: linear-gradient(135deg, #f5f3ff, #ede9fe); font-size: 14px; line-height: 1; white-space: nowrap; }
 .workflow-add-btn .wf-icon { font-size: 18px; line-height: 1; }
 .workflow-add-btn .wf-label { font-size: 13px; font-weight: 700; color: #6d28d9; line-height: 1; }
