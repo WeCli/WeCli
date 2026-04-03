@@ -12,7 +12,7 @@ Three expert backends:
   3. ExternalExpert — external OpenAI-compatible API (name="tag#ext#id")
      - Directly calls external endpoints (DeepSeek, GPT-4, Ollama, etc)
      - Configured per-expert via YAML: api_url, api_key, model
-     - ACP agent support: tag (openclaw, codex, etc) determines the ACP binary;
+     - ACP agent support: tag (codex, claude, gemini, aider, etc) determines the ACP binary;
        model "agent:<name>[:<session>]" prefers ACP persistent connection,
        falls back to HTTP API if ACP unavailable and api_url is configured.
        Session suffix defaults to teamclawchat if not specified in model (aligned with group ACP).

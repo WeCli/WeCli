@@ -1,10 +1,15 @@
 from flask import Flask, render_template, request, jsonify, session, Response, redirect, stream_with_context
 from werkzeug.middleware.proxy_fix import ProxyFix
 import hashlib
+import base64
 import requests
 import os
 import json
+import re
+import subprocess
 from pathlib import Path
+
+from acpx_cli_tools import acpx_agent_command_names
 from typing import Any
 from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
@@ -106,7 +111,6 @@ import time
 import secrets
 import hmac
 import hashlib
-import base64
 from logging_utils import get_logger
 from openclaw_restore_naming import (
     openclaw_entries_ordered,
@@ -2283,6 +2287,420 @@ def proxy_openclaw_chat():
         return jsonify({"error": str(e)}), 500
 
 
+def _parse_openai_data_uri(s: str) -> tuple[str | None, str | None]:
+    """Parse ``data:[mime];base64,<payload>`` → (mime, raw_base64)."""
+    if not isinstance(s, str) or not s.startswith("data:"):
+        return None, None
+    try:
+        header, b64 = s.split(",", 1)
+    except ValueError:
+        return None, None
+    meta = header[5:]
+    mime: str | None
+    if ";" in meta:
+        mime = (meta.split(";", 1)[0].strip() or None)
+    else:
+        mime = meta.strip() or None
+    return mime, b64
+
+
+_ACPX_TEXT_MIME_PREFIXES = ("text/",)
+_ACPX_TEXT_MIME_EXACT = {
+    "application/json",
+    "application/xml",
+    "application/javascript",
+    "application/typescript",
+    "application/x-yaml",
+    "application/yaml",
+    "application/csv",
+    "application/x-csv",
+}
+
+
+def _acpx_is_text_mime(mime_type: str) -> bool:
+    mime = mime_type.lower().strip()
+    if any(mime.startswith(p) for p in _ACPX_TEXT_MIME_PREFIXES):
+        return True
+    if mime in _ACPX_TEXT_MIME_EXACT:
+        return True
+    if mime.endswith("+json") or mime.endswith("+xml"):
+        return True
+    return False
+
+
+def _acpx_decode_b64_utf8(b64: str, *, max_chars: int = 100_000) -> str | None:
+    try:
+        raw = base64.b64decode(b64)
+        return raw.decode("utf-8")[:max_chars]
+    except Exception:
+        return None
+
+
+def _acpx_prompt_and_attachments_from_openai_messages(messages: list) -> tuple[str, list[dict[str, Any]]]:
+    """Build acpx prompt text + adapter attachments from OpenAI-style ``messages`` (align with group ACP)."""
+    attachments: list[dict[str, Any]] = []
+    blocks: list[str] = []
+
+    for m in messages:
+        if not isinstance(m, dict):
+            continue
+        role = (m.get("role") or "").strip().lower()
+        if role not in ("system", "user", "assistant"):
+            continue
+        content = m.get("content")
+        if isinstance(content, str):
+            t = content.strip()
+            if t:
+                blocks.append(f"[{role}]\n{t}")
+            continue
+
+        if isinstance(content, list):
+            text_bits: list[str] = []
+            for p in content:
+                if not isinstance(p, dict):
+                    continue
+                typ = (p.get("type") or "").lower()
+                if typ == "text":
+                    text_bits.append(str(p.get("text") or ""))
+                elif typ == "image_url":
+                    iu = p.get("image_url") if isinstance(p.get("image_url"), dict) else {}
+                    url = iu.get("url") if isinstance(iu, dict) else None
+                    if isinstance(url, str) and url.startswith("data:"):
+                        mime, b64 = _parse_openai_data_uri(url)
+                        if b64:
+                            attachments.append(
+                                {
+                                    "type": "image",
+                                    "mime_type": mime or "image/png",
+                                    "data": b64,
+                                    "name": "image",
+                                }
+                            )
+                            text_bits.append("[附件: 图片已随多模态附件发送]")
+                    elif isinstance(url, str) and url.strip():
+                        text_bits.append("[附件: 图片 URL 非内嵌格式，已跳过（请使用本地上传）]")
+                elif typ == "input_audio":
+                    ia = p.get("input_audio") if isinstance(p.get("input_audio"), dict) else {}
+                    data = ia.get("data") if isinstance(ia, dict) else None
+                    fmt = str((ia.get("format") if isinstance(ia, dict) else "") or "wav").lower()
+                    mime = fmt if "/" in fmt else f"audio/{fmt}"
+                    if isinstance(data, str):
+                        if data.startswith("data:"):
+                            _, data = _parse_openai_data_uri(data)
+                        if data:
+                            attachments.append(
+                                {
+                                    "type": "audio",
+                                    "mime_type": mime,
+                                    "data": data,
+                                    "name": "audio",
+                                }
+                            )
+                            text_bits.append("[附件: 音频已随多模态附件发送]")
+                elif typ == "file":
+                    fd = p.get("file") if isinstance(p.get("file"), dict) else {}
+                    name = str(fd.get("filename") or "file")
+                    raw_fd = fd.get("file_data")
+                    if not isinstance(raw_fd, str):
+                        continue
+                    mime: str | None
+                    b64: str | None
+                    if raw_fd.startswith("data:"):
+                        mime, b64 = _parse_openai_data_uri(raw_fd)
+                    else:
+                        mime, b64 = "application/octet-stream", raw_fd
+                    if b64 and mime and _acpx_is_text_mime(mime):
+                        decoded = _acpx_decode_b64_utf8(b64)
+                        if decoded is not None:
+                            text_bits.append(f"\n📄 附件「{name}」内容:\n```\n{decoded}\n```")
+                        else:
+                            text_bits.append(f"[附件: {name} ({mime}), 解码失败]")
+                    elif b64:
+                        text_bits.append(f"[附件: {name} ({mime or 'unknown'}), 二进制文件无法随 ACP 发送]")
+            merged = "\n".join(x for x in text_bits if x).strip()
+            if merged:
+                blocks.append(f"[{role}]\n{merged}")
+            continue
+
+        t = str(content).strip()
+        if t:
+            blocks.append(f"[{role}]\n{t}")
+
+    prompt = "\n\n".join(blocks).strip()
+    return prompt, attachments
+
+
+def _list_acpx_tools() -> list[str]:
+    """Agent subcommands from `acpx --help` (cached)."""
+    return sorted(acpx_agent_command_names())
+
+
+def _normalize_acpx_tool(body: dict) -> str | None:
+    supported = acpx_agent_command_names()
+    raw = (body.get("tool") or "").strip().lower()
+    if raw in supported:
+        return raw
+    model = str(body.get("model") or "").strip().lower()
+    if model.startswith("acp:"):
+        t = model[4:].strip()
+        if t in supported:
+            return t
+    return None
+
+
+def _sanitize_acpx_session_slug(name: Any) -> str:
+    """Safe segment for acpx session key (letters, digits, ._-)."""
+    s = str(name or "").strip()
+    if not s:
+        return ""
+    s = re.sub(r"[^a-zA-Z0-9_.-]+", "_", s)
+    s = s.strip("._-")[:80]
+    return s
+
+
+def _acpx_main_session_key(*, tool: str, body: dict) -> str:
+    """Session key for main-page ACP.
+
+    Priority:
+      1. acp_session_pick — exact ``name`` from ``acpx <tool> sessions list`` (reuse existing)
+      2. acp_session_name / aliases — builds main:<tool>:<slug>
+      3. session_id / chat_session_id — main:<tool>:<sid>
+    """
+    if "acp_session_pick" in body:
+        s = str(body.get("acp_session_pick") or "").strip()
+        if s:
+            if len(s) > 512 or not re.fullmatch(r"[A-Za-z0-9_.:\-]+", s):
+                raise ValueError("invalid acp_session_pick")
+            return s
+    for key in ("acp_session_name", "acp_session", "session_name"):
+        raw = body.get(key)
+        if raw is None:
+            continue
+        slug = _sanitize_acpx_session_slug(raw)
+        if slug:
+            return f"main:{tool}:{slug}"
+    sid = str(body.get("session_id") or body.get("chat_session_id") or "").strip() or "default"
+    return f"main:{tool}:{sid}"
+
+
+@app.route("/proxy_acpx_status", methods=["GET"])
+def proxy_acpx_status():
+    """Return whether the acpx CLI is on PATH (main chat ACP modes)."""
+    import shutil
+
+    available = bool(shutil.which("acpx"))
+    return jsonify({"available": available, "tools": _list_acpx_tools() if available else []})
+
+
+@app.route("/proxy_acpx_sessions", methods=["GET"])
+def proxy_acpx_sessions():
+    """List existing acpx sessions for a tool (``acpx <tool> sessions list`` JSON), slim rows."""
+    import asyncio
+    import shutil
+
+    if not shutil.which("acpx"):
+        return jsonify({"ok": False, "error": "acpx not found in PATH", "sessions": []}), 503
+
+    tool = (request.args.get("tool") or "").strip().lower()
+    if tool not in acpx_agent_command_names():
+        return jsonify({"ok": False, "error": "unsupported tool", "sessions": []}), 400
+
+    try:
+        from acpx_adapter import AcpxError, get_acpx_adapter
+    except ImportError as e:
+        return jsonify({"ok": False, "error": str(e), "sessions": []}), 500
+
+    adapter = get_acpx_adapter(cwd=root_dir)
+
+    async def _list() -> list[dict]:
+        return await adapter.list_sessions(tool=tool)
+
+    try:
+        sessions = asyncio.run(_list())
+    except AcpxError as e:
+        return jsonify({"ok": False, "error": str(e), "sessions": []}), 502
+
+    return jsonify({"ok": True, "tool": tool, "sessions": sessions})
+
+
+@app.route("/proxy_acpx_chat", methods=["POST", "OPTIONS"])
+def proxy_acpx_chat():
+    """Main-page chat via local acpx (Codex / Claude / Gemini CLI), OpenAI-style SSE out.
+
+    Request JSON:
+      - tool: any acpx-supported agent command (or model: acp:<tool>)
+      - messages: OpenAI-format list
+      - stream: bool (default true)
+      - session_id: optional TeamClaw chat session id (used when no custom name)
+      - acp_session_name: optional stable name for this ACP session (same name = same CLI context)
+        Aliases: acp_session, session_name
+      - acp_session_pick: optional exact session ``name`` from GET /proxy_acpx_sessions (reuse existing; overrides acp_session_name)
+    """
+    if request.method == "OPTIONS":
+        resp = Response("", status=204)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return resp
+
+    import asyncio
+    import shutil
+
+    if not shutil.which("acpx"):
+        return jsonify({"error": "acpx not found in PATH"}), 503
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"error": "Invalid or empty JSON body"}), 400
+
+    tool = _normalize_acpx_tool(body)
+    if not tool:
+        return jsonify({"error": "unsupported tool (or invalid model acp:<tool>)"}), 400
+
+    messages = body.get("messages")
+    if not isinstance(messages, list) or not messages:
+        return jsonify({"error": "messages required"}), 400
+
+    prompt_text, acpx_attachments = _acpx_prompt_and_attachments_from_openai_messages(messages)
+    if not prompt_text and not acpx_attachments:
+        return jsonify({"error": "No usable text or attachments in messages"}), 400
+
+    try:
+        session_key = _acpx_main_session_key(tool=tool, body=body)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    stream = body.get("stream", True)
+
+    try:
+        from acpx_adapter import AcpxError, get_acpx_adapter
+    except ImportError as e:
+        return jsonify({"error": f"acpx adapter unavailable: {e}"}), 500
+
+    adapter = get_acpx_adapter(cwd=root_dir)
+
+    async def _run_prompt() -> str:
+        return await adapter.prompt(
+            tool=tool,
+            session_key=session_key,
+            prompt_text=prompt_text,
+            timeout_sec=int(body.get("timeout_sec") or 600),
+            reset_session=False,
+            attachments=acpx_attachments or None,
+        )
+
+    try:
+        reply = asyncio.run(_run_prompt())
+    except AcpxError as e:
+        return jsonify({"error": str(e)}), 502
+    except RuntimeError as e:
+        # asyncio.run from nested loop (unlikely in Flask sync)
+        return jsonify({"error": str(e)}), 500
+
+    if not stream:
+        return jsonify(
+            {
+                "id": "acpx-chatcmpl",
+                "object": "chat.completion",
+                "model": f"acp:{tool}",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": reply},
+                        "finish_reason": "stop",
+                    }
+                ],
+            }
+        )
+
+    def _sse():
+        chunk = {
+            "id": "acpx-chatcmpl",
+            "object": "chat.completion.chunk",
+            "model": f"acp:{tool}",
+            "choices": [{"index": 0, "delta": {"content": reply}, "finish_reason": None}],
+        }
+        yield f"data: {json.dumps(chunk)}\n\n"
+        done = {
+            "id": "acpx-chatcmpl",
+            "object": "chat.completion.chunk",
+            "model": f"acp:{tool}",
+            "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+        }
+        yield f"data: {json.dumps(done)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return Response(
+        _sse(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+            "X-Acpx-Session-Key": session_key,
+        },
+    )
+
+
+@app.route("/proxy_acpx_session_ensure", methods=["POST", "OPTIONS"])
+def proxy_acpx_session_ensure():
+    """Warm / create named main-page ACP session without sending a prompt.
+
+    Request JSON:
+      - tool: any acpx-supported agent command
+      - acp_session_pick: optional exact name from /proxy_acpx_sessions (reuse existing)
+      - acp_session_name: optional (aliases acp_session, session_name)
+      - session_id: fallback when name omitted (TeamClaw chat session id)
+    Response: { ok, tool, session_key }
+    """
+    if request.method == "OPTIONS":
+        resp = Response("", status=204)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        return resp
+
+    import asyncio
+    import shutil
+
+    if not shutil.which("acpx"):
+        return jsonify({"ok": False, "error": "acpx not found in PATH"}), 503
+
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "Invalid JSON"}), 400
+
+    tool = _normalize_acpx_tool(body)
+    if not tool:
+        return jsonify({"ok": False, "error": "unsupported tool"}), 400
+
+    try:
+        session_key = _acpx_main_session_key(tool=tool, body=body)
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    try:
+        from acpx_adapter import AcpxError, get_acpx_adapter
+    except ImportError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    adapter = get_acpx_adapter(cwd=root_dir)
+
+    async def _ensure() -> None:
+        await adapter.ensure_session(
+            tool=tool,
+            session_key=session_key,
+            acpx_session=adapter.to_acpx_session_name(tool=tool, session_key=session_key),
+        )
+
+    try:
+        asyncio.run(_ensure())
+    except AcpxError as e:
+        return jsonify({"ok": False, "error": str(e), "session_key": session_key}), 502
+
+    return jsonify({"ok": True, "tool": tool, "session_key": session_key})
+
+
 # ------------------------------------------------------------------
 # Team OpenClaw Snapshot — export/restore agent configs in team folder
 # ------------------------------------------------------------------
@@ -3665,6 +4083,7 @@ def add_external_member(team_name):
     api_key = body.get("api_key", "")
     model = body.get("model", "")
     headers = body.get("headers", {})
+    platform = str(body.get("platform", "") or "").strip()
     
     if not name or not global_name:
         return jsonify({"error": "name and global_name are required"}), 400
@@ -3690,6 +4109,7 @@ def add_external_member(team_name):
             "tag": tag,
             "global_name": global_name,
             "meta": {
+                "platform": platform,
                 "api_url": api_url,
                 "api_key": api_key,
                 "model": model,
@@ -3827,6 +4247,8 @@ def update_external_member(team_name):
             meta["model"] = body["model"]
         if "headers" in body:
             meta["headers"] = body["headers"]
+        if "platform" in body:
+            meta["platform"] = str(body["platform"] or "").strip()
         if meta:
             found["meta"] = meta
 
@@ -3835,6 +4257,100 @@ def update_external_member(team_name):
             json.dump(agents, f, ensure_ascii=False, indent=2)
 
         return jsonify({"status": "success", "agent": found})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ------------------------------------------------------------------
+# User-level external_agents.json  (data/user_files/<user>/external_agents.json)
+# Same entry shape as team external_agents.json; used for non-team Ext + fast contacts.
+# ------------------------------------------------------------------
+
+def _public_external_agents_user_path(user_id: str) -> str:
+    return os.path.join(root_dir, "data", "user_files", user_id, "external_agents.json")
+
+
+def _public_agents_load_raw(user_id: str) -> list:
+    p = _public_external_agents_user_path(user_id)
+    if not os.path.isfile(p):
+        return []
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _public_agents_save_raw(user_id: str, agents: list) -> None:
+    p = _public_external_agents_user_path(user_id)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(agents, f, ensure_ascii=False, indent=2)
+
+
+@app.route("/public_external_agents", methods=["GET", "POST", "DELETE"])
+def public_external_agents():
+    """User-level external_agents.json: list (GET), add (POST), remove (DELETE)."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "not logged in"}), 401
+
+    if request.method == "GET":
+        return jsonify({"agents": _public_agents_load_raw(user_id)})
+
+    if request.method == "POST":
+        body = request.get_json(force=True)
+        name = body.get("name", "")
+        tag = body.get("tag", "")
+        global_name = body.get("global_name", "")
+        api_url = body.get("api_url", "")
+        api_key = body.get("api_key", "")
+        model = body.get("model", "")
+        headers = body.get("headers", {})
+        platform = str(body.get("platform", "") or "").strip()
+        if not name or not global_name:
+            return jsonify({"error": "name and global_name are required"}), 400
+        try:
+            agents = _public_agents_load_raw(user_id)
+            if any(a.get("global_name") == global_name for a in agents if isinstance(a, dict)):
+                return jsonify({"error": "Global name already exists"}), 409
+            new_agent = {
+                "name": name,
+                "tag": tag,
+                "global_name": global_name,
+                "meta": {
+                    "platform": platform,
+                    "api_url": api_url,
+                    "api_key": api_key,
+                    "model": model,
+                    "headers": headers,
+                },
+            }
+            agents.append(new_agent)
+            _public_agents_save_raw(user_id, agents)
+            return jsonify({"status": "success", "agent": new_agent})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # DELETE
+    body = request.get_json(force=True)
+    global_name = body.get("global_name", "")
+    if not global_name:
+        return jsonify({"error": "global_name is required"}), 400
+    try:
+        agents = _public_agents_load_raw(user_id)
+        deleted = None
+        new_agents = []
+        for a in agents:
+            if isinstance(a, dict) and a.get("global_name") == global_name:
+                deleted = a
+            else:
+                new_agents.append(a)
+        if not deleted:
+            return jsonify({"error": "Global name not found"}), 404
+        _public_agents_save_raw(user_id, new_agents)
+        return jsonify({"status": "success", "deleted": deleted})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

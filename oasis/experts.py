@@ -1145,15 +1145,21 @@ class SessionExpert:
 #   name = "title#ext#id"
 #   Does NOT go through local TeamBot agent.
 #   Calls external api_url directly using httpx + OpenAI chat format.
-#   ACP agent support: tag (openclaw/codex) determines the ACP binary.
+#   ACP agent support: tag (codex/claude/gemini/aider) determines ACP binary.
 # ======================================================================
 
 # ── ACP long-lived connection helpers (inline from acptest4.py) ──
 
 # ACP-capable CLI tags (keep in sync with src/group_service._ACP_KNOWN_TOOLS)
-_OASIS_ACP_KNOWN_TOOLS: frozenset[str] = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
-_OASIS_ACP_AGENT_TAGS: frozenset[str] = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
-_OASIS_HTTP_AGENT_TAGS: frozenset[str] = frozenset()
+_OASIS_ACP_KNOWN_TOOLS: frozenset[str] = frozenset({
+    "openclaw", "codex", "claude", "gemini", "aider",
+    "claude-code", "gemini-cli",
+})
+_OASIS_ACP_AGENT_TAGS: frozenset[str] = frozenset({
+    "codex", "claude", "gemini", "aider",
+    "claude-code", "gemini-cli",
+})
+_OASIS_HTTP_AGENT_TAGS: frozenset[str] = frozenset({"openclaw"})
 
 
 class ExternalExpert:
@@ -1168,7 +1174,7 @@ class ExternalExpert:
     ``agent:<agent_name>`` or ``agent:<agent_name>:<session>``, ACP
     long-lived subprocess connections are preferred. If ACP is unavailable
     (binary not found or start failed), falls back to HTTP API when
-    ``api_url`` is configured. The ``tag`` field (e.g. "openclaw", "codex")
+    ``api_url`` is configured. The ``tag`` field (e.g. "codex", "claude")
     determines which CLI binary is used for the ACP subprocess. Session
     suffix defaults to ``teamclawchat`` if not specified in the model string (same as group/ops ACP).
 
@@ -1439,7 +1445,7 @@ class ExternalExpert:
     async def _call_api(self, messages: list[dict], timeout_override: float | None = ...) -> str:
         """Send messages to external API and return the assistant response text.
 
-        For ACP agent-type externals (model="agent:<name>" with tag openclaw/codex/etc):
+        For ACP agent-type externals (model="agent:<name>" with tag codex/claude/gemini/aider):
           - Prefers ACP persistent connection when available.
           - Falls back to HTTP API if ACP not started and api_url is configured.
           - Raises RuntimeError only when neither ACP nor HTTP is available.
@@ -1465,20 +1471,35 @@ class ExternalExpert:
                 cli_message = messages[-1].get("content", "") if messages else ""
 
             if self._acp_available:
-                reply = await self._acp_pooled_prompt(cli_message)
-                print(f"  [OASIS] 🔌 ACP send success for {self.name} ({len(reply)} chars)")
-                self._acp_started = True
-                return reply
-            raise RuntimeError(
-                f"ACP unavailable for agent {self.name} "
-                f"(agent={self._oc_agent_name}, tool={self._acp_tool_name})"
-            )
+                try:
+                    reply = await self._acp_pooled_prompt(cli_message)
+                    print(f"  [OASIS] 🔌 ACP send success for {self.name} ({len(reply)} chars)")
+                    self._acp_started = True
+                    return reply
+                except Exception as acp_err:
+                    if self._api_url:
+                        print(f"  [OASIS] ⚠️ ACP failed for {self.name}, fallback to HTTP: {acp_err}")
+                    else:
+                        raise RuntimeError(
+                            f"ACP failed for agent {self.name} "
+                            f"(agent={self._oc_agent_name}, tool={self._acp_tool_name}): {acp_err}"
+                        ) from acp_err
+            elif not self._api_url:
+                raise RuntimeError(
+                    f"ACP unavailable for agent {self.name} "
+                    f"(agent={self._oc_agent_name}, tool={self._acp_tool_name})"
+                )
 
         # ── HTTP API call (non-ACP route) ──
         if not self._api_url:
             raise RuntimeError(f"No api_url configured for external expert {self.name}")
+        req_model = self.model
+        if self._tag_lower == "openclaw" and self._http_global_name:
+            model_str = str(req_model or "").strip()
+            if not model_str.startswith("agent:"):
+                req_model = f"agent:{self._http_global_name}"
         body = {
-            "model": self.model,
+            "model": req_model,
             "messages": messages,
             "stream": False,
         }
@@ -1490,6 +1511,37 @@ class ExternalExpert:
             data = resp.json()
             return data["choices"][0]["message"]["content"]
         except Exception as api_err:
+            # OpenClaw: prefer HTTP first, then fallback to ACP.
+            if self._tag_lower == "openclaw" and self._http_global_name and bool(shutil.which("acpx")):
+                try:
+                    cli_message = ""
+                    for msg in reversed(messages):
+                        if msg.get("role") == "user":
+                            cli_message = msg.get("content", "")
+                            break
+                    if not cli_message:
+                        cli_message = messages[-1].get("content", "") if messages else ""
+                    adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
+                    acp_session = f"agent:{self._http_global_name}:{self._session_suffix}"
+                    acpx_session = adapter.to_acpx_session_name(tool="openclaw", session_key=acp_session)
+                    await adapter.ensure_session(
+                        tool="openclaw",
+                        session_key=acp_session,
+                        acpx_session=acpx_session,
+                    )
+                    reply = await adapter.prompt(
+                        tool="openclaw",
+                        session_key=acp_session,
+                        prompt_text=cli_message,
+                        timeout_sec=180,
+                        reset_session=False,
+                    )
+                    print(f"  [OASIS] ⚠️ HTTP failed for {self.name}, fallback to ACP succeeded")
+                    return reply
+                except Exception as acp_err:
+                    raise RuntimeError(
+                        f"API call failed for {self.name}: {api_err}; ACP fallback failed: {acp_err}"
+                    ) from acp_err
             raise RuntimeError(f"API call failed for {self.name}: {api_err}")
 
     def _inject_oasis_reply_instruction(self, messages: list[dict]) -> None:

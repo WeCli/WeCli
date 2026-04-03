@@ -3787,9 +3787,103 @@ body.session-panel-resizing * {
 }
 .oc-switcher-inner {
     display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+}
+.oc-switcher-row-main {
+    display: flex;
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+}
+.oc-acp-session-row {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 2px 0 0 2px;
+}
+.oc-acp-session-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    white-space: nowrap;
+}
+.oc-acp-session-select {
+    flex: 1;
+    min-width: 140px;
+    max-width: min(420px, 100%);
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 11px;
+    background: #fff;
+    color: #374151;
+    cursor: pointer;
+}
+.oc-acp-session-select:focus {
+    outline: none;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+}
+.oc-acp-session-select:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+.oc-acp-session-refresh {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #4b5563;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.oc-acp-session-refresh:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
+}
+.oc-acp-session-or {
+    font-size: 11px;
+    color: #9ca3af;
+    font-weight: 600;
+}
+.oc-acp-session-label-sub {
+    margin-left: 4px;
+}
+.oc-acp-session-input {
+    flex: 1;
+    min-width: 120px;
+    max-width: 320px;
+    padding: 4px 8px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 12px;
+    background: #fff;
+    color: #374151;
+}
+.oc-acp-session-input:focus {
+    outline: none;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.15);
+}
+.oc-acp-session-ensure {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    color: #4b5563;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.oc-acp-session-ensure:hover {
+    background: #f9fafb;
+    border-color: #9ca3af;
 }
 .oc-switcher-tabs {
     display: flex;
@@ -3798,6 +3892,49 @@ body.session-panel-resizing * {
     border-radius: 8px;
     padding: 2px;
     flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.oc-acp-tabs {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    align-items: center;
+    max-width: min(100%, 70vw);
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    scrollbar-width: thin;
+}
+/* ACP 工具标签：小 SVG 图标（非各厂商商标，仅示意终端 / 星形 / 宝石形） */
+.oc-tab-with-acp-ico {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.oc-acp-ico {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+}
+/* 终端风格 — 对应 Codex CLI */
+.oc-acp-ico-codex {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='1' y='3' width='18' height='14' rx='2' fill='%230d1117' stroke='%23238636' stroke-width='1'/%3E%3Cpath d='M5 10h6M5 7h10' stroke='%2339d353' stroke-width='1' stroke-linecap='round'/%3E%3Cpath d='M13 12l3 2-3 2' stroke='%2358a6ff' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+/* 暖色星形 — 示意 Claude Code */
+.oc-acp-ico-claude {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='%23cc785c' d='M10 2l1.8 4.2L16 8l-4.2 1.8L10 14l-1.8-4.2L4 8l4.2-1.8z'/%3E%3C/svg%3E");
+}
+/* 渐变菱形 — 示意 Gemini CLI */
+.oc-acp-ico-gemini {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cdefs%3E%3ClinearGradient id='tcgm' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234285f4'/%3E%3Cstop offset='.5' stop-color='%239b72cb'/%3E%3Cstop offset='1' stop-color='%23d96570'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23tcgm)' d='M10 3l6 7-6 7-6-7z'/%3E%3C/svg%3E");
+}
+.oc-acp-ico-generic {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='2' y='3' width='16' height='14' rx='2.5' fill='%231f2937'/%3E%3Cpath d='M6 9.2l2.4 2.2L6 13.6' stroke='%23d1d5db' stroke-width='1.4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M10.5 13.6h3.5' stroke='%239ca3af' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
 }
 .oc-switcher-tab {
     padding: 5px 14px;

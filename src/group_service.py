@@ -37,13 +37,12 @@ from group_models import Attachment, GroupCreateRequest, GroupAddMemberRequest, 
 from logging_utils import get_logger
 from session_summary import first_human_title
 from acpx_adapter import AcpxError, get_acpx_adapter
+from acpx_cli_tools import acpx_agent_tags_with_legacy
 
 logger = get_logger("group_service")
 
-# Known ACP-compatible tool binaries (must match CLI status platforms list)
-_ACP_KNOWN_TOOLS: frozenset = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
-_ACP_AGENT_TAGS: frozenset = frozenset({"openclaw", "codex", "claude", "gemini", "aider"})
-_HTTP_AGENT_TAGS: frozenset = frozenset()
+# Subcommands accepted by `acpx <tag> ...` (from `acpx --help` + legacy aliases)
+_ACP_TOOL_NAMES: frozenset[str] = acpx_agent_tags_with_legacy()
 _DEFAULT_ACP_SESSION_SUFFIX = "teamclawchat"
 _AGENT_MODEL_RE = re.compile(r"^agent:[^:]+(?::(.+))?$")
 
@@ -63,12 +62,18 @@ def _acp_group_trace(event: str, **fields: Any) -> None:
     return
 
 
-def _select_external_transport(tag: str) -> Literal["acp", "http", "drop"]:
-    tag_lower = (tag or "").lower()
-    if tag_lower in _ACP_AGENT_TAGS:
+def _select_external_transport(tag: str, platform: str = "") -> Literal["acp", "http", "drop"]:
+    pl = (platform or "").strip().lower()
+    if pl in ("acp", "acpx", "local"):
         return "acp"
-    if tag_lower in _HTTP_AGENT_TAGS:
+    if pl in ("http", "openai", "openai_http"):
         return "http"
+    tag_lower = (tag or "").lower()
+    # OpenClaw defaults to HTTP path in TeamClaw (gateway); optional platform=acp overrides.
+    if tag_lower == "openclaw":
+        return "http"
+    if tag_lower in _ACP_TOOL_NAMES and tag_lower != "openclaw":
+        return "acp"
     return "drop"
 
 
@@ -168,14 +173,13 @@ def _load_team_internal_agents(user_id: str, team: str) -> list[dict]:
         return []
 
 
-def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
-    """Load external agents from team's external_agents.json.
+def _public_external_agents_path(user_id: str) -> str:
+    """User-level external_agents.json (not tied to a team)."""
+    return os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "external_agents.json")
 
-    Returns list of {"user_id": "ext", "global_id": global_name, "short_name": name, "member_type": "ext", ...}
-    """
-    if not user_id or not team:
-        return []
-    path = os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "teams", team, "external_agents.json")
+
+def _parse_external_agents_file(path: str) -> list[dict]:
+    """Parse external_agents.json list into member-style dicts (shared shape with team file)."""
     if not os.path.isfile(path):
         return []
     try:
@@ -187,15 +191,18 @@ def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
         for a in data:
             if not isinstance(a, dict) or "name" not in a:
                 continue
-            # Support both "config" and "meta" field names for external agent config
             ext_config = a.get("config") or a.get("meta") or {}
+            nm = a.get("name", "")
+            gn = a.get("global_name", "")
             result.append({
                 "user_id": "ext",
-                "global_id": a.get("global_name", ""),
-                "short_name": a.get("name", ""),
+                "global_id": gn,
+                "short_name": nm,
                 "member_type": "ext",
                 "tag": a.get("tag", ""),
-                "global_name": a.get("global_name", ""),
+                "global_name": gn,
+                "name": nm,
+                "platform": str(ext_config.get("platform", "") or "").strip(),
                 "api_url": ext_config.get("api_url", ""),
                 "api_key": ext_config.get("api_key", ""),
                 "model": ext_config.get("model", ""),
@@ -203,6 +210,24 @@ def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
         return result
     except Exception:
         return []
+
+
+def _load_public_external_agents(user_id: str) -> list[dict]:
+    """Load external agents from user-level external_agents.json."""
+    if not user_id:
+        return []
+    return _parse_external_agents_file(_public_external_agents_path(user_id))
+
+
+def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
+    """Load external agents from team's external_agents.json.
+
+    Returns list of {"user_id": "ext", "global_id": global_name, "short_name": name, "member_type": "ext", ...}
+    """
+    if not user_id or not team:
+        return []
+    path = os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "teams", team, "external_agents.json")
+    return _parse_external_agents_file(path)
 
 
 def _load_team_members(user_id: str, team: str) -> list[dict]:
@@ -296,7 +321,7 @@ class GroupService:
         if not global_name:
             logger.warning("No global_name for external agent %s", agent_info.get("name"))
             return None
-        if tag not in _ACP_KNOWN_TOOLS:
+        if tag not in _ACP_TOOL_NAMES:
             logger.warning("Unsupported ACP tool '%s' for %s", tag, global_name)
             return None
 
@@ -384,6 +409,12 @@ class GroupService:
             api_url = os.getenv("OPENCLAW_API_URL", "") or api_url
             api_key = os.getenv("OPENCLAW_GATEWAY_TOKEN", "") or api_key
         model = agent_info.get("model", "gpt-3.5-turbo")
+        # Keep OpenClaw HTTP payload aligned with /proxy_openclaw_chat:
+        # use agent:<global_name> model for gateway session routing.
+        if tag == "openclaw" and global_name:
+            model_str = str(model or "").strip()
+            if not model_str.startswith("agent:"):
+                model = f"agent:{global_name}"
 
         if not api_url:
             logger.warning("No api_url for external agent %s", agent_info.get("name"))
@@ -475,8 +506,11 @@ class GroupService:
         ACP response is NOT automatically posted to group.
         Agent should use CLI tool `groups send` to send messages if needed.
         """
-        # Select transport explicitly by tag; no ACP->HTTP fallback.
-        transport = _select_external_transport(str(agent_info.get("tag", "")))
+        # Select transport explicitly by tag.
+        transport = _select_external_transport(
+            str(agent_info.get("tag", "")),
+            str(agent_info.get("platform", "") or ""),
+        )
         if transport == "drop":
             logger.warning(
                 "Drop external agent %s due to unknown tag '%s'",
@@ -484,10 +518,23 @@ class GroupService:
                 agent_info.get("tag", ""),
             )
             return
+        tag_lower = str(agent_info.get("tag", "")).lower()
         if transport == "acp":
             reply = await self._send_to_acp_agent(agent_info, message, attachments=attachments)
+            if not reply:
+                logger.info(
+                    "ACP failed/no reply for %s, fallback to HTTP",
+                    agent_name,
+                )
+                reply = await self._send_to_http_agent(agent_info, message, attachments=attachments)
         else:
             reply = await self._send_to_http_agent(agent_info, message, attachments=attachments)
+            if not reply and tag_lower == "openclaw":
+                logger.info(
+                    "HTTP failed/no reply for openclaw %s, fallback to ACP",
+                    agent_name,
+                )
+                reply = await self._send_to_acp_agent(agent_info, message, attachments=attachments)
         if not reply:
             logger.info("External agent %s did not reply", agent_name)
             return
@@ -529,12 +576,17 @@ class GroupService:
         external_agents_map: dict[str, dict] = {}
         if user_id:
             owner = user_id
+            # User-level public external_agents.json (team entries override by global_id)
+            for ea in _load_public_external_agents(owner):
+                gid = str(ea.get("global_id") or ea.get("global_name") or "").strip()
+                if gid:
+                    external_agents_map[gid] = ea
             # Scan all teams for this owner to find external agent configs
             teams_dir = os.path.join(_PROJECT_ROOT, "data", "user_files", owner, "teams")
             if os.path.isdir(teams_dir):
                 for team_dir in os.listdir(teams_dir):
                     for ea in _load_team_external_agents(owner, team_dir):
-                        gid = ea.get("global_id", "")
+                        gid = str(ea.get("global_id", "") or "").strip()
                         if gid:
                             external_agents_map[gid] = ea
 
