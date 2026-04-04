@@ -93,12 +93,12 @@ If the task is narrow, inspect only the indexed files for that area instead of s
 
 The goal is a **silent, non-interactive install**. NEVER repeatedly ask the user for `LLM_API_KEY`, `LLM_BASE_URL`, or `LLM_MODEL` during installation. Instead:
 
-1. Run `setup` → `configure --init` → `start`. The `start` command:
+1. Run **`start`** (or `start-foreground`). First run **does not** require a separate `setup`: `start` **runs the same environment bootstrap as `setup` when needed** (venv, Python deps, and on Linux/macOS `acpx` when `npm` is available). You do **not** need `configure --init` before `start` — `start` creates `config/.env` from the template if missing. The `start` command:
    - Creates a default `.env` if missing
    - Starts all services even if LLM is not yet configured
    - Automatically warms an installed OpenClaw gateway and refreshes runtime `OPENCLAW_*` values
-   - If `config/.env` has no real `LLM_API_KEY` (missing/placeholder), it will auto-import OpenClaw LLM config into TeamClaw
-     (but it will NOT overwrite a user-provided real `LLM_API_KEY`)
+   - If `config/.env` has no real `LLM_API_KEY` (missing/placeholder), it **tries** to import OpenClaw LLM config into TeamClaw (optional; **failure does not block startup**)
+     (it will NOT overwrite a user-provided real `LLM_API_KEY`)
    - **Automatically starts Cloudflare Tunnel** for mobile remote access and prints the public URL
    - After Tunnel (or when it is still starting), prints **Magic link** lines (local + remote when `PUBLIC_DOMAIN` is ready)
 2. **Do NOT ask the user for LLM credentials before starting**. The frontend provides a first-login setup wizard where the user can configure API Key, select provider, and choose a model — all from the web UI.

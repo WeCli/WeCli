@@ -16,6 +16,27 @@ $pidFile = Join-Path $projectRoot ".teamclaw.pid"
 $tunnelPidFile = Join-Path $projectRoot ".tunnel.pid"
 $envPath = Join-Path $projectRoot "config\.env"
 
+function Stop-TeamClawTunnelForFreshStart {
+    $touched = $false
+    if (Test-TrackedProcessRunning -PidFile $tunnelPidFile) {
+        Write-Host "Stopping existing Tunnel before starting a new one..."
+        Stop-TrackedProcess -PidFile $tunnelPidFile | Out-Null
+        $touched = $true
+    } elseif (Test-Path $tunnelPidFile) {
+        Write-Host "Removing stale .tunnel.pid"
+        Remove-Item $tunnelPidFile -Force -ErrorAction SilentlyContinue
+        $touched = $true
+    }
+    if ($touched -and (Test-Path $envPath)) {
+        $raw = Get-Content $envPath -Raw -ErrorAction SilentlyContinue
+        if ($raw -and ($raw -match '(?m)^PUBLIC_DOMAIN=')) {
+            $cleared = $raw -replace '(?m)^PUBLIC_DOMAIN=.*', 'PUBLIC_DOMAIN='
+            [System.IO.File]::WriteAllText($envPath, $cleared, [System.Text.UTF8Encoding]::new($false))
+            Write-Host "Cleared PUBLIC_DOMAIN in config\.env"
+        }
+    }
+}
+
 function Invoke-TeamClawPython {
     param(
         [Parameter(Mandatory = $true)]
@@ -30,6 +51,21 @@ function Invoke-TeamClawPython {
     } finally {
         Pop-Location
     }
+}
+
+function Get-TeamClawStartOptions {
+    param([string[]]$FlagArgs)
+    $noTunnel = $false
+    $noOpenclaw = $false
+    if ($null -ne $FlagArgs) {
+        foreach ($a in $FlagArgs) {
+            switch -Exact ($a) {
+                '--no-tunnel' { $noTunnel = $true }
+                '--no-openclaw' { $noOpenclaw = $true }
+            }
+        }
+    }
+    [pscustomobject]@{ NoTunnel = $noTunnel; NoOpenclaw = $noOpenclaw }
 }
 
 function Write-MagicLinks {
@@ -60,6 +96,12 @@ function Write-MagicLinks {
         return
     }
     Write-Host "  Local:  http://127.0.0.1:$fe/login-link/${token}?user=$mlUser"
+    if ($env:TEAMCLAW_NO_TUNNEL -eq "1") {
+        Write-Host "  Remote: (This start used --no-tunnel; Cloudflare Tunnel was not started.)"
+        Write-Host ""
+        Write-Host "FOR AI ASSISTANTS: Only the Local URL applies; do not claim a public/mobile URL was provided."
+        return
+    }
     $pd = Get-EnvValue -Key "PUBLIC_DOMAIN"
     if ($pd -and $pd -ne "wait to set") {
         Write-Host "  Remote: ${pd}/login-link/${token}?user=$mlUser"
@@ -258,9 +300,9 @@ function Show-Help {
     Write-Host "  powershell -ExecutionPolicy Bypass -File selfskill\scripts\run.ps1 <command> [args]"
     Write-Host ""
     Write-Host "Commands:"
-    Write-Host "  setup                          Install or update Python dependencies"
-    Write-Host "  start                          Start services in the background (also warms installed OpenClaw)"
-    Write-Host "  start-foreground               Start services in the foreground (best for managed terminals / CI / agent runners; also warms installed OpenClaw)"
+    Write-Host "  setup                          Optional: full setup_env.ps1 (start runs it when venv/deps are missing)"
+    Write-Host "  start [--no-tunnel] [--no-openclaw]   Background start; --no-tunnel skips Cloudflare; --no-openclaw skips OpenClaw import + gateway warm"
+    Write-Host "  start-foreground [--no-openclaw] [--no-tunnel]   Foreground start; --no-openclaw same (--no-tunnel ignored; no tunnel in this mode)"
     Write-Host "  stop                           Stop services"
     Write-Host "  status                         Show current service status"
     Write-Host "  add-user <name> <password>     Create or update a password user"
@@ -415,6 +457,31 @@ function Stop-TeamClawServiceProcesses {
     return $true
 }
 
+# 等价于 run.sh run_teamclaw_setup_if_needed：缺 venv / 缺依赖 / 有 npm 无 acpx 时跑 setup_env.ps1
+function Invoke-TeamClawSetupIfNeeded {
+    $venvPy = Get-VenvPython -ProjectRoot $projectRoot
+    if (-not $venvPy) {
+        Write-Host "📋 Virtualenv missing — running scripts\setup_env.ps1 ..."
+        & (Join-Path $projectRoot "scripts\setup_env.ps1")
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        return
+    }
+    $null = & $venvPy -c "import fastapi" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "📋 Python dependencies incomplete — running scripts\setup_env.ps1 ..."
+        & (Join-Path $projectRoot "scripts\setup_env.ps1")
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        return
+    }
+    $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+    $acpxCmd = Get-Command acpx -ErrorAction SilentlyContinue
+    if ($npmCmd -and -not $acpxCmd) {
+        Write-Host "📋 npm is available but acpx is not on PATH — running scripts\setup_env.ps1 ..."
+        & (Join-Path $projectRoot "scripts\setup_env.ps1")
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+}
+
 # ---- uv 环境自检 & 自动配置 ----
 Push-Location $projectRoot
 try {
@@ -462,24 +529,31 @@ switch ($Command) {
     }
 
     "start" {
+        $startOpts = Get-TeamClawStartOptions -FlagArgs $Rest
+        Invoke-TeamClawSetupIfNeeded
         # Auto-create .env if missing
         if (-not (Test-Path $envPath)) {
             Write-Host "config/.env is missing, auto-initializing from template..."
             Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
         }
 
-        # Auto-import LLM config:
-        # If config/.env has no real LLM_API_KEY (missing/placeholder), try to read it from OpenClaw.
-        $envValues = Read-TeamClawEnvFile -Path $envPath
-        $llmKey = ""
-        if ($envValues.ContainsKey("LLM_API_KEY")) { $llmKey = $envValues["LLM_API_KEY"] }
-        if ([string]::IsNullOrWhiteSpace($llmKey) -or $llmKey -eq "your_api_key_here") {
+        if ($startOpts.NoOpenclaw) {
             Write-Host ""
-            Write-Host "🔄 Detected LLM_API_KEY not configured (or placeholder), importing from OpenClaw..."
-            try {
-                Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-teamclaw-llm-from-openclaw") | Out-Null
-            } catch {
-                Write-Host "⚠️ OpenClaw import failed, continuing startup."
+            Write-Host "⏭️  --no-openclaw: skipping LLM import from OpenClaw; launcher will not warm OpenClaw gateway."
+            $env:TEAMCLAW_NO_OPENCLAW = "1"
+        } else {
+            Remove-Item Env:\TEAMCLAW_NO_OPENCLAW -ErrorAction SilentlyContinue
+            $envValues = Read-TeamClawEnvFile -Path $envPath
+            $llmKey = ""
+            if ($envValues.ContainsKey("LLM_API_KEY")) { $llmKey = $envValues["LLM_API_KEY"] }
+            if ([string]::IsNullOrWhiteSpace($llmKey) -or $llmKey -eq "your_api_key_here") {
+                Write-Host ""
+                Write-Host "🔄 LLM_API_KEY still empty/placeholder: trying OpenClaw -> TeamClaw .env (optional)..."
+                try {
+                    Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-teamclaw-llm-from-openclaw") | Out-Null
+                } catch {
+                    Write-Host "⚠️ OpenClaw import skipped or failed; continuing startup."
+                }
             }
         }
 
@@ -501,6 +575,11 @@ switch ($Command) {
 
         $python = Ensure-VenvPython -ProjectRoot $projectRoot
         $env:TEAMBOT_HEADLESS = "1"
+        if ($startOpts.NoOpenclaw) {
+            $env:TEAMCLAW_NO_OPENCLAW = "1"
+        } else {
+            Remove-Item Env:\TEAMCLAW_NO_OPENCLAW -ErrorAction SilentlyContinue
+        }
         $stdoutLog = Join-Path $projectRoot "logs\launcher.out.log"
         $stderrLog = Join-Path $projectRoot "logs\launcher.err.log"
         $process = Start-BackgroundPythonProcess `
@@ -544,17 +623,8 @@ switch ($Command) {
             Write-Host ""
         }
 
-        # Auto-start Cloudflare Tunnel for mobile remote access
-        if (Test-TrackedProcessRunning -PidFile $tunnelPidFile) {
-            Write-Host "Tunnel is already running."
-            $envContent = Get-Content $envPath -ErrorAction SilentlyContinue | Out-String
-            if ($envContent -match 'PUBLIC_DOMAIN=(\S+)') {
-                $publicDomain = $matches[1]
-                if ($publicDomain -and $publicDomain -ne "wait to set") {
-                    Write-Host "Mobile access: $publicDomain/mobile_group_chat"
-                }
-            }
-        } else {
+        if (-not $startOpts.NoTunnel) {
+            Stop-TeamClawTunnelForFreshStart
             Write-Host "Starting Cloudflare Tunnel for mobile remote access..."
             $python = Ensure-VenvPython -ProjectRoot $projectRoot
             $tunnelStdoutLog = Join-Path $projectRoot "logs\tunnel.out.log"
@@ -568,7 +638,6 @@ switch ($Command) {
             Set-Content -Path $tunnelPidFile -Value $tunnelProcess.Id -Encoding UTF8
             Write-Host "Tunnel started. PID: $($tunnelProcess.Id)"
 
-            # Wait for PUBLIC_DOMAIN to appear
             $tunnelReady = $false
             for ($i = 0; $i -lt 20; $i++) {
                 Start-Sleep -Seconds 2
@@ -583,9 +652,18 @@ switch ($Command) {
             if (-not $tunnelReady) {
                 Write-Host "Tunnel is still starting. Check later: powershell -File selfskill\scripts\run.ps1 tunnel-status"
             }
+        } else {
+            Write-Host ""
+            Write-Host "⏭️  --no-tunnel: skipping Cloudflare Tunnel (local access only)."
         }
 
+        if ($startOpts.NoTunnel) {
+            $env:TEAMCLAW_NO_TUNNEL = "1"
+        } else {
+            Remove-Item Env:\TEAMCLAW_NO_TUNNEL -ErrorAction SilentlyContinue
+        }
         Write-MagicLinks
+        Remove-Item Env:\TEAMCLAW_NO_TUNNEL -ErrorAction SilentlyContinue
 
         Write-Host ""
         Write-Host "Docs (read before creating/managing Teams):"
@@ -600,24 +678,37 @@ switch ($Command) {
     }
 
     "start-foreground" {
+        $startOpts = Get-TeamClawStartOptions -FlagArgs $Rest
+        Invoke-TeamClawSetupIfNeeded
         # Auto-create .env if missing
         if (-not (Test-Path $envPath)) {
             Write-Host "config/.env is missing, auto-initializing from template..."
             Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
         }
 
-        # Same auto-import behavior in foreground start.
-        $envValues = Read-TeamClawEnvFile -Path $envPath
-        $llmKey = ""
-        if ($envValues.ContainsKey("LLM_API_KEY")) { $llmKey = $envValues["LLM_API_KEY"] }
-        if ([string]::IsNullOrWhiteSpace($llmKey) -or $llmKey -eq "your_api_key_here") {
+        if ($startOpts.NoOpenclaw) {
             Write-Host ""
-            Write-Host "🔄 Detected LLM_API_KEY not configured (or placeholder), importing from OpenClaw..."
-            try {
-                Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-teamclaw-llm-from-openclaw") | Out-Null
-            } catch {
-                Write-Host "⚠️ OpenClaw import failed, continuing startup."
+            Write-Host "⏭️  --no-openclaw: skipping LLM import from OpenClaw; launcher will not warm OpenClaw gateway."
+            $env:TEAMCLAW_NO_OPENCLAW = "1"
+        } else {
+            Remove-Item Env:\TEAMCLAW_NO_OPENCLAW -ErrorAction SilentlyContinue
+            $envValues = Read-TeamClawEnvFile -Path $envPath
+            $llmKey = ""
+            if ($envValues.ContainsKey("LLM_API_KEY")) { $llmKey = $envValues["LLM_API_KEY"] }
+            if ([string]::IsNullOrWhiteSpace($llmKey) -or $llmKey -eq "your_api_key_here") {
+                Write-Host ""
+                Write-Host "🔄 LLM_API_KEY still empty/placeholder: trying OpenClaw -> TeamClaw .env (optional)..."
+                try {
+                    Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-teamclaw-llm-from-openclaw") | Out-Null
+                } catch {
+                    Write-Host "⚠️ OpenClaw import skipped or failed; continuing startup."
+                }
             }
+        }
+
+        if ($startOpts.NoTunnel) {
+            Write-Host ""
+            Write-Host "ℹ️  start-foreground does not start Tunnel; --no-tunnel is ignored for this mode."
         }
 
         Stop-TeamClawServiceProcesses | Out-Null
@@ -630,6 +721,11 @@ switch ($Command) {
 
         $python = Ensure-VenvPython -ProjectRoot $projectRoot
         $env:TEAMBOT_HEADLESS = "1"
+        if ($startOpts.NoOpenclaw) {
+            $env:TEAMCLAW_NO_OPENCLAW = "1"
+        } else {
+            Remove-Item Env:\TEAMCLAW_NO_OPENCLAW -ErrorAction SilentlyContinue
+        }
         Write-Host "Starting TeamClaw in the foreground (headless) ..."
         Write-Host "This session stays attached. Press Ctrl+C to stop all services."
 
@@ -932,16 +1028,7 @@ switch ($Command) {
     }
 
     "start-tunnel" {
-        if (Test-TrackedProcessRunning -PidFile $tunnelPidFile) {
-            $existingPid = Get-TrackedProcessId -PidFile $tunnelPidFile
-            Write-Host "Tunnel is already running. PID: $existingPid"
-            $envValues = Read-TeamClawEnvFile -Path $envPath
-            if ($envValues.ContainsKey("PUBLIC_DOMAIN") -and -not [string]::IsNullOrWhiteSpace($envValues["PUBLIC_DOMAIN"]) -and $envValues["PUBLIC_DOMAIN"] -ne "wait to set") {
-                Write-Host "Public URL: $($envValues["PUBLIC_DOMAIN"])"
-            }
-            Write-MagicLinks
-            exit 0
-        }
+        Stop-TeamClawTunnelForFreshStart
 
         $python = Ensure-VenvPython -ProjectRoot $projectRoot
         $stdoutLog = Join-Path $projectRoot "logs\tunnel.out.log"

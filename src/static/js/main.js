@@ -321,6 +321,10 @@ const i18n = {
         orch_ia_created: 'Internal Agent 已创建',
         orch_ia_tag_set: 'Tag 已设置为',
 orch_openclaw_sessions: '🦞 OpenClaw',
+        orch_external_agents_section: '2. 外部 Agent',
+        orch_ext_cat_openclaw: '2.1 OpenClaw',
+        orch_ext_openclaw_empty: '暂无 OpenClaw Agent 或未配置',
+        orch_ext_pool_empty: '暂无可拖拽的外部 Agent',
         orch_add_openclaw_title: '新建 OpenClaw Agent',
         orch_openclaw_agent_name: 'Agent 名称',
         orch_openclaw_ws_path: '路径',
@@ -793,6 +797,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         oc_acp_session_placeholder: '可选；留空则按左侧 TeamClaw 会话区分',
         oc_acp_session_ensure: '预热',
         oc_acp_session_ensure_title: '仅创建/预热 ACP 会话，不发送消息',
+        oc_internal_session_refresh_title: '从服务器刷新 TeamBot 会话列表',
     },
     'en': {
         // General
@@ -1069,6 +1074,10 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         orch_ia_created: 'Internal Agent created',
         orch_ia_tag_set: 'Tag set to',
 orch_openclaw_sessions: '🦞 OpenClaw',
+        orch_external_agents_section: '2. External Agents',
+        orch_ext_cat_openclaw: '2.1 OpenClaw',
+        orch_ext_openclaw_empty: 'No OpenClaw agents or not configured',
+        orch_ext_pool_empty: 'No external agents to drag',
         orch_add_openclaw_title: 'New OpenClaw Agent',
         orch_openclaw_agent_name: 'Agent Name',
         orch_openclaw_ws_path: 'Path',
@@ -1549,6 +1558,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         oc_acp_session_placeholder: 'Optional; empty = scope by TeamClaw session',
         oc_acp_session_ensure: 'Warm up',
         oc_acp_session_ensure_title: 'Create/warm ACP session only (no message sent)',
+        oc_internal_session_refresh_title: 'Refresh TeamBot session list from server',
     }
 };
 
@@ -1969,6 +1979,7 @@ function initSession() {
     }
     currentSessionId = saved;
     updateSessionDisplay();
+    loadSessionList().catch(() => {});
 }
 
 function updateSessionDisplay() {
@@ -2591,9 +2602,36 @@ function _modeActionButtons(sessionId, currentMode) {
         .join('')}</div>`;
 }
 
+function _buildWorkflowPresetSection(runtime, item) {
+    const sessionId = runtime?.session_id || item?.session_id || currentSessionId || '';
+    const presets = Array.isArray(runtime?.workflow_presets) ? runtime.workflow_presets : [];
+    const active = runtime?.active_workflow || runtime?.plan?.metadata?.workflow || null;
+    const activeMeta = active && typeof active === 'object' ? active : null;
+    const activeHtml = activeMeta
+        ? `
+            <div class="teambot-runtime-caption">${_escapeAndFormatText(`${activeMeta.name || activeMeta.preset_id || 'workflow'} · ${activeMeta.mode || ''}`)}</div>
+            <div class="teambot-runtime-detail">${_escapeAndFormatText(activeMeta.description || '')}</div>
+        `
+        : `<div class="teambot-runtime-empty">No active workflow preset</div>`;
+    const buttonHtml = presets.slice(0, 4).map((preset) => `
+        <button class="teambot-subagent-btn${activeMeta && activeMeta.preset_id === preset.preset_id ? ' is-active' : ''}"
+                type="button"
+                title="${escapeHtml(preset.description || '')}"
+                onclick="applyTeamBotWorkflowPreset('${encodeURIComponent(sessionId)}', '${encodeURIComponent(preset.preset_id || '')}')">${escapeHtml(preset.name || preset.preset_id || 'preset')}</button>
+    `).join('');
+    return `
+        <div class="teambot-runtime-section">
+            <div class="teambot-runtime-title">Workflow</div>
+            ${activeHtml}
+            ${buttonHtml ? `<div class="teambot-runtime-actions">${buttonHtml}</div>` : ''}
+        </div>
+    `;
+}
+
 function _buildExtendedSections(runtime, item) {
     const sessionId = runtime?.session_id || item?.session_id || currentSessionId || '';
     const sections = [];
+    sections.push(_buildWorkflowPresetSection(runtime, item));
     if (runtime?.bridge) {
         const bridge = runtime.bridge || {};
         const primary = bridge.primary || (Array.isArray(bridge.sessions) ? bridge.sessions[0] : {}) || {};
@@ -2737,6 +2775,24 @@ async function toggleTeamBotVoice(sessionId, enabled) {
         await refreshSubagentPanel();
     } catch (e) {
         _setTeamBotPolicyStatus(String(e.message || 'Voice update failed'), 'error');
+    }
+}
+
+async function applyTeamBotWorkflowPreset(sessionId, presetId) {
+    if (!sessionId || !presetId) return;
+    try {
+        const resp = await fetch('/proxy_teambot_workflow_apply', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: sessionId, preset_id: presetId}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Workflow preset apply failed');
+        }
+        await refreshSubagentPanel();
+    } catch (e) {
+        _setTeamBotPolicyStatus(String(e.message || 'Workflow preset apply failed'), 'error');
     }
 }
 
@@ -2947,6 +3003,7 @@ function _buildRuntimeRunList(items, sessionId = '', agentRef = '') {
             run.attempt_count != null ? `attempts=${run.attempt_count}` : '',
         ].filter(Boolean);
         const canInterrupt = !!sessionId && ['queued', 'running', 'cancelling'].includes(String(run.status || '').toLowerCase());
+        const recovery = run.recovery || {};
         return `
             <div class="teambot-runtime-block">
                 <div class="teambot-runtime-row">
@@ -2956,6 +3013,8 @@ function _buildRuntimeRunList(items, sessionId = '', agentRef = '') {
                 <div class="teambot-runtime-caption">${escapeHtml(metaParts.join(' · '))}</div>
                 ${run.last_error ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(run.last_error)}</div>` : ''}
                 ${run.last_result ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(run.last_result)}</div>` : ''}
+                ${recovery.summary ? `<div class="teambot-runtime-caption">Recovery · ${_escapeAndFormatText(recovery.summary)}</div>` : ''}
+                ${recovery.suggestion ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(recovery.suggestion)}</div>` : ''}
                 ${canInterrupt ? `<div class="teambot-runtime-actions"><button class="teambot-subagent-btn danger" type="button" onclick="interruptTeamBotRun('${encodeURIComponent(sessionId)}', '${encodeURIComponent(run.run_id || '')}', '${encodeURIComponent(agentRef || '')}')">Interrupt</button></div>` : ''}
                 ${eventHtml}
             </div>
@@ -3528,6 +3587,8 @@ let sessionFilterMode = 'named';
 let _cachedAgentMap = {};
 // All known session IDs across all JSON files (public + all teams), for unnamed detection
 let _allKnownSessions = new Set();
+// Last merged /proxy_sessions list (+ named-only from agent map), for chat-bar session picker
+let _mergedSessionsCache = [];
 
 function isNamedSession(sessionId) {
     const meta = _cachedAgentMap[sessionId];
@@ -3578,10 +3639,14 @@ async function loadSessionList() {
         }
         if (allSessions.length === 0) {
             listEl.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">${t('history_empty')}</div>`;
+            _mergedSessionsCache = [];
+            ocInternalRepaintSessionPick();
             return;
         }
         listEl.innerHTML = '';
         allSessions.sort((a, b) => b.session_id.localeCompare(a.session_id));
+        _mergedSessionsCache = allSessions;
+        ocInternalRepaintSessionPick();
         for (const s of allSessions) {
             const isActive = s.session_id === currentSessionId;
             const displayTitle = _resolveTitle(s.title, s.session_id, agentMap);
@@ -3603,6 +3668,8 @@ async function loadSessionList() {
         refreshSessionStatus();
     } catch (e) {
         listEl.innerHTML = `<div class="text-xs text-red-400 text-center py-4">${t('history_error')}</div>`;
+        _mergedSessionsCache = [];
+        ocInternalRepaintSessionPick();
     }
 }
 
@@ -3631,6 +3698,8 @@ async function refreshHistoryList() {
         const listEl = document.getElementById('session-list');
         if (sessions.length === 0) {
             listEl.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">${t('history_empty')}</div>`;
+            _mergedSessionsCache = [];
+            ocInternalRepaintSessionPick();
             return;
         }
         // 构建 session map
@@ -3651,6 +3720,8 @@ async function refreshHistoryList() {
         });
         // 更新现有的 + 添加新的
         sessions.sort((a, b) => b.session_id.localeCompare(a.session_id));
+        _mergedSessionsCache = sessions;
+        ocInternalRepaintSessionPick();
         let prevEl = null;
         for (const s of sessions) {
             let div = listEl.querySelector(`.session-item[data-session-id="${s.session_id}"]`);
@@ -3980,7 +4051,115 @@ async function switchToSession(sessionId, force = false, options = {}) {
             setSystemBusyUI(false);
         }
     } catch(e) {} finally {
+        if (_ocChatMode === 'internal') {
+            ocInternalSyncNameInput();
+            ocInternalRepaintSessionPick();
+        }
         if (!quiet) hidePageLoading();
+    }
+}
+
+function ocSyncSessionSubrowsVisibility() {
+    const intRow = document.getElementById('oc-internal-session-row');
+    const acpRow = document.getElementById('oc-acp-session-row');
+    if (intRow) {
+        intRow.style.display = (_ocChatMode === 'internal') ? 'flex' : 'none';
+    }
+    if (acpRow) {
+        acpRow.style.display = (_ocChatMode === 'acp' && _acpAvailable) ? 'flex' : 'none';
+    }
+}
+
+function ocInternalRepaintSessionPick() {
+    const sel = document.getElementById('oc-internal-session-pick');
+    if (!sel || _ocChatMode !== 'internal') return;
+    const agentMap = _cachedAgentMap || {};
+    let list = Array.isArray(_mergedSessionsCache) ? _mergedSessionsCache.slice() : [];
+    const ids = new Set(list.map((s) => s.session_id));
+    if (currentSessionId && !ids.has(currentSessionId)) {
+        list = [{ session_id: currentSessionId, title: '', message_count: 0 }, ...list];
+    }
+    const prev = sel.value;
+    sel.innerHTML = '';
+    const o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = t('oc_acp_session_pick_none');
+    sel.appendChild(o0);
+    for (const s of list) {
+        if (!s.session_id) continue;
+        const opt = document.createElement('option');
+        opt.value = s.session_id;
+        const displayTitle = _resolveTitle(s.title, s.session_id, agentMap);
+        const short = s.session_id.slice(-6);
+        opt.textContent = displayTitle + ' · #' + short;
+        sel.appendChild(opt);
+    }
+    if (currentSessionId && Array.from(sel.options).some((o) => o.value === currentSessionId)) {
+        sel.value = currentSessionId;
+    } else if (prev && Array.from(sel.options).some((o) => o.value === prev)) {
+        sel.value = prev;
+    } else {
+        sel.value = '';
+    }
+}
+
+function ocInternalSyncNameInput() {
+    const inp = document.getElementById('oc-internal-session-name');
+    if (!inp || _ocChatMode !== 'internal') return;
+    const meta = _cachedAgentMap[currentSessionId];
+    inp.value = (meta && meta.name) ? meta.name : '';
+}
+
+function ocInternalOnSessionPickChange() {
+    if (_ocChatMode !== 'internal') return;
+    const sel = document.getElementById('oc-internal-session-pick');
+    if (!sel) return;
+    const v = sel.value;
+    if (!v) {
+        ocInternalQuickNewSession();
+        return;
+    }
+    if (v === currentSessionId) return;
+    switchToSession(v);
+}
+
+async function ocInternalQuickNewSession() {
+    if (_ocChatMode !== 'internal') return;
+    const newSid = generateSessionId();
+    await switchToSession(newSid, true, { quiet: true });
+    ocInternalSyncNameInput();
+    await loadSessionList();
+}
+
+async function ocInternalSessionRefresh() {
+    await loadSessionList();
+    ocInternalSyncNameInput();
+}
+
+async function ocInternalOnSessionNameBlur() {
+    if (_ocChatMode !== 'internal' || !currentSessionId) return;
+    const inp = document.getElementById('oc-internal-session-name');
+    const raw = inp ? String(inp.value || '').trim() : '';
+    const urlPut = _currentAgentTeam
+        ? `/internal_agents/${encodeURIComponent(currentSessionId)}?team=${encodeURIComponent(_currentAgentTeam)}`
+        : `/internal_agents/${encodeURIComponent(currentSessionId)}`;
+    try {
+        let r = await fetch(urlPut, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ meta: { name: raw } }),
+        });
+        if (r.status === 404) {
+            const postUrl = _currentAgentTeam ? `/internal_agents?team=${encodeURIComponent(_currentAgentTeam)}` : '/internal_agents';
+            await fetch(postUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session: currentSessionId, meta: raw ? { name: raw } : {} }),
+            });
+        }
+        await loadSessionList();
+    } catch (e) {
+        console.warn('ocInternalOnSessionNameBlur', e);
     }
 }
 
@@ -4149,7 +4328,7 @@ async function handleLocalLogin() {
         loadTools();
         refreshOasisTopics();
         startHistoryPolling();
-        switchPage('chat');
+        await applyStudioInitialTabAfterAuth();
         updateLocalLoginBanner();
         // Show setup wizard if LLM not configured
         _checkAndShowSetupWizard();
@@ -4231,8 +4410,7 @@ async function handleLogin() {
         loadTools();
         refreshOasisTopics(); // Load OASIS topics after login
         startHistoryPolling();
-        // Default to chat page after login
-        switchPage('chat');
+        await applyStudioInitialTabAfterAuth();
         updateLocalLoginBanner();
         // Show setup wizard if LLM not configured
         _checkAndShowSetupWizard();
@@ -5577,6 +5755,15 @@ async function _applyTabParam() {
     }
 }
 
+/** After auth on /studio, honor ?tab= for Team / Chat / Workflow; else default Chat. */
+async function applyStudioInitialTabAfterAuth() {
+    const _tabParam = new URLSearchParams(window.location.search).get('tab');
+    await _applyTabParam();
+    if (!(_tabParam === 'group' || _tabParam === 'chat' || _tabParam === 'orchestrate')) {
+        await switchPage('chat');
+    }
+}
+
 // Session check
 (async function checkSession() {
     // 初始化语言
@@ -5614,7 +5801,7 @@ async function _applyTabParam() {
                 refreshOasisTopics();
                 startHistoryPolling();
                 _syncPublicToggle();
-                switchPage('chat');
+                await applyStudioInitialTabAfterAuth();
                 _checkAndShowSetupWizard();
                 // 移除 URL 中的 token 参数（安全原因）
                 if (window.history.replaceState) {
@@ -10548,6 +10735,108 @@ function closeHubImportModal() {
     if (input) input.value = '';
 }
 
+let _builtinTeamPresets = [];
+
+function closeBuiltinPresetModal() {
+    const modal = document.getElementById('builtin-preset-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+function _renderBuiltinPresetCards() {
+    const listEl = document.getElementById('builtin-preset-list');
+    if (!listEl) return;
+    if (!_builtinTeamPresets.length) {
+        listEl.innerHTML = '<div style="font-size:12px;color:#9ca3af;">暂无可用预设</div>';
+        return;
+    }
+    listEl.innerHTML = _builtinTeamPresets.map((preset) => {
+        const presetId = encodeURIComponent(String(preset.preset_id || ''));
+        const defaultTeam = String(preset.default_team_name || preset.name || preset.preset_id || '');
+        const meta = [
+            preset.role_count ? `${preset.role_count} roles` : '',
+            Array.isArray(preset.tags) ? preset.tags.slice(0, 3).join(' · ') : '',
+        ].filter(Boolean).join(' · ');
+        return `
+            <div style="border:1px solid #e5e7eb;border-radius:10px;padding:12px;background:#fff;">
+                <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+                    <div style="min-width:0;flex:1;">
+                        <div style="font-size:14px;font-weight:700;color:#111827;">${escapeHtml(preset.name || preset.preset_id || 'preset')}</div>
+                        <div style="margin-top:4px;font-size:12px;line-height:1.55;color:#6b7280;">${escapeHtml(preset.description || '')}</div>
+                        ${meta ? `<div style="margin-top:6px;font-size:11px;color:#9ca3af;">${escapeHtml(meta)}</div>` : ''}
+                    </div>
+                    <button class="teambot-subagent-btn" type="button" onclick="installBuiltinTeamPreset(decodeURIComponent('${presetId}'), '${escapeHtml(defaultTeam)}')">安装</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function loadBuiltinTeamPresets() {
+    const statusEl = document.getElementById('builtin-preset-status');
+    const listEl = document.getElementById('builtin-preset-list');
+    if (statusEl) statusEl.textContent = '正在加载预设...';
+    if (listEl) listEl.innerHTML = '<div style="font-size:12px;color:#9ca3af;">加载中...</div>';
+    try {
+        const resp = await fetch('/api/team-presets');
+        const data = await resp.json();
+        if (!resp.ok || data.ok === false) {
+            throw new Error(data.error || '加载失败');
+        }
+        _builtinTeamPresets = Array.isArray(data.presets) ? data.presets : [];
+        _renderBuiltinPresetCards();
+        if (statusEl) statusEl.textContent = `已加载 ${_builtinTeamPresets.length} 个内置制度团队预设`;
+    } catch (e) {
+        _builtinTeamPresets = [];
+        if (listEl) listEl.innerHTML = '';
+        if (statusEl) statusEl.textContent = `加载失败: ${e.message}`;
+    }
+}
+
+async function showBuiltinPresetModal() {
+    const modal = document.getElementById('builtin-preset-modal');
+    const input = document.getElementById('builtin-preset-team-name');
+    if (modal) modal.style.display = 'flex';
+    if (input && !input.value) {
+        input.value = currentGroupId || '';
+    }
+    await loadBuiltinTeamPresets();
+}
+
+async function installBuiltinTeamPreset(presetId, suggestedTeamName = '') {
+    const input = document.getElementById('builtin-preset-team-name');
+    const statusEl = document.getElementById('builtin-preset-status');
+    const teamName = String((input && input.value) || suggestedTeamName || '').trim();
+    if (!presetId) {
+        if (statusEl) statusEl.textContent = '缺少 preset_id';
+        return;
+    }
+    if (!teamName) {
+        if (statusEl) statusEl.textContent = '请先输入团队名称';
+        if (input) input.focus();
+        return;
+    }
+    if (statusEl) statusEl.textContent = `正在安装 ${presetId} 到团队 "${teamName}"...`;
+    try {
+        const resp = await fetch('/api/team-presets/install', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preset_id: presetId, team: teamName }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.ok === false) {
+            throw new Error(data.error || '安装失败');
+        }
+        if (statusEl) statusEl.textContent = `✅ 已安装 ${data.preset?.name || presetId}`;
+        closeBuiltinPresetModal();
+        await loadGroupList();
+        if (typeof openGroup === 'function') {
+            await openGroup(teamName);
+        }
+    } catch (e) {
+        if (statusEl) statusEl.textContent = `❌ ${e.message}`;
+    }
+}
+
 // Parse curl command or URL to extract download link and team name
 function _parseHubInput(raw) {
     raw = raw.trim();
@@ -12626,6 +12915,12 @@ async function ocSwitchTo(mode, acpTool) {
         if (agentSelector) agentSelector.style.display = 'none';
         await switchToSession(currentSessionId, true, { quiet: true });
     }
+
+    ocSyncSessionSubrowsVisibility();
+    if (_ocChatMode === 'internal') {
+        ocInternalSyncNameInput();
+        ocInternalRepaintSessionPick();
+    }
 }
 
 /**
@@ -12715,18 +13010,16 @@ async function ocInitSwitcher() {
             _ocAgentsCache = [];
         }
 
-        const acpRow = document.getElementById('oc-acp-session-row');
         if (ocOk || _acpAvailable) {
             switcher.style.display = '';
             if (acpTabs) {
                 acpTabs.style.display = _acpAvailable ? 'inline-flex' : 'none';
             }
-            if (acpRow) acpRow.style.display = _acpAvailable ? 'flex' : 'none';
         } else {
             switcher.style.display = 'none';
             if (acpTabs) acpTabs.style.display = 'none';
-            if (acpRow) acpRow.style.display = 'none';
         }
+        ocSyncSessionSubrowsVisibility();
     } catch (e) {
         _ocAvailable = false;
         _acpAvailable = false;
@@ -12735,8 +13028,7 @@ async function ocInitSwitcher() {
         ocRenderAcpTabs([]);
         switcher.style.display = 'none';
         if (acpTabs) acpTabs.style.display = 'none';
-        const acpRowErr = document.getElementById('oc-acp-session-row');
-        if (acpRowErr) acpRowErr.style.display = 'none';
         console.log('Chat switcher init failed:', e && e.message);
+        ocSyncSessionSubrowsVisibility();
     }
 }

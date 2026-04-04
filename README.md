@@ -36,19 +36,16 @@ Clone https://github.com/BorisGuo6/TeamClaw.git, read AGENTS.md, and install Tea
 **Linux / macOS**
 
 ```bash
-bash selfskill/scripts/run.sh setup
-bash selfskill/scripts/run.sh configure --init
 bash selfskill/scripts/run.sh start
+# start 会按需执行与 setup 相同的环境脚本（venv、依赖、acpx 等），并初始化 .env、启动服务
 # → Open http://127.0.0.1:51209
-# → First login: passwordless on localhost
+# → First login: passwordless on localhost (或使用终端打印的 Magic link)
 # → Setup wizard auto-appears if LLM not configured
 ```
 
 **Windows PowerShell**
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 setup
-powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 configure --init
 powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 start
 ```
 

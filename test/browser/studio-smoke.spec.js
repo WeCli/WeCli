@@ -60,6 +60,9 @@ async function stubStudioNetwork(page, calls, options = {}) {
       },
     ],
   };
+  calls.workflowApply = calls.workflowApply || [];
+  calls.teamPresetInstall = calls.teamPresetInstall || [];
+  calls.teamPresetList = calls.teamPresetList || 0;
   const currentRuntimeState = {
     status: 'success',
     session_id: 'main-session',
@@ -67,9 +70,39 @@ async function stubStudioNetwork(page, calls, options = {}) {
     workspace: '/tmp/teamclaw/main',
     mode: { mode: 'execute', reason: 'Runtime panel smoke' },
     plan: {
-      title: 'Main session plan',
+      title: 'Execution swarm',
       status: 'active',
       items: [{ step: 'Keep runtime panel synced', status: 'in_progress' }],
+      metadata: {
+        workflow: {
+          preset_id: 'execution_swarm',
+          name: 'Execution Swarm',
+          description: 'Use a planner/researcher/implementer/verifier split with inbox handoffs.',
+          source: 'claw-code parity / browser-native swarm',
+          mode: 'execute',
+        },
+      },
+    },
+    workflow_presets: [
+      {
+        preset_id: 'review_gate',
+        name: 'Review Gate',
+        description: 'Force reviewer discipline before completion.',
+        mode: 'review',
+      },
+      {
+        preset_id: 'execution_swarm',
+        name: 'Execution Swarm',
+        description: 'Use a planner/researcher/implementer/verifier split with inbox handoffs.',
+        mode: 'execute',
+      },
+    ],
+    active_workflow: {
+      preset_id: 'execution_swarm',
+      name: 'Execution Swarm',
+      description: 'Use a planner/researcher/implementer/verifier split with inbox handoffs.',
+      source: 'claw-code parity / browser-native swarm',
+      mode: 'execute',
     },
     todos: {
       items: [{ title: 'Deliver inbox', status: 'pending' }],
@@ -129,12 +162,42 @@ async function stubStudioNetwork(page, calls, options = {}) {
     session_id: 'subagent__coder__curie',
     workspace: '/tmp/teamclaw/worktree/curie',
     plan: {
-      title: 'Claude-style runtime audit',
+      title: 'Review gate',
       status: 'active',
       items: [
         { step: 'Inspect TeamBot runtime surface', status: 'completed' },
         { step: 'Verify approval roundtrip', status: 'in_progress' },
       ],
+      metadata: {
+        workflow: {
+          preset_id: 'review_gate',
+          name: 'Review Gate',
+          description: 'Force reviewer discipline before completion.',
+          source: 'oh-my-openagent / review gate',
+          mode: 'review',
+        },
+      },
+    },
+    workflow_presets: [
+      {
+        preset_id: 'review_gate',
+        name: 'Review Gate',
+        description: 'Force reviewer discipline before completion.',
+        mode: 'review',
+      },
+      {
+        preset_id: 'execution_swarm',
+        name: 'Execution Swarm',
+        description: 'Use a planner/researcher/implementer/verifier split with inbox handoffs.',
+        mode: 'execute',
+      },
+    ],
+    active_workflow: {
+      preset_id: 'review_gate',
+      name: 'Review Gate',
+      description: 'Force reviewer discipline before completion.',
+      source: 'oh-my-openagent / review gate',
+      mode: 'review',
     },
     todos: {
       items: [
@@ -186,8 +249,28 @@ async function stubStudioNetwork(page, calls, options = {}) {
       relevant_entries: [{ name: 'runtime_gap_matrix' }],
     },
     artifacts: [],
-    runs: [],
-    active_run: null,
+    runs: [
+      {
+        run_id: 'run-curie-1',
+        status: 'failed',
+        title: 'Review gate verifier',
+        recovery: {
+          kind: 'approval_blocked',
+          summary: 'Run is blocked on a permission or approval decision.',
+          suggestion: 'Resolve the pending tool approval, then deliver the inbox or rerun the blocked step.',
+        },
+      },
+    ],
+    active_run: {
+      run_id: 'run-curie-1',
+      status: 'failed',
+      title: 'Review gate verifier',
+      recovery: {
+        kind: 'approval_blocked',
+        summary: 'Run is blocked on a permission or approval decision.',
+        suggestion: 'Resolve the pending tool approval, then deliver the inbox or rerun the blocked step.',
+      },
+    },
     relationships: { parent_session: 'main-session', children: [] },
   };
 
@@ -326,6 +409,33 @@ async function stubStudioNetwork(page, calls, options = {}) {
       return json(route, { ...currentRuntimeState });
     }
   );
+  await page.route('**/proxy_teambot_workflow_apply', async (route) => {
+    const payload = await route.request().postDataJSON();
+    calls.workflowApply.push(payload);
+    const workflow = {
+      preset_id: payload.preset_id || 'review_gate',
+      name: payload.preset_id === 'execution_swarm' ? 'Execution Swarm' : 'Review Gate',
+      description:
+        payload.preset_id === 'execution_swarm'
+          ? 'Use a planner/researcher/implementer/verifier split with inbox handoffs.'
+          : 'Force reviewer discipline before completion.',
+      source:
+        payload.preset_id === 'execution_swarm'
+          ? 'claw-code parity / browser-native swarm'
+          : 'oh-my-openagent / review gate',
+      mode: payload.preset_id === 'execution_swarm' ? 'execute' : 'review',
+    };
+    const target =
+      payload.session_id === 'subagent__coder__curie' ? subagentRuntimeState : currentRuntimeState;
+    target.active_workflow = workflow;
+    target.plan = {
+      ...(target.plan || {}),
+      title: workflow.name,
+      metadata: { workflow },
+    };
+    target.mode = { mode: workflow.mode, reason: `workflow:${workflow.preset_id}` };
+    return json(route, { status: 'success', preset: workflow });
+  });
   await page.route('**/proxy_teambot_tool_approval_resolve', async (route) => {
     calls.approvalActions.push(await route.request().postDataJSON());
     teambotState.approvals = [
@@ -504,6 +614,48 @@ async function stubStudioNetwork(page, calls, options = {}) {
   await page.route('**/api/import_openclaw_config', (route) => {
     calls.importOpenClaw += 1;
     return json(route, importOpenClawPayload);
+  });
+  await page.route('**/api/team-presets', (route) => {
+    calls.teamPresetList += 1;
+    return json(route, {
+      ok: true,
+      presets: [
+        {
+          preset_id: 'ming-neige',
+          name: '明朝内阁制',
+          default_team_name: '明朝内阁制',
+          role_count: 19,
+          tags: ['ming', 'governance'],
+          description: '明朝内阁制治理与部门联动预设。',
+        },
+        {
+          preset_id: 'hanlin-novel-studio',
+          name: '翰林院小说创作局',
+          default_team_name: '翰林院小说创作局',
+          role_count: 6,
+          tags: ['creative', 'writing'],
+          description: '翰林院创作型团队预设。',
+        },
+      ],
+    });
+  });
+  await page.route('**/api/team-presets/install', async (route) => {
+    const payload = await route.request().postDataJSON();
+    calls.teamPresetInstall.push(payload);
+    return json(route, {
+      ok: true,
+      team: payload.team,
+      preset: {
+        preset_id: payload.preset_id,
+        name: payload.preset_id === 'hanlin-novel-studio' ? '翰林院小说创作局' : '明朝内阁制',
+      },
+      internal_agents: payload.preset_id === 'hanlin-novel-studio' ? 6 : 19,
+      experts: payload.preset_id === 'hanlin-novel-studio' ? 6 : 19,
+      workflow_files:
+        payload.preset_id === 'hanlin-novel-studio'
+          ? ['hanlin_novel_studio.yaml']
+          : ['ming_neige_baseline.yaml', 'ming_neige_governance.yaml'],
+    });
   });
   await page.route('**/api/discover_models', (route) => json(route, discoverModelsPayload));
   await page.route('**/api/export_openclaw_config', async (route) => {
@@ -684,7 +836,7 @@ test('studio teambot current runtime card stays synced over bridge websocket', a
 
   await expect(page.locator('#teambot-current-session')).toBeVisible();
   await expect(page.locator('#teambot-current-session')).toContainText('Current Session');
-  await expect(page.locator('#teambot-current-session')).toContainText('Main session plan');
+  await expect(page.locator('#teambot-current-session')).toContainText(/Execution swarm|Execution Swarm/);
   await expect(page.locator('#teambot-current-session')).toContainText('Memory');
   await expect(page.locator('#teambot-current-session')).toContainText('Buddy');
   await expect(page.locator('#teambot-current-session')).toContainText('Waiting by the prompt');
@@ -829,7 +981,7 @@ test('studio teambot runtime sidebar shows runtime state and resolves approvals'
   await expect.poll(() => page.evaluate(() => localStorage.getItem('teamclawSessionRuntimePanelHeightV1'))).not.toBeNull();
 
   await expect(page.locator('#teambot-subagent-list')).toContainText('Curie');
-  await expect(page.locator('#teambot-subagent-detail')).toContainText('Claude-style runtime audit');
+  await expect(page.locator('#teambot-subagent-detail')).toContainText('Review gate');
   await expect(page.locator('#teambot-subagent-detail')).toContainText('/tmp/teamclaw/worktree/curie');
   await expect(page.locator('#teambot-subagent-detail')).toContainText('Flask proxy chain');
 
@@ -849,6 +1001,118 @@ test('studio teambot runtime sidebar shows runtime state and resolves approvals'
   await expect(page.locator('#teambot-policy-status')).toContainText(/Approval 已处理|Approval resolved/);
   await expect(page.locator('#teambot-subagent-detail')).toContainText(/approved|APPROVED/);
 
+  expect(pageErrors).toEqual([]);
+});
+
+test('studio teambot runtime surfaces recovery hints and applies workflow presets', async ({ page }) => {
+  const calls = {
+    importOpenClaw: 0,
+    exportOpenClaw: 0,
+    tinyfishRun: 0,
+    lastExportPayload: null,
+    approvalActions: [],
+    workflowApply: [],
+  };
+  const pageErrors = [];
+
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('dialog', async (dialog) => {
+    pageErrors.push(`unexpected dialog: ${dialog.message()}`);
+    await dialog.dismiss();
+  });
+
+  await stubStudioNetwork(page, calls);
+  await page.addInitScript(() => {
+    window.alert = () => {};
+    window.confirm = () => true;
+    localStorage.removeItem('teamclawSessionRuntimePanelHeightV1');
+  });
+
+  await page.goto('/studio');
+  await page.locator('.hamburger-btn').click();
+  await page.locator('#hamburger-panel button[onclick*="toggleSessionSidebar(); closeHamburgerMenu();"]').click();
+
+  await expect(page.locator('#teambot-subagent-detail')).toContainText('Workflow');
+  await expect(page.locator('#teambot-subagent-detail')).toContainText('Resolve the pending tool approval');
+
+  await page
+    .locator('#teambot-current-session button')
+    .filter({ hasText: 'Execution Swarm' })
+    .click();
+
+  await expect.poll(() => calls.workflowApply.length).toBe(1);
+  expect(calls.workflowApply[0]).toMatchObject({ preset_id: 'execution_swarm' });
+  expect(String(calls.workflowApply[0].session_id || '')).not.toBe('');
+  await expect(page.locator('#teambot-current-session')).toContainText('Execution Swarm');
+  expect(pageErrors).toEqual([]);
+});
+
+test('studio builtin preset modal installs team presets', async ({ page }) => {
+  const calls = {
+    importOpenClaw: 0,
+    exportOpenClaw: 0,
+    tinyfishRun: 0,
+    lastExportPayload: null,
+    approvalActions: [],
+    teamPresetInstall: [],
+    teamPresetList: 0,
+  };
+  const pageErrors = [];
+
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('dialog', async (dialog) => {
+    pageErrors.push(`unexpected dialog: ${dialog.message()}`);
+    await dialog.dismiss();
+  });
+
+  await stubStudioNetwork(page, calls);
+  await page.addInitScript(() => {
+    window.alert = () => {};
+    window.confirm = () => true;
+  });
+
+  await page.goto('/studio');
+  await page.evaluate(() => {
+    window.__openedBuiltinTeam = '';
+    const originalOpenGroup = window.openGroup;
+    window.openGroup = async (teamName) => {
+      window.__openedBuiltinTeam = String(teamName || '');
+      if (typeof originalOpenGroup === 'function') {
+        return undefined;
+      }
+    };
+  });
+
+  await page.evaluate(() => {
+    window.currentGroupId = 'Smoke Team';
+  });
+  await page.evaluate(async () => {
+    const modal = document.getElementById('builtin-preset-modal');
+    if (modal) modal.style.display = 'flex';
+    if (typeof window.loadBuiltinTeamPresets === 'function') {
+      await window.loadBuiltinTeamPresets();
+    }
+    return modal ? modal.style.display : '';
+  });
+
+  await expect.poll(() => calls.teamPresetList).toBe(1);
+  await expect(page.locator('#builtin-preset-list')).toContainText('明朝内阁制');
+  await expect(page.locator('#builtin-preset-list')).toContainText('翰林院小说创作局');
+
+  await page.evaluate(async () => {
+    const input = document.getElementById('builtin-preset-team-name');
+    if (input) input.value = 'Smoke Preset Team';
+    if (typeof window.installBuiltinTeamPreset === 'function') {
+      await window.installBuiltinTeamPreset('ming-neige');
+    }
+  });
+
+  await expect.poll(() => calls.teamPresetInstall.length).toBe(1);
+  expect(calls.teamPresetInstall[0]).toMatchObject({
+    preset_id: 'ming-neige',
+    team: 'Smoke Preset Team',
+  });
+  await expect.poll(() => page.evaluate(() => window.__openedBuiltinTeam)).toBe('Smoke Preset Team');
   expect(pageErrors).toEqual([]);
 });
 

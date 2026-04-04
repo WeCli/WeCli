@@ -5,7 +5,7 @@ import os
 import shlex
 import shutil
 import tempfile
-from typing import Any
+from typing import Any, Literal
 
 
 class AcpxError(RuntimeError):
@@ -44,6 +44,94 @@ class AcpxAdapter:
             timeout_sec=10,
             allow_nonzero=True,
         )
+
+    # ── OpsService /acp_control only (do not use from group_chat prompt path) ──
+
+    async def ops_openclaw_exec_slash(
+        self,
+        *,
+        session_key: str,
+        slash: Literal["/new", "/stop"],
+        timeout_sec: int = 180,
+    ) -> None:
+        """``acpx … --agent 'openclaw acp --session <key>' exec '/new'|'/stop'``; no acpx ``-s``."""
+        raw = f"openclaw acp --session {shlex.quote(session_key)}"
+        await self._ops_run_acpx(
+            ["--agent", raw, "exec", slash],
+            timeout_sec=timeout_sec,
+            allow_nonzero=True,
+        )
+
+    async def ops_non_openclaw_reset_session(self, *, tool: str, session_key: str) -> None:
+        """``sessions close`` (best-effort) + ``sessions new --name``."""
+        acpx_session = self.to_acpx_session_name(tool=tool, session_key=session_key)
+        prefix = self._command_prefix(tool=tool, session_key=session_key)
+        await self._ops_run_acpx(
+            prefix + ["sessions", "close", acpx_session],
+            timeout_sec=15,
+            allow_nonzero=True,
+        )
+        await self._ops_run_acpx(
+            prefix + ["sessions", "new", "--name", acpx_session],
+            timeout_sec=30,
+            allow_nonzero=True,
+        )
+
+    async def ops_non_openclaw_cancel(self, *, tool: str, session_key: str) -> None:
+        """``<tool> cancel -s <name>``."""
+        acpx_session = self.to_acpx_session_name(tool=tool, session_key=session_key)
+        prefix = self._command_prefix(tool=tool, session_key=session_key)
+        await self._ops_run_acpx(
+            prefix + ["cancel", "-s", acpx_session],
+            timeout_sec=25,
+            allow_nonzero=True,
+        )
+
+    async def _ops_run_acpx(self, args: list[str], *, timeout_sec: int, allow_nonzero: bool) -> str:
+        """Ops-only: ``--format quiet`` (control output is not JSON-RPC)."""
+        assert self._acpx_bin is not None
+        approve_all = (os.getenv("ACPX_APPROVE_ALL", "1") or "").strip().lower() not in (
+            "0",
+            "false",
+            "no",
+            "off",
+        )
+        nip = (os.getenv("ACPX_NON_INTERACTIVE_PERMISSIONS", "") or "").strip()
+        cmd: list[str] = [
+            self._acpx_bin,
+            "--cwd",
+            self._cwd,
+            "--ttl",
+            "86400",
+        ]
+        if approve_all:
+            cmd.append("--approve-all")
+        if nip:
+            cmd.extend(["--non-interactive-permissions", nip])
+        cmd.extend(["--format", "quiet", *args])
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+        except FileNotFoundError as e:
+            raise AcpxError(f"acpx executable missing: {e}") from e
+        try:
+            out_b, err_b = await asyncio.wait_for(proc.communicate(), timeout=timeout_sec)
+        except asyncio.TimeoutError as e:
+            with contextlib.suppress(Exception):
+                proc.kill()
+            raise AcpxError(
+                f"acpx timeout after {timeout_sec}s: {' '.join(shlex.quote(x) for x in cmd)}"
+            ) from e
+        out = out_b.decode("utf-8", errors="replace")
+        err = err_b.decode("utf-8", errors="replace")
+        rc = proc.returncode if proc.returncode is not None else -1
+        if rc != 0 and not allow_nonzero:
+            msg = err.strip() or out.strip() or f"exit={rc}"
+            raise AcpxError(f"acpx failed ({rc}): {msg}")
+        return out
 
     async def list_sessions(self, *, tool: str) -> list[dict[str, Any]]:
         """Run `acpx <tool> sessions list --format json` and return slim session rows."""

@@ -135,6 +135,39 @@ def register_teambot_routes(
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500
 
+    @app.route("/proxy_teambot_workflow_presets")
+    def proxy_teambot_workflow_presets():
+        user_id = session.get("user_id", "")
+        try:
+            response = requests.get(
+                f"{base_url}/teambot/workflow-presets",
+                params={"user_id": user_id},
+                headers=_internal_auth_headers(),
+                timeout=15,
+            )
+            return jsonify(response.json()), response.status_code
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    @app.route("/proxy_teambot_workflow_apply", methods=["POST"])
+    def proxy_teambot_workflow_apply():
+        user_id = session.get("user_id", "")
+        body = request.get_json(force=True) if request.is_json else {}
+        try:
+            response = requests.post(
+                f"{base_url}/teambot/workflow-presets/apply",
+                json={
+                    "user_id": user_id,
+                    "session_id": body.get("session_id", ""),
+                    "preset_id": body.get("preset_id", ""),
+                },
+                headers=_internal_auth_headers(),
+                timeout=15,
+            )
+            return jsonify(response.json()), response.status_code
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
     @app.route("/proxy_teambot_session_inbox")
     def proxy_teambot_session_inbox():
         user_id = session.get("user_id", "")

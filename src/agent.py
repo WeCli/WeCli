@@ -123,6 +123,7 @@ USER_INJECTED_TOOLS = {
     # TeamBot subagent tools
     "list_teambot_agent_profiles", "spawn_subagent", "list_subagents",
     "send_subagent_message", "get_subagent_history", "cancel_subagent",
+    "list_teambot_workflow_presets", "apply_teambot_workflow_preset",
     "session_send_to", "session_inbox", "session_deliver_inbox",
     "claude_session_send_to", "claude_session_inbox", "claude_session_deliver_inbox",
     "ultraplan_start", "ultraplan_status",
@@ -148,6 +149,7 @@ SESSION_INJECTED_TOOLS = {
     "spawn_subagent": "parent_session",
     "send_subagent_message": "source_session",
     "cancel_subagent": "source_session",
+    "apply_teambot_workflow_preset": "source_session",
     "write_session_plan": "source_session",
     "read_session_plan": "source_session",
     "clear_session_plan": "source_session",

@@ -53,6 +53,7 @@ from team_creator_service import (
     update_job,
     PRESET_POOL,
 )
+from team_preset_assets import install_team_preset, list_team_presets
 
 # 加载 .env 配置
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -3154,9 +3155,10 @@ if _VISUAL_DIR not in _sys.path:
     _sys.path.insert(0, _VISUAL_DIR)
 
 try:
+    # visual/main.py exports DEFAULT_EXPERTS_LIST / TAG_EMOJI_MAP (not DEFAULT_EXPERTS / TAG_EMOJI)
     from main import (
-        DEFAULT_EXPERTS as _VIS_EXPERTS,
-        TAG_EMOJI as _VIS_TAG_EMOJI,
+        DEFAULT_EXPERTS_LIST as _VIS_EXPERTS,
+        TAG_EMOJI_MAP as _VIS_TAG_EMOJI,
         layout_to_yaml as _vis_layout_to_yaml,
         _build_llm_prompt as _vis_build_llm_prompt,
         _extract_yaml_from_response as _vis_extract_yaml,
@@ -3918,6 +3920,40 @@ def create_team():
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/team-presets", methods=["GET"])
+def list_builtin_team_presets():
+    return jsonify({"ok": True, "presets": list_team_presets()})
+
+
+@app.route("/api/team-presets/install", methods=["POST"])
+def install_builtin_team_preset():
+    user_id = session.get("user_id", "")
+    body = request.get_json(force=True) or {}
+    preset_id = str(body.get("preset_id") or "").strip()
+    team_name = str(body.get("team") or "").strip()
+
+    if not preset_id:
+        return jsonify({"ok": False, "error": "preset_id is required"}), 400
+    if not team_name:
+        return jsonify({"ok": False, "error": "team is required"}), 400
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"ok": False, "error": "Invalid team name"}), 400
+
+    try:
+        result = install_team_preset(
+            project_root=Path(root_dir),
+            user_id=user_id,
+            team_name=team_name,
+            preset_id=preset_id,
+        )
+    except FileNotFoundError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 404
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
+
+    return jsonify({"ok": True, **result})
 
 
 @app.route("/teams/<team_name>", methods=["PATCH"])

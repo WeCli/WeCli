@@ -235,6 +235,41 @@ class FrontendIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
+    def test_proxy_teambot_workflow_routes_forward_payloads(self):
+        with self.subTest("list workflow presets"):
+            with mock.patch.object(
+                front.requests,
+                "get",
+                return_value=_MockJsonResponse({"status": "success", "presets": [{"preset_id": "review_gate"}]}, 200),
+            ) as mock_get:
+                response = self.client.get("/proxy_teambot_workflow_presets")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json()["presets"][0]["preset_id"], "review_gate")
+            _, kwargs = mock_get.call_args
+            self.assertEqual(kwargs["params"], {"user_id": "integration-user"})
+
+        with self.subTest("apply workflow preset"):
+            with mock.patch.object(
+                front.requests,
+                "post",
+                return_value=_MockJsonResponse({"status": "success", "preset": {"preset_id": "review_gate"}}, 200),
+            ) as mock_post:
+                response = self.client.post(
+                    "/proxy_teambot_workflow_apply",
+                    json={"session_id": "default", "preset_id": "review_gate"},
+                )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json()["preset"]["preset_id"], "review_gate")
+            _, kwargs = mock_post.call_args
+            self.assertEqual(
+                kwargs["json"],
+                {
+                    "user_id": "integration-user",
+                    "session_id": "default",
+                    "preset_id": "review_gate",
+                },
+            )
+
     def test_proxy_teambot_session_inbox_forwards_query_params(self):
         with mock.patch.object(
             front.requests,
@@ -394,6 +429,41 @@ class FrontendIntegrationTests(unittest.TestCase):
                 },
             )
             self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
+
+    def test_builtin_team_preset_api_uses_asset_loader(self):
+        with self.subTest("list"):
+            with mock.patch.object(
+                front,
+                "list_team_presets",
+                return_value=[{"preset_id": "modern-ceo", "name": "现代企业制"}],
+            ) as mock_list:
+                response = self.client.get("/api/team-presets")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.get_json()["presets"][0]["preset_id"], "modern-ceo")
+            mock_list.assert_called_once()
+
+        with self.subTest("install"):
+            with mock.patch.object(
+                front,
+                "install_team_preset",
+                return_value={
+                    "team": "现代企业制",
+                    "preset": {"preset_id": "modern-ceo", "name": "现代企业制"},
+                    "internal_agents": 14,
+                    "experts": 14,
+                    "workflow_files": ["modern_ceo_baseline.yaml"],
+                },
+            ) as mock_install:
+                response = self.client.post(
+                    "/api/team-presets/install",
+                    json={"preset_id": "modern-ceo", "team": "现代企业制"},
+                )
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.get_json()["ok"])
+            _, kwargs = mock_install.call_args
+            self.assertEqual(kwargs["user_id"], "integration-user")
+            self.assertEqual(kwargs["team_name"], "现代企业制")
+            self.assertEqual(kwargs["preset_id"], "modern-ceo")
 
     def test_proxy_teambot_bridge_memory_and_buddy_controls_forward_payloads(self):
         with self.subTest("bridge attach"):

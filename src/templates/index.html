@@ -245,7 +245,7 @@
                 <div class="page-tab active" id="tab-chat" onclick="switchPage('chat')" data-i18n="tab_chat">💬 Chat</div>
                 <div class="page-tab" id="tab-group" onclick="switchPage('group')" data-i18n="tab_group">👥 Team</div>
                 <div class="page-tab" id="tab-orchestrate" onclick="switchPage('orchestrate')" data-i18n="tab_orchestrate">🤝 Workflow</div>
-                <div class="page-tab" id="tab-groupchat" onclick="window.open('/mobile_group_chat', '_blank')" data-i18n="tab_groupchat" data-i18n-title="tip_open_msgcenter" title="打开消息中心">📨 消息中心</div>
+                <div class="page-tab" id="tab-groupchat" onclick="window.location.assign('/mobile/group_chat')" data-i18n="tab_groupchat" data-i18n-title="tip_open_msgcenter" title="打开消息中心">📨 消息中心</div>
             </div>
             <!-- === Chat Page === -->
             <div id="page-chat" class="chat-page" style="display:flex;">
@@ -312,6 +312,18 @@
                             <button type="button" class="oc-acp-session-ensure" onclick="acpEnsureSession()" data-i18n="oc_acp_session_ensure" data-i18n-title="oc_acp_session_ensure_title" title="仅创建/预热 ACP 会话，不发送消息">预热</button>
                         </div>
                     </div>
+                </div>
+
+                <!-- TeamBot (internal) session picker: same UX as ACP row; no 「预热」 -->
+                <div id="oc-internal-session-row" class="oc-acp-session-row oc-internal-session-row" style="display:none;">
+                    <label for="oc-internal-session-pick" class="oc-acp-session-label" data-i18n="oc_acp_session_pick_label">已有会话</label>
+                    <select id="oc-internal-session-pick" class="oc-acp-session-select" onchange="ocInternalOnSessionPickChange()">
+                        <option value="" data-i18n="oc_acp_session_pick_none">— 选择已有会话（不选则新建）—</option>
+                    </select>
+                    <button type="button" class="oc-acp-session-refresh" onclick="ocInternalSessionRefresh()" data-i18n="oc_acp_session_refresh" data-i18n-title="oc_internal_session_refresh_title" title="刷新 TeamBot 会话列表">刷新</button>
+                    <span class="oc-acp-session-or" data-i18n="oc_acp_session_or_new">或新建</span>
+                    <label for="oc-internal-session-name" class="oc-acp-session-label oc-acp-session-label-sub" data-i18n="oc_acp_session_label">名称</label>
+                    <input type="text" id="oc-internal-session-name" class="oc-acp-session-input" maxlength="80" autocomplete="off" data-i18n-placeholder="oc_acp_session_placeholder" onblur="ocInternalOnSessionNameBlur()" placeholder="可选；留空则按左侧 TeamClaw 会话区分" />
                 </div>
 
                 <div id="chat-box" class="chat-container overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 flex-grow bg-gray-50">
@@ -427,6 +439,13 @@
   <button id="team-upload-btn" onclick="toggleImportDropdown()" class="text-xs bg-purple-50 text-purple-600 hover:bg-purple-100 px-2 py-1 rounded border border-purple-200" title="导入团队">📤 导入团队 ▾</button>
   <input type="file" id="team-upload-input" accept=".zip" style="display:none;" onchange="uploadTeam(this)">
   <div id="import-dropdown" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:999;min-width:260px;overflow:hidden;">
+    <div onclick="showBuiltinPresetModal();closeImportDropdown();" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f4f6;transition:background .15s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
+      <span style="font-size:18px;">🏛️</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#374151;">安装内置制度团队</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:1px;">明朝内阁制、唐朝三省制、现代企业制</div>
+      </div>
+    </div>
     <div onclick="showHubImportModal();closeImportDropdown();" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid #f3f4f6;transition:background .15s;" onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background=''">
       <span style="font-size:18px;">🌐</span>
       <div>
@@ -440,6 +459,23 @@
         <div style="font-size:13px;font-weight:600;color:#374151;">上传 .zip 文件导入</div>
         <div style="font-size:11px;color:#9ca3af;margin-top:1px;">从本地选择团队快照文件</div>
       </div>
+    </div>
+  </div>
+</div>
+<div id="builtin-preset-modal" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45);align-items:center;justify-content:center;" onclick="if(event.target===this)closeBuiltinPresetModal()">
+  <div style="background:#fff;border-radius:12px;width:640px;max-width:94vw;max-height:88vh;box-shadow:0 20px 60px rgba(0,0,0,.2);overflow:hidden;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e5e7eb;">
+      <h3 style="font-size:15px;font-weight:700;margin:0;">🏛️ 安装内置制度团队</h3>
+      <button onclick="closeBuiltinPresetModal()" style="background:none;border:none;font-size:20px;color:#9ca3af;cursor:pointer;padding:2px 8px;border-radius:6px;line-height:1;">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px;overflow:auto;">
+      <div style="font-size:12px;color:#6b7280;">从 TeamClaw 内置预设创建团队资产。将写入当前用户的 team 目录，包括 `internal_agents.json`、`oasis_experts.json` 和 `oasis/yaml/*.yaml`。</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:12px;font-weight:600;color:#374151;min-width:72px;">团队名称</label>
+        <input id="builtin-preset-team-name" type="text" placeholder="输入团队名称" style="flex:1;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;">
+      </div>
+      <div id="builtin-preset-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+      <div id="builtin-preset-status" style="font-size:12px;color:#6b7280;"></div>
     </div>
   </div>
 </div>
@@ -595,10 +631,10 @@
                             </div>
                             <!-- 列 Divider -->
                             <div class="orch-grid-col-divider" id="orch-grid-col-divider-bottom"></div>
-                            <!-- Bottom-right: OpenClaw sessions -->
+                            <!-- Bottom-right: External agents (OpenClaw + HTTP/ACP), same layering as contacts -->
                             <div class="orch-sidebar-grid-cell" id="orch-cell-br">
                                 <div class="orch-sidebar-grid-cell-header">
-                                    <span data-i18n="orch_openclaw_sessions">🦞 OpenClaw</span>
+                                    <span data-i18n="orch_external_agents_section">2. 外部 Agent</span>
                                     <span style="display:flex;gap:2px;">
                                         <button onclick="orchShowAddOpenClawModal()" data-i18n-title="orch_add_openclaw_title" title="新建Agent" style="color:#10b981;">➕</button>
                                         <button onclick="orchLoadOpenClawSessions()" data-i18n-title="refresh" title="刷新">🔄</button>

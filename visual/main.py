@@ -336,7 +336,7 @@ def layout_to_yaml(canvas_data: dict) -> str:
         return None
 
     def _make_plan_step(node):
-        return _make_special_step(node) or _make_expert_step(node)
+        return _make_special_step(node) or _build_expert_step(node)
 
     plan_steps = []
 

@@ -56,9 +56,11 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(PROJECT_ROOT)
 ENV_FILE_PATH = os.path.join(PROJECT_ROOT, "config", ".env")
 
-# 检查 .env 配置文件是否存在
+# 检查 .env 配置文件是否存在（推荐用 run.sh/run.ps1 start，会自动 configure --init）
 if not os.path.exists("config/.env"):
-    print("❌ 未找到 config/.env 文件，请先创建并填入 LLM_API_KEY")
+    print("❌ 未找到 config/.env。")
+    print("   请执行: bash selfskill/scripts/run.sh start（或 Windows: selfskill\\scripts\\run.ps1 start）")
+    print("   会先按模板生成 .env；不必事先填写 LLM Key，可用 Magic link 登录后在网页向导配置或从 OpenClaw 导入。")
     sys.exit(1)
 
 # 加载 .env 配置
@@ -179,6 +181,10 @@ def resolve_openclaw_cli():
 
 def ensure_openclaw_gateway_running():
     """Best-effort startup for OpenClaw Gateway when the CLI is installed."""
+    _no_oc = (os.getenv("TEAMCLAW_NO_OPENCLAW") or "").strip().lower()
+    if _no_oc in ("1", "true", "yes", "on"):
+        print("⏭️  已跳过 OpenClaw 联动（TEAMCLAW_NO_OPENCLAW）— 不预热 Gateway、不刷新 OPENCLAW_*")
+        return
     openclaw_cli = resolve_openclaw_cli()
     if not openclaw_cli:
         return

@@ -48,6 +48,49 @@ try {
         throw "Dependency installation failed."
     }
 
+    # --- acpx (ACP exchange), parity with setup_env.sh ---
+    $acpxCmd = Get-Command acpx -ErrorAction SilentlyContinue
+    if ($acpxCmd) {
+        Write-Host ("✅ acpx already available: " + $acpxCmd.Source)
+        try {
+            & acpx --version 2>&1 | Out-Host
+        } catch {
+            Write-Host "(version check skipped)"
+        }
+    } else {
+        Write-Host "📦 acpx not found, attempting install..."
+        $npmCmd = Get-Command npm -ErrorAction SilentlyContinue
+        if ($npmCmd) {
+            $prevEap = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                & npm install -g acpx@latest 2>&1 | Out-Host
+            } finally {
+                $ErrorActionPreference = $prevEap
+            }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "⚠️  npm install -g acpx@latest exited with code $LASTEXITCODE (continuing)"
+            }
+            # Common npm global bin on Windows (often already on PATH after Node install)
+            $npmBin = Join-Path $env:APPDATA "npm"
+            if ((Test-Path $npmBin) -and ($env:PATH -notlike "*${npmBin}*")) {
+                $env:PATH = "${npmBin};${env:PATH}"
+                Write-Host "Prepended npm global bin to PATH for this session: $npmBin"
+            }
+            $acpxAfter = Get-Command acpx -ErrorAction SilentlyContinue
+            if ($acpxAfter) {
+                Write-Host ("✅ acpx installed: " + $acpxAfter.Source)
+            } else {
+                Write-Host "⚠️  acpx not found on PATH after install (group ACP features may be unavailable)"
+                Write-Host "   Manual: npm install -g acpx@latest"
+                Write-Host "   Ensure npm global directory is in your PATH (often $npmBin)"
+            }
+        } else {
+            Write-Host "⚠️  npm not found; skipping acpx (group ACP features may be unavailable)"
+            Write-Host "   After installing Node.js: npm install -g acpx@latest"
+        }
+    }
+
     Write-Host ""
     if (Test-Path "config\.env") {
         Write-Host "config/.env already exists"
