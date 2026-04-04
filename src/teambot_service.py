@@ -31,6 +31,7 @@ from teambot_models import (
     TeamBotToolPolicyUpdateRequest,
     TeamBotVerificationCreateRequest,
     TeamBotVoiceStateUpdateRequest,
+    TeamBotWorkflowPresetApplyRequest,
 )
 from teambot_permission_context import resolve_permission_request
 from teambot_policy import get_tool_policy, save_tool_policy_config, serialize_tool_policy
@@ -75,6 +76,11 @@ from teambot_subagents import (
     list_subagents_for_parent_session,
     list_subagents_for_user,
     update_subagent_status,
+)
+from teambot_workflow_presets import (
+    build_run_recovery_hint,
+    get_workflow_preset,
+    list_workflow_presets,
 )
 from teambot_workspace import describe_session_workspace
 
@@ -173,6 +179,7 @@ class TeamBotService:
         }
 
     def _serialize_run(self, user_id: str, item, *, include_events: bool = True) -> dict[str, Any]:
+        events = list_run_events(user_id, item.run_id, limit=8) if include_events else []
         payload = {
             "run_id": item.run_id,
             "agent_id": item.agent_id,
@@ -195,11 +202,18 @@ class TeamBotService:
             "last_error": item.last_error,
             "last_result": item.last_result,
             "metadata": _safe_json_loads(item.metadata_json),
+            "recovery": build_run_recovery_hint(
+                status=item.status,
+                last_error=item.last_error,
+                last_result=item.last_result,
+                interrupt_requested=item.interrupt_requested,
+                events=events,
+            ),
             "created_at": item.created_at,
             "updated_at": item.updated_at,
         }
         if include_events:
-            payload["events"] = list_run_events(user_id, item.run_id, limit=8)
+            payload["events"] = events
         return payload
 
     def _serialize_subagent_card(self, user_id: str, record: SubagentRecord) -> dict[str, Any]:
@@ -368,10 +382,23 @@ class TeamBotService:
         state["summary"] = " · ".join(summary_parts)
         return state
 
+    @staticmethod
+    def _active_workflow_payload(plan: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not isinstance(plan, dict):
+            return None
+        metadata = plan.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            return None
+        workflow = metadata.get("workflow") or {}
+        if not isinstance(workflow, dict) or not workflow.get("preset_id"):
+            return None
+        return workflow
+
     def _serialize_session_runtime(self, user_id: str, session_id: str) -> dict[str, Any]:
         record = get_subagent_by_session(session_id, user_id)
         runtime_runs = list_runs_for_session(user_id, session_id, limit=10)
         runtime_mode = get_session_mode(user_id, session_id)
+        plan = get_session_plan(user_id, session_id)
         inbox_items = list_inbox_messages(user_id, session_id, limit=20)
         artifacts = list_runtime_artifacts(user_id, session_id, limit=20)
         approvals = [
@@ -398,7 +425,9 @@ class TeamBotService:
                 explicit_cwd=record.cwd if record is not None else "",
             ),
             "mode": runtime_mode,
-            "plan": get_session_plan(user_id, session_id),
+            "plan": plan,
+            "workflow_presets": list_workflow_presets(),
+            "active_workflow": self._active_workflow_payload(plan),
             "todos": get_session_todos(user_id, session_id),
             "verifications": list_verification_records(user_id, session_id, limit=20),
             "approvals": approvals,
@@ -649,6 +678,68 @@ class TeamBotService:
             "mode": mode,
         }
 
+    async def list_session_workflow_presets(
+        self,
+        user_id: str,
+        password: str,
+        x_internal_token: str | None,
+    ):
+        self.verify_auth_or_token(user_id, password, x_internal_token)
+        return {
+            "status": "success",
+            "presets": list_workflow_presets(),
+        }
+
+    async def apply_session_workflow_preset(
+        self,
+        req: TeamBotWorkflowPresetApplyRequest,
+        x_internal_token: str | None,
+    ):
+        self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
+        preset = get_workflow_preset(req.preset_id)
+        if preset is None:
+            raise HTTPException(status_code=404, detail=f"未知 workflow preset: {req.preset_id}")
+        save_session_mode(
+            req.user_id,
+            req.session_id,
+            mode=preset.mode,
+            reason=preset.reason,
+        )
+        save_session_plan(
+            req.user_id,
+            req.session_id,
+            title=preset.title,
+            status="active",
+            items=list(preset.items),
+            metadata=preset.plan_metadata(),
+        )
+        create_runtime_artifact(
+            user_id=req.user_id,
+            session_id=req.session_id,
+            run_id="",
+            kind="workflow_preset",
+            title=f"Applied workflow preset: {preset.name}",
+            path=f"workflow://{preset.preset_id}",
+            summary=preset.description,
+            metadata={
+                "preset_id": preset.preset_id,
+                "mode": preset.mode,
+                "source": preset.source,
+            },
+        )
+        await self._publish_runtime_snapshot(
+            req.user_id,
+            req.session_id,
+            reason="workflow_preset_apply",
+        )
+        return {
+            "status": "success",
+            "session_id": req.session_id,
+            "preset": preset.to_payload(),
+            "mode": get_session_mode(req.user_id, req.session_id),
+            "plan": get_session_plan(req.user_id, req.session_id),
+        }
+
     async def get_session_inbox(
         self,
         req: TeamBotSessionInboxListRequest,
@@ -832,6 +923,7 @@ class TeamBotService:
             title=req.title,
             status=req.status,
             items=req.items,
+            metadata=req.metadata or {},
         )
         plan = get_session_plan(req.user_id, req.session_id)
         await self._publish_runtime_snapshot(

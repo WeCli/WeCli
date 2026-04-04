@@ -98,17 +98,29 @@ def set_env_with_validation(key, value):
     if not validate_key(key):
         return False
     
-    # 设置环境变量
+    # 设置环境变量（合并同 key 的多余赋值行，避免 OpenClaw 同步多次后重复 LLM_*）
     lines, _ = read_env()
     key_found = False
     new_lines = []
     for line in lines:
         s = line.strip()
-        if s.startswith(f"{key}=") or s.startswith(f"# {key}="):
-            new_lines.append(f"{key}={value}\n")
-            key_found = True
-        else:
+        # 行内注释形式的 #KEY= 或 # KEY=
+        if s.startswith("#"):
+            body = s[1:].lstrip()
+            if body.startswith(f"{key}="):
+                if not key_found:
+                    new_lines.append(f"{key}={value}\n")
+                    key_found = True
+                continue
             new_lines.append(line)
+            continue
+        # 未注释的 KEY=value：只保留第一次写入，其余重复行删除
+        if s.startswith(f"{key}="):
+            if not key_found:
+                new_lines.append(f"{key}={value}\n")
+                key_found = True
+            continue
+        new_lines.append(line)
     if not key_found:
         if new_lines and not new_lines[-1].endswith("\n"):
             new_lines.append("\n")

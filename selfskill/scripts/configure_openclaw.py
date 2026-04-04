@@ -77,11 +77,21 @@ except ImportError:
         new_lines = []
         for line in lines:
             s = line.strip()
-            if s.startswith(f"{key}=") or s.startswith(f"# {key}="):
-                new_lines.append(f"{key}={value}\n")
-                key_found = True
-            else:
+            if s.startswith("#"):
+                body = s[1:].lstrip()
+                if body.startswith(f"{key}="):
+                    if not key_found:
+                        new_lines.append(f"{key}={value}\n")
+                        key_found = True
+                    continue
                 new_lines.append(line)
+                continue
+            if s.startswith(f"{key}="):
+                if not key_found:
+                    new_lines.append(f"{key}={value}\n")
+                    key_found = True
+                continue
+            new_lines.append(line)
         if not key_found:
             if new_lines and not new_lines[-1].endswith("\n"):
                 new_lines.append("\n")
@@ -900,10 +910,48 @@ def detect_llm_config_from_openclaw():
     return result
 
 
+# 模板 / 初始化向导留的默认 BASE_URL，不应阻止从 OpenClaw 导入真实 provider 的 baseUrl
+_BOOTSTRAP_LLM_BASE_URLS = frozenset(
+    {
+        "",
+        "https://api.deepseek.com",
+        "http://api.deepseek.com",
+    }
+)
+
+
+def _is_bootstrap_llm_base_url(url: str) -> bool:
+    u = (url or "").strip().lower().rstrip("/")
+    if not u:
+        return True
+    if u in {x.rstrip("/") for x in _BOOTSTRAP_LLM_BASE_URLS if x}:
+        return True
+    return False
+
+
+def _llm_base_url_conflicts_with_openclaw(kvs: dict, detected: dict) -> bool:
+    """TeamClaw 里 BASE_URL 与 OpenClaw 探测结果明显不一致（如 DeepSeek 模板 + MiniMax 模型）。"""
+    ex_url = (kvs.get("LLM_BASE_URL") or "").strip().lower()
+    det_url = (detected.get("LLM_BASE_URL") or "").strip().lower()
+    if not det_url or not ex_url:
+        return False
+    if ex_url.rstrip("/") == det_url.rstrip("/"):
+        return False
+    if _is_bootstrap_llm_base_url(ex_url):
+        return True
+    det_p = (detected.get("LLM_PROVIDER") or "").strip().lower()
+    if det_p == "minimax" and "deepseek" in ex_url:
+        return True
+    if det_p == "deepseek" and "minimaxi" in ex_url:
+        return True
+    return False
+
+
 def sync_llm_config_from_openclaw():
     """从 OpenClaw 同步 LLM 配置到 TeamClaw .env。
 
     仅同步未设置或仍为占位符的字段，不覆盖用户已显式设置的值。
+    模板默认的 LLM_BASE_URL（如 api.deepseek.com）视为可覆盖，以便导入 OpenClaw 真实 baseUrl。
     返回成功同步的字段数量。
     """
     detected = detect_llm_config_from_openclaw()
@@ -911,21 +959,28 @@ def sync_llm_config_from_openclaw():
         return 0
 
     _, kvs = read_env()
+    kvs = dict(kvs)
     synced = 0
     placeholder_values = {"your_api_key_here", ""}
+    base_url_conflict = _llm_base_url_conflicts_with_openclaw(kvs, detected)
 
     print("\n🔍 从 OpenClaw 同步 LLM 配置...")
     for key in ("LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_PROVIDER"):
         new_val = detected.get(key)
         if not new_val:
             continue
-        existing = kvs.get(key, "").strip()
+        existing = (kvs.get(key) or "").strip()
         if existing and existing not in placeholder_values:
-            # 用户已显式设置且不是占位符，跳过
-            display = mask_secret(existing) if key in {"LLM_API_KEY"} else existing
-            print(f"   ⏭️  {key} 已设置 ({display})，保留不变")
-            continue
+            if key == "LLM_BASE_URL" and (
+                _is_bootstrap_llm_base_url(existing) or base_url_conflict
+            ):
+                pass
+            else:
+                display = mask_secret(existing) if key in {"LLM_API_KEY"} else existing
+                print(f"   ⏭️  {key} 已设置 ({display})，保留不变")
+                continue
         set_env_with_validation(key, new_val)
+        kvs[key] = new_val
         synced += 1
 
     if synced > 0:

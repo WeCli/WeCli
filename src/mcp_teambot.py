@@ -76,6 +76,7 @@ from teambot_subagents import (
     upsert_subagent,
 )
 from teambot_voice import get_voice_state as get_voice_runtime_state
+from teambot_workflow_presets import get_workflow_preset, list_workflow_presets
 from teambot_workspace import describe_session_workspace
 
 
@@ -722,6 +723,51 @@ async def list_teambot_agent_profiles(username: str = "") -> str:
             lines.append(f"  source: {profile.source}")
     lines.append("\n推荐流程：先选 profile，再用 spawn_subagent 创建或继续一个子 Agent。")
     return "\n".join(lines)
+
+
+@mcp.tool()
+async def list_teambot_workflow_presets(username: str = "") -> str:
+    presets = list_workflow_presets()
+    if not presets:
+        return "📭 当前没有可用的 TeamBot workflow preset。"
+    lines = ["🧭 TeamBot workflow presets"]
+    for preset in presets:
+        lines.append(
+            f"- {preset.get('preset_id', '')} · {preset.get('name', '')}\n"
+            f"  mode={preset.get('mode', 'execute')} · source={preset.get('source', '')}\n"
+            f"  {preset.get('description', '')}"
+        )
+    lines.append("\n可用 apply_teambot_workflow_preset 将 preset 写入当前会话计划和 mode。")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+async def apply_teambot_workflow_preset(
+    username: str,
+    preset_id: str,
+    source_session: str = "",
+) -> str:
+    session_id = source_session or "default"
+    preset = get_workflow_preset(preset_id)
+    if preset is None:
+        return f"❌ 未找到 workflow preset: {preset_id}"
+    save_session_mode(username, session_id, mode=preset.mode, reason=preset.reason)
+    save_session_plan(
+        username,
+        session_id,
+        title=preset.title,
+        status="active",
+        items=list(preset.items),
+        metadata=preset.plan_metadata(),
+    )
+    return (
+        f"✅ 已应用 TeamBot workflow preset\n"
+        f"session_id: {session_id}\n"
+        f"preset_id: {preset.preset_id}\n"
+        f"name: {preset.name}\n"
+        f"mode: {preset.mode}\n"
+        f"items: {len(preset.items)}"
+    )
 
 
 @mcp.tool()

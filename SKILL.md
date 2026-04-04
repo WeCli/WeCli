@@ -6,47 +6,82 @@
 
 ---
 
+## For AI agents that read this SKILL
+
+**Mandatory before starting services**
+
+1. After you have read this file (or the sections needed for the user’s task), you **must ask the user** whether they want to **start TeamClaw** now (background `start` or foreground `start-foreground`), and **wait for their answer** before running those commands.
+2. **Exception:** if the user already clearly asked to start in the same turn (e.g. “帮我启动 TeamClaw”“run start”“执行 start”), you may run `start` / `start-foreground` without asking again.
+3. When TeamClaw **is** started, copy the **local URL**, Magic link lines, and (if present) **remote** Tunnel URL from the terminal output into your reply — see [`AGENTS.md`](./AGENTS.md) Zero-Question Install Flow.
+
+---
+
 ## Standard Install Flow
 
 ### Quick Start (Zero Questions)
 
-The simplest install — no questions asked, no manual config required:
+The simplest path: **no LLM key, no user account, and no manual `.env` editing are required before the first `start`.** Login can use the printed **Magic link** (or passwordless localhost). LLM and other settings are done **after** services are up — via the web setup wizard, OpenClaw import, or the CLI sections below.
+
+**How many commands?**
+
+| Situation | Typical commands |
+|---|---|
+| **Fresh machine / first clone** | **One:** **`start`** only (`start` / `start-foreground` 会按需运行与 `setup` 相同的 `setup_env`：venv、依赖、Linux 下 acpx 等). |
+| **Optional** | `setup` — 仅当你想**单独**重装/检查环境时；日常不必先跑。 |
+
+`start` automatically runs the equivalent of `configure --init` when `config/.env` is missing, so you **do not** need a separate `configure --init` unless you want to create or inspect `.env` before launching.
 
 ```bash
 # Linux / macOS
-bash selfskill/scripts/run.sh setup          # installs uv, venv, deps, and acpx (ACP plugin)
-bash selfskill/scripts/run.sh configure --init
-bash selfskill/scripts/run.sh start
-# → Open http://127.0.0.1:51209
-# → First login: use passwordless localhost login
-# → Setup wizard appears automatically if LLM not configured
+bash selfskill/scripts/run.sh start          # 按需 setup_env + 创建 .env + 启动服务、Tunnel、Magic links
+# Optional flags (same semantics as Windows run.ps1):
+#   --no-tunnel      Do not start Cloudflare Tunnel (local-only; Magic link output has no “remote” URL).
+#   --no-openclaw    Do not import LLM from OpenClaw; launcher skips OpenClaw gateway warm / OPENCLAW_* refresh.
+bash selfskill/scripts/run.sh start --no-tunnel --no-openclaw   # example: both
+# → Open http://127.0.0.1:51209 (or use the printed Magic link; remote/HTTPS needs the remote link)
+# → First login: Magic link or passwordless localhost
+# → Setup wizard appears if LLM is not yet configured in TeamClaw
 ```
 
 ```powershell
-# Windows PowerShell
-powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 setup   # installs uv, venv, deps, and acpx
-powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 configure --init
+# Windows PowerShell（入口脚本会先自检 uv/venv/依赖；`start` 内若仍缺 venv 或依赖会再跑 setup_env.ps1）
 powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 start
-# → Open http://127.0.0.1:51209
+# Same flags: --no-tunnel --no-openclaw (any order). start-foreground accepts --no-openclaw; --no-tunnel is ignored there (no tunnel in that mode).
+powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 start --no-tunnel --no-openclaw
 ```
 
-The `setup` command automatically:
+The `setup` command (optional standalone) automatically:
 1. Installs `uv` package manager if missing
 2. Creates a Python 3.11+ virtual environment
 3. Installs Python dependencies from `config/requirements.txt`
 4. **Installs `acpx` (ACP exchange plugin) via `npm install -g acpx@latest`** — used for external AI agent communication
 
 The `start` command automatically:
-1. Creates `config/.env` from template if missing
-2. Starts all services regardless of LLM config status
-3. Warms an installed OpenClaw gateway and refreshes runtime `OPENCLAW_*` values without importing OpenClaw's LLM config
-4. Starts **Cloudflare Tunnel** (unless already running), then prints **`🔗 Magic link`** with correct HMAC tokens: **local** and **remote** (when `PUBLIC_DOMAIN` is set). Operators and AI agents **must** pass these links to the user after install/start — remote HTTPS login (e.g. phone) requires the remote magic link.
+1. **When needed**, runs the same environment bootstrap as `setup` (`scripts/setup_env.sh` on Linux/macOS, or `setup_env.ps1` on Windows if venv/deps are still incomplete after the script’s built-in checks; on Linux/macOS, **acpx** is also installed when `npm` is present — Windows `setup_env.ps1` mirrors that)
+2. Creates `config/.env` from template if missing
+3. **Optionally** tries to copy LLM fields from local OpenClaw into `config/.env` when the key is still empty or placeholder — **failure is OK**; services still start — **skipped entirely** if you pass **`--no-openclaw`**
+4. Starts all services even if LLM is not fully configured yet
+5. Warms an installed OpenClaw gateway and refreshes runtime `OPENCLAW_*` values in `.env` (does not overwrite a **real** user-set `LLM_API_KEY`) — **skipped** if **`--no-openclaw`** (or env `TEAMCLAW_NO_OPENCLAW=1` for the launcher process)
+6. Starts **Cloudflare Tunnel** via `scripts/tunnel.py`, then prints **`🔗 Magic link`**: **local** and **remote** (when `PUBLIC_DOMAIN` is set). Operators and AI agents **must** pass these links to the user after install/start — **skipped** if **`--no-tunnel`** (Magic link text will state that no Tunnel was started).
 
 After startup, the frontend setup wizard handles LLM configuration via the web UI. The wizard detects local OpenClaw and Antigravity-Manager and offers one-click import buttons.
 
-### Auto-import OpenClaw LLM (new behavior)
-During `start` / `start-foreground`, if `config/.env` has no real `LLM_API_KEY` (missing or the default placeholder `your_api_key_here`), the startup scripts will auto-import provider/model/api settings from OpenClaw and write them back into `config/.env`.
-If you already set a real `LLM_API_KEY`, startup will not overwrite it.
+### `start` / `start-foreground` flags (`run.sh` and `run.ps1` aligned)
+
+| Flag | When to use | Behavior |
+|------|-------------|----------|
+| **`--no-tunnel`** | User wants **no** quick public URL (no Cloudflare Tunnel for this run). | Background `start` does **not** run `tunnel.py` or wait on `PUBLIC_DOMAIN`. **`start-foreground`**: tunnel is never started anyway; the flag is **ignored** (a short note is printed). |
+| **`--no-openclaw`** | User does **not** want TeamClaw to tie into OpenClaw for this run (no shared LLM import on start, no gateway warm). | Skips `configure_openclaw.py --import-teamclaw-llm-from-openclaw` when the key is still placeholder. Sets **`TEAMCLAW_NO_OPENCLAW`** for **`scripts/launcher.py`**, which **skips** `ensure_openclaw_gateway_running()` (no `OPENCLAW_*` refresh on startup; restart loop respects the same flag). |
+
+Environment variables (for advanced/manual launcher runs): **`TEAMCLAW_NO_OPENCLAW`** and **`TEAMCLAW_NO_TUNNEL`** may be set to `1` / `true` / `yes` / `on` where documented; scripts set them when the flags above are used.
+
+### For agents using this SKILL (settings are documented — startup does not enforce them)
+
+Follow **[For AI agents that read this SKILL](#for-ai-agents-that-read-this-skill)** before running `start`. Use the rest of this file when the user **wants** to configure something: **OpenClaw Integration**, **Advanced: Manual CLI Configuration** (`configure`, `auto-model`, `sync-openclaw-llm`), **Magic link** / `add-user`, provider tables, etc. **None of that blocks `start`:** the stack comes up with a template `.env`; the human signs in and finishes LLM/account choices in the UI or CLI when ready.
+
+### Optional: auto-import OpenClaw LLM at startup
+
+During `start` / `start-foreground`, if `config/.env` has no real `LLM_API_KEY` (missing or placeholder `your_api_key_here`), the scripts **try** to import provider/model/key from OpenClaw into TeamClaw `.env` — **unless** **`--no-openclaw`** was passed. If OpenClaw is missing or has no LLM config, startup **continues** anyway. If you already set a real `LLM_API_KEY`, startup does not overwrite it.
 
 ### Magic Prompts for AI Code CLI
 

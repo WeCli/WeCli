@@ -137,14 +137,15 @@
   .tab-item {
     flex: 1; display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    cursor: pointer; gap: 2px;
+    cursor: pointer; gap: 4px;
+    padding-top: 4px;
     -webkit-tap-highlight-color: transparent; user-select: none;
   }
   .tab-item:active { opacity: 0.7; }
   .tab-icon { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; position: relative; }
   .tab-icon svg { width: 24px; height: 24px; fill: #8c8c8c; }
   .tab-item.active .tab-icon svg { fill: #1e3a8a; }
-  .tab-label { font-size: 10px; color: #8c8c8c; line-height: 1; }
+  .tab-label { font-size: 12px; font-weight: 600; color: #8c8c8c; line-height: 1.2; }
   .tab-item.active .tab-label { color: #1e3a8a; }
   .tab-badge {
     position: absolute; top: -3px; right: -8px;
@@ -224,6 +225,10 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 18px; color: #fff; font-weight: 700;
     flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   /* ── Grid avatar (group chat, 4-cell) ── */
   .group-avatar-grid {
@@ -240,6 +245,10 @@
     display: flex; align-items: center; justify-content: center;
     color: #fff; font-weight: 700; font-size: 11px;
     overflow: hidden;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   .group-info { flex: 1; margin-left: 12px; overflow: hidden; }
   .group-name-row {
@@ -347,6 +356,10 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 15px; font-weight: 700; color: #fff;
     flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   .msg-row.self .msg-avatar { background: #07c160; }
 
@@ -676,6 +689,10 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 700; color: #fff;
     flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   .mention-item-avatar.oasis { background: #409eff; }
   .mention-item-avatar.ext   { background: #e6a23c; }
@@ -823,6 +840,10 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 13px; font-weight: 700; color: #fff;
     flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   .member-avatar.oasis { background: #409eff; }
   .member-avatar.ext   { background: #e6a23c; }
@@ -975,6 +996,10 @@
     justify-content: center;
     font-size: 20px;
     flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   .side-panel-tag-info {
     min-width: 0;
@@ -1485,6 +1510,10 @@
     width: 24px; height: 24px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; color: #fff; flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   .oasis-post-avatar.creative { background: linear-gradient(135deg, #f59e0b, #f97316); }
   .oasis-post-avatar.critical { background: linear-gradient(135deg, #ef4444, #dc2626); }
@@ -1747,10 +1776,56 @@
   }
   .mobile-add-agent-form .form-submit:disabled { opacity: 0.6; }
   .contact-section-title {
-    padding: 6px 16px;
-    font-size: 12px; font-weight: 600; color: var(--text-secondary);
+    padding: 12px 16px;
+    font-size: 15px; font-weight: 700; line-height: 1.35;
+    color: var(--text-secondary);
     background: var(--bg); position: sticky; top: 0; z-index: 1;
   }
+  /* 通讯录层级：同一灰阶、不同深浅（不花哨） */
+  .contact-section-title.contact-section-l1-internal {
+    color: #1f2937;
+    background: linear-gradient(90deg, #e5e7eb, #f3f4f6 45%, var(--bg) 100%);
+    box-shadow: inset 3px 0 0 #4b5563;
+  }
+  .contact-section-title.contact-section-l2-external {
+    color: #374151;
+    background: linear-gradient(90deg, #e5e7eb, #f3f4f6 50%, var(--bg) 100%);
+    box-shadow: inset 3px 0 0 #6b7280;
+  }
+  .contact-section-title.contact-section-l3-custom {
+    color: #4b5563;
+    background: linear-gradient(90deg, #eceff3, #f3f4f6 55%, var(--bg) 100%);
+    box-shadow: inset 3px 0 0 #9ca3af;
+  }
+  .contact-section-title.contact-section-l4-preset {
+    color: #475569;
+    background: linear-gradient(90deg, #e8e8ec, #f3f4f6 55%, var(--bg) 100%);
+    box-shadow: inset 3px 0 0 #787887;
+  }
+  /* 外部子类：OpenClaw / ACP 等统一次级灰 */
+  .contacts-cat-header.contacts-ext-sub {
+    color: #6b7280;
+    background: linear-gradient(90deg, #f3f4f6, var(--bg) 72%);
+    box-shadow: inset 3px 0 0 #d1d5db;
+    font-size: 12px;
+  }
+  .contacts-cat-header.contacts-ext-sub .cat-count {
+    color: #6b7280;
+    background: #e5e7eb;
+  }
+  .contacts-cat-header.contacts-ext-sub .cat-arrow { color: #9ca3af; }
+  /* 预设专家 4.1 / 4.2 … */
+  .contacts-cat-header.contacts-preset-sub {
+    color: #64748b;
+    background: linear-gradient(90deg, #f1f5f9, var(--bg) 75%);
+    box-shadow: inset 3px 0 0 #cbd5e1;
+    font-size: 12px;
+  }
+  .contacts-cat-header.contacts-preset-sub .cat-count {
+    color: #64748b;
+    background: #e2e8f0;
+  }
+  .contacts-cat-header.contacts-preset-sub .cat-arrow { color: #94a3b8; }
   .contact-item {
     display: flex; align-items: center;
     padding: 12px 16px; background: var(--bg-card);
@@ -1761,6 +1836,10 @@
     width: 40px; height: 40px; border-radius: 4px;
     display: flex; align-items: center; justify-content: center;
     font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   .contact-avatar.oasis { background: #409eff; }
   .contact-avatar.ext { background: #e6a23c; }
@@ -1817,6 +1896,12 @@
   .contacts-cat-header.expanded .cat-arrow { transform: rotate(90deg); }
   .contacts-cat-list { display: none; }
   .contacts-cat-list.expanded { display: block; }
+  /* External Agent: nested 2 → 2.1 OpenClaw + ACP groups */
+  .contact-external-nested {
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left: 2px solid var(--border);
+  }
   .contact-avatar.preset { background: #67c23a; }
   .contact-avatar.custom { background: #e040fb; }
 
@@ -1861,6 +1946,10 @@
     background: #07c160;
     display: flex; align-items: center; justify-content: center;
     font-size: 28px; color: #fff; font-weight: 700; flex-shrink: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+      "Helvetica Neue", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji", sans-serif;
+    line-height: 1;
   }
   .profile-info { margin-left: 16px; flex: 1; }
   .profile-name { font-size: 20px; font-weight: 600; }
@@ -2151,9 +2240,68 @@
       align-self: flex-start;
     }
   }
+
+  /* Studio-style boot splash & delayed page loading (same behavior as /studio) */
+  #app-splash {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(135deg, #111827 0%, #1e3a5f 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 99999; transition: opacity 0.5s ease;
+  }
+  #app-splash.fade-out { opacity: 0; pointer-events: none; }
+  #app-splash .splash-icon { width: 72px; height: 72px; margin-bottom: 14px; animation: mc-splash-bounce 1s ease infinite; }
+  #app-splash .splash-logo { filter: drop-shadow(0 10px 24px rgba(36, 72, 216, 0.3)); }
+  #app-splash .splash-title { color: #fff; font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+  #app-splash .splash-sub { color: rgba(219,234,254,0.74); font-size: 11px; margin-top: 8px; letter-spacing: 0.1em; text-transform: uppercase; }
+  @keyframes mc-splash-bounce { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+
+  #page-loading-overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 100000;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(17, 24, 39, 0.35);
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  #page-loading-overlay.loading-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .page-loading-spinner { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .page-loading-dots { display: flex; gap: 6px; }
+  .page-loading-dots span {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #3b82f6;
+    animation: mc-page-loading-bounce 1.2s ease-in-out infinite;
+  }
+  .page-loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .page-loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes mc-page-loading-bounce {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
+    40% { opacity: 1; transform: scale(1.1); }
+  }
+  .page-loading-text {
+    font-size: 12px; color: rgba(255,255,255,0.88);
+    font-weight: 500; letter-spacing: 0.5px;
+  }
 </style>
 </head>
 <body>
+
+<div id="app-splash">
+  <img class="splash-icon splash-logo" src="/static/assets/teamclaw-mark.svg" alt="TeamClaw">
+  <div class="splash-title">TeamClaw</div>
+  <div class="splash-sub">Message Center</div>
+</div>
+<div id="page-loading-overlay">
+  <div class="page-loading-spinner">
+    <div class="page-loading-dots"><span></span><span></span><span></span></div>
+    <div class="page-loading-text">Loading…</div>
+  </div>
+</div>
+
 <div class="body-layout">
 
 <!-- LLM 未配置警告横幅（放在 app-container 外面，避免被绝对定位 tab-page 遮挡） -->
@@ -2869,6 +3017,11 @@ const I18N = {
     remove_failed: '移除失败',
     internal_agent: '内部 Agent',
     external_agent: '外部 Agent',
+    contacts_level1_internal: '1. 内部 Agent',
+    contacts_level2_external: '2. 外部 Agent',
+    contacts_level21_openclaw: '2.1 OpenClaw',
+    contacts_level3_custom_experts: '3. 自定义专家',
+    contacts_level4_preset_experts: '4. 预设专家',
     external_agent_desc: '此为外部 Agent（通过 ACP/HTTP 连接），详细配置请查看外部 Agent 配置文件。',
     reset_all_agents: '一次重置所有 agent',
     reset_all_confirm: '确定要一次重置当前群里的全部 agent 吗？\n\n- 外部 agent：创建新会话并重置上下文\n- 内部 agent：终止当前任务并清空历史',
@@ -3388,6 +3541,11 @@ const I18N = {
     remove_failed: 'Remove failed',
     internal_agent: 'Internal Agent',
     external_agent: 'External Agent',
+    contacts_level1_internal: '1. Internal Agent',
+    contacts_level2_external: '2. External Agent',
+    contacts_level21_openclaw: '2.1 OpenClaw',
+    contacts_level3_custom_experts: '3. Custom Experts',
+    contacts_level4_preset_experts: '4. Preset Experts',
     external_agent_desc: 'This is an external Agent (connected via ACP/HTTP). Check the external Agent config for details.',
     reset_all_agents: 'Reset All Agents',
     reset_all_confirm: 'Reset all agents in this group?\n\n- External agents: create a new session and reset context\n- Internal agents: cancel current task and clear history',
@@ -4206,7 +4364,6 @@ function renderGroupList(list) {
   container.innerHTML = sorted.map(g => {
     const gid = g.group_id || g.id || '';
     const rawName = g.name || gid;
-    const isPrivate = (g.custom_name || '').startsWith('private_');
     const name = rawName;
     const members = g.member_count || 0;
     const msgs = g.message_count || 0;
@@ -4220,7 +4377,7 @@ function renderGroupList(list) {
       const cells = [];
       for (let i = 0; i < 4; i++) {
         const n = memberNames[i] || '';
-        const initial = n ? (n[0] || '?').toUpperCase() : '';
+        const initial = n ? avatarLabelFromDisplayName(n) : '';
         const bg = n ? stringToColor(n) : '#ccc';
         if (initial) {
           cells.push(`<div class="grid-cell" style="background:${bg}">${esc(initial)}</div>`);
@@ -4230,13 +4387,12 @@ function renderGroupList(list) {
       }
       avatarHtml = `<div class="group-avatar-grid">${cells.join('')}</div>`;
     } else {
-      const otherName = memberNames.length > 0 ? memberNames[0] : name;
-      const initial = (otherName[0] || '?').toUpperCase();
-      const bg = stringToColor(otherName);
+      const otherName = groupListAvatarPeerName(g, memberNames, rawName);
+      const initial = avatarLabelFromDisplayName(otherName);
+      const bg = stringToColor(otherName || rawName);
       avatarHtml = `<div class="group-avatar" style="background:${bg}">${esc(initial)}</div>`;
     }
 
-    const displayName = isPrivate ? `🤖 ${name}` : name;
     const isMutedGroup = mutedGroupIds.has(gid);
     const unreadCount = getUnreadCount(gid);
     const escapedGid = gid.replace(/'/g, "\\'");
@@ -4248,11 +4404,11 @@ function renderGroupList(list) {
           ${avatarHtml}
           <div class="group-info">
             <div class="group-name-row">
-              <div class="group-name">${esc(displayName)}</div>
+              <div class="group-name">${esc(name)}</div>
               ${timeStr ? `<span class="group-time">${timeStr}</span>` : ''}
             </div>
             <div class="group-meta-row">
-              <div class="group-meta">${isPrivate ? '💬 ' + t('private_chat_label') + ' · ' : ''}${members} ${t('members')} · ${msgs} ${t('messages_count')}</div>
+              <div class="group-meta">${members} ${t('members')} · ${msgs} ${t('messages_count')}</div>
               ${isMutedGroup ? '<span class="group-mute-icon">🔇</span>' : ''}
               <span class="group-badge${unreadCount ? '' : ' hidden'}">${unreadCount > 99 ? '99+' : unreadCount || ''}</span>
             </div>
@@ -4273,6 +4429,11 @@ function renderGroupList(list) {
 // Swipe-to-action 
 // ══════════════════════════════════════════════════════════
 const SWIPE_THRESHOLD = 144; // px to fully reveal actions
+/** 左滑灵敏度：斜率 + 垂直退出，避免上下滑时瞬间带出操作按钮 */
+const SWIPE_TOUCH_SLOP = 16;
+const SWIPE_HORIZ_RATIO = 2.35; // |dx| 需明显大于 |dy| 才认定为横滑
+const SWIPE_VERTICAL_ABORT = 32; // 已横滑后，纵向明显占优则取消
+
 let _swipeActiveWrapper = null; // currently open swipe wrapper
 
 function swipeBindAll() {
@@ -4281,7 +4442,7 @@ function swipeBindAll() {
     if (!item || item._swipeBound) return;
     item._swipeBound = true;
 
-    let startX = 0, startY = 0, currentX = 0, dragging = false, moved = false;
+    let startX = 0, startY = 0, currentX = 0, dragging = false, swipeCommitted = false;
 
     item.addEventListener('touchstart', e => {
       const touch = e.touches[0];
@@ -4289,7 +4450,7 @@ function swipeBindAll() {
       startY = touch.clientY;
       currentX = 0;
       dragging = true;
-      moved = false;
+      swipeCommitted = false;
       item.style.transition = 'none';
       // Reset confirm state on any new touch
       const delBtn = wrapper.querySelector('.swipe-action-btn.delete');
@@ -4307,39 +4468,55 @@ function swipeBindAll() {
       const dx = touch.clientX - startX;
       const dy = touch.clientY - startY;
 
-      // If vertical scroll dominates, cancel swipe
-      if (!moved && Math.abs(dy) > Math.abs(dx)) {
+      if (!swipeCommitted) {
+        if (Math.abs(dx) < SWIPE_TOUCH_SLOP && Math.abs(dy) < SWIPE_TOUCH_SLOP) return;
+        if (Math.abs(dx) < Math.abs(dy) * SWIPE_HORIZ_RATIO) {
+          dragging = false;
+          return;
+        }
+        swipeCommitted = true;
+        if (_swipeActiveWrapper && _swipeActiveWrapper !== wrapper) {
+          swipeClose(_swipeActiveWrapper);
+        }
+      } else if (Math.abs(dy) > Math.abs(dx) + SWIPE_VERTICAL_ABORT) {
         dragging = false;
+        swipeCommitted = false;
+        currentX = 0;
+        item.style.transition = 'transform .2s ease';
+        item.style.transform = 'translateX(0)';
+        if (_swipeActiveWrapper === wrapper) _swipeActiveWrapper = null;
         return;
       }
-      moved = true;
 
-      // Only allow left swipe (dx < 0)
       currentX = Math.min(0, Math.max(-SWIPE_THRESHOLD, dx));
-
-      // Close any other open wrapper
-      if (_swipeActiveWrapper && _swipeActiveWrapper !== wrapper) {
-        swipeClose(_swipeActiveWrapper);
-      }
-
       item.style.transform = `translateX(${currentX}px)`;
       e.preventDefault();
     }, {passive: false});
 
     item.addEventListener('touchend', () => {
-      if (!dragging) return;
-      dragging = false;
       item.style.transition = 'transform .25s ease';
-
-      if (currentX < -SWIPE_THRESHOLD / 2) {
-        // Snap open
+      const didCommit = swipeCommitted;
+      dragging = false;
+      swipeCommitted = false;
+      if (!didCommit) {
+        item.style.transform = 'translateX(0)';
+        return;
+      }
+      if (currentX < -SWIPE_THRESHOLD * 0.52) {
         item.style.transform = `translateX(-${SWIPE_THRESHOLD}px)`;
         _swipeActiveWrapper = wrapper;
       } else {
-        // Snap closed
         item.style.transform = 'translateX(0)';
         if (_swipeActiveWrapper === wrapper) _swipeActiveWrapper = null;
       }
+    }, {passive: true});
+
+    item.addEventListener('touchcancel', () => {
+      dragging = false;
+      swipeCommitted = false;
+      item.style.transition = 'transform .2s ease';
+      item.style.transform = 'translateX(0)';
+      if (_swipeActiveWrapper === wrapper) _swipeActiveWrapper = null;
     }, {passive: true});
 
     // Prevent click when swiped
@@ -4888,6 +5065,7 @@ async function mobileSubmitCreateExtAgent() {
     });
     if (ok) {
       closeCreateAgentModal();
+      invalidateContactsPrefetch();
       if (typeof loadContactsForTeam === 'function') loadContactsForTeam();
     }
   } catch (e) {
@@ -5028,6 +5206,7 @@ async function mobileSubmitCreateOpenClawAgent() {
     });
     if (ok) {
       closeCreateAgentModal();
+      invalidateContactsPrefetch();
       if (typeof loadContactsForTeam === 'function') loadContactsForTeam();
     }
   } catch (e) {
@@ -5128,6 +5307,8 @@ async function submitCreateAgent() {
       global_id: newSid,
       tag: tag || ''
     });
+    invalidateContactsPrefetch();
+    if (typeof loadContactsForTeam === 'function') loadContactsForTeam();
   } catch (e) {
     toast(t('agent_create_failed') + ': ' + e.message);
   }
@@ -5362,7 +5543,7 @@ function renderOneMsgHTML(m) {
 
   return `
     <div class="msg-row ${colorClass}">
-      <div class="msg-avatar ${isSelf ? '' : 'clickable'}" style="background:${stringToColor(sender)}"${isSelf ? '' : ` onclick="showAgentDetailBySender('${sender.replace(/'/g, "\\'")}')" title="${t('tip_view_detail')}"`}>${initial}</div>
+      <div class="msg-avatar ${isSelf ? '' : 'clickable'}" style="background:${stringToColor(sender)}"${isSelf ? '' : ` onclick="showAgentDetailBySender('${sender.replace(/'/g, "\\'")}')" title="${t('tip_view_detail')}"`}>${esc(initial)}</div>
       <div class="msg-body">
         <div class="msg-sender">${esc(displayName)}</div>
         <div class="${bubbleClass}">${contentHTML}${attachHTML}</div>
@@ -6668,8 +6849,8 @@ setInterval(() => {
 const TEAM_HUB_URL = 'https://teamclawhub.com';
 
 function openTeamStudio() {
-  // Navigate to the main Team Studio page
-  window.location.href = '/studio';
+  // 当前窗口进入 Studio（与主站同一标签，便于会话/登录延续），默认打开「团队」Tab
+  window.location.assign('/studio?tab=group');
 }
 
 function openTeamHub() {
@@ -6677,7 +6858,7 @@ function openTeamHub() {
 }
 
 function openTeamCreator() {
-  window.location.href = '/creator';
+  window.location.assign('/creator');
 }
 
 // ── Polling ──
@@ -6795,7 +6976,8 @@ function renderMembers(members) {
     // 操作按钮：外部 agent 显示 /new, /reset(通过_meta), 和 /stop，内部 agent 显示 cancel
     let actionBtns = '';
     if (type === 'ext') {
-      const acpKey = (shortName || globalId || '').replace(/'/g, "\\'");
+      // Prefer global_id for /acp_control lookup (matches global_name; short_name can collide)
+      const acpKey = (globalId || shortName || '').replace(/'/g, "\\'");
       actionBtns = `
         <div class="member-actions" style="display:flex;gap:4px;margin-top:4px;">
           <button onclick="event.stopPropagation();acpControl('${acpKey}','new')" class="member-action-btn" title="${t('tip_acp_new')}">🔄 new</button>
@@ -6813,7 +6995,7 @@ function renderMembers(members) {
 
     return `
       <div class="member-item" onclick="insertMention('${globalId}', '${name.replace(/'/g, "\\'")}')">
-        <div class="member-avatar ${type} ${isAgent ? 'clickable' : ''}"${isAgent ? ` onclick="event.stopPropagation();showAgentDetail({name:'${name.replace(/'/g, "\\\\'")}',type:'${type}',global_id:'${globalId.replace(/'/g, "\\\\'")}',tag:'${(tag||'').replace(/'/g, "\\\\'")}',short_name:'${shortName.replace(/'/g, "\\\\'")}'})" title="${t('tip_view_detail')}"` : ''}>${initial}</div>
+        <div class="member-avatar ${type} ${isAgent ? 'clickable' : ''}"${isAgent ? ` onclick="event.stopPropagation();showAgentDetail({name:'${name.replace(/'/g, "\\\\'")}',type:'${type}',global_id:'${globalId.replace(/'/g, "\\\\'")}',tag:'${(tag||'').replace(/'/g, "\\\\'")}',short_name:'${shortName.replace(/'/g, "\\\\'")}'})" title="${t('tip_view_detail')}"` : ''}>${esc(initial)}</div>
         <div class="member-info" style="flex:1;">
           <div class="member-name">${esc(name)}</div>
           <div class="member-tag">${typeLabel} · ${tag ? esc(tag) + ' · ' : ''}${esc(globalId)}</div>
@@ -6899,7 +7081,7 @@ function renderMentionPopup(members) {
     const selectedClass = idx === mentionState.selectedIndex ? 'selected' : '';
     return `
       <div class="mention-item ${selectedClass}" data-idx="${idx}" onclick="selectMentionByClick(${idx})" ontouchstart="this.classList.add('selected')" ontouchend="this.classList.remove('selected')">
-        <div class="mention-item-avatar ${type}">${initial}</div>
+        <div class="mention-item-avatar ${type}">${esc(initial)}</div>
         <div class="mention-item-info">
           <div class="mention-item-name">${esc(name)}</div>
           <div class="mention-item-tag">${typeLabel} · ${esc(uid)}#${esc(sid)}</div>
@@ -7481,6 +7663,7 @@ async function startExpertChat(expertInfo) {
     });
 
     // Refresh contacts in background
+    invalidateContactsPrefetch();
     if (typeof loadContactsForTeam === 'function') loadContactsForTeam();
   } catch (e) {
     // If 409 (duplicate session), the agent already exists — just open private chat
@@ -7564,7 +7747,8 @@ async function loadAddAgentMembers() {
         short_name: m.name || m.global_name || t('unnamed'),
         global_id: m.type === 'ext' ? (m.global_name || m.name || '') : (m.session || m.global_name || ''),
         type: m.type,
-        tag: m.tag || ''
+        tag: m.tag || '',
+        team: m.team || ''
       }));
       experts = Array.isArray(expertData) ? expertData : [];
     } else {
@@ -7597,15 +7781,15 @@ async function loadAddAgentMembers() {
 
     let html = '';
     if (internalAgents.length > 0) {
-      html += '<div class="contact-section-title">' + t('internal_agent') + ' (' + internalAgents.length + ')</div>';
+      html += '<div class="contact-section-title contact-section-l1-internal">🤖 ' + t('contacts_level1_internal') + ' (' + internalAgents.length + ')</div>';
       html += internalAgents.map(a => {
         const key = a.global_id;
         const checked = addAgentSelected.has(key) ? 'checked' : '';
-        const initial = (a.short_name[0] || '?').toUpperCase();
+        const initial = avatarLabelFromDisplayName(a.short_name);
         return `
           <label class="contact-item" style="cursor:pointer;display:flex;align-items:center;">
             <input type="checkbox" value="${esc(key)}" data-short="${esc(a.short_name)}" data-type="${esc(a.type)}" data-tag="${esc(a.tag)}" onchange="toggleAddAgentSelect('${esc(key)}')" ${checked} style="width:18px;height:18px;margin-right:10px;accent-color:#07c160;">
-            <div class="contact-avatar oasis">${initial}</div>
+            <div class="contact-avatar oasis">${esc(initial)}</div>
             <div class="contact-name">${esc(a.short_name)}</div>
             ${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}
           </label>`;
@@ -7613,24 +7797,19 @@ async function loadAddAgentMembers() {
     }
 
     if (externalAgents.length > 0) {
-      html += '<div class="contact-section-title">' + t('external_agent') + ' (' + externalAgents.length + ')</div>';
-      html += externalAgents.map(a => {
-        const key = a.global_id;
-        const checked = addAgentSelected.has(key) ? 'checked' : '';
-        const initial = (a.short_name[0] || '?').toUpperCase();
-        return `
-          <label class="contact-item" style="cursor:pointer;display:flex;align-items:center;">
-            <input type="checkbox" value="${esc(key)}" data-short="${esc(a.short_name)}" data-type="${esc(a.type)}" data-tag="${esc(a.tag)}" onchange="toggleAddAgentSelect('${esc(key)}')" ${checked} style="width:18px;height:18px;margin-right:10px;accent-color:#07c160;">
-            <div class="contact-avatar ext">${initial}</div>
-            <div class="contact-name">${esc(a.short_name)}</div>
-            ${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}
-          </label>`;
-      }).join('');
+      html += '<div class="contact-section-title contact-section-l2-external">🦞 ' + t('contacts_level2_external') + ' (' + externalAgents.length + ')</div>';
+      const extGrouped = groupTeamExternalMembers(externalAgents.map(a => ({
+        name: a.short_name,
+        global_name: a.global_id,
+        tag: a.tag || '',
+        team: a.team || ''
+      })));
+      html += '<div class="contact-external-nested">' + renderExternalAgentGroupsForAddMembersHtml(extGrouped, 'addmbr-ext-') + '</div>';
     }
 
     // ── Custom Experts ──
     if (customExperts.length > 0) {
-      html += '<div class="contact-section-title">🔧 ' + t('custom_experts') + ' (' + customExperts.length + ')</div>';
+      html += '<div class="contact-section-title contact-section-l3-custom">🛠️ ' + t('contacts_level3_custom_experts') + ' (' + customExperts.length + ')</div>';
       html += customExperts.map(exp => {
         const isZh = (_currentLang === 'zh');
         const dname = isZh ? (exp.name_zh || exp.name) : (exp.name_en || exp.name);
@@ -7648,16 +7827,21 @@ async function loadAddAgentMembers() {
       }).join('');
     }
 
-    // ── Preset Experts ──
+    // ── Preset Experts（4.1 / 4.2 …） ──
     if (presetExperts.length > 0) {
-      html += '<div class="contact-section-title">🌟 ' + t('preset_experts') + ' (' + presetExperts.length + ')</div>';
-      html += presetExperts.map(exp => {
-        const isZh = (_currentLang === 'zh');
-        const dname = isZh ? (exp.name_zh || exp.name) : (exp.name_en || exp.name);
-        const emoji = exp.emoji || '🌟';
-        const key = 'expert_' + (exp.tag || exp.name || dname);
-        const checked = addAgentSelected.has(key) ? 'checked' : '';
-        return `
+      const addMBPresetLabels = contactsPresetCategoryLabels();
+      html += '<div class="contact-section-title contact-section-l4-preset">🌟 ' + t('contacts_level4_preset_experts') + ' (' + presetExperts.length + ')</div>';
+      html += '<div class="contact-external-nested">' + renderPresetExpertsCategoriesHtml(
+        presetExperts,
+        addMBPresetLabels,
+        'addmbr-preset-',
+        (exp) => {
+          const isZh = (_currentLang === 'zh');
+          const dname = isZh ? (exp.name_zh || exp.name) : (exp.name_en || exp.name);
+          const emoji = exp.emoji || '🌟';
+          const key = 'expert_' + (exp.tag || exp.name || dname);
+          const checked = addAgentSelected.has(key) ? 'checked' : '';
+          return `
           <label class="contact-item expert-item" style="cursor:pointer;display:flex;align-items:center;">
             <input type="checkbox" value="${esc(key)}" data-short="${esc(dname)}" data-type="expert" data-tag="${esc(exp.tag || '')}" data-persona="${esc(exp.persona || '')}" data-temperature="${esc(exp.temperature || '')}" onchange="toggleAddAgentSelect('${esc(key)}')" ${checked} style="width:18px;height:18px;margin-right:10px;accent-color:#07c160;">
             <div class="contact-avatar preset">${emoji}</div>
@@ -7665,7 +7849,8 @@ async function loadAddAgentMembers() {
             <span class="contact-type-pill prompt">Prompt</span>
             ${exp.tag ? `<span class="contact-tag">${esc(exp.tag)}</span>` : ''}
           </label>`;
-      }).join('');
+        }
+      ) + '</div>';
     }
 
     body.innerHTML = html || `<div style="text-align:center;padding:30px;color:var(--text-secondary);">${t('no_members')}</div>`;
@@ -7819,12 +8004,61 @@ function esc(s) {
   return d.innerHTML;
 }
 
+/** First user-perceived character (emoji / ZWJ sequences) for avatar labels */
+function firstGraphemeCluster(s) {
+  if (s == null || s === '') return '';
+  const t = String(s).trim();
+  if (!t) return '';
+  try {
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+      for (const { segment } of seg.segment(t)) {
+        if (segment.trim()) return segment;
+      }
+      return '';
+    }
+  } catch (_) { /* ignore */ }
+  const arr = [...t];
+  return arr[0] || '';
+}
+
+function avatarLabelFromDisplayName(displayName) {
+  const ch = firstGraphemeCluster(displayName);
+  if (!ch) return '?';
+  if (ch.length === 1 && /[a-z]/.test(ch)) return ch.toUpperCase();
+  return ch;
+}
+
+/** 会话列表单头像：私聊用对方 agent short_name */
+function groupListAvatarPeerName(g, memberNames, rawName) {
+  const mc = g.member_count || 0;
+  const names = memberNames || [];
+  if (mc === 2) {
+    const owner = String(g.owner || '');
+    if (names.length >= 2 && owner && names[0] === owner) {
+      return names[1] || names[0] || rawName;
+    }
+    if (names.length >= 1) return names[0] || rawName;
+    const head = rawStrHeadBeforeHash(rawName);
+    if (head) return head;
+    return rawName || '';
+  }
+  if (names.length > 0) return names[0];
+  return rawName || '';
+}
+
+function rawStrHeadBeforeHash(rawName) {
+  const s = String(rawName || '');
+  const i = s.indexOf('#');
+  if (i <= 0) return '';
+  return s.slice(0, i).trim() || '';
+}
+
 function getInitial(name) {
   if (!name) return '?';
-  // For "user#session" format, use the part after #
   const parts = name.split('#');
-  const n = parts.length > 1 ? parts[1] : parts[0];
-  return (n[0] || '?').toUpperCase();
+  const n = (parts.length > 1 ? parts[1] : parts[0]).trim();
+  return avatarLabelFromDisplayName(n);
 }
 
 function stringToColor(str) {
@@ -8096,6 +8330,7 @@ async function deleteInternalAgent(info) {
     await api('DELETE', `/internal_agents/${encodeURIComponent(info.global_id)}` + teamQuery);
     toast(t('agent_deleted') + ': ' + name);
     closeAgentDetail();
+    invalidateContactsPrefetch();
     // Refresh contacts list
     if (typeof loadContactsForTeam === 'function') loadContactsForTeam();
   } catch (e) {
@@ -8122,20 +8357,42 @@ function scrollToBottom() {
 // ══════════════════════════════════════════════════════════
 async function loadContacts() {
   contactsLoaded = true;
-  // Load teams for the selector
-  try {
-    const data = await api('GET', '/teams');
-    contactsTeamList = data.teams || data || [];
-    const select = document.getElementById('contacts-team-select');
+  const select = document.getElementById('contacts-team-select');
+  const prevTeamVal = select ? select.value : '';
+
+  const fillTeamSelect = (list) => {
+    contactsTeamList = Array.isArray(list) ? list : [];
     select.innerHTML = `<option value="">${t('public_agent')}</option>` +
       contactsTeamList.map(tm => `<option value="${tm}">${tm}</option>`).join('');
+    if (prevTeamVal !== undefined && prevTeamVal !== null &&
+        [...select.options].some(o => o.value === prevTeamVal)) {
+      select.value = prevTeamVal;
+    }
+  };
+
+  // 先用预取的团队列表填好下拉框，避免切到通讯录时卡在等 /teams
+  const pf = __contactsPrefetch;
+  if (pf && Date.now() - pf.ts < 120000 && pf.teamsData && select) {
+    try {
+      const raw = pf.teamsData;
+      const list = Array.isArray(raw) ? raw : (raw.teams || raw || []);
+      fillTeamSelect(Array.isArray(list) ? list : []);
+    } catch (e) { /* ignore */ }
+  }
+
+  try {
+    const data = await api('GET', '/teams');
+    const list = data.teams || data || [];
+    fillTeamSelect(Array.isArray(list) ? list : []);
   } catch (e) { console.error('Load teams for contacts failed:', e); }
+
   await loadContactsForTeam();
 }
 
 async function refreshContacts() {
   contactsLoaded = false;
   _allContactsCache = null; // Clear search cache
+  invalidateContactsPrefetch();
   await loadContacts();
   toast(t('refreshed'));
 }
@@ -8146,6 +8403,250 @@ let contactsSearchKeyword = '';
 // Cache for all contacts (for global search)
 let _allContactsCache = null;
 let _allContactsLoading = false;
+
+/** Warm contacts API responses in background (mobile 通讯录预加载). */
+let __contactsPrefetch = null;
+let __contactsPrefetchPromise = null;
+
+function invalidateContactsPrefetch() {
+  __contactsPrefetch = null;
+  __contactsPrefetchPromise = null;
+}
+
+/** OpenClaw sessions + public_external_agents grouped by tag (skip openclaw dup in JSON). */
+async function loadPublicExternalAgentGroups() {
+  const [ocRes, pubRes] = await Promise.all([
+    api('GET', '/proxy_openclaw_sessions').catch(() => ({ agents: [] })),
+    api('GET', '/public_external_agents').catch(() => ({ agents: [] }))
+  ]);
+  const ocList = (ocRes.agents || []).map(s => ({
+    name: s.name || s.global_name || t('unnamed'),
+    type: 'ext',
+    tag: s.tag || 'openclaw',
+    global_name: s.global_name || s.name || ''
+  }));
+  const acpByTool = {};
+  const rows = (pubRes && Array.isArray(pubRes.agents)) ? pubRes.agents : [];
+  rows.forEach((row) => {
+    if (!row || typeof row !== 'object') return;
+    const tagRaw = String(row.tag || '').trim().toLowerCase();
+    if (tagRaw === 'openclaw') return;
+    const gn = String(row.global_name || '').trim();
+    if (!gn) return;
+    const key = tagRaw || '_';
+    const item = {
+      name: row.name || row.global_name || t('unnamed'),
+      type: 'ext',
+      tag: row.tag || '',
+      global_name: gn
+    };
+    if (!acpByTool[key]) acpByTool[key] = [];
+    acpByTool[key].push(item);
+  });
+  return { openclaw: ocList, acpByTool };
+}
+
+function groupTeamExternalMembers(extMembers) {
+  const openclaw = [];
+  const acpByTool = {};
+  (extMembers || []).forEach((m) => {
+    if (!m || typeof m !== 'object') return;
+    const tagRaw = String(m.tag || '').trim().toLowerCase();
+    const gn = String(m.global_name || m.name || m.session || '').trim();
+    const item = {
+      name: m.name || m.global_name || t('unnamed'),
+      type: 'ext',
+      tag: m.tag || '',
+      global_name: gn,
+      team: m.team || ''
+    };
+    if (tagRaw === 'openclaw') {
+      openclaw.push(item);
+    } else {
+      const key = tagRaw || '_';
+      if (!acpByTool[key]) acpByTool[key] = [];
+      acpByTool[key].push(item);
+    }
+  });
+  return { openclaw, acpByTool };
+}
+
+/** Collapsible HTML for external groups (2.1 OpenClaw + ACP/tool buckets). */
+function renderExternalAgentGroupsHtml(groups, idPrefix) {
+  const escId = (s) => String(s || '').replace(/[^a-zA-Z0-9]/g, '_');
+  const toggleFn = (uid) =>
+    `(function(h){var l=document.getElementById('${uid}');if(!l)return;h.classList.toggle('expanded');l.classList.toggle('expanded');})(this)`;
+
+  const renderOne = (a) => {
+    const name = a.name || a.global_name || t('unnamed');
+    const initial = avatarLabelFromDisplayName(name);
+    const info = JSON.stringify({
+      name: a.name,
+      type: 'ext',
+      global_id: a.global_name || '',
+      short_name: a.name || '',
+      tag: a.tag || '',
+      team: a.team || ''
+    }).replace(/"/g, '&quot;');
+    const teamLabel = a.team ? `<span style="font-size:11px;color:var(--text-hint);margin-left:4px;">[${esc(a.team)}]</span>` : '';
+    return `<div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}"><div class="contact-avatar ext">${esc(initial)}</div><div class="contact-name">${esc(name)}${teamLabel}</div>${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}</div>`;
+  };
+
+  const oc = (groups && Array.isArray(groups.openclaw)) ? groups.openclaw : [];
+  const acpByTool = (groups && groups.acpByTool) ? groups.acpByTool : {};
+  let allCount = oc.length;
+  Object.values(acpByTool).forEach((arr) => { if (Array.isArray(arr)) allCount += arr.length; });
+  if (allCount === 0) {
+    return `<div style="text-align:center;padding:20px;color:var(--text-secondary)">${t('no_agents')}</div>`;
+  }
+
+  let html = '';
+  if (oc.length > 0) {
+    const uid = idPrefix + 'ext-openclaw';
+    html += `<div class="contacts-cat-group"><div class="contacts-cat-header contacts-ext-sub expanded" onclick="${toggleFn(uid)}"><span class="cat-icon">🦞</span><span class="cat-name">${esc(t('contacts_level21_openclaw'))}</span><span class="cat-count">${oc.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list expanded">${oc.map(renderOne).join('')}</div></div>`;
+  }
+
+  Object.keys(acpByTool).sort((a, b) => {
+    if (a === '_') return 1;
+    if (b === '_') return -1;
+    return a.localeCompare(b);
+  }).forEach((tool) => {
+    const items = acpByTool[tool] || [];
+    if (!items.length) return;
+    const uid = idPrefix + 'ext-acp-' + escId(tool);
+    const label = tool === '_' ? t('tag_none') : tool;
+    html += `<div class="contacts-cat-group"><div class="contacts-cat-header contacts-ext-sub" onclick="${toggleFn(uid)}"><span class="cat-icon">🔌</span><span class="cat-name">${esc(label)}</span><span class="cat-count">${items.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list">${items.map(renderOne).join('')}</div></div>`;
+  });
+
+  return html;
+}
+
+/** Same buckets as renderExternalAgentGroupsHtml, with checkboxes for add-member drawer. */
+function renderExternalAgentGroupsForAddMembersHtml(groups, idPrefix) {
+  const escId = (s) => String(s || '').replace(/[^a-zA-Z0-9]/g, '_');
+  const toggleFn = (uid) =>
+    `(function(h){var l=document.getElementById('${uid}');if(!l)return;h.classList.toggle('expanded');l.classList.toggle('expanded');})(this)`;
+
+  const renderCheckbox = (a) => {
+    const name = a.name || a.global_name || t('unnamed');
+    const key = String(a.global_name || '').trim();
+    const checked = addAgentSelected.has(key) ? 'checked' : '';
+    const initial = avatarLabelFromDisplayName(name);
+    const tag = a.tag || '';
+    const teamLabel = a.team ? `<span style="font-size:11px;color:var(--text-hint);margin-left:4px;">[${esc(a.team)}]</span>` : '';
+    return `
+          <label class="contact-item" style="cursor:pointer;display:flex;align-items:center;">
+            <input type="checkbox" value="${esc(key)}" data-short="${esc(name)}" data-type="ext" data-tag="${esc(tag)}" onchange="toggleAddAgentSelect('${esc(key)}')" ${checked} style="width:18px;height:18px;margin-right:10px;accent-color:#07c160;">
+            <div class="contact-avatar ext">${esc(initial)}</div>
+            <div class="contact-name">${esc(name)}${teamLabel}</div>
+            ${tag ? `<span class="contact-tag">${esc(tag)}</span>` : ''}
+          </label>`;
+  };
+
+  const oc = (groups && Array.isArray(groups.openclaw)) ? groups.openclaw : [];
+  const acpByTool = (groups && groups.acpByTool) ? groups.acpByTool : {};
+  let allCount = oc.length;
+  Object.values(acpByTool).forEach((arr) => { if (Array.isArray(arr)) allCount += arr.length; });
+  if (allCount === 0) {
+    return `<div style="text-align:center;padding:12px;color:var(--text-secondary)">${t('no_agents')}</div>`;
+  }
+
+  let html = '';
+  if (oc.length > 0) {
+    const uid = idPrefix + 'ext-openclaw';
+    html += `<div class="contacts-cat-group"><div class="contacts-cat-header contacts-ext-sub expanded" onclick="${toggleFn(uid)}"><span class="cat-icon">🦞</span><span class="cat-name">${esc(t('contacts_level21_openclaw'))}</span><span class="cat-count">${oc.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list expanded">${oc.map(renderCheckbox).join('')}</div></div>`;
+  }
+
+  Object.keys(acpByTool).sort((a, b) => {
+    if (a === '_') return 1;
+    if (b === '_') return -1;
+    return a.localeCompare(b);
+  }).forEach((tool) => {
+    const items = acpByTool[tool] || [];
+    if (!items.length) return;
+    const uid = idPrefix + 'ext-acp-' + escId(tool);
+    const label = tool === '_' ? t('tag_none') : tool;
+    html += `<div class="contacts-cat-group"><div class="contacts-cat-header contacts-ext-sub" onclick="${toggleFn(uid)}"><span class="cat-icon">🔌</span><span class="cat-name">${esc(label)}</span><span class="cat-count">${items.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list">${items.map(renderCheckbox).join('')}</div></div>`;
+  });
+
+  return html;
+}
+
+/** Preset expert category labels (agency / public), shared by contacts + modals */
+function contactsPresetCategoryLabels() {
+  return {
+    '_public':            {icon: '🌟', key: 'cat_public'},
+    'design':             {icon: '🎨', key: 'cat_design'},
+    'engineering':        {icon: '⚙️', key: 'cat_engineering'},
+    'marketing':          {icon: '📢', key: 'cat_marketing'},
+    'product':            {icon: '📦', key: 'cat_product'},
+    'project-management': {icon: '📋', key: 'cat_project_mgmt'},
+    'spatial-computing':  {icon: '🥽', key: 'cat_spatial'},
+    'specialized':        {icon: '🔬', key: 'cat_specialized'},
+    'support':            {icon: '🛡️', key: 'cat_support'},
+    'testing':            {icon: '🧪', key: 'cat_testing'},
+  };
+}
+
+function buildPresetExpertsByCategory(presetExperts) {
+  const list = presetExperts || [];
+  const withCat = list.map(exp => {
+    const cat = (exp._cat != null && exp._cat !== '')
+      ? exp._cat
+      : ((exp.source === 'agency' && exp.category) ? exp.category : '_public');
+    return Object.assign({}, exp, { _cat: cat });
+  });
+  const byCat = {};
+  withCat.forEach(exp => {
+    const c = exp._cat || '_public';
+    if (!byCat[c]) byCat[c] = [];
+    byCat[c].push(exp);
+  });
+  const sortedCats = Object.keys(byCat).sort((a, b) => {
+    if (a === '_public') return -1;
+    if (b === '_public') return 1;
+    return a.localeCompare(b);
+  });
+  return { byCat, sortedCats };
+}
+
+/** 分层：主区为「4. 预设专家」，子折叠标题为「4.1 公共」「4.2 …」 */
+function renderPresetExpertsCategoriesHtml(presetExperts, catLabels, idPrefix, renderRowHtml) {
+  const { byCat, sortedCats } = buildPresetExpertsByCategory(presetExperts);
+  if (!sortedCats.length) return '';
+  let html = '';
+  sortedCats.forEach((cat, idx) => {
+    const items = byCat[cat];
+    const info = catLabels[cat] || {icon: '📂', key: null};
+    const catName = info.key ? t(info.key) : cat;
+    const subLabel = '4.' + (idx + 1) + ' ' + catName;
+    const isPublic = (cat === '_public');
+    const uid = idPrefix + 'pcat-' + cat.replace(/[^a-zA-Z0-9]/g, '_');
+    html += `<div class="contacts-cat-group"><div class="contacts-cat-header contacts-preset-sub${isPublic ? ' expanded' : ''}" onclick="(function(h){var l=document.getElementById('${uid}');if(!l)return;h.classList.toggle('expanded');l.classList.toggle('expanded');})(this)"><span class="cat-icon">${info.icon}</span><span class="cat-name">${esc(subLabel)}</span><span class="cat-count">${items.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list${isPublic ? ' expanded' : ''}">`;
+    items.forEach(exp => { html += renderRowHtml(exp); });
+    html += '</div></div>';
+  });
+  return html;
+}
+
+async function prefetchContactsBootstrap() {
+  if (!window.__currentUser) return null;
+  if (__contactsPrefetchPromise) return __contactsPrefetchPromise;
+  __contactsPrefetchPromise = (async () => {
+    try {
+      const [teamsData, intData, extGroups] = await Promise.all([
+        api('GET', '/teams').catch(() => ({ teams: [] })),
+        api('GET', '/internal_agents').catch(() => ({ agents: [] })),
+        loadPublicExternalAgentGroups()
+      ]);
+      __contactsPrefetch = { ts: Date.now(), teamsData, intData, extGroups };
+    } catch (e) {
+      console.warn('prefetchContactsBootstrap', e);
+    }
+    return __contactsPrefetch;
+  })();
+  return __contactsPrefetchPromise;
+}
 
 async function loadAllContactsForSearch() {
   if (_allContactsCache) return _allContactsCache;
@@ -8282,14 +8783,14 @@ async function filterContactsList() {
   const externalAgents = filteredAgents.filter(a => a.type === 'ext');
 
   if (internalAgents.length > 0) {
-    html += '<div class="contact-section-title">🤖 ' + t('internal_agent') + ' (' + internalAgents.length + ')</div>';
+    html += '<div class="contact-section-title contact-section-l1-internal">🤖 ' + t('contacts_level1_internal') + ' (' + internalAgents.length + ')</div>';
     internalAgents.forEach(a => {
       const name = a.name || t('unnamed');
-      const initial = (name[0] || '?').toUpperCase();
+      const initial = avatarLabelFromDisplayName(name);
       const info = JSON.stringify({name: a.name, type: a.type, global_id: a.global_name || '', short_name: a.name || '', tag: a.tag || '', team: a.team || ''}).replace(/"/g, '&quot;');
       const teamLabel = a.team ? `<span style="font-size:11px;color:var(--text-hint);margin-left:4px;">[${esc(a.team)}]</span>` : '';
       html += `<div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}">
-        <div class="contact-avatar oasis">${initial}</div>
+        <div class="contact-avatar oasis">${esc(initial)}</div>
         <div class="contact-name">${esc(name)}${teamLabel}</div>
         ${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}
       </div>`;
@@ -8297,18 +8798,9 @@ async function filterContactsList() {
   }
 
   if (externalAgents.length > 0) {
-    html += '<div class="contact-section-title">🦞 ' + t('external_agent') + ' (' + externalAgents.length + ')</div>';
-    externalAgents.forEach(a => {
-      const name = a.name || t('unnamed');
-      const initial = (name[0] || '?').toUpperCase();
-      const info = JSON.stringify({name: a.name, type: a.type, global_id: a.global_name || '', short_name: a.name || '', tag: a.tag || '', team: a.team || ''}).replace(/"/g, '&quot;');
-      const teamLabel = a.team ? `<span style="font-size:11px;color:var(--text-hint);margin-left:4px;">[${esc(a.team)}]</span>` : '';
-      html += `<div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}">
-        <div class="contact-avatar ext">${initial}</div>
-        <div class="contact-name">${esc(name)}${teamLabel}</div>
-        ${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}
-      </div>`;
-    });
+    const extGroups = groupTeamExternalMembers(externalAgents);
+    html += '<div class="contact-section-title contact-section-l2-external">🦞 ' + t('contacts_level2_external') + ' (' + externalAgents.length + ')</div>';
+    html += '<div class="contact-external-nested">' + renderExternalAgentGroupsHtml(extGroups, 'search-') + '</div>';
   }
 
   // Experts (custom + preset)
@@ -8316,7 +8808,7 @@ async function filterContactsList() {
   const presetExperts = filteredExperts.filter(e => e.source !== 'custom' && e.source !== 'team');
 
   if (customExperts.length > 0) {
-    html += '<div class="contact-section-title">🔧 ' + t('custom_experts') + ' (' + customExperts.length + ')</div>';
+    html += '<div class="contact-section-title contact-section-l3-custom">🛠️ ' + t('contacts_level3_custom_experts') + ' (' + customExperts.length + ')</div>';
     customExperts.forEach(exp => {
       const name = exp.name || t('unnamed');
       const emoji = exp.emoji || '🛠️';
@@ -8337,24 +8829,30 @@ async function filterContactsList() {
   }
 
   if (presetExperts.length > 0) {
-    html += '<div class="contact-section-title">🌟 ' + t('preset_experts') + ' (' + presetExperts.length + ')</div>';
-    presetExperts.forEach(exp => {
-      const name = exp.name || t('unnamed');
-      const emoji = exp.emoji || '🌟';
-      const teamLabel = exp.team ? `<span style="font-size:11px;color:var(--text-hint);margin-left:4px;">[${esc(exp.team)}]</span>` : '';
-      const expertInfo = JSON.stringify({
-        name: name, type: 'expert', subtype: 'preset',
-        global_id: exp.tag || exp.name || '', short_name: name,
-        tag: exp.tag || '', emoji: emoji,
-        persona: exp.persona || '', temperature: exp.temperature || ''
-      }).replace(/"/g, '&quot;');
-      html += `<div class="contact-item expert-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${expertInfo}">
+    const _pCat = contactsPresetCategoryLabels();
+    html += '<div class="contact-section-title contact-section-l4-preset">🌟 ' + t('contacts_level4_preset_experts') + ' (' + presetExperts.length + ')</div>';
+    html += '<div class="contact-external-nested">' + renderPresetExpertsCategoriesHtml(
+      presetExperts,
+      _pCat,
+      'search-preset-',
+      (exp) => {
+        const name = exp.name || t('unnamed');
+        const emoji = exp.emoji || '🌟';
+        const teamLabel = exp.team ? `<span style="font-size:11px;color:var(--text-hint);margin-left:4px;">[${esc(exp.team)}]</span>` : '';
+        const expertInfo = JSON.stringify({
+          name: name, type: 'expert', subtype: 'preset',
+          global_id: exp.tag || exp.name || '', short_name: name,
+          tag: exp.tag || '', emoji: emoji,
+          persona: exp.persona || '', temperature: exp.temperature || ''
+        }).replace(/"/g, '&quot;');
+        return `<div class="contact-item expert-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${expertInfo}">
         <div class="contact-avatar expert">${emoji}</div>
         <div class="contact-name">${esc(name)}${teamLabel}</div>
         <span class="contact-type-pill prompt">Prompt</span>
         ${exp.tag ? `<span class="contact-tag">${esc(exp.tag)}</span>` : ''}
       </div>`;
-    });
+      }
+    ) + '</div>';
   }
 
   if (!html) {
@@ -8373,21 +8871,9 @@ async function loadContactsForTeam() {
   const team = document.getElementById('contacts-team-select').value;
   window.__currentAgentTeam = team; // track for private chat
   const container = document.getElementById('contacts-list');
-  container.innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner"></div></div>';
+  // 不要用整页独占 spinner：公共视图直接铺章节；团队视图用分块占位，减少「整页空白加载」感
 
-  // Category label mapping (same as orchestration.js)
-  const _catLabels = {
-    '_public':            {icon: '🌟', key: 'cat_public'},
-    'design':             {icon: '🎨', key: 'cat_design'},
-    'engineering':        {icon: '⚙️', key: 'cat_engineering'},
-    'marketing':          {icon: '📢', key: 'cat_marketing'},
-    'product':            {icon: '📦', key: 'cat_product'},
-    'project-management': {icon: '📋', key: 'cat_project_mgmt'},
-    'spatial-computing':  {icon: '🥽', key: 'cat_spatial'},
-    'specialized':        {icon: '🔬', key: 'cat_specialized'},
-    'support':            {icon: '🛡️', key: 'cat_support'},
-    'testing':            {icon: '🧪', key: 'cat_testing'},
-  };
+  const _catLabels = contactsPresetCategoryLabels();
 
   try {
     let internalAgents = [];
@@ -8396,6 +8882,12 @@ async function loadContactsForTeam() {
     let customExperts = [];
 
     if (team) {
+      container.innerHTML = `
+        <div class="contact-section-title contact-section-l1-internal">🤖 ${t('contacts_level1_internal')}</div>
+        <div><div style="text-align:center;padding:18px"><div class="spinner"></div></div></div>
+        <div class="contact-section-title contact-section-l2-external">🦞 ${t('contacts_level2_external')}</div>
+        <div class="contact-external-nested"><div style="text-align:center;padding:18px"><div class="spinner"></div></div></div>
+      `;
       const [data, expertData] = await Promise.all([
         api('GET', `/teams/${encodeURIComponent(team)}/members`),
         api('GET', `/proxy_visual/experts?team=${encodeURIComponent(team)}`).catch(() => [])
@@ -8413,14 +8905,14 @@ async function loadContactsForTeam() {
       // Public agents (no team) — load internal + external + experts in parallel
       // First render section headers with placeholder containers
       container.innerHTML = `
-        <div class="contact-section-title">🤖 ${t('internal_agent')} (<span id="int-count">-</span>)</div>
+        <div class="contact-section-title contact-section-l1-internal">🤖 ${t('contacts_level1_internal')} (<span id="int-count">-</span>)</div>
         <div id="int-agents-list"><div style="text-align:center;padding:20px"><div class="spinner"></div></div></div>
-        <div class="contact-section-title">🦞 ${t('external_agent')} (<span id="ext-count">-</span>)</div>
-        <div id="ext-agents-list"><div style="text-align:center;padding:20px"><div class="spinner"></div></div></div>
-        <div class="contact-section-title">🛠️ ${t('custom_experts')} (<span id="custom-exp-count">-</span>)</div>
+        <div class="contact-section-title contact-section-l2-external">🦞 ${t('contacts_level2_external')} (<span id="ext-count">-</span>)</div>
+        <div id="ext-agents-list" class="contact-external-nested"><div style="text-align:center;padding:20px"><div class="spinner"></div></div></div>
+        <div class="contact-section-title contact-section-l3-custom">🛠️ ${t('contacts_level3_custom_experts')} (<span id="custom-exp-count">-</span>)</div>
         <div id="custom-experts-list"><div style="text-align:center;padding:20px"><div class="spinner"></div></div></div>
-        <div class="contact-section-title">🌟 ${t('preset_experts')} (<span id="preset-exp-count">-</span>)</div>
-        <div id="preset-experts-list"><div style="text-align:center;padding:20px"><div class="spinner"></div></div></div>
+        <div class="contact-section-title contact-section-l4-preset">🌟 ${t('contacts_level4_preset_experts')} (<span id="preset-exp-count">-</span>)</div>
+        <div id="preset-experts-list" class="contact-external-nested"><div style="text-align:center;padding:20px"><div class="spinner"></div></div></div>
       `;
 
       // Helper to render internal agents
@@ -8432,14 +8924,12 @@ async function loadContactsForTeam() {
         }
         document.getElementById('int-agents-list').innerHTML = agents.map(a => {
           const name = a.name || a.global_name || t('unnamed');
-          const initial = (name[0] || '?').toUpperCase();
+          const initial = avatarLabelFromDisplayName(name);
           const info = JSON.stringify({name: a.name, type: a.type, global_id: a.session || a.global_name || '', short_name: a.name || '', tag: a.tag || ''}).replace(/"/g, '&quot;');
-          return `<div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}"><div class="contact-avatar oasis">${initial}</div><div class="contact-name">${esc(name)}</div>${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}</div>`;
+          return `<div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}"><div class="contact-avatar oasis">${esc(initial)}</div><div class="contact-name">${esc(name)}</div>${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}</div>`;
         }).join('');
       };
 
-      // Helper to render external agents by platform (collapsible; reuse contacts-cat-*).
-      // OpenClaw default expanded; each ACP platform default collapsed.
       const renderExternalAgents = (groups) => {
         const all = [];
         if (groups && Array.isArray(groups.openclaw)) all.push(...groups.openclaw);
@@ -8449,82 +8939,20 @@ async function loadContactsForTeam() {
           });
         }
         document.getElementById('ext-count').textContent = all.length;
-        if (all.length === 0) {
-          document.getElementById('ext-agents-list').innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-secondary)">${t('no_agents')}</div>`;
-          return;
-        }
-
-        const renderOne = (a) => {
-          const name = a.name || a.global_name || t('unnamed');
-          const initial = (name[0] || '?').toUpperCase();
-          const info = JSON.stringify({
-            name: a.name,
-            type: 'ext',
-            global_id: a.global_name || '',
-            short_name: a.name || '',
-            tag: a.tag || ''
-          }).replace(/"/g, '&quot;');
-          return `<div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}"><div class="contact-avatar ext">${initial}</div><div class="contact-name">${esc(name)}</div>${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}</div>`;
-        };
-
-        const escId = (s) => String(s || '').replace(/[^a-zA-Z0-9]/g, '_');
-        const toggleFn = (uid) =>
-          `(function(h){var l=document.getElementById('${uid}');if(!l)return;h.classList.toggle('expanded');l.classList.toggle('expanded');})(this)`;
-
-        let html = '';
-        const oc = (groups && Array.isArray(groups.openclaw)) ? groups.openclaw : [];
-        if (oc.length > 0) {
-          const uid = 'contacts-ext-openclaw';
-          html += `<div class="contacts-cat-group"><div class="contacts-cat-header expanded" onclick="${toggleFn(uid)}"><span class="cat-icon">🦞</span><span class="cat-name">OpenClaw</span><span class="cat-count">${oc.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list expanded">${oc.map(renderOne).join('')}</div></div>`;
-        }
-
-        const acpByTool = (groups && groups.acpByTool) ? groups.acpByTool : {};
-        Object.keys(acpByTool).sort((a, b) => {
-          if (a === '_') return 1;
-          if (b === '_') return -1;
-          return a.localeCompare(b);
-        }).forEach((tool) => {
-          const items = acpByTool[tool] || [];
-          if (!items.length) return;
-          const uid = 'contacts-ext-acp-' + escId(tool);
-          const label = tool === '_' ? t('tag_none') : tool;
-          html += `<div class="contacts-cat-group"><div class="contacts-cat-header" onclick="${toggleFn(uid)}"><span class="cat-icon">🔌</span><span class="cat-name">${esc(label)}</span><span class="cat-count">${items.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list">${items.map(renderOne).join('')}</div></div>`;
-        });
-
-        document.getElementById('ext-agents-list').innerHTML = html;
+        document.getElementById('ext-agents-list').innerHTML = renderExternalAgentGroupsHtml(groups, 'contacts-');
       };
 
-      /** OpenClaw 仍走 sessions；其它 Ext 走用户级 external_agents.json（单次 GET，按 tag 分组） */
-      async function loadPublicExternalAgentGroups() {
-        const [ocRes, pubRes] = await Promise.all([
-          api('GET', '/proxy_openclaw_sessions').catch(() => ({ agents: [] })),
-          api('GET', '/public_external_agents').catch(() => ({ agents: [] }))
-        ]);
-        const ocList = (ocRes.agents || []).map(s => ({
-          name: s.name || s.global_name || t('unnamed'),
-          type: 'ext',
-          tag: s.tag || 'openclaw',
-          global_name: s.global_name || s.name || ''
+      // Stale-while-revalidate: show prefetch immediately if fresh
+      const pfApply = __contactsPrefetch;
+      if (pfApply && Date.now() - pfApply.ts < 120000 && pfApply.intData && pfApply.extGroups) {
+        const agents = (pfApply.intData.agents || []).map(a => ({
+          name: (a.meta && a.meta.name) || a.session || t('unnamed'),
+          type: 'oasis',
+          tag: (a.meta && a.meta.tag) || '',
+          global_name: a.session || ''
         }));
-        const acpByTool = {};
-        const rows = (pubRes && Array.isArray(pubRes.agents)) ? pubRes.agents : [];
-        rows.forEach((row) => {
-          if (!row || typeof row !== 'object') return;
-          const tagRaw = String(row.tag || '').trim().toLowerCase();
-          if (tagRaw === 'openclaw') return;
-          const gn = String(row.global_name || '').trim();
-          if (!gn) return;
-          const key = tagRaw || '_';
-          const item = {
-            name: row.name || row.global_name || t('unnamed'),
-            type: 'ext',
-            tag: row.tag || '',
-            global_name: gn
-          };
-          if (!acpByTool[key]) acpByTool[key] = [];
-          acpByTool[key].push(item);
-        });
-        return { openclaw: ocList, acpByTool };
+        renderInternalAgents(agents);
+        renderExternalAgents(pfApply.extGroups);
       }
 
       // Load internal agents
@@ -8573,31 +9001,18 @@ async function loadContactsForTeam() {
         if (presetExperts.length === 0) {
           document.getElementById('preset-experts-list').innerHTML = '';
         } else {
-          const byCat = {};
-          presetExperts.forEach(exp => {
-            const cat = exp._cat || '_public';
-            if (!byCat[cat]) byCat[cat] = [];
-            byCat[cat].push(exp);
-          });
-          const sortedCats = Object.keys(byCat).sort((a, b) => {
-            if (a === '_public') return -1;
-            if (b === '_public') return 1;
-            return a.localeCompare(b);
-          });
-          document.getElementById('preset-experts-list').innerHTML = sortedCats.map(cat => {
-            const items = byCat[cat];
-            const info = _catLabels[cat] || {icon: '📂', key: null};
-            const catName = info.key ? t(info.key) : cat;
-            const isPublic = (cat === '_public');
-            const uid = 'contacts-cat-' + cat.replace(/[^a-zA-Z0-9]/g, '_');
-            return `<div class="contacts-cat-group"><div class="contacts-cat-header${isPublic ? ' expanded' : ''}" onclick="(function(h){var l=document.getElementById('${uid}');h.classList.toggle('expanded');l.classList.toggle('expanded');})(this)"><span class="cat-icon">${info.icon}</span><span class="cat-name">${esc(catName)}</span><span class="cat-count">${items.length}</span><span class="cat-arrow">▶</span></div><div id="${uid}" class="contacts-cat-list${isPublic ? ' expanded' : ''}">` + items.map(exp => {
+          document.getElementById('preset-experts-list').innerHTML = renderPresetExpertsCategoriesHtml(
+            presetExperts,
+            _catLabels,
+            'contacts-preset-',
+            (exp) => {
               const isZh = (_currentLang === 'zh');
               const dname = isZh ? (exp.name_zh || exp.name) : (exp.name_en || exp.name);
               const emoji = exp.emoji || '🌟';
               const expertInfo = JSON.stringify({name: dname, type: 'expert', subtype: 'preset', global_id: exp.tag || exp.name || '', short_name: dname, tag: exp.tag || '', emoji: emoji, persona: exp.persona || '', temperature: exp.temperature || ''}).replace(/"/g, '&quot;');
               return `<div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${expertInfo}"><div class="contact-avatar preset">${emoji}</div><div class="contact-name">${esc(dname)}</div><span class="contact-type-pill prompt">Prompt</span>${exp.tag ? `<span class="contact-tag">${esc(exp.tag)}</span>` : ''}</div>`;
-            }).join('') + '</div></div>';
-          }).join('');
+            }
+          );
         }
       }).catch(() => {
         document.getElementById('custom-exp-count').textContent = '0';
@@ -8611,39 +9026,31 @@ async function loadContactsForTeam() {
 
     // ── 1. Internal Agent ──
     if (internalAgents.length > 0) {
-      html += '<div class="contact-section-title">🤖 ' + t('internal_agent') + ' (' + internalAgents.length + ')</div>';
+      html += '<div class="contact-section-title contact-section-l1-internal">🤖 ' + t('contacts_level1_internal') + ' (' + internalAgents.length + ')</div>';
       html += internalAgents.map(a => {
         const name = a.name || a.global_name || t('unnamed');
-        const initial = (name[0] || '?').toUpperCase();
+        const initial = avatarLabelFromDisplayName(name);
         const info = JSON.stringify({name: a.name, type: a.type, global_id: a.session || a.global_name || '', short_name: a.name || '', tag: a.tag || ''}).replace(/"/g, '&quot;');
         return `
           <div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}">
-            <div class="contact-avatar oasis">${initial}</div>
+            <div class="contact-avatar oasis">${esc(initial)}</div>
             <div class="contact-name">${esc(name)}</div>
             ${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}
           </div>`;
       }).join('');
     }
 
-    // ── 2. OpenClaw Agent ──
+    // ── 2. External: 2.1 OpenClaw + other ACP (collapsible) ──
     if (externalAgents.length > 0) {
-      html += '<div class="contact-section-title">🦞 ' + t('external_agent') + ' (' + externalAgents.length + ')</div>';
-      html += externalAgents.map(a => {
-        const name = a.name || a.global_name || t('unnamed');
-        const initial = (name[0] || '?').toUpperCase();
-        const info = JSON.stringify({name: a.name, type: a.type, global_id: a.global_name || '', short_name: a.name || '', tag: a.tag || ''}).replace(/"/g, '&quot;');
-        return `
-          <div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${info}">
-            <div class="contact-avatar ext">${initial}</div>
-            <div class="contact-name">${esc(name)}</div>
-            ${a.tag ? `<span class="contact-tag">${esc(a.tag)}</span>` : ''}
-          </div>`;
-      }).join('');
+      const escTeamId = String(team || '').replace(/[^a-zA-Z0-9]/g, '_');
+      const extGroups = groupTeamExternalMembers(externalAgents);
+      html += '<div class="contact-section-title contact-section-l2-external">🦞 ' + t('contacts_level2_external') + ' (' + externalAgents.length + ')</div>';
+      html += '<div class="contact-external-nested">' + renderExternalAgentGroupsHtml(extGroups, 'ct-' + escTeamId + '-') + '</div>';
     }
 
     // ── 3. Custom Experts ──
     if (customExperts.length > 0) {
-      html += '<div class="contact-section-title">🛠️ ' + t('custom_experts') + ' (' + customExperts.length + ')</div>';
+      html += '<div class="contact-section-title contact-section-l3-custom">🛠️ ' + t('contacts_level3_custom_experts') + ' (' + customExperts.length + ')</div>';
       html += customExperts.map(exp => {
         const isZh = (_currentLang === 'zh');
         const dname = isZh ? (exp.name_zh || exp.name) : (exp.name_en || exp.name);
@@ -8664,35 +9071,14 @@ async function loadContactsForTeam() {
       }).join('');
     }
 
-    // ── 4. Preset Experts (by category, collapsible) ──
+    // ── 4. Preset Experts（4.1 / 4.2 …） ──
     if (presetExperts.length > 0) {
-      html += '<div class="contact-section-title">🌟 ' + t('preset_experts') + ' (' + presetExperts.length + ')</div>';
-      const byCat = {};
-      presetExperts.forEach(exp => {
-        const cat = exp._cat || '_public';
-        if (!byCat[cat]) byCat[cat] = [];
-        byCat[cat].push(exp);
-      });
-      const sortedCats = Object.keys(byCat).sort((a, b) => {
-        if (a === '_public') return -1;
-        if (b === '_public') return 1;
-        return a.localeCompare(b);
-      });
-      sortedCats.forEach(cat => {
-        const items = byCat[cat];
-        const info = _catLabels[cat] || {icon: '📂', key: null};
-        const catName = info.key ? t(info.key) : cat;
-        const isPublic = (cat === '_public');
-        const uid = 'contacts-cat-' + cat.replace(/[^a-zA-Z0-9]/g, '_');
-        html += `<div class="contacts-cat-group">
-          <div class="contacts-cat-header${isPublic ? ' expanded' : ''}" onclick="(function(h){var l=document.getElementById('${uid}');h.classList.toggle('expanded');l.classList.toggle('expanded');})(this)">
-            <span class="cat-icon">${info.icon}</span>
-            <span class="cat-name">${esc(catName)}</span>
-            <span class="cat-count">${items.length}</span>
-            <span class="cat-arrow">▶</span>
-          </div>
-          <div id="${uid}" class="contacts-cat-list${isPublic ? ' expanded' : ''}">`;
-        items.forEach(exp => {
+      html += '<div class="contact-section-title contact-section-l4-preset">🌟 ' + t('contacts_level4_preset_experts') + ' (' + presetExperts.length + ')</div>';
+      html += '<div class="contact-external-nested">' + renderPresetExpertsCategoriesHtml(
+        presetExperts,
+        _catLabels,
+        'cteam-preset-',
+        (exp) => {
           const isZh = (_currentLang === 'zh');
           const dname = isZh ? (exp.name_zh || exp.name) : (exp.name_en || exp.name);
           const emoji = exp.emoji || '🌟';
@@ -8702,16 +9088,15 @@ async function loadContactsForTeam() {
             tag: exp.tag || '', emoji: emoji,
             persona: exp.persona || '', temperature: exp.temperature || ''
           }).replace(/"/g, '&quot;');
-          html += `
+          return `
             <div class="contact-item" onclick="showAgentDetail(JSON.parse(this.dataset.info))" data-info="${expertInfo}">
               <div class="contact-avatar preset">${emoji}</div>
               <div class="contact-name">${esc(dname)}</div>
               <span class="contact-type-pill prompt">Prompt</span>
               ${exp.tag ? `<span class="contact-tag">${esc(exp.tag)}</span>` : ''}
             </div>`;
-        });
-        html += '</div></div>';
-      });
+        }
+      ) + '</div>';
     }
 
     if (!html) {
@@ -8765,18 +9150,7 @@ async function loadContactsExperts() {
   const team = document.getElementById('contacts-experts-team-select').value;
   body.innerHTML = `<div class="agent-detail-loading">${t('loading')}</div>`;
 
-  const _catLabels = {
-    '_public':            {icon: '🌟', key: 'cat_public'},
-    'design':             {icon: '🎨', key: 'cat_design'},
-    'engineering':        {icon: '⚙️', key: 'cat_engineering'},
-    'marketing':          {icon: '📢', key: 'cat_marketing'},
-    'product':            {icon: '📦', key: 'cat_product'},
-    'project-management': {icon: '📋', key: 'cat_project_mgmt'},
-    'spatial-computing':  {icon: '🥽', key: 'cat_spatial'},
-    'specialized':        {icon: '🔬', key: 'cat_specialized'},
-    'support':            {icon: '🛡️', key: 'cat_support'},
-    'testing':            {icon: '🧪', key: 'cat_testing'},
-  };
+  const _catLabels = contactsPresetCategoryLabels();
 
   try {
     let customExperts = [];
@@ -8802,7 +9176,7 @@ async function loadContactsExperts() {
 
     // ── Custom Experts ──
     if (customExperts.length > 0) {
-      html += '<div class="contact-section-title" style="padding:12px 14px 6px;">🛠️ ' + t('custom_experts') + ' (' + customExperts.length + ')</div>';
+      html += '<div class="contact-section-title contact-section-l3-custom" style="padding:12px 14px 6px;">🛠️ ' + t('contacts_level3_custom_experts') + ' (' + customExperts.length + ')</div>';
       html += customExperts.map(exp => {
         const isZh = (_currentLang === 'zh');
         const dname = isZh ? (exp.name_zh || exp.name) : (exp.name_en || exp.name);
@@ -8823,35 +9197,14 @@ async function loadContactsExperts() {
       }).join('');
     }
 
-    // ── Preset Experts (by category, collapsible) ──
+    // ── Preset Experts（4.1 / 4.2 …） ──
     if (presetExperts.length > 0) {
-      html += '<div class="contact-section-title" style="padding:12px 14px 6px;">🌟 ' + t('preset_experts') + ' (' + presetExperts.length + ')</div>';
-      const byCat = {};
-      presetExperts.forEach(exp => {
-        const cat = exp._cat || '_public';
-        if (!byCat[cat]) byCat[cat] = [];
-        byCat[cat].push(exp);
-      });
-      const sortedCats = Object.keys(byCat).sort((a, b) => {
-        if (a === '_public') return -1;
-        if (b === '_public') return 1;
-        return a.localeCompare(b);
-      });
-      sortedCats.forEach(cat => {
-        const items = byCat[cat];
-        const info = _catLabels[cat] || {icon: '📂', key: null};
-        const catName = info.key ? t(info.key) : cat;
-        const isPublic = (cat === '_public');
-        const uid = 'cexperts-cat-' + cat.replace(/[^a-zA-Z0-9]/g, '_');
-        html += `<div class="contacts-cat-group">
-          <div class="contacts-cat-header${isPublic ? ' expanded' : ''}" onclick="(function(h){var l=document.getElementById('${uid}');h.classList.toggle('expanded');l.classList.toggle('expanded');})(this)">
-            <span class="cat-icon">${info.icon}</span>
-            <span class="cat-name">${esc(catName)}</span>
-            <span class="cat-count">${items.length}</span>
-            <span class="cat-arrow">▶</span>
-          </div>
-          <div id="${uid}" class="contacts-cat-list${isPublic ? ' expanded' : ''}">`;
-        items.forEach(exp => {
+      html += '<div class="contact-section-title contact-section-l4-preset" style="padding:12px 14px 6px;">🌟 ' + t('contacts_level4_preset_experts') + ' (' + presetExperts.length + ')</div>';
+      html += '<div class="contact-external-nested">' + renderPresetExpertsCategoriesHtml(
+        presetExperts,
+        _catLabels,
+        'cexperts-preset-',
+        (exp) => {
           const isZh = (_currentLang === 'zh');
           const dname = isZh ? (exp.name_zh || exp.name) : (exp.name_en || exp.name);
           const emoji = exp.emoji || '🌟';
@@ -8861,16 +9214,15 @@ async function loadContactsExperts() {
             tag: exp.tag || '', emoji: emoji,
             persona: exp.persona || '', temperature: exp.temperature || ''
           }).replace(/"/g, '&quot;');
-          html += `
+          return `
             <div class="contact-item expert-item" onclick="showAgentDetail(JSON.parse(this.dataset.info));closeContactsExpertsModal();" data-info="${expertInfo}">
               <div class="contact-avatar preset">${emoji}</div>
               <div class="contact-name">${esc(dname)}</div>
               <span class="contact-type-pill prompt">Prompt</span>
               ${exp.tag ? `<span class="contact-tag">${esc(exp.tag)}</span>` : ''}
             </div>`;
-        });
-        html += '</div></div>';
-      });
+        }
+      ) + '</div>';
     }
 
     if (!html) {
@@ -8890,7 +9242,7 @@ async function loadProfile() {
   profileLoaded = true;
   const container = document.getElementById('profile-area');
   const userId = window.__currentUser || t('not_logged_in');
-  const initial = (userId[0] || '?').toUpperCase();
+  const initial = avatarLabelFromDisplayName(userId);
 
   // Try to load user profile
   userProfileText = '';
@@ -8904,7 +9256,7 @@ async function loadProfile() {
 
   container.innerHTML = `
     <div class="profile-card">
-      <div class="profile-avatar-large">${initial}</div>
+      <div class="profile-avatar-large">${esc(initial)}</div>
       <div class="profile-info">
         <div class="profile-name">${esc(userId)}</div>
         <div class="profile-id">ID: ${esc(userId)}</div>
@@ -10130,7 +10482,7 @@ async function resetAllGroupAgents() {
         const type = m.member_type || '';
         const sid = m.global_id || '';
         if (type === 'ext') {
-            const key = m.short_name || m.title || sid;
+            const key = sid || m.short_name || m.title || '';
             await acpControlRequest(key, 'reset');
             return;
         }
@@ -10308,7 +10660,7 @@ async function doLogout() {
   if (!confirm(t('confirm_logout'))) return;
   try {
     await api('POST', '/proxy_logout');
-window.location.href = '/studio?redirect=group_chat';
+window.location.href = '/studio?redirect=group_chat&tab=group';
   } catch (e) {
     toast(t('logout_failed') + ': ' + e.message);
   }
@@ -10320,61 +10672,107 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.title = t('page_title');
   applyLangToDOM();
 
-  // Check login session first — share login with main page
-  try {
-    const resp = await fetch('/proxy_check_session');
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data.valid && data.user_id) {
-        window.__currentUser = data.user_id;
-        window.__currentUserHasPassword = Boolean(data.has_password);
-        window.__currentLoginMode = data.mode || '';
-        _syncLocalPasswordBannerDismissedState();
-      } else {
-        // Not logged in — redirect to main page for login, with redirect back
-window.location.href = '/studio?redirect=group_chat';
-        return;
+  const _boot = { timer: null, visible: false, startTime: 0, DELAY: 300, MIN_VISIBLE: 400 };
+  function showBootLoading(text) {
+    _boot.startTime = Date.now();
+    if (_boot.timer) { clearTimeout(_boot.timer); _boot.timer = null; }
+    _boot.timer = setTimeout(() => {
+      const el = document.getElementById('page-loading-overlay');
+      if (!el) return;
+      if (text) {
+        const txt = el.querySelector('.page-loading-text');
+        if (txt) txt.textContent = text;
       }
-    } else {
-window.location.href = '/studio?redirect=group_chat';
-      return;
+      el.classList.add('loading-visible');
+      _boot.visible = true;
+      _boot.timer = null;
+    }, _boot.DELAY);
+  }
+  function hideBootLoading() {
+    const elapsed = Date.now() - _boot.startTime;
+    if (_boot.timer) { clearTimeout(_boot.timer); _boot.timer = null; }
+    if (!_boot.visible) return;
+    const visibleSince = elapsed - _boot.DELAY;
+    const remaining = Math.max(0, _boot.MIN_VISIBLE - visibleSince);
+    setTimeout(() => {
+      const el = document.getElementById('page-loading-overlay');
+      if (el) el.classList.remove('loading-visible');
+      _boot.visible = false;
+    }, remaining);
+  }
+  function dismissMobileSplash() {
+    const splash = document.getElementById('app-splash');
+    if (splash) {
+      splash.classList.add('fade-out');
+      setTimeout(() => { splash.remove(); }, 600);
     }
-  } catch (e) {
-    // Network error — redirect to main page
-window.location.href = '/studio?redirect=group_chat';
-    return;
   }
 
-  refreshGroups();
-  startGroupsPolling();
+  showBootLoading(t('loading'));
 
-  // Check LLM API config
+  let stayOnPage = false;
   try {
-    const r = await fetch('/api/llm_config_status');
-    if (r.ok) {
-      const d = await r.json();
-      if (!d.configured) {
-        document.getElementById('llm-warning-banner').style.display = 'block';
+    try {
+      const resp = await fetch('/proxy_check_session');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.valid && data.user_id) {
+          window.__currentUser = data.user_id;
+          window.__currentUserHasPassword = Boolean(data.has_password);
+          window.__currentLoginMode = data.mode || '';
+          _syncLocalPasswordBannerDismissedState();
+        } else {
+          window.location.href = '/studio?redirect=group_chat&tab=group';
+          return;
+        }
+      } else {
+        window.location.href = '/studio?redirect=group_chat&tab=group';
+        return;
       }
+    } catch (e) {
+      window.location.href = '/studio?redirect=group_chat&tab=group';
+      return;
     }
-  } catch(e) {}
 
-  updateLocalPasswordBanner();
+    try {
+      await refreshGroups();
+      startGroupsPolling();
+      await prefetchContactsBootstrap();
+    } catch (e) {
+      console.warn('mobile boot data load:', e);
+    }
 
-  // Click outside to close popups
-  document.addEventListener('click', (e) => {
-    const popup = document.getElementById('mention-popup');
-    const input = document.getElementById('msg-input');
-    if (mentionState.active && !popup.contains(e.target) && e.target !== input) {
-      closeMentionPopup();
-    }
-    
-    const workflowPopup = document.getElementById('workflow-popup');
-    const workflowBtn = document.getElementById('workflow-btn');
-    if (workflowPopup.classList.contains('show') && !workflowPopup.contains(e.target) && e.target !== workflowBtn) {
-      closeWorkflowPopup();
-    }
-  });
+    try {
+      const r = await fetch('/api/llm_config_status');
+      if (r.ok) {
+        const d = await r.json();
+        if (!d.configured) {
+          document.getElementById('llm-warning-banner').style.display = 'block';
+        }
+      }
+    } catch (e) {}
+
+    updateLocalPasswordBanner();
+
+    document.addEventListener('click', (e) => {
+      const popup = document.getElementById('mention-popup');
+      const input = document.getElementById('msg-input');
+      if (mentionState.active && !popup.contains(e.target) && e.target !== input) {
+        closeMentionPopup();
+      }
+
+      const workflowPopup = document.getElementById('workflow-popup');
+      const workflowBtn = document.getElementById('workflow-btn');
+      if (workflowPopup.classList.contains('show') && !workflowPopup.contains(e.target) && e.target !== workflowBtn) {
+        closeWorkflowPopup();
+      }
+    });
+
+    stayOnPage = true;
+  } finally {
+    hideBootLoading();
+    if (stayOnPage) dismissMobileSplash();
+  }
 });
 </script>
 

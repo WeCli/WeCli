@@ -36,6 +36,47 @@ class _FakeAgent:
 
 
 class TeamBotRoutesTests(unittest.TestCase):
+    def test_workflow_preset_routes_return_presets_and_apply_to_runtime(self):
+        with TemporaryDirectory() as tmpdir:
+            original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
+            runtime_store.DEFAULT_DB_PATH = Path(tmpdir) / "runtime.db"
+            try:
+                app = FastAPI()
+                app.include_router(
+                    create_teambot_router(
+                        agent=_FakeAgent(),
+                        verify_auth_or_token=lambda user_id, password, token: None,
+                        extract_text=lambda content: content if isinstance(content, str) else str(content),
+                    )
+                )
+
+                with TestClient(app) as client:
+                    listed = client.get("/teambot/workflow-presets", params={"user_id": "alice"})
+                    self.assertEqual(listed.status_code, 200)
+                    payload = listed.json()
+                    self.assertEqual(payload["status"], "success")
+                    self.assertTrue(any(item["preset_id"] == "deep_interview" for item in payload["presets"]))
+
+                    applied = client.post(
+                        "/teambot/workflow-presets/apply",
+                        json={"user_id": "alice", "session_id": "default", "preset_id": "execution_swarm"},
+                    )
+                    self.assertEqual(applied.status_code, 200)
+                    data = applied.json()
+                    self.assertEqual(data["preset"]["preset_id"], "execution_swarm")
+                    self.assertEqual(data["mode"]["mode"], "execute")
+
+                    runtime = client.get(
+                        "/teambot/session-runtime",
+                        params={"user_id": "alice", "session_id": "default"},
+                    )
+                    self.assertEqual(runtime.status_code, 200)
+                    runtime_payload = runtime.json()
+                    self.assertEqual(runtime_payload["active_workflow"]["preset_id"], "execution_swarm")
+                    self.assertTrue(any(item["artifact_kind"] == "workflow_preset" for item in runtime_payload["artifacts"]))
+            finally:
+                runtime_store.DEFAULT_DB_PATH = original_runtime_db_path
+
     def test_bridge_websocket_connects_refreshes_and_cleans_up(self):
         with TemporaryDirectory() as tmpdir:
             original_runtime_db_path = runtime_store.DEFAULT_DB_PATH

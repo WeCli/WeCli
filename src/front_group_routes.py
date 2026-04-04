@@ -10,6 +10,10 @@ Flask 前端群聊代理路由模块
 from flask import jsonify, request, session
 import requests
 
+# Agent /acp_control may run acpx OpenClaw exec /new for up to ~180s; a short proxy
+# timeout makes the UI show "超时" while the backend still succeeds.
+_PROXY_ACP_CONTROL_TIMEOUT_SEC = 240
+
 
 def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
     """Register group-chat proxy routes for Flask frontend."""
@@ -250,7 +254,7 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
                 "http://127.0.0.1:{port}/acp_control".format(port=port_agent),
                 json=data,
                 headers={"X-Internal-Token": internal_token},
-                timeout=20,
+                timeout=_PROXY_ACP_CONTROL_TIMEOUT_SEC,
             )
             try:
                 resp_data = r.json()

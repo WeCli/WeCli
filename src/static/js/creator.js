@@ -2131,7 +2131,11 @@
                 setBuilderStatus('提取已停止，已保留 ' + roleCount + ' 个已完成角色，请确认后继续构建', 'warning');
             } else {
                 setBuilderPill('✅ 发现 ' + roleCount + ' 个角色', 'success');
-                setBuilderStatus('TinyFish 并行提取完成，共 ' + roleCount + ' 个角色，请确认后构建团队', 'success');
+                if (options && options.llmDirect) {
+                    setBuilderStatus('LLM 已生成 ' + roleCount + ' 个角色（无 TinyFish），请确认后构建团队', 'success');
+                } else {
+                    setBuilderStatus('TinyFish 并行提取完成，共 ' + roleCount + ' 个角色，请确认后构建团队', 'success');
+                }
             }
             schedulePersistBuilderState();
         }
@@ -2262,8 +2266,9 @@
 
             state.discoverController = null;
 
-            // Parse discovered pages from result
+            // Result: pages (TinyFish path) or llm_direct roles (no TINYFISH_API_KEY)
             var pages = [];
+            var directRoles = null;
             if (discoveryResult && discoveryResult.result) {
                 var raw = discoveryResult.result;
                 if (typeof raw === 'string') {
@@ -2272,6 +2277,40 @@
                 if (raw && raw.pages && Array.isArray(raw.pages)) {
                     pages = raw.pages.filter(function (p) { return p && p.url; });
                 }
+                if (raw && raw.llm_direct && Array.isArray(raw.roles) && raw.roles.length) {
+                    directRoles = raw.roles;
+                }
+            }
+
+            if (directRoles && directRoles.length) {
+                var normalized = directRoles.map(function (item) {
+                    if (!item || typeof item !== 'object') return null;
+                    var name = String(item.role_name || '').trim();
+                    if (!name) return null;
+                    return {
+                        role_name: name,
+                        personality_traits: item.personality_traits || [],
+                        primary_responsibilities: item.primary_responsibilities || [],
+                        depends_on: item.depends_on || item.input_dependency || [],
+                        tools_used: item.tools_used || [],
+                        _output_target: item.output_target || [],
+                    };
+                }).filter(Boolean);
+                if (!normalized.length) {
+                    appendDiscoveryLog('WARNING', 'LLM 返回的角色格式无效', 'warning');
+                    setBuilderPill('解析失败', 'warning');
+                    setBuilderStatus('无法解析角色数据，请重试', 'warning');
+                    setDiscoveryButtons(false);
+                    schedulePersistBuilderState();
+                    return;
+                }
+                state.discoveredPages = [];
+                renderDiscoveredPages([]);
+                appendDiscoveryLog('COMPLETE', 'LLM 直接生成 ' + normalized.length + ' 个角色（无 TinyFish）', 'success');
+                showDiscoveryRoleReview(normalized, { stopped: false, llmDirect: true });
+                setDiscoveryButtons(false);
+                schedulePersistBuilderState();
+                return;
             }
 
             state.discoveredPages = pages;

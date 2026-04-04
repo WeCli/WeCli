@@ -2,10 +2,9 @@
 """Team Creator Service — convert open-web organizational structures into TeamClaw teams.
 
 Three-stage pipeline:
-  1. Discovery  — use internal LLM Agent to find relevant SOP/org-structure URLs
-                  (falls back to TinyFish browser search if LLM fails)
-  2. Extraction — TinyFish crawls discovered URLs to extract role data
-                  (agent_role, persona_traits, core_duties, input_dependency, output_target)
+  1. Discovery  — No TINYFISH_API_KEY: one LLM call, task → roles only (no URL list).
+                  With key: LLM URL hints, then TinyFish browser if URLs empty.
+  2. Extraction — Requires TinyFish to open URLs; optional LLM fallback only if TinyFish fails after a key was set.
   3. Mapping    — AI-powered conversion to TeamClaw personas + LLM DAG enhancement + YAML workflows + ZIP snapshot
 
 Shared by:
@@ -281,12 +280,32 @@ def build_discovery_target(task_description: str, search_url: str = "") -> Targe
 
 
 def stream_discovery(task_description: str, search_url: str = "") -> Iterator[dict[str, Any]]:
-    """Stream SSE events for the discovery phase.
+    """Discovery: without TinyFish key = one LLM step (task → roles only, no URLs).
 
-    New behavior: First uses LLM to find URLs, then returns them as events.
-    If LLM discovery fails, falls back to TinyFish SSE (legacy).
+    With TinyFish: LLM URL hints → pages, or empty URLs → TinyFish browser (unchanged).
     """
-    # Phase 1: Try LLM-powered URL discovery first
+    if not get_api_key():
+        yield {"type": "STARTED", "message": "纯 LLM 模式：根据任务描述一次生成角色（无 URL / 无浏览器）…"}
+        yield {"type": "PROGRESS", "message": "正在生成与后续构建一致的角色 JSON…"}
+        try:
+            roles_out = generate_roles_from_task_via_llm(task_description)
+        except Exception as ex:
+            yield {"type": "ERROR", "error": f"LLM 生成角色失败：{ex}"}
+            return
+        if not roles_out:
+            yield {"type": "ERROR", "error": "LLM 未返回可用角色，请修改任务描述后重试。"}
+            return
+        yield {
+            "type": "COMPLETE",
+            "message": f"已生成 {len(roles_out)} 个角色",
+            "result": json.dumps({
+                "pages": [],
+                "roles": roles_out,
+                "llm_direct": True,
+            }, ensure_ascii=False),
+        }
+        return
+
     yield {"type": "STARTED", "message": "正在使用 AI 搜索相关 SOP / 组织架构 URL..."}
 
     try:
@@ -302,18 +321,16 @@ def stream_discovery(task_description: str, search_url: str = "") -> Iterator[di
                 "result": json.dumps({"pages": urls}, ensure_ascii=False),
             }
             return
-        else:
-            yield {
-                "type": "PROGRESS",
-                "message": "AI 未找到候选 URL，切换到 TinyFish 浏览器搜索...",
-            }
+        yield {
+            "type": "PROGRESS",
+            "message": "AI 未找到候选 URL，切换到 TinyFish 浏览器搜索...",
+        }
     except Exception as e:
         yield {
             "type": "PROGRESS",
             "message": f"AI URL 发现失败 ({e})，切换到 TinyFish 浏览器搜索...",
         }
 
-    # Phase 2: Fallback to TinyFish SSE (legacy behavior)
     target = build_discovery_target(task_description, search_url)
     client = create_client(request_timeout=300)
     yield from client.run_sse(target)
@@ -344,6 +361,15 @@ EXTRACTION_GOAL_TEMPLATE = (
     '"output_target": [], "tools_used": []}}]}}'
 )
 
+EXTRACTION_LLM_PAGE_PREAMBLE = (
+    "You are helping TeamClaw Team Creator extract organizational roles for a multi-agent workflow.\n"
+    "There is no live browser; infer reasonable roles from the URL and page title only.\n"
+    "Do not invent verbatim quotes from the page. If unsure, propose a small generic role set.\n\n"
+    "Target:\n"
+    "- URL: {page_url}\n"
+    "- Title: {page_title}\n\n"
+)
+
 
 def build_extraction_targets(pages: list[dict]) -> list[Target]:
     """Create TinyFish targets for parallel extraction from discovered pages."""
@@ -363,22 +389,35 @@ def build_extraction_targets(pages: list[dict]) -> list[Target]:
     return targets
 
 
+_NO_TF_URL_EXTRACT_MSG = (
+    "未配置 TINYFISH_API_KEY，无法按 URL 打开页面提取。请在上一步用「任务描述」走纯 LLM 一次生成角色，"
+    "或配置 TinyFish 后再使用链接提取。"
+)
+
+
 def run_extraction_batch(pages: list[dict]) -> list[dict[str, Any]]:
-    """Submit parallel extraction targets and return results (blocking)."""
+    """Parallel extraction via TinyFish. No key → cannot fetch URLs; returns failed rows (no fake per-URL LLM)."""
     targets = build_extraction_targets(pages)
     if not targets:
         return []
 
-    client = create_client(request_timeout=300)
-    results = []
+    if not get_api_key():
+        return [
+            {
+                "run_id": f"no-tinyfish-{i}",
+                "target": t.name,
+                "url": t.url,
+                "status": "FAILED",
+                "result": None,
+                "error": _NO_TF_URL_EXTRACT_MSG,
+            }
+            for i, t in enumerate(targets)
+        ]
 
-    # Use batch API for parallel execution
+    results: list[dict[str, Any]] = []
     try:
+        client = create_client(request_timeout=300)
         run_ids = client.start_batch(targets)
-        # Poll until complete
-        import urllib.request
-        import urllib.error
-
         pending = dict(zip(run_ids, targets))
         max_wait = 600  # 10 minutes
         start = time.time()
@@ -401,22 +440,32 @@ def run_extraction_batch(pages: list[dict]) -> list[dict[str, Any]]:
             if pending:
                 time.sleep(5)
     except Exception as e:
-        results.append({"error": str(e), "status": "FAILED"})
+        _log.warning("TinyFish batch extraction failed, using LLM fallback: %s", e)
+        return _run_extraction_batch_llm(targets)
 
     return results
 
 
 def stream_extraction(page_url: str, page_title: str = "") -> Iterator[dict[str, Any]]:
-    """Stream SSE events for extracting a single page."""
+    """Extract one page: TinyFish SSE when API key set; no key → URL 提取不可用（纯 LLM 只走 discover）。"""
+    if not get_api_key():
+        yield {"type": "PROGRESS", "message": _NO_TF_URL_EXTRACT_MSG}
+        yield {"type": "ERROR", "error": _NO_TF_URL_EXTRACT_MSG}
+        return
     target = Target(
         site_key="team-creator-extract",
-        name=f"Extract: {page_title or page_url[:50]}",
+        name=f"Extract: {(page_title or page_url)[:50]}",
         url=page_url,
         goal=EXTRACTION_GOAL_TEMPLATE,
         browser_profile="lite",
     )
-    client = create_client(request_timeout=300)
-    yield from client.run_sse(target)
+    try:
+        client = create_client(request_timeout=300)
+        yield from client.run_sse(target)
+    except Exception as exc:
+        _log.warning("TinyFish extraction failed for %s, LLM fallback: %s", page_url, exc)
+        yield {"type": "PROGRESS", "message": f"TinyFish 不可用（{exc}），改用本地 LLM…"}
+        yield from stream_extraction_via_llm(page_url, page_title)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -501,6 +550,232 @@ def serialize_extracted_role(role: ExtractedRole) -> dict[str, Any]:
 
 def serialize_extracted_roles(roles: list[ExtractedRole]) -> list[dict[str, Any]]:
     return [serialize_extracted_role(role) for role in roles]
+
+
+TEAM_CREATOR_TASK_TO_ROLES_PROMPT = (
+    "From the user's team/task description, propose 4-10 roles for a multi-agent workflow.\n\n"
+    "Description:\n{task_description}\n\n"
+    "Output JSON MUST use the same role shape as Team Creator page extraction:\n"
+    "role_name, personality_traits[], primary_responsibilities[], input_dependency[], "
+    "output_target[], tools_used[].\n"
+    "Use role_name strings consistently in input_dependency and output_target.\n\n"
+    "Return ONLY valid JSON, no markdown:\n"
+    '{{"roles": [{{"role_name": "", "personality_traits": [], "primary_responsibilities": [], '
+    '"input_dependency": [], "output_target": [], "tools_used": []}}]}}'
+)
+
+
+def _truncate_for_llm_error(text: str, max_len: int = 1800) -> str:
+    t = (text or "").replace("\r\n", "\n").strip()
+    if not t:
+        return "(空输出)"
+    if len(t) <= max_len:
+        return t
+    half = max_len // 2
+    return t[:half] + "\n…\n…(中间已省略)\n…\n" + t[-half:]
+
+
+def _preprocess_llm_json_blob(raw: str) -> str:
+    """Strip noise so json.loads is more likely to succeed."""
+    s = (raw or "").strip()
+    if not s:
+        return s
+    if s.startswith("\ufeff"):
+        s = s.lstrip("\ufeff")
+    m = re.search(r"```(?:json|JSON)?\s*([\s\S]*?)```", s)
+    if m:
+        s = m.group(1).strip()
+    lbrace, lbrack = s.find("{"), s.find("[")
+    candidates = [i for i in (lbrace, lbrack) if i >= 0]
+    if candidates:
+        start = min(candidates)
+        if start > 0:
+            s = s[start:]
+    return s.strip()
+
+
+def _balanced_json_slice(text: str, open_ch: str, close_ch: str) -> str | None:
+    i = text.find(open_ch)
+    if i < 0:
+        return None
+    depth = 0
+    in_str = False
+    esc = False
+    quote = ""
+    for j in range(i, len(text)):
+        c = text[j]
+        if esc:
+            esc = False
+            continue
+        if in_str:
+            if c == "\\":
+                esc = True
+            elif c == quote:
+                in_str = False
+            continue
+        if c in "\"'":
+            in_str = True
+            quote = c
+            continue
+        if c == open_ch:
+            depth += 1
+        elif c == close_ch:
+            depth -= 1
+            if depth == 0:
+                return text[i : j + 1]
+    return None
+
+
+def _coerce_root_to_roles_dict(parsed: Any) -> dict | None:
+    """Normalize LLM root shape to {\"roles\": [...]} for parse_extracted_roles."""
+    if isinstance(parsed, dict):
+        if isinstance(parsed.get("roles"), list):
+            return parsed
+        for key in ("data", "results", "team_roles", "agents"):
+            v = parsed.get(key)
+            if isinstance(v, list) and v and isinstance(v[0], dict):
+                return {"roles": v}
+        if "role_name" in parsed and isinstance(parsed.get("role_name"), str):
+            return {"roles": [parsed]}
+    if isinstance(parsed, list) and parsed and all(isinstance(x, dict) for x in parsed):
+        return {"roles": parsed}
+    return None
+
+
+def _parse_roles_payload_from_llm_text(raw_text: str) -> dict | None:
+    """Parse model output into {\"roles\": [...]} or return None."""
+    clean = _preprocess_llm_json_blob(raw_text)
+    if not clean:
+        return None
+
+    try:
+        parsed = json.loads(clean)
+        coerced = _coerce_root_to_roles_dict(parsed)
+        if coerced is not None:
+            return coerced
+    except json.JSONDecodeError:
+        pass
+
+    for slice_fn in (
+        lambda t: _balanced_json_slice(t, "{", "}"),
+        lambda t: _balanced_json_slice(t, "[", "]"),
+    ):
+        chunk = slice_fn(clean)
+        if not chunk:
+            continue
+        try:
+            parsed = json.loads(chunk)
+            coerced = _coerce_root_to_roles_dict(parsed)
+            if coerced is not None:
+                return coerced
+        except json.JSONDecodeError:
+            continue
+
+    match = re.search(r"(\{[\s\S]*\}|\[[\s\S]*\])", clean)
+    if match:
+        try:
+            parsed = json.loads(match.group(1))
+            return _coerce_root_to_roles_dict(parsed)
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
+def generate_roles_from_task_via_llm(task_description: str) -> list[dict[str, Any]]:
+    """No-TinyFish discovery: task text → serialize_extracted_roles-compatible list."""
+    from llm_factory import create_chat_model
+
+    llm = create_chat_model(temperature=0.35, max_tokens=4096, timeout=120)
+    prompt = TEAM_CREATOR_TASK_TO_ROLES_PROMPT.format(task_description=task_description)
+    response = llm.invoke(prompt)
+    raw_text = _llm_content_to_text(response.content if hasattr(response, "content") else str(response))
+    try:
+        _log.debug("generate_roles_from_task raw (%s chars): %s", len(raw_text), raw_text[:4000])
+    except Exception:
+        pass
+    raw_payload = _parse_roles_payload_from_llm_text(raw_text)
+    if raw_payload is None:
+        _emit_full_llm_output_on_failure("generate_roles_from_task_via_llm.parse_failed", raw_text)
+        preview = _truncate_for_llm_error(raw_text, 2000)
+        raise ValueError(
+            "无法把模型输出解析成含 roles 的 JSON（已尝试去掉 markdown 代码块、从首段 { } / [ ] 截取）。\n"
+            f"完整输出已打印到服务终端/stderr；以下为预览：\n{preview}"
+        )
+    synthetic = [{"status": "COMPLETED", "result": raw_payload, "url": ""}]
+    parsed = parse_extracted_roles(synthetic)
+    ser = serialize_extracted_roles(parsed)
+    if not ser:
+        _emit_full_llm_output_on_failure("generate_roles_from_task_via_llm.zero_roles_after_parse", raw_text)
+        preview = _truncate_for_llm_error(raw_text, 1200)
+        raise ValueError(
+            "JSON 已解析但未得到任何有效角色（缺 role_name 等）。请检查字段是否与示例一致。\n"
+            f"解析到的 roles 长度: {len(raw_payload.get('roles') or [])}。完整输出已打印到服务终端/stderr；预览：\n{preview}"
+        )
+    return ser
+
+
+def extract_roles_via_llm(page_url: str, page_title: str = "") -> dict[str, Any]:
+    """TinyFish-offline extraction: same JSON shape as EXTRACTION_GOAL_TEMPLATE / frontend parse."""
+    from llm_factory import create_chat_model
+
+    title = (page_title or "").strip() or page_url
+    prompt = EXTRACTION_LLM_PAGE_PREAMBLE.format(page_url=page_url, page_title=title) + EXTRACTION_GOAL_TEMPLATE
+    llm = create_chat_model(temperature=0.2, max_tokens=4096, timeout=120)
+    response = llm.invoke(prompt)
+    raw_text = _llm_content_to_text(response.content if hasattr(response, "content") else str(response))
+    raw_payload = _parse_roles_payload_from_llm_text(raw_text)
+    if raw_payload is None:
+        _emit_full_llm_output_on_failure("extract_roles_via_llm.parse_failed", raw_text)
+        preview = _truncate_for_llm_error(raw_text, 2000)
+        raise ValueError(
+            "无法解析为含 roles 的 JSON。完整输出已打印到服务终端/stderr；预览：\n" + preview
+        )
+
+    synthetic = [{"status": "COMPLETED", "result": raw_payload, "url": page_url}]
+    parsed = parse_extracted_roles(synthetic)
+    return {"roles": serialize_extracted_roles(parsed)}
+
+
+def _run_extraction_batch_llm(targets: list[Target]) -> list[dict[str, Any]]:
+    results: list[dict[str, Any]] = []
+    for i, t in enumerate(targets):
+        title_guess = t.name[9:].strip() if t.name.startswith("Extract: ") else t.name
+        try:
+            payload = extract_roles_via_llm(t.url, title_guess)
+            results.append({
+                "run_id": f"llm-extract-{i}",
+                "target": t.name,
+                "url": t.url,
+                "status": "COMPLETED",
+                "result": payload,
+                "error": None,
+            })
+        except Exception as e:
+            results.append({
+                "run_id": f"llm-extract-{i}",
+                "target": t.name,
+                "url": t.url,
+                "status": "FAILED",
+                "result": None,
+                "error": str(e),
+            })
+    return results
+
+
+def stream_extraction_via_llm(page_url: str, page_title: str = "") -> Iterator[dict[str, Any]]:
+    yield {
+        "type": "PROGRESS",
+        "message": "使用本地 LLM 提取（无 TINYFISH_API_KEY；仅根据 URL/标题推断）…",
+    }
+    try:
+        payload = extract_roles_via_llm(page_url, page_title)
+        yield {
+            "type": "COMPLETE",
+            "message": "LLM 提取完成",
+            "result": json.dumps(payload, ensure_ascii=False),
+        }
+    except Exception as exc:
+        yield {"type": "ERROR", "error": str(exc)}
 
 
 def _slugify(text: str) -> str:
@@ -772,6 +1047,23 @@ def _build_persona(role: ExtractedRole) -> str:
 import logging as _logging
 
 _log = _logging.getLogger(__name__)
+
+
+def _emit_full_llm_output_on_failure(context: str, raw_text: str) -> None:
+    """On parse/validation failure: print full model text to stderr and emit ERROR log."""
+    import sys
+
+    text = raw_text if raw_text is not None else ""
+    header = f"[Team Creator] {context} — full LLM output ({len(text)} chars)\n"
+    try:
+        print(header + text, file=sys.stderr, flush=True)
+    except Exception:
+        pass
+    try:
+        _log.error("%s — full LLM output (%d chars):\n%s", context, len(text), text)
+    except Exception:
+        pass
+
 
 _REVIEW_KEYWORDS = (
     "review", "reviewer", "qa", "quality", "approve", "approval", "audit", "compliance",

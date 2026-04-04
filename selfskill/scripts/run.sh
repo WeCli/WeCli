@@ -2,14 +2,16 @@
 # TeamBot skill 入口脚本（供外部 agent 非交互式调用）
 #
 # 用法:
-#   bash selfskill/scripts/run.sh start                          # 后台启动服务（会自动拉起已安装的 OpenClaw gateway）
-#   bash selfskill/scripts/run.sh start-foreground               # 前台启动服务（适合受管终端 / CI / agent runner；同样会自动拉起 OpenClaw）
+#   bash selfskill/scripts/run.sh start [--no-tunnel] [--no-openclaw]
+#   bash selfskill/scripts/run.sh start-foreground [--no-openclaw]
+#       --no-tunnel     不启动 Cloudflare Tunnel（仅本机访问）
+#       --no-openclaw   不从 OpenClaw 导入 LLM、launcher 不预热 OpenClaw Gateway
 #   bash selfskill/scripts/run.sh stop                           # 停止服务
 #   bash selfskill/scripts/run.sh status                         # 检查服务状态
 #   bash selfskill/scripts/run.sh start-tunnel                   # 启动公网隧道（自动下载+暴露前端）
 #   bash selfskill/scripts/run.sh stop-tunnel                    # 停止公网隧道
 #   bash selfskill/scripts/run.sh tunnel-status                  # 查看隧道状态和公网地址
-#   bash selfskill/scripts/run.sh setup                          # 首次：安装环境依赖
+#   bash selfskill/scripts/run.sh setup                          # 可选：单独补环境；直接 start 会按需自动执行 setup_env
 #   bash selfskill/scripts/run.sh add-user <name> <password>     # 创建/更新用户
 #   bash selfskill/scripts/run.sh configure <KEY> <VALUE>        # 设置 .env 配置项
 #   bash selfskill/scripts/run.sh configure --batch K1=V1 K2=V2  # 批量设置配置
@@ -61,7 +63,7 @@ fi
 if [ -f .venv/bin/activate ]; then
     source .venv/bin/activate
 else
-    echo "❌ 虚拟环境 .venv 不存在，请先运行: bash selfskill/scripts/run.sh setup" >&2
+    echo "❌ 虚拟环境 .venv 不存在，请运行: bash selfskill/scripts/run.sh start（或 setup）" >&2
     exit 1
 fi
 
@@ -71,7 +73,7 @@ _PY_MAJOR=$(echo "$_PY_VER" | cut -d. -f1)
 if [ "$_PY_MAJOR" -lt 3 ]; then
     echo "❌ 虚拟环境中的 python 版本异常: Python $_PY_VER ($(which python))" >&2
     echo "   本项目需要 Python 3.11+。请删除 .venv 并重新创建:" >&2
-    echo "   rm -rf .venv && bash selfskill/scripts/run.sh setup" >&2
+    echo "   rm -rf .venv && bash selfskill/scripts/run.sh start" >&2
     exit 1
 fi
 
@@ -113,6 +115,34 @@ print_wsl_access_hint() {
     echo "   If Windows localhost forwarding does not work, open these WSL IP URLs from Windows."
 }
 
+# 若已有 .tunnel.pid（进程活或仅陈旧文件），先停进程、删 pid、清空 PUBLIC_DOMAIN=，再交给调用方重新 nohup tunnel.py
+_stop_tracked_tunnel_if_running() {
+    local pf="$PROJECT_ROOT/.tunnel.pid"
+    [ -f "$pf" ] || return 0
+    local apid
+    apid=$(tr -d ' \r\n' < "$pf")
+    if [ -n "$apid" ] && kill -0 "$apid" 2>/dev/null; then
+        echo "🌐 检测到已有 Tunnel (PID $apid)，先停止再启动新的…"
+        kill "$apid" 2>/dev/null || true
+        local i
+        for i in $(seq 1 10); do
+            kill -0 "$apid" 2>/dev/null || break
+            sleep 0.5
+        done
+        if kill -0 "$apid" 2>/dev/null; then
+            kill -9 "$apid" 2>/dev/null || true
+        fi
+        echo "✅ 旧 Tunnel 已停止"
+    else
+        echo "🧹 清理失效或残留的 .tunnel.pid"
+    fi
+    rm -f "$pf"
+    if [ -f "$PROJECT_ROOT/config/.env" ] && grep -q "^PUBLIC_DOMAIN=" "$PROJECT_ROOT/config/.env"; then
+        sed -i 's|^PUBLIC_DOMAIN=.*|PUBLIC_DOMAIN=|' "$PROJECT_ROOT/config/.env"
+        echo "🧹 已清空 PUBLIC_DOMAIN（避免沿用过期公网地址）"
+    fi
+}
+
 # 从 cli.py token generate 输出中解析 token（兼容 "Token: xxx" / 前导空格）
 _magic_token_from_cli_output() {
     echo "$1" | grep -F "Token:" | head -1 | sed 's/.*[Tt]oken:[[:space:]]*//' | tr -d '\r' | sed 's/[[:space:]].*//'
@@ -137,6 +167,12 @@ print_magic_links() {
         return 1
     fi
     echo "   本机: http://127.0.0.1:${port}/login-link/${token}?user=${ml_user}"
+    if [ "${TEAMCLAW_NO_TUNNEL:-}" = "1" ]; then
+        echo "   远程: （本次 start 使用了 --no-tunnel，未启动 Cloudflare Tunnel）"
+        echo ""
+        echo "🤖 给 AI / 助手: 仅输出上方本机 Magic link；勿声称已提供公网/手机远程 URL。"
+        return 0
+    fi
     if [ -n "$pub" ] && [ "$pub" != "wait to set" ]; then
         echo "   远程: ${pub}/login-link/${token}?user=${ml_user}"
         echo "📱 消息中心（手机）: ${pub}/mobile_group_chat"
@@ -316,35 +352,78 @@ for agent in agents:
 ' "$agent_name"
 }
 
+# 与 `run.sh setup` 实质相同：缺 venv/依赖或未装 acpx（且本机有 npm）时运行 scripts/setup_env.sh
+run_teamclaw_setup_if_needed() {
+    local need=false
+    if [ ! -d ".venv" ]; then need=true; fi
+    if [ "$need" = false ] && ! python -c "import fastapi" 2>/dev/null; then need=true; fi
+    if [ "$need" = false ] && command -v npm &>/dev/null && ! command -v acpx &>/dev/null; then need=true; fi
+    if [ "$need" = true ]; then
+        echo "📋 首次运行或环境未齐全，正在执行 scripts/setup_env.sh …"
+        bash scripts/setup_env.sh
+        if [ -f .venv/bin/activate ]; then
+            source .venv/bin/activate
+        fi
+        if ! python -c "import fastapi" 2>/dev/null; then
+            echo "❌ setup_env.sh 完成后仍无法 import fastapi" >&2
+            exit 1
+        fi
+    fi
+}
+
+# start / start-foreground 可选参数：--no-tunnel / --no-openclaw（$1 为子命令名）
+_teamclaw_parse_start_flags() {
+    NO_TUNNEL=0
+    NO_OPENCLAW=0
+    [ $# -ge 1 ] || return 0
+    shift
+    local a
+    for a in "$@"; do
+        case "$a" in
+            --no-tunnel) NO_TUNNEL=1 ;;
+            --no-openclaw) NO_OPENCLAW=1 ;;
+        esac
+    done
+}
+
 case "${1:-help}" in
 
     start)
+        _teamclaw_parse_start_flags "$@"
+        run_teamclaw_setup_if_needed
         # Auto-create .env if missing
         if [ ! -f config/.env ]; then
             echo "📋 config/.env 不存在，自动从模板初始化..."
             python selfskill/scripts/configure.py --init
         fi
 
-        # Auto-import LLM config:
-        # If config/.env has no real LLM_API_KEY (missing/placeholder), try to read it from OpenClaw.
-        # This reduces first-start friction while keeping user-provided keys unchanged.
+        # 可选：若尚未配置 LLM，尝试从本机 OpenClaw 写入 TeamClaw .env（失败不影响启动）。
+        # 不强制在启动阶段设置 LLM；用户可用 Magic link 进站后，在向导里填 Key 或一键导入 OpenClaw。
         source config/.env 2>/dev/null || true
-        if [ -z "${LLM_API_KEY:-}" ] || [ "${LLM_API_KEY:-}" = "your_api_key_here" ]; then
+        if [ "${NO_OPENCLAW:-0}" != 1 ]; then
+            if [ -z "${LLM_API_KEY:-}" ] || [ "${LLM_API_KEY:-}" = "your_api_key_here" ]; then
+                echo ""
+                echo "🔄 LLM_API_KEY 仍为占位/空：尝试从 OpenClaw 同步到 TeamClaw .env（可忽略失败）..."
+                python selfskill/scripts/configure_openclaw.py --import-teamclaw-llm-from-openclaw || true
+                source config/.env 2>/dev/null || true
+            fi
+        else
             echo ""
-            echo "🔄 检测到 LLM_API_KEY 未配置（或为占位符），尝试从 OpenClaw 导入 LLM 配置..."
-            python selfskill/scripts/configure_openclaw.py --import-teamclaw-llm-from-openclaw || true
-            source config/.env 2>/dev/null || true
+            echo "⏭️  已指定 --no-openclaw：跳过从 OpenClaw 导入 LLM；launcher 不会预热 OpenClaw Gateway。"
         fi
 
-        # NOTE: 启动时会自动预热已安装的 OpenClaw gateway，并刷新 OPENCLAW_*
-        # runtime 配置，但不会静默改写 TeamClaw 的 LLM 配置。导入 OpenClaw /
-        # 切换 Antigravity 仍然由首次登录向导和设置页按钮负责。
+        # launcher 会预热 OpenClaw gateway 并刷新 OPENCLAW_*（可用 TEAMCLAW_NO_OPENCLAW=1 禁用）
 
         stop_teamclaw_service_processes || true
         rm -f "$PIDFILE"
 
         echo "🚀 启动 TeamBot (headless)..."
         export TEAMBOT_HEADLESS=1
+        if [ "${NO_OPENCLAW:-0}" = 1 ]; then
+            export TEAMCLAW_NO_OPENCLAW=1
+        else
+            unset TEAMCLAW_NO_OPENCLAW
+        fi
         mkdir -p "$PROJECT_ROOT/logs"
         nohup python scripts/launcher.py > "$PROJECT_ROOT/logs/launcher.log" 2>&1 &
         LAUNCHER_PID=$!
@@ -379,15 +458,13 @@ case "${1:-help}" in
         python scripts/cli.py status
         echo ""
 
-        # 自动启动公网隧道（方便手机远程访问）
+        # 自动启动公网隧道（可用 --no-tunnel 跳过）
         TUNNEL_PIDFILE="$PROJECT_ROOT/.tunnel.pid"
-        if [ -f "$TUNNEL_PIDFILE" ] && kill -0 "$(cat "$TUNNEL_PIDFILE")" 2>/dev/null; then
-            source config/.env 2>/dev/null || true
-            echo "🌐 Tunnel 已在运行"
-            if [ -n "$PUBLIC_DOMAIN" ] && [ "$PUBLIC_DOMAIN" != "wait to set" ]; then
-                echo "📱 手机访问地址: ${PUBLIC_DOMAIN}/mobile_group_chat"
-            fi
+        if [ "${NO_TUNNEL:-0}" = 1 ]; then
+            echo ""
+            echo "⏭️  已指定 --no-tunnel：不启动 Cloudflare Tunnel（仅本机访问）。"
         else
+            _stop_tracked_tunnel_if_running
             echo "🌐 正在启动 Cloudflare Tunnel（手机远程访问）..."
             mkdir -p "$PROJECT_ROOT/logs"
             nohup python scripts/tunnel.py > "$PROJECT_ROOT/logs/tunnel.log" 2>&1 &
@@ -404,7 +481,6 @@ case "${1:-help}" in
                 echo -n "."
                 sleep 2
             done
-            # If tunnel didn't become ready in time, still continue
             source config/.env 2>/dev/null || true
             if [ -z "$PUBLIC_DOMAIN" ] || [ "$PUBLIC_DOMAIN" = "wait to set" ]; then
                 echo ""
@@ -412,26 +488,43 @@ case "${1:-help}" in
             fi
         fi
 
+        if [ "${NO_TUNNEL:-0}" = 1 ]; then
+            export TEAMCLAW_NO_TUNNEL=1
+        else
+            unset TEAMCLAW_NO_TUNNEL
+        fi
         print_magic_links
+        unset TEAMCLAW_NO_TUNNEL 2>/dev/null || true
         echo ""
         print_teamclaw_docs_hint
         exit 0
         ;;
 
     start-foreground|start-fg)
+        _teamclaw_parse_start_flags "$@"
+        run_teamclaw_setup_if_needed
         # Auto-create .env if missing
         if [ ! -f config/.env ]; then
             echo "📋 config/.env 不存在，自动从模板初始化..."
             python selfskill/scripts/configure.py --init
         fi
 
-        # Same auto-import behavior in foreground start.
         source config/.env 2>/dev/null || true
-        if [ -z "${LLM_API_KEY:-}" ] || [ "${LLM_API_KEY:-}" = "your_api_key_here" ]; then
+        if [ "${NO_OPENCLAW:-0}" != 1 ]; then
+            if [ -z "${LLM_API_KEY:-}" ] || [ "${LLM_API_KEY:-}" = "your_api_key_here" ]; then
+                echo ""
+                echo "🔄 LLM_API_KEY 仍为占位/空：尝试从 OpenClaw 同步到 TeamClaw .env（可忽略失败）..."
+                python selfskill/scripts/configure_openclaw.py --import-teamclaw-llm-from-openclaw || true
+                source config/.env 2>/dev/null || true
+            fi
+        else
             echo ""
-            echo "🔄 检测到 LLM_API_KEY 未配置（或为占位符），尝试从 OpenClaw 导入 LLM 配置..."
-            python selfskill/scripts/configure_openclaw.py --import-teamclaw-llm-from-openclaw || true
-            source config/.env 2>/dev/null || true
+            echo "⏭️  已指定 --no-openclaw：跳过从 OpenClaw 导入 LLM；launcher 不会预热 OpenClaw Gateway。"
+        fi
+
+        if [ "${NO_TUNNEL:-0}" = 1 ]; then
+            echo ""
+            echo "ℹ️  start-foreground 本身不启动 Tunnel；--no-tunnel 与此模式无关，已忽略。"
         fi
 
         stop_teamclaw_service_processes || true
@@ -440,6 +533,11 @@ case "${1:-help}" in
         echo "🚀 前台启动 TeamBot (headless)..."
         echo "   当前终端会持续占用；按 Ctrl+C 可停止所有服务"
         export TEAMBOT_HEADLESS=1
+        if [ "${NO_OPENCLAW:-0}" = 1 ]; then
+            export TEAMCLAW_NO_OPENCLAW=1
+        else
+            unset TEAMCLAW_NO_OPENCLAW
+        fi
         exec python scripts/launcher.py
         ;;
     stop)
@@ -503,7 +601,7 @@ case "${1:-help}" in
         ;;
 
     setup)
-        echo "=== 环境配置 ==="
+        echo "=== 环境配置（亦会在 start / start-foreground 中按需自动执行）==="
         bash scripts/setup_env.sh
 
         # acpx 自检（setup_env.sh 已处理安装，这里做最终确认）
@@ -773,16 +871,7 @@ case "${1:-help}" in
     start-tunnel)
         # 启动 Cloudflare Tunnel（自动下载 cloudflared + 暴露前端到公网）
         TUNNEL_PIDFILE="$PROJECT_ROOT/.tunnel.pid"
-        if [ -f "$TUNNEL_PIDFILE" ] && kill -0 "$(cat "$TUNNEL_PIDFILE")" 2>/dev/null; then
-            echo "⚠️  Tunnel 已在运行 (PID: $(cat "$TUNNEL_PIDFILE"))"
-            # 读取当前 PUBLIC_DOMAIN
-            source config/.env 2>/dev/null || true
-            if [ -n "$PUBLIC_DOMAIN" ] && [ "$PUBLIC_DOMAIN" != "wait to set" ]; then
-                echo "🌍 公网地址: $PUBLIC_DOMAIN"
-            fi
-            print_magic_links
-            exit 0
-        fi
+        _stop_tracked_tunnel_if_running
 
         echo "🌐 正在启动 Cloudflare Tunnel..."
         mkdir -p "$PROJECT_ROOT/logs"
@@ -868,14 +957,14 @@ case "${1:-help}" in
         echo "用法: bash selfskill/scripts/run.sh <command> [args]"
         echo ""
         echo "命令:"
-        echo "  start                          后台启动服务（自动预热已安装的 OpenClaw gateway）"
-        echo "  start-foreground               前台启动服务（适合受管终端 / CI / agent runner；同样自动预热 OpenClaw）"
+        echo "  start [--no-tunnel] [--no-openclaw]   后台启动；--no-tunnel 不启公网隧道；--no-openclaw 不与 OpenClaw 联动"
+        echo "  start-foreground [--no-openclaw] [--no-tunnel]  前台启动；--no-openclaw 同上（--no-tunnel 在此模式仅提示、无隧道）"
         echo "  stop                           停止服务"
         echo "  status                         检查服务状态"
         echo "  start-tunnel                   启动公网隧道（自动下载 cloudflared）"
         echo "  stop-tunnel                    停止公网隧道"
         echo "  tunnel-status                  查看隧道状态和公网地址"
-        echo "  setup                          安装环境依赖（首次）"
+        echo "  setup                          单独安装/更新环境（start 会按需自动执行）"
         echo "  add-user <name> <password>     创建/更新用户"
         echo "  configure <KEY> <VALUE>        设置 .env 配置项"
         echo "  configure --batch K1=V1 K2=V2  批量设置配置"

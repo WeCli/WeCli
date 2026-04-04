@@ -27,6 +27,7 @@ from teambot_models import (
     TeamBotToolPolicyUpdateRequest,
     TeamBotVerificationCreateRequest,
     TeamBotVoiceStateUpdateRequest,
+    TeamBotWorkflowPresetApplyRequest,
 )
 from teambot_bridge import bridge_hub, get_bridge_record_for_user
 from teambot_service import TeamBotService
@@ -97,6 +98,21 @@ def create_teambot_router(
         x_internal_token: str | None = Header(None),
     ):
         return await service.update_session_mode(req, x_internal_token)
+
+    @router.get("/teambot/workflow-presets")
+    async def list_session_workflow_presets(
+        user_id: str,
+        password: str = "",
+        x_internal_token: str | None = Header(None),
+    ):
+        return await service.list_session_workflow_presets(user_id, password, x_internal_token)
+
+    @router.post("/teambot/workflow-presets/apply")
+    async def apply_session_workflow_preset(
+        req: TeamBotWorkflowPresetApplyRequest,
+        x_internal_token: str | None = Header(None),
+    ):
+        return await service.apply_session_workflow_preset(req, x_internal_token)
 
     @router.get("/teambot/session-inbox")
     async def get_session_inbox(

@@ -19,11 +19,6 @@ config/users.json
 # 但 requirements.txt 需要上传
 !config/requirements.txt
 
-# 运行时数据（用户文件、数据库等）
-data/*
-!data/prompts/
-!data/.gitkeep
-
 # IDE
 .vscode/
 .idea/
@@ -37,9 +32,6 @@ Thumbs.db
 
 # cloudflared / bark-server 二进制
 bin/
-
-# Bark 推送运行时数据
-data/bark/
 
 # 打包产物
 build/
@@ -70,3 +62,10 @@ logs/
 
 .tunnel.pid
 /test-results
+
+# 运行时数据（保留 data/team_presets 等可版本化资产）
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/user_files/
+data/oasis_discussions/

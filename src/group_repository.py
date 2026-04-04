@@ -136,11 +136,13 @@ async def list_groups_for_user(group_db_path: str, user_id: str) -> list[dict]:
         rows = await cursor.fetchall()
         results = [dict(r) for r in rows]
 
-        # Fetch up to 4 member short_names per group for avatar grid display
+        # Fetch up to 4 member short_names per group for avatar grid display.
+        # Agents first (私聊列表头像需要对方 agent 名；群主行 is_agent=0 先入库会占首位)
         for d in results:
             db.row_factory = None
             cursor2 = await db.execute(
-                "SELECT short_name FROM group_members WHERE group_id = ? ORDER BY joined_at ASC LIMIT 4",
+                "SELECT short_name FROM group_members WHERE group_id = ? "
+                "ORDER BY is_agent DESC, joined_at ASC LIMIT 4",
                 (d["group_id"],),
             )
             rows2 = await cursor2.fetchall()

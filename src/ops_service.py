@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import shutil
 from typing import Any, Callable
 
@@ -8,7 +9,10 @@ import httpx
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
+from acpx_adapter import AcpxError, get_acpx_adapter
+from acpx_cli_tools import acpx_agent_tags_with_legacy
 from auth_utils import extract_user_password_session, is_internal_bearer, parse_bearer_parts
+from group_service import _load_public_external_agents
 from llm_factory import get_provider_audio_defaults, infer_provider
 from logging_utils import get_logger
 from ops_models import ACPControlRequest, ACPStatusRequest, CancelRequest, LoginRequest, TTSRequest
@@ -24,39 +28,17 @@ _ACP_KNOWN_TOOLS: frozenset = frozenset({
     "claude-code", "gemini-cli",
 })
 
-# ACP protocol support (optional)
-try:
-    from acp import PROTOCOL_VERSION, Client, connect_to_agent
-    from acp.schema import ClientCapabilities, Implementation, AgentMessageChunk
-    _ACP_AVAILABLE = True
-except ImportError:
-    _ACP_AVAILABLE = False
+# Session suffix rule aligned with group_service (model `agent:…:suffix` → suffix; else default)
+_DEFAULT_ACP_SESSION_SUFFIX = "teamclawchat"
+_AGENT_MODEL_RE = re.compile(r"^agent:[^:]+(?::(.+))?$")
+_ACPX_AGENT_TAGS: frozenset[str] = acpx_agent_tags_with_legacy()
 
 
-if _ACP_AVAILABLE:
-    class _SecureStreamReader(asyncio.StreamReader):
-        """包装 subprocess stdout，只传递 JSON-RPC 行。"""
-        def __init__(self, real_reader, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self._real_reader = real_reader
-
-        async def readline(self):
-            while True:
-                line = await self._real_reader.readline()
-                if not line:
-                    return b""
-                if line.strip().startswith(b'{'):
-                    return line
-                continue
-
-    class _ACPClient(Client):
-        """ACP 协议客户端，用于控制操作。"""
-        def __init__(self):
-            self.chunks: list[str] = []
-
-        async def session_update(self, session_id, update, **kwargs):
-            if isinstance(update, AgentMessageChunk) and hasattr(update.content, 'text'):
-                self.chunks.append(update.content.text)
+def _resolve_external_session_suffix(model: str) -> str:
+    m = _AGENT_MODEL_RE.match((model or "").strip())
+    if m and m.group(1):
+        return m.group(1)
+    return _DEFAULT_ACP_SESSION_SUFFIX
 
 
 def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
@@ -94,15 +76,15 @@ def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
 
 
 def _find_external_agent(agents: list[dict], agent_key: str) -> dict | None:
-    """Match external agent by short name first, then global_name."""
+    """Match by global_name first (stable id), then by short name (may collide)."""
     agent_key = (agent_key or "").strip()
     if not agent_key:
         return None
     for agent in agents:
-        if (agent.get("name") or "").strip() == agent_key:
+        if (agent.get("global_name") or "").strip() == agent_key:
             return agent
     for agent in agents:
-        if (agent.get("global_name") or "").strip() == agent_key:
+        if (agent.get("name") or "").strip() == agent_key:
             return agent
     return None
 
@@ -122,6 +104,22 @@ def _find_external_agent_across_teams(user_id: str, agent_key: str) -> dict | No
         if found:
             return found
     return None
+
+
+def _resolve_external_agent_record(user_id: str, team_hint: str, agent_key: str) -> dict | None:
+    """Team external_agents.json first (if team given), then user-level external_agents.json, then any team."""
+    agent_key = (agent_key or "").strip()
+    if not user_id or not agent_key:
+        return None
+    th = (team_hint or "").strip()
+    if th:
+        found = _find_external_agent(_load_team_external_agents(user_id, th), agent_key)
+        if found:
+            return found
+    found = _find_external_agent(_load_public_external_agents(user_id), agent_key)
+    if found:
+        return found
+    return _find_external_agent_across_teams(user_id, agent_key)
 
 
 class OpsService:
@@ -264,138 +262,88 @@ class OpsService:
     # ------------------------------------------------------------------
 
     async def acp_control(self, req: ACPControlRequest, x_internal_token: str | None):
-        """对外部 ACP agent 执行 /new 或 /stop。
-
-        Session routing 通过命令行 --session 参数传入（bridge 当前版本不处理 _meta.sessionKey）。
-        reset_session 通过命令行 --reset-session 标志实现。
-        stop 通过在 new_session 时建立连接后直接 cancel(session_id) 实现，
-        因为 bridge 不支持 session/list 方法。
-        """
+        """对外部 agent 执行 new / stop：经 acpx（与群聊 session 后缀规则一致）。"""
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
 
         team_hint = (req.team or "").strip()
         agent_key = (req.agent_name or "").strip()
-        agents = _load_team_external_agents(req.user_id, team_hint) if team_hint else []
-        agent_info = _find_external_agent(agents, agent_key)
-        if not agent_info:
-            agent_info = _find_external_agent_across_teams(req.user_id, agent_key)
+        agent_info = _resolve_external_agent_record(req.user_id, team_hint, agent_key)
         if not agent_info:
             raise HTTPException(
                 status_code=404,
-                detail=f"外部 agent '{agent_key}' 未找到（team={team_hint or '(空)'}，已在全部 team 目录中查找）",
+                detail=(
+                    f"外部 agent '{agent_key}' 未找到（team={team_hint or '(空)'}；"
+                    "已查用户级 external_agents.json 与各 team 目录）"
+                ),
             )
 
         global_name = agent_info.get("global_name", "")
         if not global_name:
             raise HTTPException(status_code=400, detail="该 agent 未配置 global_name")
 
-        tag = agent_info.get("tag", "").lower()
-        acp_tool = tag if tag in _ACP_KNOWN_TOOLS else "openclaw"
-        acp_bin = shutil.which(acp_tool)
-        if not acp_bin:
-            raise HTTPException(status_code=500, detail=f"ACP 工具 '{acp_tool}' 未安装")
+        tag = (agent_info.get("tag") or "").strip().lower()
+        suffix = _resolve_external_session_suffix(str(agent_info.get("model", "")))
+        session_key = f"agent:{global_name}:{suffix}"
 
-        if not _ACP_AVAILABLE:
-            raise HTTPException(status_code=500, detail="ACP 协议库不可用")
+        if not shutil.which("acpx"):
+            raise HTTPException(status_code=500, detail="acpx 未安装或不在 PATH")
 
-        acp_session = f"agent:{global_name}:teamclawchat"
-        logger.info("acp_control action=%s agent=%s session=%s", req.action, agent_key, acp_session)
-
-        proc = None
         try:
-            # 通过命令行传入 session key（bridge 只认命令行 --session，不处理 _meta.sessionKey）
-            cmd = [acp_bin, "acp", "--session", acp_session, "--no-prefix-cwd"]
-            # new/reset 都强制重置持久化上下文；否则 new 只会复用旧线程状态
+            adapter = get_acpx_adapter(cwd=_PROJECT_ROOT)
+        except AcpxError as e:
+            raise HTTPException(status_code=500, detail=str(e)) from e
+
+        use_openclaw_exec = tag in ("", "openclaw") or tag not in _ACPX_AGENT_TAGS
+        acpx_tool = tag if tag in _ACPX_AGENT_TAGS and tag != "openclaw" else "openclaw"
+
+        logger.info(
+            "acp_control action=%s agent=%s session_key=%s openclaw_exec=%s acpx_tool=%s",
+            req.action,
+            agent_key,
+            session_key,
+            use_openclaw_exec,
+            acpx_tool,
+        )
+
+        try:
             if req.action == "new":
-                cmd.append("--reset-session")
-                logger.info("acp_control reset_session=true for %s", agent_key)
-
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
-            safe_stdout = _SecureStreamReader(proc.stdout)
-            client = _ACPClient()
-            conn = connect_to_agent(client, proc.stdin, safe_stdout)
-
-            await asyncio.wait_for(
-                conn.initialize(
-                    protocol_version=PROTOCOL_VERSION,
-                    client_capabilities=ClientCapabilities(),
-                    client_info=Implementation(name="teamclaw-ops", version="1.0"),
-                ),
-                timeout=10,
-            )
-
-            result: dict = {}
-            if req.action == "new":
-                async def _do_new_session():
-                    try:
-                        return await conn.new_session(
-                            mcp_servers=[],
-                            cwd=os.getcwd(),
-                            metadata={"resetSession": True},
-                        )
-                    except TypeError:
-                        return await conn.new_session(
-                            mcp_servers=[],
-                            cwd=os.getcwd(),
-                        )
-
-                new_session = await asyncio.wait_for(_do_new_session(), timeout=10)
-                session_id = getattr(new_session, "session_id", str(new_session))
-                result = {
-                    "session_id": session_id,
-                    "acp_session": acp_session,
-                    "message": f"已为 {agent_key} 创建新 session（已请求重置持久化上下文）",
+                if use_openclaw_exec:
+                    await adapter.ops_openclaw_exec_slash(
+                        session_key=session_key, slash="/new", timeout_sec=180
+                    )
+                else:
+                    await adapter.ops_non_openclaw_reset_session(
+                        tool=acpx_tool, session_key=session_key
+                    )
+                return {
+                    "status": "success",
+                    "action": req.action,
+                    "acp_session": session_key,
+                    "message": f"已为 {agent_key} 请求新会话（acpx）",
                 }
-                logger.info("acp_control new session_id=%s acp_session=%s", session_id, acp_session)
 
-            elif req.action == "stop":
-                # bridge 不支持 session/list，直接用 new_session 建立连接后 cancel 该 session
-                new_session = await asyncio.wait_for(
-                    conn.new_session(
-                        mcp_servers=[],
-                        cwd=os.getcwd(),
-                    ),
-                    timeout=10,
-                )
-                session_id = getattr(new_session, "session_id", str(new_session))
-                await asyncio.wait_for(
-                    conn.cancel(session_id=session_id),
-                    timeout=10,
-                )
-                result = {
-                    "cancelled_session": session_id,
-                    "acp_session": acp_session,
-                    "message": f"已取消 {agent_key} 的当前操作",
+            if req.action == "stop":
+                if use_openclaw_exec:
+                    await adapter.ops_openclaw_exec_slash(
+                        session_key=session_key, slash="/stop", timeout_sec=25
+                    )
+                else:
+                    await adapter.ops_non_openclaw_cancel(tool=acpx_tool, session_key=session_key)
+                return {
+                    "status": "success",
+                    "action": req.action,
+                    "acp_session": session_key,
+                    "message": f"已请求停止 {agent_key}（acpx）",
                 }
-                logger.info("acp_control stop cancelled session_id=%s", session_id)
 
-            return {"status": "success", "action": req.action, **result}
+            raise HTTPException(status_code=400, detail=f"未知 action: {req.action}")
 
-        except asyncio.TimeoutError:
-            raise HTTPException(status_code=504, detail="ACP 操作超时")
-        except Exception as e:
-            logger.warning("acp_control failed: %s", e)
-            raise HTTPException(status_code=500, detail=f"ACP 操作失败: {e}")
-        finally:
-            if proc:
-                try:
-                    proc.stdout.feed_eof()
-                    if proc.stdin:
-                        proc.stdin.close()
-                    proc.terminate()
-                    try:
-                        await asyncio.wait_for(proc.wait(), timeout=1)
-                    except asyncio.TimeoutError:
-                        proc.kill()
-                        await proc.wait()
-                except Exception:
-                    pass
+        except AcpxError as e:
+            msg = str(e)
+            logger.warning("acp_control failed: %s", msg)
+            if "timeout" in msg.lower():
+                raise HTTPException(status_code=504, detail=msg) from e
+            raise HTTPException(status_code=500, detail=msg) from e
 
     async def acp_status(self, req: ACPStatusRequest, x_internal_token: str | None):
         """查询外部 agent 的 session 状态列表。
@@ -410,13 +358,29 @@ class OpsService:
         self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
 
         team_hint = (req.team or "").strip()
-        agents = _load_team_external_agents(req.user_id, team_hint) if team_hint else []
         if req.agent_name:
             agent_key = req.agent_name.strip()
-            one = _find_external_agent(agents, agent_key)
-            if not one:
-                one = _find_external_agent_across_teams(req.user_id, agent_key)
+            one = _resolve_external_agent_record(req.user_id, team_hint, agent_key)
             agents = [one] if one else []
+        else:
+            agents = []
+            if team_hint:
+                agents.extend(_load_team_external_agents(req.user_id, team_hint))
+            else:
+                agents.extend(_load_public_external_agents(req.user_id))
+                team_base = os.path.join(_PROJECT_ROOT, "data", "user_files", req.user_id, "teams")
+                if os.path.isdir(team_base):
+                    seen: set[str] = set()
+                    for entry in sorted(os.listdir(team_base)):
+                        path = os.path.join(team_base, entry)
+                        if not os.path.isdir(path):
+                            continue
+                        for ea in _load_team_external_agents(req.user_id, entry):
+                            gn = (ea.get("global_name") or "").strip()
+                            key = gn or (ea.get("name") or "").strip()
+                            if key and key not in seen:
+                                seen.add(key)
+                                agents.append(ea)
 
         if not agents:
             return {"status": "success", "agents": []}

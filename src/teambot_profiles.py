@@ -104,6 +104,8 @@ TEAMBOT_RUNTIME_TOOLS = (
     "enter_plan_mode",
     "exit_plan_mode",
     "get_session_mode",
+    "list_teambot_workflow_presets",
+    "apply_teambot_workflow_preset",
     "write_session_plan",
     "read_session_plan",
     "clear_session_plan",

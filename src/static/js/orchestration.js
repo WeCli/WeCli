@@ -770,15 +770,86 @@ async function orchDeleteInternalAgent(sessionId) {
     }
 }
 
-// ── Load OpenClaw agents ──
+/** Non–OpenClaw rows from public_external_agents.json, grouped by tag (same idea as mobile contacts). */
+function _orchGroupPublicExternalAgents(rows) {
+    const acpByTool = {};
+    (rows || []).forEach((row) => {
+        if (!row || typeof row !== 'object') return;
+        const tagRaw = String(row.tag || '').trim().toLowerCase();
+        if (tagRaw === 'openclaw') return;
+        const gn = String(row.global_name || '').trim();
+        if (!gn) return;
+        const key = tagRaw || '_';
+        if (!acpByTool[key]) acpByTool[key] = [];
+        acpByTool[key].push(row);
+    });
+    return acpByTool;
+}
+
+function _orchMakeExtCategory(title, count) {
+    const det = document.createElement('details');
+    det.className = 'orch-ext-cat';
+    det.open = true;
+    const sum = document.createElement('summary');
+    sum.className = 'orch-ext-cat-summary';
+    const t1 = document.createElement('span');
+    t1.textContent = title;
+    const t2 = document.createElement('span');
+    t2.className = 'orch-ext-cat-count';
+    t2.textContent = String(count);
+    sum.appendChild(t1);
+    sum.appendChild(t2);
+    const body = document.createElement('div');
+    body.className = 'orch-ext-cat-body';
+    det.appendChild(sum);
+    det.appendChild(body);
+    return { det, body };
+}
+
+function _orchAppendPublicExternalCard(parent, row) {
+    const card = document.createElement('div');
+    card.className = 'orch-expert-card';
+    card.draggable = true;
+    const name = row.name || row.global_name || 'unknown';
+    const tag = row.tag || '';
+    const meta = row.meta || {};
+    const mdl = (meta.model && meta.model !== 'unknown') ? meta.model : '';
+    const rawUrl = meta.api_url || '';
+    const urlShort = rawUrl ? (rawUrl.length > 36 ? rawUrl.slice(0, 36) + '…' : rawUrl) : '';
+    card.innerHTML = `<span class="orch-emoji">🔌</span><div style="min-width:0;flex:1;"><div class="orch-name" title="${escapeHtml(name)}">${escapeHtml(name)}</div>${tag ? '<div class="orch-tag" style="color:#6b7280;">🏷️' + escapeHtml(tag) + '</div>' : ''}${mdl ? '<div class="orch-tag" style="color:#059669;font-family:monospace;">' + escapeHtml(mdl) + '</div>' : ''}${urlShort ? '<div class="orch-tag" style="color:#6b7280;font-size:9px;">' + escapeHtml(urlShort) + '</div>' : ''}</div>`;
+    const nodeData = {
+        type: 'external',
+        name: name,
+        tag: tag || 'custom',
+        emoji: '🔌',
+        temperature: 0.7,
+        api_url: rawUrl,
+        api_key: meta.api_key ? '****' : '',
+        model: meta.model || '',
+        ext_id: row.global_name || name,
+    };
+    if (meta.headers && typeof meta.headers === 'object' && Object.keys(meta.headers).length) {
+        nodeData.headers = meta.headers;
+    }
+    orchBindCardEvents(card, nodeData);
+    parent.appendChild(card);
+}
+
+// ── External agent pool (OpenClaw + public HTTP/ACP), layered like mobile contacts ──
 async function orchLoadOpenClawSessions() {
     const list = document.getElementById('orch-expert-list-openclaw');
     if (!list) return;
     list.innerHTML = '<div style="padding:6px 10px;font-size:10px;color:#9ca3af;text-align:center;">⏳ ' + t('loading') + '</div>';
     try {
-        // Load CLI agents list
-        const resp = await fetch('/proxy_openclaw_sessions');
-        const data = await resp.json();
+        const [ocResp, pubResp] = await Promise.all([
+            fetch('/proxy_openclaw_sessions'),
+            fetch('/public_external_agents'),
+        ]);
+        const data = await ocResp.json().catch(() => ({}));
+        let pubData = { agents: [] };
+        try {
+            if (pubResp.ok) pubData = await pubResp.json();
+        } catch (_) { /* ignore */ }
 
         // When team mode is active, also load external_agents.json to get
         // the authoritative name↔global_name mapping.
@@ -799,32 +870,30 @@ async function orchLoadOpenClawSessions() {
             } catch(e) { /* ignore, will fall back to prefix stripping */ }
         }
 
-        list.innerHTML = '';
-        if (!data.available) {
-            list.innerHTML = '<div style="padding:6px 10px;font-size:10px;color:#d1d5db;text-align:center;">🚫 Not configured</div>';
-            return;
-        }
-        if (!data.agents || data.agents.length === 0) {
-            list.innerHTML = '<div style="padding:6px 10px;font-size:10px;color:#d1d5db;text-align:center;">No OpenClaw agents</div>';
-            return;
-        }
-        // Filter by team: prefer matching against external_agents.json global_name,
-        // fall back to prefix matching for agents not yet in JSON.
-        let agents = data.agents;
+        const acpByTool = _orchGroupPublicExternalAgents(pubData.agents || []);
+        let acpTotal = 0;
+        Object.values(acpByTool).forEach((arr) => {
+            if (Array.isArray(arr)) acpTotal += arr.length;
+        });
+
+        let agents = data.available ? (data.agents || []) : [];
         if (orch.teamEnabled && orch.teamName) {
             const prefix = orch.teamName.toLowerCase() + '_';
-            agents = agents.filter(a => {
+            agents = agents.filter((a) => {
                 const aName = (a.name || '').toLowerCase();
-                // Include if in external_agents.json OR matches team prefix
                 return extAgentMap[aName] || aName.startsWith(prefix);
             });
-            if (agents.length === 0) {
-                list.innerHTML = '<div style="padding:6px 10px;font-size:10px;color:#d1d5db;text-align:center;">No agents with prefix \'' + escapeHtml(orch.teamName) + '_\'</div>';
-                return;
-            }
         }
+
+        if (agents.length === 0 && acpTotal === 0) {
+            list.innerHTML = '<div style="padding:6px 10px;font-size:10px;color:#d1d5db;text-align:center;">' + escapeHtml(t('orch_ext_pool_empty')) + '</div>';
+            return;
+        }
+
         const openclawUrl = data.openclaw_api_url || '';
-        for (const a of agents) {
+        list.innerHTML = '';
+
+        const appendOpenClawAgentCard = (parent, a) => {
             const card = document.createElement('div');
             card.className = 'orch-expert-card';
             card.draggable = true;
@@ -924,11 +993,36 @@ async function orchLoadOpenClawSessions() {
                 });
                 snapBtn.addEventListener('dblclick', (e) => e.stopPropagation());
             }
-            list.appendChild(card);
+            parent.appendChild(card);
+        };
+
+        const ocCat = _orchMakeExtCategory(t('orch_ext_cat_openclaw'), agents.length);
+        list.appendChild(ocCat.det);
+        if (agents.length === 0) {
+            const hint = document.createElement('div');
+            hint.style.cssText = 'padding:8px 10px;font-size:10px;color:#9ca3af;text-align:center;';
+            hint.textContent = t('orch_ext_openclaw_empty');
+            ocCat.body.appendChild(hint);
+        } else {
+            for (const a of agents) appendOpenClawAgentCard(ocCat.body, a);
+        }
+
+        const sortedTools = Object.keys(acpByTool).sort((a, b) => {
+            if (a === '_') return 1;
+            if (b === '_') return -1;
+            return a.localeCompare(b);
+        });
+        for (const tool of sortedTools) {
+            const items = acpByTool[tool] || [];
+            if (!items.length) continue;
+            const label = tool === '_' ? t('group_ext_tag_none') : tool;
+            const cat = _orchMakeExtCategory(label, items.length);
+            list.appendChild(cat.det);
+            for (const row of items) _orchAppendPublicExternalCard(cat.body, row);
         }
 
         // Team mode: add Export All / Restore All buttons
-        if (orch.teamEnabled && orch.teamName) {
+        if (orch.teamEnabled && orch.teamName && data.available) {
             const btnBar = document.createElement('div');
             btnBar.style.cssText = 'display:flex;gap:4px;padding:6px 8px;border-top:1px solid #e5e7eb;';
             btnBar.innerHTML = `

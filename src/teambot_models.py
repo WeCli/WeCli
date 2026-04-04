@@ -31,6 +31,12 @@ class TeamBotPlanUpdateRequest(TeamBotSessionRuntimeRequest):
     title: str
     status: str = "active"
     items: list[dict] = Field(default_factory=list)
+    metadata: dict = Field(default_factory=dict)
+
+
+class TeamBotWorkflowPresetApplyRequest(TeamBotSessionRuntimeRequest):
+    preset_id: str
+    metadata: dict = Field(default_factory=dict)
 
 
 class TeamBotTodoUpdateRequest(TeamBotSessionRuntimeRequest):

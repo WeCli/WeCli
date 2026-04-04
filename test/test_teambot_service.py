@@ -37,6 +37,7 @@ from teambot_models import (
     TeamBotTodoUpdateRequest,
     TeamBotVerificationCreateRequest,
     TeamBotVoiceStateUpdateRequest,
+    TeamBotWorkflowPresetApplyRequest,
 )
 import teambot_policy
 import teambot_runtime_store as runtime_store
@@ -236,6 +237,76 @@ class TeamBotServiceTests(unittest.IsolatedAsyncioTestCase):
                 store.DEFAULT_DB_PATH = original_db_path
                 runtime_store.DEFAULT_DB_PATH = original_runtime_db_path
                 teambot_policy.PROJECT_ROOT = original_policy_root
+
+    async def test_workflow_preset_application_and_run_recovery_are_exposed(self):
+        with TemporaryDirectory() as tmpdir:
+            import teambot_subagents as store
+            original_db_path = store.DEFAULT_DB_PATH
+            original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
+            store.DEFAULT_DB_PATH = Path(tmpdir) / "subagents.db"
+            runtime_store.DEFAULT_DB_PATH = Path(tmpdir) / "runtime.db"
+            try:
+                service = TeamBotService(
+                    agent=_FakeAgent({}, active_keys=set(), statuses={}),
+                    verify_auth_or_token=lambda user_id, password, token: None,
+                    extract_text=lambda content: content if isinstance(content, str) else str(content),
+                )
+
+                applied = await service.apply_session_workflow_preset(
+                    TeamBotWorkflowPresetApplyRequest(
+                        user_id="alice",
+                        session_id="default",
+                        preset_id="review_gate",
+                    ),
+                    None,
+                )
+                self.assertEqual(applied["preset"]["preset_id"], "review_gate")
+                self.assertEqual(applied["mode"]["mode"], "review")
+                self.assertEqual(applied["plan"]["metadata"]["workflow"]["preset_id"], "review_gate")
+
+                failed_run = runtime_store.create_run_record(
+                    run_id="run-1",
+                    user_id="alice",
+                    agent_id="worker-1",
+                    session_id="default",
+                    parent_session="default",
+                    agent_type="coder",
+                    title="Review gate verifier",
+                    input_text="verify runtime",
+                    status="failed",
+                    timeout_seconds=120,
+                    max_turns=4,
+                    wait_mode=False,
+                    run_kind="subagent",
+                    mode="review",
+                )
+                failed_run = runtime_store.upsert_run(failed_run)
+                runtime_store.update_run_status(
+                    "run-1",
+                    "alice",
+                    status="failed",
+                    last_error="approval pending for run_command",
+                )
+                runtime_store.record_run_event(
+                    run_id="run-1",
+                    user_id="alice",
+                    agent_id="worker-1",
+                    session_id="default",
+                    event_type="tool_approval_pending",
+                    status="blocked",
+                    message="Need manual approval",
+                )
+
+                runtime_view = await service.get_session_runtime("alice", "default", "", None)
+                self.assertTrue(runtime_view["workflow_presets"])
+                self.assertEqual(runtime_view["active_workflow"]["preset_id"], "review_gate")
+                self.assertEqual(runtime_view["runs"][0]["recovery"]["kind"], "approval_blocked")
+                self.assertIn("Resolve the pending tool approval", runtime_view["runs"][0]["recovery"]["suggestion"])
+                artifacts = runtime_view["artifacts"]
+                self.assertTrue(any(item["artifact_kind"] == "workflow_preset" for item in artifacts))
+            finally:
+                store.DEFAULT_DB_PATH = original_db_path
+                runtime_store.DEFAULT_DB_PATH = original_runtime_db_path
 
     async def test_session_control_plane_features(self):
         with TemporaryDirectory() as tmpdir:
