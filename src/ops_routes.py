@@ -24,6 +24,7 @@ def create_ops_router(
     agent: Any,
     verify_password: Callable[[str, str], bool],
     verify_auth_or_token: Callable[[str, str, str | None], None],
+    group_db_path: str | None = None,
 ) -> APIRouter:
     """构建基础运维/认证相关路由。"""
     router = APIRouter()
@@ -32,6 +33,7 @@ def create_ops_router(
         agent=agent,
         verify_password=verify_password,
         verify_auth_or_token=verify_auth_or_token,
+        group_db_path=group_db_path,
     )
 
     @router.get("/tools")

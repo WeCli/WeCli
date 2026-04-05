@@ -7,8 +7,15 @@ Flask 前端群聊代理路由模块
 - /proxy_groups/{group_id}/messages：代理消息
 """
 
+from urllib.parse import quote
+
 from flask import jsonify, request, session
 import requests
+
+
+def _enc_group_seg(segment: str) -> str:
+    """Path segment for FastAPI /groups/{group_id}/... (Unicode, #, :, etc.)."""
+    return quote(segment or "", safe="")
 
 # Agent /acp_control may run acpx OpenClaw exec /new for up to ~180s; a short proxy
 # timeout makes the UI show "超时" while the backend still succeeds.
@@ -74,7 +81,10 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
         print(f"[DEBUG proxy_get_group] group_id={repr(group_id)}")
         try:
             r = requests.get(
-                "http://127.0.0.1:{port}/groups/{group_id}".format(port=port_agent, group_id=group_id),
+                "http://127.0.0.1:{port}/groups/{gid}".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
                 headers=_group_auth_headers(),
                 timeout=20,
             )
@@ -90,7 +100,10 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
             headers = _group_auth_headers()
             headers["Content-Type"] = "application/json"
             r = requests.put(
-                "http://127.0.0.1:{port}/groups/{group_id}".format(port=port_agent, group_id=group_id),
+                "http://127.0.0.1:{port}/groups/{gid}".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
                 json=request.get_json(silent=True),
                 headers=headers,
                 timeout=10,
@@ -103,7 +116,10 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
     def proxy_delete_group(group_id):
         try:
             r = requests.delete(
-                "http://127.0.0.1:{port}/groups/{group_id}".format(port=port_agent, group_id=group_id),
+                "http://127.0.0.1:{port}/groups/{gid}".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
                 headers=_group_auth_headers(),
                 timeout=10,
             )
@@ -116,9 +132,9 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
         try:
             after_id = request.args.get("after_id", "0")
             r = requests.get(
-                "http://127.0.0.1:{port}/groups/{group_id}/messages".format(
+                "http://127.0.0.1:{port}/groups/{gid}/messages".format(
                     port=port_agent,
-                    group_id=group_id,
+                    gid=_enc_group_seg(group_id),
                 ),
                 params={"after_id": after_id},
                 headers=_group_auth_headers(),
@@ -134,9 +150,9 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
             headers = _group_auth_headers()
             headers["Content-Type"] = "application/json"
             r = requests.post(
-                "http://127.0.0.1:{port}/groups/{group_id}/messages".format(
+                "http://127.0.0.1:{port}/groups/{gid}/messages".format(
                     port=port_agent,
-                    group_id=group_id,
+                    gid=_enc_group_seg(group_id),
                 ),
                 json=request.get_json(silent=True),
                 headers=headers,
@@ -150,7 +166,10 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
     def proxy_mute_group(group_id):
         try:
             r = requests.post(
-                "http://127.0.0.1:{port}/groups/{group_id}/mute".format(port=port_agent, group_id=group_id),
+                "http://127.0.0.1:{port}/groups/{gid}/mute".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
                 headers=_group_auth_headers(),
                 timeout=10,
             )
@@ -162,7 +181,10 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
     def proxy_unmute_group(group_id):
         try:
             r = requests.post(
-                "http://127.0.0.1:{port}/groups/{group_id}/unmute".format(port=port_agent, group_id=group_id),
+                "http://127.0.0.1:{port}/groups/{gid}/unmute".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
                 headers=_group_auth_headers(),
                 timeout=10,
             )
@@ -174,9 +196,9 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
     def proxy_group_mute_status(group_id):
         try:
             r = requests.get(
-                "http://127.0.0.1:{port}/groups/{group_id}/mute_status".format(
+                "http://127.0.0.1:{port}/groups/{gid}/mute_status".format(
                     port=port_agent,
-                    group_id=group_id,
+                    gid=_enc_group_seg(group_id),
                 ),
                 headers=_group_auth_headers(),
                 timeout=10,
@@ -189,7 +211,10 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
     def proxy_group_sessions(group_id):
         try:
             r = requests.get(
-                "http://127.0.0.1:{port}/groups/{group_id}/sessions".format(port=port_agent, group_id=group_id),
+                "http://127.0.0.1:{port}/groups/{gid}/sessions".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
                 headers=_group_auth_headers(),
                 timeout=15,
             )
@@ -202,7 +227,10 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
         try:
             team_name = request.args.get("team_name", "")
             r = requests.post(
-                "http://127.0.0.1:{port}/groups/{group_id}/sync_members".format(port=port_agent, group_id=group_id),
+                "http://127.0.0.1:{port}/groups/{gid}/sync_members".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
                 params={"team_name": team_name} if team_name else {},
                 headers=_group_auth_headers(),
                 timeout=30,
@@ -217,7 +245,10 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
             headers = _group_auth_headers()
             headers["Content-Type"] = "application/json"
             r = requests.post(
-                "http://127.0.0.1:{port}/groups/{group_id}/members".format(port=port_agent, group_id=group_id),
+                "http://127.0.0.1:{port}/groups/{gid}/members".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
                 json=request.get_json(silent=True),
                 headers=headers,
                 timeout=10,
@@ -230,8 +261,11 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
     def proxy_remove_member(group_id, global_id):
         try:
             r = requests.delete(
-                "http://127.0.0.1:{port}/groups/{group_id}/members/{global_id}".format(
-                    port=port_agent, group_id=group_id, global_id=global_id),
+                "http://127.0.0.1:{port}/groups/{gid}/members/{gmid}".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                    gmid=_enc_group_seg(global_id),
+                ),
                 headers=_group_auth_headers(),
                 timeout=10,
             )

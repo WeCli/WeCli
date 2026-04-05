@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import hashlib
 import json
 import os
 import re
@@ -51,6 +52,28 @@ _ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # Project root for team-scoped paths
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+
+_EXTERNAL_AGENT_GROUP_RULES_PATH = os.path.join(
+    _PROJECT_ROOT, "data", "prompts", "external_agent_group_rules.txt",
+)
+_external_agent_group_rules_cache: str | None = None
+
+
+def _external_agent_group_rules_block() -> str:
+    """Rules for ext agents (ACP/HTTP): no access to agent.py group_chat_rules; prompt must be inlined."""
+    global _external_agent_group_rules_cache
+    if _external_agent_group_rules_cache is not None:
+        return _external_agent_group_rules_cache
+    try:
+        with open(_EXTERNAL_AGENT_GROUP_RULES_PATH, encoding="utf-8") as f:
+            _external_agent_group_rules_cache = f.read().strip()
+    except Exception:
+        _external_agent_group_rules_cache = (
+            "【外部 Agent】人类问候、@你、直呼你名时必须 groups send 简短回复；"
+            "其他消息仅在与职责相关、被点名或面向众人需要专业意见时回复。"
+        )
+    return _external_agent_group_rules_cache
+
 
 # ── Temporary ACP lifecycle trace (群聊): logger [ACP_TRACE] + logs/acp_group_trace.jsonl
 _ACP_TRACE_PATH = os.path.join(_PROJECT_ROOT, "logs", "acp_group_trace.jsonl")
@@ -230,6 +253,25 @@ def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
     return _parse_external_agents_file(path)
 
 
+def build_external_agents_map_for_owner(owner_uid: str) -> dict[str, dict]:
+    """Merge user-level + all teams' external_agents.json by global_id (same as broadcast_to_group)."""
+    external_agents_map: dict[str, dict] = {}
+    if not owner_uid:
+        return external_agents_map
+    for ea in _load_public_external_agents(owner_uid):
+        gid = str(ea.get("global_id") or ea.get("global_name") or "").strip()
+        if gid:
+            external_agents_map[gid] = ea
+    teams_dir = os.path.join(_PROJECT_ROOT, "data", "user_files", owner_uid, "teams")
+    if os.path.isdir(teams_dir):
+        for team_dir in os.listdir(teams_dir):
+            for ea in _load_team_external_agents(owner_uid, team_dir):
+                gid = str(ea.get("global_id", "") or "").strip()
+                if gid:
+                    external_agents_map[gid] = ea
+    return external_agents_map
+
+
 def _load_team_members(user_id: str, team: str) -> list[dict]:
     """Load all team members (internal + external agents).
 
@@ -243,6 +285,21 @@ def _load_team_members(user_id: str, team: str) -> list[dict]:
 async def init_group_db(group_db_path: str) -> None:
     """初始化群聊数据库表结构。"""
     await init_group_db_repo(group_db_path)
+
+
+def _group_id_name_segment(display_name: str) -> str:
+    """从展示用群名得到 group_id 中段（owner::此段）。
+
+    保留中文及绝大部分可打印字符（不丢语义）；只去掉对 ``uid::segment`` 和路径不安全的字符
+    （``:``、``/``、``\\``、控制符）。仅当去完后为空时用 hash 兜底，避免撞车。
+    """
+    raw = (display_name or "").strip()
+    if not raw:
+        return "h" + hashlib.sha256(b"").hexdigest()[:20]
+    segment = re.sub(r"[:/\\\x00-\x1f]", "_", raw).strip()
+    if not segment:
+        return "h" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:20]
+    return segment[:120]
 
 
 class GroupService:
@@ -571,24 +628,9 @@ class GroupService:
         )
 
         # Build external agent config map by global_id (need api_url etc. for ACP/HTTP)
-        # We need to load external agent configs from the owner's team files
-        # since api_url/api_key are not stored in DB
-        external_agents_map: dict[str, dict] = {}
-        if user_id:
-            owner = user_id
-            # User-level public external_agents.json (team entries override by global_id)
-            for ea in _load_public_external_agents(owner):
-                gid = str(ea.get("global_id") or ea.get("global_name") or "").strip()
-                if gid:
-                    external_agents_map[gid] = ea
-            # Scan all teams for this owner to find external agent configs
-            teams_dir = os.path.join(_PROJECT_ROOT, "data", "user_files", owner, "teams")
-            if os.path.isdir(teams_dir):
-                for team_dir in os.listdir(teams_dir):
-                    for ea in _load_team_external_agents(owner, team_dir):
-                        gid = str(ea.get("global_id", "") or "").strip()
-                        if gid:
-                            external_agents_map[gid] = ea
+        external_agents_map: dict[str, dict] = (
+            build_external_agents_map_for_owner(user_id) if user_id else {}
+        )
 
         for user_id_member, global_id, is_agent, member_type, short_name, tag in members:
             if group_id in self.group_muted:
@@ -610,11 +652,12 @@ class GroupService:
             cli_hint = (f"cd {_PROJECT_ROOT} && "
                         f"uv run scripts/cli.py groups send --group-id {group_id} --sender '{sender_display}' --message '你的回复内容'")
 
+            _ext_rules = _external_agent_group_rules_block()
             if is_private_chat:
                 # 私聊：不需要群聊标记，直接告知是私信
                 msg_prefix = f"[私聊] {sender} 说:\n"
                 msg_suffix = (f"\n\n{agent_identity}，这是用户发给你的私信，请认真回复。\n"
-                              f"{human_user_hint}\n"
+                              f"{human_user_hint}\n\n{_ext_rules}\n\n"
                               "请先 cd 到项目目录，然后使用 CLI 工具发送消息：\n"
                               f"{cli_hint}\n"
                               "注意：不要在 ACP 响应中直接输出内容，系统不会自动发布你的回复。\n"
@@ -622,22 +665,23 @@ class GroupService:
             elif mentions and global_id in mentions:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} @你 说:\n"
                 msg_suffix = (f"\n\n⚠️ 这是专门 @你 的消息，你必须回复！{agent_identity}。\n"
-                              f"{human_user_hint}\n"
+                              f"{human_user_hint}\n\n{_ext_rules}\n\n"
                               "请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
                               f"{cli_hint}\n"
                               "注意：不要在 ACP 响应中直接输出群聊内容，系统不会自动发布你的回复。\n"
                               "[end padding]\n[end padding]\n[end padding]")
             else:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} 说:\n"
-                msg_suffix = (f"\n\n{agent_identity}，仅当消息与你直接相关时才回复。\n"
-                              f"{human_user_hint}\n"
-                              "💡 尽量等待人类用户发起讨论或提出问题后再参与，不要主动发起新话题。\n"
-                              "如果需要回复，请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
-                              f"{cli_hint}\n"
-                              "⚠️ 回复时尽量精准 @具体的人，不要给群中所有人发消息。"
-                              "例如消息末尾加上 @某人名字 来指定回复对象。\n"
-                              "注意：不要在 ACP 响应中直接输出群聊内容，系统不会自动发布你的回复。\n"
-                              "[end padding]\n[end padding]\n[end padding]")
+                msg_suffix = (
+                    f"\n\n{agent_identity}。请遵守下面「外部 Agent 群聊须知」："
+                    f"人类问候与 @/点名必须 groups send 回复；其他消息仅在相关或被需要时再回。\n"
+                    f"{human_user_hint}\n\n{_ext_rules}\n\n"
+                    "💡 不要主动发起与当前话题无关的新讨论；回复时尽量 @ 具体对象，避免对全群广播。\n"
+                    "如需回复，请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
+                    f"{cli_hint}\n"
+                    "注意：不要在 ACP 响应中直接输出群聊内容，系统不会自动发布你的回复。\n"
+                    "[end padding]\n[end padding]\n[end padding]"
+                )
 
             msg_text = msg_prefix + content + msg_suffix
 
@@ -731,8 +775,8 @@ class GroupService:
         else:
             members = []
 
-        # group_id = owner::name_safe  (确定性、URL 安全)
-        name_safe = re.sub(r"[^a-zA-Z0-9_\-]", "_", req.name).strip("_") or "group"
+        # group_id = owner::segment（segment 保留中文语义，仅剔除 : / \ 与控制符）
+        name_safe = _group_id_name_segment(req.name)
         group_id = f"{uid}::{name_safe}"
 
         if await group_exists(self.group_db_path, group_id):

@@ -12,7 +12,8 @@ from fastapi.responses import StreamingResponse
 from acpx_adapter import AcpxError, get_acpx_adapter
 from acpx_cli_tools import acpx_agent_tags_with_legacy
 from auth_utils import extract_user_password_session, is_internal_bearer, parse_bearer_parts
-from group_service import _load_public_external_agents
+from group_repository import get_group, get_group_member_by_global_id
+from group_service import _load_public_external_agents, build_external_agents_map_for_owner
 from llm_factory import get_provider_audio_defaults, infer_provider
 from logging_utils import get_logger
 from ops_models import ACPControlRequest, ACPStatusRequest, CancelRequest, LoginRequest, TTSRequest
@@ -132,11 +133,13 @@ class OpsService:
         agent: Any,
         verify_password: Callable[[str, str], bool],
         verify_auth_or_token: Callable[[str, str, str | None], None],
+        group_db_path: str | None = None,
     ):
         self.internal_token = internal_token
         self.agent = agent
         self.verify_password = verify_password
         self.verify_auth_or_token = verify_auth_or_token
+        self.group_db_path = group_db_path
 
     async def get_tools_list(self, x_internal_token: str | None, authorization: str | None):
         """获取可用工具列表。
@@ -267,15 +270,40 @@ class OpsService:
 
         team_hint = (req.team or "").strip()
         agent_key = (req.agent_name or "").strip()
-        agent_info = _resolve_external_agent_record(req.user_id, team_hint, agent_key)
-        if not agent_info:
-            raise HTTPException(
-                status_code=404,
-                detail=(
-                    f"外部 agent '{agent_key}' 未找到（team={team_hint or '(空)'}；"
-                    "已查用户级 external_agents.json 与各 team 目录）"
-                ),
-            )
+        group_id = (req.group_id or "").strip()
+
+        agent_info: dict | None = None
+        if self.group_db_path and group_id:
+            g = await get_group(self.group_db_path, group_id)
+            if not g:
+                raise HTTPException(status_code=404, detail="群聊不存在")
+            if g.get("owner") != req.user_id:
+                raise HTTPException(status_code=403, detail="只有群主可控制群内外部 agent")
+            member = await get_group_member_by_global_id(self.group_db_path, group_id, agent_key)
+            if not member:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"群内未找到成员（global_id={agent_key}）",
+                )
+            if (member.get("member_type") or "").strip() != "ext":
+                raise HTTPException(status_code=400, detail="该成员不是外部 agent")
+            ext_map = build_external_agents_map_for_owner(req.user_id)
+            agent_info = ext_map.get(agent_key, {})
+            if not agent_info:
+                short_n = str(member.get("short_name") or "").strip()
+                tag_m = str(member.get("tag") or "").strip()
+                agent_info = {"global_name": agent_key, "name": short_n, "tag": tag_m}
+        else:
+            agent_info = _resolve_external_agent_record(req.user_id, team_hint, agent_key)
+            if not agent_info:
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"外部 agent '{agent_key}' 未找到（team={team_hint or '(空)'}；"
+                        "已查用户级 external_agents.json 与各 team 目录；"
+                        "若在群内仅限 JSON 的成员，请在请求中提供 group_id）"
+                    ),
+                )
 
         global_name = agent_info.get("global_name", "")
         if not global_name:

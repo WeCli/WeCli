@@ -69,3 +69,6 @@ data/*.db-wal
 data/*.db-shm
 data/user_files/
 data/oasis_discussions/
+
+# 临时 LLM 请求调试导出（TEAMCLAW_DEBUG_LLM_PAYLOAD=1）
+data/debug_llm_payload_last.json
