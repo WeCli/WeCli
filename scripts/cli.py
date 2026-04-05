@@ -165,6 +165,11 @@ def _group_headers(user_id):
     return {"Authorization": f"Bearer {INTERNAL_TOKEN}:{user_id}"}
 
 
+def _quote_group_id(gid: str) -> str:
+    """Path segment for /groups/{group_id}/...（#、中文、:: 等须编码，否则 # 会截断路径）。"""
+    return urllib.parse.quote((gid or "").strip(), safe="")
+
+
 def _check_token():
     """检查 INTERNAL_TOKEN 是否已配置，未配置则退出"""
     if not INTERNAL_TOKEN:
@@ -536,7 +541,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        url = f"{base}/{args.group_id}/messages"
+        gid = _quote_group_id(args.group_id)
+        url = f"{base}/{gid}/messages"
         if args.after_id:
             url += f"?after_id={args.after_id}"
         code, body = _req("GET", url, headers=hdrs)
@@ -554,7 +560,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        url = f"{base}/{args.group_id}/messages"
+        gid = _quote_group_id(args.group_id)
+        url = f"{base}/{gid}/messages"
         data = {"content": args.message or ""}
         if args.sender:
             data["sender"] = args.sender
@@ -571,7 +578,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        code, body = _req("GET", f"{base}/{args.group_id}", headers=hdrs)
+        gid = _quote_group_id(args.group_id)
+        code, body = _req("GET", f"{base}/{gid}", headers=hdrs)
         if code == 200:
             _pp(body)
         else:
@@ -583,7 +591,8 @@ def cmd_groups(args):
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
         data = json.loads(args.data) if args.data else {}
-        code, body = _req("PUT", f"{base}/{args.group_id}", headers=hdrs, data=data)
+        gid = _quote_group_id(args.group_id)
+        code, body = _req("PUT", f"{base}/{gid}", headers=hdrs, data=data)
         if code == 200:
             print("✅ 群组已更新")
             _pp(body)
@@ -595,7 +604,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        code, body = _req("DELETE", f"{base}/{args.group_id}", headers=hdrs)
+        gid = _quote_group_id(args.group_id)
+        code, body = _req("DELETE", f"{base}/{gid}", headers=hdrs)
         if code == 200:
             print(f"✅ 群组 {args.group_id} 已删除")
         else:
@@ -606,7 +616,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        code, body = _req("POST", f"{base}/{args.group_id}/mute", headers=hdrs)
+        gid = _quote_group_id(args.group_id)
+        code, body = _req("POST", f"{base}/{gid}/mute", headers=hdrs)
         if code == 200:
             print("✅ 群组已静音")
         else:
@@ -617,7 +628,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        code, body = _req("POST", f"{base}/{args.group_id}/unmute", headers=hdrs)
+        gid = _quote_group_id(args.group_id)
+        code, body = _req("POST", f"{base}/{gid}/unmute", headers=hdrs)
         if code == 200:
             print("✅ 群组已取消静音")
         else:
@@ -628,7 +640,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        code, body = _req("GET", f"{base}/{args.group_id}/mute_status", headers=hdrs)
+        gid = _quote_group_id(args.group_id)
+        code, body = _req("GET", f"{base}/{gid}/mute_status", headers=hdrs)
         if code == 200:
             _pp(body)
         else:
@@ -639,7 +652,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        code, body = _req("GET", f"{base}/{args.group_id}/sessions", headers=hdrs)
+        gid = _quote_group_id(args.group_id)
+        code, body = _req("GET", f"{base}/{gid}/sessions", headers=hdrs)
         if code == 200:
             _pp(body)
         else:
@@ -650,7 +664,8 @@ def cmd_groups(args):
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
             return
-        code, body = _req("POST", f"{base}/{args.group_id}/sync_members", headers=hdrs)
+        gid = _quote_group_id(args.group_id)
+        code, body = _req("POST", f"{base}/{gid}/sync_members", headers=hdrs)
         if code == 200:
             print("✅ 群成员已同步")
             _pp(body)

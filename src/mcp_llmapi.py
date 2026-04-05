@@ -18,6 +18,8 @@ Runs as a stdio MCP server.
 
 import os
 import json
+from urllib.parse import quote
+
 import httpx
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
@@ -308,7 +310,9 @@ async def send_to_group(
     if not _INTERNAL_TOKEN:
         return "❌ 系统未配置 INTERNAL_TOKEN，无法发送群聊消息。"
 
-    url = f"http://127.0.0.1:{_AGENT_PORT}/groups/{group_id}/messages"
+    # group_id 可能含 #、中文、::；必须编码，否则 # 会把 /messages 截成 fragment → POST 落到 /groups/{id} → 405
+    gid = quote((group_id or "").strip(), safe="")
+    url = f"http://127.0.0.1:{_AGENT_PORT}/groups/{gid}/messages"
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             response = await client.post(

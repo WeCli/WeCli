@@ -98,6 +98,9 @@ from notification_system import (
 )
 
 
+# 调试导出（已关闭）：原 _maybe_debug_dump_llm_payload_for_minimax 在 TEAMCLAW_DEBUG_LLM_PAYLOAD=1 时
+# 将 ainvoke 前消息写入 data/debug_llm_payload_last.json；实现已从默认分支移除，需排障时查 git 历史。
+
 # --- Tools that need automatic username injection ---
 USER_INJECTED_TOOLS = {
     # File management tools
@@ -1243,18 +1246,6 @@ class TeamAgent:
 
         history_messages = list(state["messages"])
 
-        # 每次进入前清理：移除末尾不完整的 tool_calls（有 AIMessage 带 tool_calls 但缺少 ToolMessage 回复）
-        # 但保留外部工具的未回复 tool_calls（它们正等待调用方回传结果）
-        history_messages = self._sanitize_messages(history_messages, external_tool_names)
-
-        # MCP 工具返回的 ToolMessage.content 可能是 list（如 [{"type":"text","text":"..."}]），
-        # 但 DeepSeek / OpenAI 兼容 API 的 tool message content 只接受 string，
-        # 不转换会导致 "invalid type: sequence, expected a string" 错误。
-        from llm_factory import extract_text
-        for msg in history_messages:
-            if isinstance(msg, ToolMessage) and isinstance(msg.content, list):
-                msg.content = extract_text(msg.content)
-
         # 清理历史消息中的多模态内容（file/image/audio parts），只保留文本
         # 避免旧的二进制附件在后续轮次反复发送给 LLM 导致上游 API 报错
         # 注意：保留最后一条 HumanMessage 的多模态内容（当前轮用户输入）
@@ -1345,22 +1336,39 @@ class TeamAgent:
             )
             history_messages = history_messages[:-1] + [HumanMessage(content=system_trigger_prompt)]
 
+        # 发往 LLM 前最后一次 tool 序列校验：须在 compact/compress 与系统触发改写之后，
+        # 否则摘要截断可能再次产生「孤儿 Tool / 悬空 tool_calls」。
+        history_messages = self._sanitize_messages(history_messages, external_tool_names)
+        from llm_factory import extract_text
+        for msg in history_messages:
+            if isinstance(msg, ToolMessage) and isinstance(msg.content, list):
+                msg.content = extract_text(msg.content)
+
         # 正常对话流程（用户和系统触发共用）
+        # 工具状态通知只能并入「最后一条 HumanMessage」。若最后一条是 ToolMessage / AIMessage
+        #（例如刚执行完工具、准备让模型继续），绝不能把 ToolMessage 替换成 HumanMessage，
+        # 否则会破坏 Anthropic/MiniMax 要求的 tool_calls → ToolMessage 顺序，触发 2013。
         if tool_status_prompt and len(history_messages) >= 1:
             last_msg = history_messages[-1]
-            # 如果最后一条是多模态 content（list），将通知插入为第一个 text part
-            if isinstance(last_msg.content, list):
-                notification = {"type": "text", "text": f"[系统通知] {tool_status_prompt}\n\n---\n"}
-                augmented_content = [notification] + list(last_msg.content)
-                augmented_msg = HumanMessage(content=augmented_content)
+            if isinstance(last_msg, HumanMessage):
+                if isinstance(last_msg.content, list):
+                    notification = {"type": "text", "text": f"[系统通知] {tool_status_prompt}\n\n---\n"}
+                    augmented_content = [notification] + list(last_msg.content)
+                    augmented_msg = HumanMessage(content=augmented_content)
+                else:
+                    augmented_content = f"[系统通知] {tool_status_prompt}\n\n---\n{last_msg.content}"
+                    augmented_msg = HumanMessage(content=augmented_content)
+                input_messages = (
+                    [SystemMessage(content=base_prompt)]
+                    + history_messages[:-1]
+                    + [augmented_msg]
+                )
             else:
-                augmented_content = f"[系统通知] {tool_status_prompt}\n\n---\n{last_msg.content}"
-                augmented_msg = HumanMessage(content=augmented_content)
-            input_messages = (
-                [SystemMessage(content=base_prompt)]
-                + history_messages[:-1]
-                + [augmented_msg]
-            )
+                notice_block = f"\n\n[系统通知] {tool_status_prompt}\n"
+                input_messages = (
+                    [SystemMessage(content=base_prompt + notice_block)]
+                    + history_messages
+                )
         else:
             input_messages = [SystemMessage(content=base_prompt)] + history_messages
 
@@ -1389,6 +1397,13 @@ class TeamAgent:
         # except Exception:
         #     pass
         # # === END DEBUG ===
+
+        # _maybe_debug_dump_llm_payload_for_minimax(
+        #     input_messages,
+        #     llm,
+        #     user_id=user_id,
+        #     session_id=session_id,
+        # )
 
         response = await llm.ainvoke(input_messages)
         next_turn_count = current_turn_count + 1
@@ -1508,9 +1523,12 @@ class TeamAgent:
 
         两轮扫描：
         1. 末尾截断：从后往前移除悬空的 tool_calls AIMessage（保留外部工具等待回传）
-        2. 全序列扫描：中间的悬空 tool_calls AIMessage → 去掉 tool_calls 只保留 content
+        2. 位置校验的全序列扫描：每条 AIMessage 的 tool 调用必须在**紧随其后**的连续
+           ToolMessage 中全部出现；否则剥离该轮的工具块，并丢弃同批次 tool_call_id 的孤儿
+           ToolMessage（避免 2013）。
 
-        同时检查 invalid_tool_calls（如截断的 arguments），因为序列化时也会变成 tool_calls 发给 API。
+        注意：MiniMax/Anthropic 适配下，tool_use 可能只留在 ``content`` 列表里而 ``tool_calls``
+        为空（checkpoint/合并异常）；必须通过 content 里的 ``type=="tool_use"`` 块一并检测。
         """
         import logging
         _log = logging.getLogger("agent.sanitize")
@@ -1518,18 +1536,68 @@ class TeamAgent:
         if not external_tool_names:
             external_tool_names = set()
 
+        def _tool_use_blocks_from_content(msg) -> list[dict]:
+            blocks = []
+            content = getattr(msg, "content", None)
+            if not isinstance(content, list):
+                return blocks
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "tool_use":
+                    blocks.append(
+                        {
+                            "id": block.get("id", ""),
+                            "name": block.get("name", ""),
+                        }
+                    )
+            return blocks
+
         def _get_all_tc(msg):
-            """获取 AIMessage 上所有 tool_calls + invalid_tool_calls"""
-            tc_list = list(getattr(msg, "tool_calls", None) or [])
-            for itc in (getattr(msg, "invalid_tool_calls", None) or []):
-                tc_list.append({"id": itc.get("id", ""), "name": itc.get("name", ""), **itc})
+            """AIMessage：tool_calls + invalid_tool_calls + content 内 tool_use 块（去重）"""
+            tc_list: list = []
+            seen_ids: set[str] = set()
+            for tc in list(getattr(msg, "tool_calls", None) or []):
+                tid = (tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)) or ""
+                name = (tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)) or ""
+                rec = {"id": tid, "name": name}
+                if isinstance(tc, dict):
+                    rec = {**tc, **rec}
+                tc_list.append(rec)
+                if tid:
+                    seen_ids.add(tid)
+            for itc in getattr(msg, "invalid_tool_calls", None) or []:
+                tid = itc.get("id", "") if isinstance(itc, dict) else ""
+                rec = {"id": tid, "name": itc.get("name", ""), **itc} if isinstance(itc, dict) else {"id": "", "name": ""}
+                tc_list.append(rec)
+                if tid:
+                    seen_ids.add(tid)
+            for rec in _tool_use_blocks_from_content(msg):
+                tid = rec.get("id", "")
+                if tid and tid not in seen_ids:
+                    tc_list.append(rec)
+                    seen_ids.add(tid)
             return tc_list
 
-        # 收集所有已存在的 tool_call_id 回复
+        def _strip_ai_tool_blocks(msg: AIMessage) -> AIMessage:
+            """移除 tool_calls / invalid 及 content 中的 tool_use 块，仅保留 thinking、text 等。"""
+            content = getattr(msg, "content", None)
+            if isinstance(content, list):
+                kept = [b for b in content if not (isinstance(b, dict) and b.get("type") == "tool_use")]
+                content = kept if kept else "（工具调用序列异常，已省略未完成的工具块）"
+            elif content is None or content == "":
+                content = "（工具调用序列异常，已清理）"
+            return AIMessage(
+                content=content,
+                tool_calls=[],
+                invalid_tool_calls=[],
+            )
+
+        # 收集所有已存在的 tool_call_id 回复（用于末尾外部工具启发式）
         answered_ids = set()
         for msg in messages:
             if isinstance(msg, ToolMessage) and hasattr(msg, "tool_call_id"):
-                answered_ids.add(msg.tool_call_id)
+                tid = getattr(msg, "tool_call_id", None)
+                if tid:
+                    answered_ids.add(tid)
 
         # --- 第一轮：从末尾截断悬空的 tool_calls ---
         clean = list(messages)
@@ -1545,29 +1613,56 @@ class TeamAgent:
                 break
             # 检查未回复的是否全属于外部工具
             unanswered = [tc for tc in all_tc if tc.get("id") not in answered_ids]
-            if external_tool_names and all(tc["name"] in external_tool_names for tc in unanswered):
+            if external_tool_names and all(tc.get("name") in external_tool_names for tc in unanswered):
                 break
             _log.warning("sanitize: 截断末尾悬空 AIMessage, tool_calls=%s",
                          [tc.get("name") for tc in all_tc])
             clean.pop()
 
-        # --- 第二轮：全序列扫描，修复中间的悬空 tool_calls ---
-        result = []
-        for msg in clean:
-            if isinstance(msg, AIMessage):
-                all_tc = _get_all_tc(msg)
-                if all_tc:
-                    pending_ids = {tc["id"] for tc in all_tc if tc.get("id")}
-                    if not pending_ids.issubset(answered_ids):
-                        # 中间出现悬空 tool_calls → 去掉 tool_calls，只保留 content
-                        _log.warning(
-                            "sanitize: 中间悬空 AIMessage, 剥离 tool_calls=%s, content=%s",
-                            [tc.get("name") for tc in all_tc],
-                            str(msg.content)[:100],
-                        )
-                        result.append(AIMessage(content=msg.content or "（工具调用异常，已清理）"))
-                        continue
-            result.append(msg)
+        # --- 第二轮：按「紧跟的 ToolMessage」校验；失败则剥离并记下待删除的 tool_call_id ---
+        drop_tool_ids: set[str] = set()
+        result: list = []
+        for i, msg in enumerate(clean):
+            if not isinstance(msg, AIMessage):
+                result.append(msg)
+                continue
+            all_tc = _get_all_tc(msg)
+            if not all_tc:
+                result.append(msg)
+                continue
+            pending_ids = {tc["id"] for tc in all_tc if tc.get("id")}
+            if not pending_ids:
+                result.append(msg)
+                continue
+            got_ids: set[str] = set()
+            j = i + 1
+            while j < len(clean) and isinstance(clean[j], ToolMessage):
+                tid = getattr(clean[j], "tool_call_id", "") or ""
+                if tid:
+                    got_ids.add(tid)
+                j += 1
+            if pending_ids.issubset(got_ids):
+                result.append(msg)
+                continue
+            _log.warning(
+                "sanitize: AIMessage 工具调用未紧跟 ToolMessage（或 content 内残留 tool_use），"
+                "剥离 tools=%s, got=%s, pending=%s",
+                [tc.get("name") for tc in all_tc],
+                got_ids,
+                pending_ids,
+            )
+            drop_tool_ids.update(pending_ids)
+            result.append(_strip_ai_tool_blocks(msg))
+
+        # --- 第三轮：移除孤儿 ToolMessage（其 id 属于已剥离的未完成调用）---
+        if drop_tool_ids:
+            result = [
+                m for m in result
+                if not (
+                    isinstance(m, ToolMessage)
+                    and (getattr(m, "tool_call_id", "") or "") in drop_tool_ids
+                )
+            ]
 
         return result
 

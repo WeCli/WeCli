@@ -185,6 +185,7 @@ app.include_router(
         agent=agent,
         verify_password=verify_password,
         verify_auth_or_token=verify_auth_or_token,
+        group_db_path=group_db_path,
     )
 )
 

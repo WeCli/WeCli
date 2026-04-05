@@ -44,6 +44,7 @@ class ACPControlRequest(BaseModel):
     user_id: str
     password: str = ""
     team: str                              # 群组/团队名
+    group_id: str = ""                     # 群聊 id；若提供则与 broadcast_to_group 相同方式解析 ext 成员
     agent_name: str                        # 外部 agent 的 name (= session_id in members)
     action: Literal["new", "stop"]         # new=新建session, stop=取消当前操作
     reset_session: bool = False            # 重置会话（通过 --reset-session 命令行标志实现）

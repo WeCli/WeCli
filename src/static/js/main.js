@@ -9939,7 +9939,7 @@ function startGroupPolling(groupId) {
             return;
         }
         try {
-            const resp = await fetch(`/proxy_groups/${groupId}/messages?after_id=${groupLastMsgId}`);
+            const resp = await fetch(`/proxy_groups/${encodeURIComponent(groupId)}/messages?after_id=${groupLastMsgId}`);
             if (!resp.ok) return;
             const data = await resp.json();
             if (data.messages && data.messages.length > 0) {
@@ -9968,7 +9968,7 @@ async function sendGroupMessage() {
     try {
         const body = { content: text };
         if (mentions) body.mentions = mentions;
-        const resp = await fetch(`/proxy_groups/${currentGroupId}/messages`, {
+        const resp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}/messages`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -10020,7 +10020,7 @@ async function loadAvailableSessions() {
     try {
         // Load sessions, group detail, and agent meta in parallel
         const [resp, agentMap] = await Promise.all([
-            fetch(`/proxy_groups/${currentGroupId}/sessions`),
+            fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}/sessions`),
             _loadAgentMetaMap()
         ]);
         if (!resp.ok) return;
@@ -10028,7 +10028,7 @@ async function loadAvailableSessions() {
         const sessions = data.sessions || [];
 
         // Get current members to mark them
-        const detailResp = await fetch(`/proxy_groups/${currentGroupId}`);
+        const detailResp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}`);
         const detail = await detailResp.json();
         const memberSet = new Set((detail.members || []).map(m => m.user_id + '#' + m.session_id));
 
@@ -10055,7 +10055,7 @@ async function loadAvailableSessions() {
 async function toggleGroupAgent(sessionId, add) {
     if (!currentGroupId) return;
     try {
-        await fetch(`/proxy_groups/${currentGroupId}`, {
+        await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -10069,7 +10069,7 @@ async function toggleGroupAgent(sessionId, add) {
             })
         });
         // Refresh member list
-        const resp = await fetch(`/proxy_groups/${currentGroupId}`);
+        const resp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}`);
         const detail = await resp.json();
         renderGroupMembers(detail.members || []);
     } catch (e) {
@@ -11548,7 +11548,7 @@ async function addExternalMember(event) {
 
 async function deleteGroup(groupId) {    if (!confirm(t('group_delete_confirm'))) return;
     try {
-        await fetch(`/proxy_groups/${groupId}`, {
+        await fetch(`/proxy_groups/${encodeURIComponent(groupId)}`, {
             method: 'DELETE'
         });
         if (currentGroupId === groupId) {
@@ -11582,7 +11582,7 @@ function updateMuteButton() {
 
 async function loadGroupMuteStatus(groupId) {
     try {
-        const resp = await fetch(`/proxy_groups/${groupId}/mute_status`);
+        const resp = await fetch(`/proxy_groups/${encodeURIComponent(groupId)}/mute_status`);
         if (resp.ok) {
             const data = await resp.json();
             groupMuted = data.muted;
@@ -11595,7 +11595,7 @@ async function toggleGroupMute() {
     if (!currentGroupId) return;
     const action = groupMuted ? 'unmute' : 'mute';
     try {
-        const resp = await fetch(`/proxy_groups/${currentGroupId}/${action}`, {
+        const resp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}/${action}`, {
             method: 'POST'
         });
         if (resp.ok) {
