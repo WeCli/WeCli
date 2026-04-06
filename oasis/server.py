@@ -96,6 +96,7 @@ from oasis.models import (
 from oasis.forum import DiscussionForum
 from oasis.engine import DiscussionEngine
 from oasis.experts import _apply_response
+from oasis.swarm_engine import build_pending_swarm, generate_swarm_blueprint
 from oasis.openclaw_cli import (
     build_agent_detail as _build_agent_detail_helper,
     fetch_openclaw_channels as _fetch_openclaw_channels_helper,
@@ -242,6 +243,30 @@ async def _run_discussion(topic_id: str, engine: DiscussionEngine):
             forum.status = "error"
             forum.conclusion = f"讨论出错: {str(e)}"
 
+    # Upgrade swarm blueprint with discussion results
+    if forum and forum.swarm_mode and forum.status in ("concluded",):
+        try:
+            posts = [
+                {"author": p.author, "content": p.content, "upvotes": p.upvotes, "downvotes": p.downvotes}
+                for p in await forum.browse()
+            ]
+            timeline = [
+                {"event": e.event, "agent": e.agent, "detail": e.detail, "elapsed": e.elapsed}
+                for e in forum.timeline
+            ]
+            forum.swarm = generate_swarm_blueprint(
+                forum.question,
+                user_id=forum.user_id,
+                team=getattr(engine, "_team", ""),
+                schedule_yaml=None,
+                posts=posts,
+                timeline=timeline,
+                conclusion=forum.conclusion or "",
+                mode=forum.swarm_mode,
+            )
+        except Exception as e:
+            print(f"[OASIS] ⚠️ Swarm blueprint upgrade failed: {e}")
+
     if forum:
         forum.save()
 
@@ -312,6 +337,21 @@ async def create_topic(req: CreateTopicRequest):
     engine.callback_url = req.callback_url
     engine.callback_session_id = req.callback_session_id
     engines[topic_id] = engine
+
+    # Generate pending swarm scaffold if requested
+    if req.autogen_swarm:
+        try:
+            forum.swarm_mode = req.swarm_mode or "prediction"
+            forum.swarm = build_pending_swarm(
+                req.question,
+                user_id=req.user_id,
+                team=req.team or "",
+                schedule_yaml=req.schedule_yaml,
+                mode=forum.swarm_mode,
+            )
+            forum.save()
+        except Exception as e:
+            print(f"[OASIS] ⚠️ Swarm scaffold generation failed: {e}")
 
     task = asyncio.create_task(_run_discussion(topic_id, engine))
     tasks[topic_id] = task
@@ -555,6 +595,8 @@ async def get_topic(topic_id: str, user_id: str = Query(...)):
         ],
         discussion=forum.discussion,
         conclusion=forum.conclusion,
+        swarm_mode=forum.swarm_mode or None,
+        swarm=forum.swarm,
         pending_human=(
             HumanWaitInfo(
                 node_id=forum.pending_human.node_id,
@@ -653,10 +695,44 @@ async def list_topics(user_id: str = Query(...)):
                 current_round=f.current_round,
                 max_rounds=f.max_rounds,
                 created_at=f.created_at,
+                swarm_mode=f.swarm_mode or None,
+                has_swarm=f.swarm is not None,
             )
         )
     items.sort(key=lambda x: x.created_at, reverse=True)
     return items
+
+
+@app.post("/topics/{topic_id}/swarm/refresh")
+async def refresh_swarm(topic_id: str, user_id: str = Query("default")):
+    """Regenerate the swarm blueprint using current discussion data."""
+    forum = _get_forum_or_404(topic_id)
+    _check_owner(forum, user_id)
+
+    mode = forum.swarm_mode or "prediction"
+    try:
+        posts = [
+            {"author": p.author, "content": p.content, "upvotes": p.upvotes, "downvotes": p.downvotes}
+            for p in await forum.browse()
+        ]
+        timeline = [
+            {"event": e.event, "agent": e.agent, "detail": e.detail, "elapsed": e.elapsed}
+            for e in forum.timeline
+        ]
+        forum.swarm = generate_swarm_blueprint(
+            forum.question,
+            user_id=forum.user_id,
+            team="",
+            posts=posts,
+            timeline=timeline,
+            conclusion=forum.conclusion or "",
+            mode=mode,
+        )
+        forum.save()
+    except Exception as e:
+        raise HTTPException(500, f"Swarm refresh failed: {e}")
+
+    return {"topic_id": topic_id, "status": "ok", "swarm": forum.swarm}
 
 
 @app.get("/topics/{topic_id}/conclusion")

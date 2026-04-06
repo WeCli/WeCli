@@ -42,6 +42,7 @@ from team_creator_service import (
     get_job,
     import_colleague_skill,
     import_mentor_skill,
+    import_personal_skill,
     list_jobs,
     map_roles_to_team,
     parse_extracted_roles,
@@ -1251,6 +1252,78 @@ def team_creator_import_mentor():
             "team_config": team_config,
             "summary": team_config.get("summary"),
             "import_source": "supervisor-mentor",
+        })
+
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/team-creator/import-personal", methods=["POST"])
+def team_creator_import_personal():
+    """Import a personal/relationship-type skill into Team Creator.
+
+    Handles ex-skill (前任), crush-skill, yourself-skill, pig-skill (群友), etc.
+    All share the same format: meta.json + persona.md + memory.md / self.md
+
+    Accepts JSON body:
+      - meta_json:    dict (parsed meta.json)
+      - persona_md:   string (raw persona.md — 5-layer persona)
+      - memory_md:    string (raw memory.md / self.md, optional)
+      - skill_type:   string (one of: ex, crush, yourself, pig — default "ex")
+      - team_name:    string (optional)
+      - task_description: string (optional)
+
+    Or multipart form upload with files: meta_json, persona_md, memory_md
+    """
+    try:
+        import json as _json
+
+        if request.is_json:
+            body = request.get_json(silent=True) or {}
+            meta_json = body.get("meta_json") or {}
+            persona_md = str(body.get("persona_md") or "").strip()
+            memory_md = str(body.get("memory_md") or body.get("self_md") or "").strip()
+            skill_type = str(body.get("skill_type") or "ex").strip()
+            team_name = str(body.get("team_name") or "").strip()
+            task_description = str(body.get("task_description") or "").strip()
+        else:
+            meta_file = request.files.get("meta_json")
+            persona_file = request.files.get("persona_md")
+            memory_file = request.files.get("memory_md") or request.files.get("self_md")
+
+            if meta_file:
+                meta_json = _json.loads(meta_file.read().decode("utf-8"))
+            else:
+                raw = request.form.get("meta_json", "{}")
+                meta_json = _json.loads(raw) if isinstance(raw, str) else raw
+
+            persona_md = persona_file.read().decode("utf-8") if persona_file else request.form.get("persona_md", "")
+            memory_md = memory_file.read().decode("utf-8") if memory_file else request.form.get("memory_md", "")
+            skill_type = request.form.get("skill_type", "ex")
+            team_name = request.form.get("team_name", "")
+            task_description = request.form.get("task_description", "")
+
+        if not meta_json:
+            return jsonify({"ok": False, "error": "meta_json is required"}), 400
+        if not persona_md:
+            return jsonify({"ok": False, "error": "persona_md is required"}), 400
+
+        team_config = import_personal_skill(
+            meta_json=meta_json,
+            persona_md=persona_md,
+            memory_md=memory_md,
+            skill_type=skill_type,
+            team_name=team_name,
+            task_description=task_description,
+        )
+
+        return jsonify({
+            "ok": True,
+            "team_config": team_config,
+            "summary": team_config.get("summary"),
+            "import_source": f"{skill_type}-skill",
         })
 
     except ValueError as e:

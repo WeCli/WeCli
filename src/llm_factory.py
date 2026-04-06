@@ -67,7 +67,7 @@ _PROVIDER_ALIASES: dict[str, str] = {
     "deepseek": "deepseek",
     "ollama": "ollama",
     "antigravity": "openai",  # Antigravity reverse-proxy → OpenAI-compatible
-    "minimax": "minimax",    # MiniMax API → OpenAI-compatible (handled as its own provider)
+    "minimax": "minimax",    # MiniMax chat → Anthropic-compatible API (separate branch in create_chat_model)
 }
 
 _BASE_URL_PROVIDER_PATTERNS: tuple[tuple[str, str], ...] = (
@@ -99,7 +99,7 @@ _AUDIO_DEFAULTS: dict[str, dict[str, str]] = {
         "tts_voice": "",
         "stt_model": "",
     },
-    # MiniMax is OpenAI-compatible, so reuse OpenAI audio defaults.
+    # MiniMax chat uses Anthropic-compatible API; reuse OpenAI-style names as generic audio defaults.
     "minimax": {
         "tts_model": "gpt-4o-mini-tts",
         "tts_voice": "alloy",

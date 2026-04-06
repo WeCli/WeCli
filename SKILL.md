@@ -168,6 +168,176 @@ uv run scripts/cli.py openclaw bind --data '{"agent":"main","channel":"openclaw-
 
 ---
 
+## ACP Tools Integration (Optional)
+
+TeamClaw communicates with external AI coding agents via **acpx** (ACP exchange). `acpx` is installed automatically during `start` / `setup`. Each tool below is an independent CLI agent that acpx can bridge — install only the ones the user wants.
+
+**Prerequisite for all:** `acpx` must be installed (`npm install -g acpx@latest`; done automatically by `start`).
+
+After installing any tool below, **restart TeamClaw** so the switcher bar picks it up. Verify with:
+
+```bash
+acpx --help          # lists all discovered tools
+# or in browser: the switcher bar in Team Studio shows available ACP tabs
+```
+
+### Codex (OpenAI)
+
+OpenAI's terminal coding agent.
+
+- **Prerequisites:** Node.js >= 22, OpenAI API key
+- **Install:** `npm install -g @openai/codex`
+- **Configure:**
+  ```bash
+  export OPENAI_API_KEY="sk-..."
+  ```
+- **Verify:** `codex --help`
+- **Repo:** https://github.com/openai/codex
+
+### Claude Code (Anthropic)
+
+Anthropic's official CLI agent.
+
+- **Prerequisites:** Node.js >= 18 (macOS / Linux / Windows WSL2)
+- **Install:** `npm install -g @anthropic-ai/claude-code`
+- **Configure (pick one):**
+  - Interactive login: run `claude`, it opens browser auth on first launch
+  - Environment variable:
+    ```bash
+    export ANTHROPIC_API_KEY="sk-ant-..."
+    ```
+- **Verify:** `claude --version`
+- **Docs:** https://docs.anthropic.com/en/docs/claude-code/overview
+
+### Gemini CLI (Google)
+
+Google's terminal coding agent.
+
+- **Prerequisites:** Node.js >= 20
+- **Install (pick one):**
+  ```bash
+  npm install -g @google/gemini-cli
+  # or
+  brew install gemini-cli
+  ```
+- **Configure (pick one):**
+  - Google OAuth (free tier, no key needed): run `gemini`, select "Sign in with Google"
+  - API key:
+    ```bash
+    export GEMINI_API_KEY="your-key-here"
+    ```
+- **Verify:** `gemini --version`
+- **Repo:** https://github.com/google-gemini/gemini-cli
+- **Docs:** https://geminicli.com/docs/
+
+### Aider
+
+AI pair-programming CLI, supports multiple LLM providers.
+
+- **Prerequisites:** Python >= 3.10, Git
+- **Install:**
+  ```bash
+  python -m pip install aider-install && aider-install
+  # or directly:
+  pip install aider-chat
+  ```
+- **Configure (set the key for your provider):**
+  ```bash
+  export OPENAI_API_KEY="sk-..."       # OpenAI
+  export ANTHROPIC_API_KEY="sk-ant-..."  # Anthropic
+  # or use: aider --model deepseek --api-key deepseek=<key>
+  ```
+- **Verify:** `aider --version`
+- **Repo:** https://github.com/Aider-AI/aider
+
+### OpenCode
+
+Open-source terminal TUI coding agent.
+
+- **Prerequisites:** API key for your LLM provider; modern terminal (WezTerm / Alacritty / Kitty recommended)
+- **Install (pick one):**
+  ```bash
+  curl -fsSL https://opencode.ai/install | bash
+  # or
+  npm install -g opencode-ai
+  # or
+  brew install anomalyco/tap/opencode
+  ```
+- **Verify:** `opencode --version`
+- **Repo:** https://github.com/opencode-ai/opencode
+
+### Kiro (AWS)
+
+AWS's AI coding agent, CLI + IDE.
+
+- **Prerequisites:** macOS or Linux; AWS Builder ID (or Google / GitHub login)
+- **Install:**
+  ```bash
+  curl -fsSL https://cli.kiro.dev/install | bash
+  ```
+- **Verify:** `kiro --version`
+- **Docs:** https://kiro.dev/cli/
+
+### Copilot CLI (GitHub)
+
+GitHub Copilot's standalone terminal agent.
+
+- **Prerequisites:** Node.js >= 22; active GitHub Copilot subscription
+- **Install (pick one):**
+  ```bash
+  npm install -g @github/copilot
+  # or
+  brew install copilot-cli
+  ```
+  Windows: `winget install GitHub.Copilot`
+- **Verify:** `copilot --version`
+- **Docs:** https://docs.github.com/copilot/how-tos/set-up/install-copilot-cli
+
+### Cursor CLI
+
+Cursor's standalone terminal agent (Cursor 3+).
+
+- **Prerequisites:** Cursor account / subscription
+- **Install:**
+  ```bash
+  curl https://cursor.com/install -fsS | bash
+  ```
+- **Verify:** `cursor --version`
+- **Docs:** https://cursor.com/cli
+
+### Trae Agent (ByteDance)
+
+ByteDance's open-source CLI coding agent (separate from Trae IDE).
+
+- **Prerequisites:** Python >= 3.12, UV package manager, API key (OpenAI / Anthropic / Gemini)
+- **Install:**
+  ```bash
+  git clone https://github.com/bytedance/trae-agent.git
+  cd trae-agent
+  uv sync --all-extras
+  source .venv/bin/activate
+  ```
+- **Verify:** `trae-agent --help`
+- **Repo:** https://github.com/bytedance/trae-agent
+
+### Quick Reference Table
+
+| Tool | Install | Key env var | Free? |
+|---|---|---|---|
+| Codex | `npm i -g @openai/codex` | `OPENAI_API_KEY` | API key required |
+| Claude Code | `npm i -g @anthropic-ai/claude-code` | `ANTHROPIC_API_KEY` | API key required |
+| Gemini CLI | `npm i -g @google/gemini-cli` | `GEMINI_API_KEY` or OAuth | Free tier (OAuth) |
+| Aider | `pip install aider-chat` | Provider-specific | BYO API key |
+| OpenCode | `npm i -g opencode-ai` | Provider-specific | BYO API key |
+| Kiro | `curl -fsSL https://cli.kiro.dev/install \| bash` | AWS Builder ID | Free tier |
+| Copilot CLI | `npm i -g @github/copilot` | Copilot subscription | Paid |
+| Cursor CLI | `curl https://cursor.com/install -fsS \| bash` | Cursor subscription | Paid |
+| Trae Agent | `git clone` + `uv sync` | Provider-specific | BYO API key |
+
+> **Note:** `acpx` auto-discovers installed tools. You do not need to register tools manually — just install them and restart TeamClaw.
+
+---
+
 ## Advanced: Manual CLI Configuration
 
 For users who prefer CLI over the web UI, or for automation scripts:

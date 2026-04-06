@@ -302,6 +302,9 @@ def _group_id_name_segment(display_name: str) -> str:
     return segment[:120]
 
 
+_TYPING_TIMEOUT_SEC = 120  # 超时自动清除"正在输入"状态
+
+
 class GroupService:
     def __init__(
         self,
@@ -318,6 +321,75 @@ class GroupService:
         self.group_db_path = group_db_path
         self.agent = agent
         self.group_muted: set[str] = set()
+        # Typing state: {group_id: {display_name: timestamp}}
+        self._typing_agents: dict[str, dict[str, float]] = {}
+
+    # ── Typing indicator helpers ──
+
+    def set_typing(self, group_id: str, display_name: str) -> None:
+        """标记某 agent 在某群正在输入。"""
+        if group_id not in self._typing_agents:
+            self._typing_agents[group_id] = {}
+        self._typing_agents[group_id][display_name] = time.time()
+
+    def clear_typing(self, group_id: str, display_name: str) -> None:
+        """清除某 agent 的正在输入状态。"""
+        bucket = self._typing_agents.get(group_id)
+        if bucket:
+            bucket.pop(display_name, None)
+
+    def clear_typing_by_sender_display(self, group_id: str, sender_display: str) -> None:
+        """根据 sender_display (tag#type#short_name#global_id) 清除输入状态。"""
+        bucket = self._typing_agents.get(group_id)
+        if not bucket:
+            return
+        # sender_display 格式: tag#type#short_name#global_id
+        # 从中提取 short_name 用于匹配
+        parts = sender_display.split("#")
+        short_name = parts[2] if len(parts) > 2 else ""
+        # 清除所有匹配的 key（精确匹配 display_name 或 short_name）
+        to_remove = [k for k in bucket if k == sender_display or k == short_name]
+        for k in to_remove:
+            bucket.pop(k, None)
+
+    def get_typing_agents(self, group_id: str) -> list[str]:
+        """返回某群中正在输入的 agent 列表（自动清理超时条目）。"""
+        bucket = self._typing_agents.get(group_id)
+        if not bucket:
+            return []
+        now = time.time()
+        expired = [k for k, ts in bucket.items() if now - ts > _TYPING_TIMEOUT_SEC]
+        for k in expired:
+            bucket.pop(k, None)
+        return list(bucket.keys())
+
+    async def get_typing_status(self, group_id: str, authorization: str | None) -> dict:
+        """返回群中正在输入的 agent 列表。
+
+        同时检查内部 agent 的 thread lock 状态：
+        如果内部 agent 的 thread lock 仍被占用（is_thread_busy），保持其 typing 状态。
+        """
+        self.parse_group_auth(authorization)  # 鉴权
+        typing_list = self.get_typing_agents(group_id)
+
+        # 检查内部 agent 的 thread lock 状态
+        members = await list_group_member_targets(self.group_db_path, group_id)
+        for _uid, global_id, is_agent, member_type, short_name, tag in members:
+            if not is_agent:
+                continue
+            if member_type == "oasis":
+                # 内部 agent: 通过 thread lock 检查是否仍在处理
+                thread_id = f"{_uid}#{global_id}"
+                if self.agent.is_thread_busy(thread_id):
+                    if short_name not in typing_list:
+                        typing_list.append(short_name)
+                else:
+                    # lock 已释放但 typing 列表还有，清除
+                    if short_name in typing_list:
+                        self.clear_typing(group_id, short_name)
+                        typing_list = [n for n in typing_list if n != short_name]
+
+        return {"typing": typing_list}
 
     def parse_group_auth(self, authorization: str | None):
         """从 Bearer token 解析用户认证，返回 (user_id, password, session_id)。"""
@@ -563,6 +635,8 @@ class GroupService:
         ACP response is NOT automatically posted to group.
         Agent should use CLI tool `groups send` to send messages if needed.
         """
+        # 标记正在输入
+        self.set_typing(group_id, agent_name)
         # Select transport explicitly by tag.
         transport = _select_external_transport(
             str(agent_info.get("tag", "")),
@@ -594,11 +668,15 @@ class GroupService:
                 reply = await self._send_to_acp_agent(agent_info, message, attachments=attachments)
         if not reply:
             logger.info("External agent %s did not reply", agent_name)
+            # ACP/HTTP 已返回（无回复），清除输入状态
+            self.clear_typing(group_id, agent_name)
             return
 
         # Log the reply but don't post to group
         # Agent should use CLI tool to send messages to group
         logger.info("External agent %s replied (not auto-posting to group): %s", agent_name, reply[:200] if reply else "")
+        # ACP/HTTP 已返回，清除输入状态
+        self.clear_typing(group_id, agent_name)
 
     async def broadcast_to_group(
         self,
@@ -742,6 +820,9 @@ class GroupService:
                                    f"例如在 send_to_group 的 content 末尾加上 @某人名字 来指定回复对象。)"
                                    f"{trigger_suffix}")
 
+                # 标记内部 agent 正在输入（thread lock 会在处理完成后自动释放，
+                # get_typing_status 会检查 lock 状态来判断是否仍在输入）
+                self.set_typing(group_id, short_name)
                 try:
                     trigger_body: dict = {
                         "user_id": user_id_member,
@@ -760,6 +841,7 @@ class GroupService:
                         )
                 except Exception as e:
                     logger.warning("广播到 %s (global_id=%s) 失败: %s", short_name, global_id, e)
+                    self.clear_typing(group_id, short_name)
 
     async def create_group(self, req: GroupCreateRequest, authorization: str | None):
         uid, _, _ = self.parse_group_auth(authorization)
@@ -880,6 +962,10 @@ class GroupService:
             attachments=attachments_json,
             timestamp=now,
         )
+
+        # Agent 发消息后清除其"正在输入"状态
+        if sender_display:
+            self.clear_typing_by_sender_display(group_id, sender_display)
 
         # ── Auto-resolve @mentions from message content ──
         # Instead of regex-parsing @name tokens (which breaks on spaces /

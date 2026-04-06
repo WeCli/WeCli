@@ -40,8 +40,32 @@ DEFAULT_SESSIONS_FILE = os.path.join(
 )
 
 
+INTERNAL_OPENCLAW_WRAPPER = os.path.expanduser(
+    "~/.local/lib/openclaw-internal/bin/openclaw"
+)
+INTERNAL_OPENCLAW_RUNTIME_BASE = os.path.expanduser(
+    "~/.local/lib/openclaw-internal/runtime"
+)
+INTERNAL_OPENCLAW_GATEWAY_PORT = 23001
+
+
+def is_internal_openclaw():
+    """检测是否安装了腾讯内网版 OpenClaw。"""
+    return os.path.isfile(INTERNAL_OPENCLAW_WRAPPER) and os.access(
+        INTERNAL_OPENCLAW_WRAPPER, os.X_OK
+    )
+
+
 def resolve_openclaw_command():
-    """Resolve the most reliable OpenClaw CLI entrypoint for this OS."""
+    """Resolve the most reliable OpenClaw CLI entrypoint for this OS.
+
+    优先使用腾讯内网版 wrapper（~/.local/lib/openclaw-internal/bin/openclaw），
+    因为它会自动 source 运行时环境（init_env.sh / init_gf_env.sh）。
+    """
+    # 优先检测内网版 wrapper
+    if is_internal_openclaw():
+        return INTERNAL_OPENCLAW_WRAPPER
+
     candidates = ["openclaw"]
     if os.name == "nt":
         candidates = ["openclaw.cmd", "openclaw"]
@@ -274,6 +298,23 @@ def print_install_guide():
         if is_windows
         else "bash selfskill/scripts/run.sh check-openclaw"
     )
+
+    # 腾讯内网版安装提示：仅当检测到内网版运行时目录时才显示
+    _internal_runtime_exists = os.path.isdir(INTERNAL_OPENCLAW_RUNTIME_BASE)
+    if not is_windows and _internal_runtime_exists:
+        print("=" * 50)
+        print("腾讯内网版 OpenClaw 安装（推荐内网用户使用）:")
+        print("  1. 环境准备（自动安装 Homebrew/Node.js/Python/Go 等依赖）:")
+        print("     curl -fsSL 'https://mirrors.tencent.com/repository/generic/tencent_openclaw/openclaw/install_prepare.sh' | bash -s -- --token <TOKEN> --bot-id <BOT_ID> --bot-secret <BOT_SECRET>")
+        print("  2. 安装内网版 OpenClaw:")
+        print("     curl -fsSL 'https://mirrors.tencent.com/repository/generic/tencent_openclaw/openclaw/install_openclaw.sh' | bash -s -- --token <TOKEN> --bot-id <BOT_ID> --bot-secret <BOT_SECRET>")
+        print("  3. 安装完成后执行:")
+        print(f"     {sync_cmd}")
+        print("  注: 内网版默认 gateway 端口为 23001，TeamClaw 会自动探测适配。")
+        print("")
+        print("=" * 50)
+        print("")
+
     print("OpenClaw 安装流程（本地推荐）:")
     print("  1. 确保 Node.js >= 22")
     print("  2. 安装 CLI: npm install -g openclaw@latest --ignore-scripts")
@@ -441,8 +482,9 @@ def detect_openclaw_bin():
     except Exception:
         pass
 
-    # 常见位置
+    # 常见位置（含腾讯内网版 wrapper）
     common_paths = [
+        INTERNAL_OPENCLAW_WRAPPER,
         os.path.expanduser("~/.local/bin/openclaw"),
         os.path.expanduser("~/.npm/node_modules/bin/openclaw"),
         os.path.expanduser("~/.npm-global/bin/openclaw"),
@@ -461,7 +503,10 @@ def detect_openclaw_bin():
 
 
 def detect_gateway_port():
-    """探测 OpenClaw gateway 端口"""
+    """探测 OpenClaw gateway 端口。
+
+    腾讯内网版 OpenClaw 默认使用 23001 端口，开源版使用 18789。
+    """
     port = get_config_value("gateway", "port")
     if isinstance(port, int):
         return port
@@ -474,6 +519,11 @@ def detect_gateway_port():
             port = line.strip()
             if port.isdigit():
                 return int(port)
+
+    # 内网版 OpenClaw 默认端口为 23001
+    if is_internal_openclaw():
+        return INTERNAL_OPENCLAW_GATEWAY_PORT
+
     return None
 
 
@@ -1296,6 +1346,8 @@ def auto_detect_and_configure():
         return False
 
     print(f"📍 OpenClaw 路径: {oc_bin}")
+    if is_internal_openclaw():
+        print("📌 版本类型: 腾讯内网版 (gateway 默认端口 23001)")
 
     # 获取版本信息
     rc, out, _ = run_cmd([oc_bin, "--version"])
@@ -1349,7 +1401,8 @@ def auto_detect_and_configure():
         else:
             print("   ⚠️ 无法自动探测 gateway 端口")
             print("   提示: 确保 OpenClaw gateway 正在运行 (openclaw gateway)")
-            print("   或手动配置: bash selfskill/scripts/run.sh configure OPENCLAW_API_URL http://127.0.0.1:18789/v1/chat/completions")
+            default_hint_port = INTERNAL_OPENCLAW_GATEWAY_PORT if is_internal_openclaw() else DEFAULT_GATEWAY_PORT
+            print(f"   或手动配置: bash selfskill/scripts/run.sh configure OPENCLAW_API_URL http://127.0.0.1:{default_hint_port}/v1/chat/completions")
 
     # 2. 探测 gateway token → OPENCLAW_GATEWAY_TOKEN
     print("\n🔍 探测 Gateway Token...")

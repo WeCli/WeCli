@@ -170,7 +170,18 @@ def cleanup():
 
 
 def resolve_openclaw_cli():
-    """Return the preferred OpenClaw CLI binary path when available."""
+    """Return the preferred OpenClaw CLI binary path when available.
+
+    优先使用腾讯内网版 wrapper（~/.local/lib/openclaw-internal/bin/openclaw），
+    因为它会自动 source 运行时环境。
+    """
+    # 优先检测内网版 wrapper
+    internal_wrapper = os.path.expanduser(
+        "~/.local/lib/openclaw-internal/bin/openclaw"
+    )
+    if os.path.isfile(internal_wrapper) and os.access(internal_wrapper, os.X_OK):
+        return internal_wrapper
+
     candidates = ["openclaw.cmd", "openclaw"] if sys.platform == "win32" else ["openclaw"]
     for candidate in candidates:
         path = shutil.which(candidate)
