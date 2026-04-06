@@ -149,10 +149,17 @@ class SystemService:
         }
 
         async def wait_and_invoke():
+            """在 thread 锁上排队执行：不 preempt 用户对话；仅在拿到锁后注册 cancel 目标。"""
             task_key = f"{req.user_id}#{req.session_id}"
             lock = await self.agent.get_thread_lock(thread_id)
-            logger.info("Waiting for lock on %s ...", thread_id)
+            logger.info(
+                "system_trigger waiting for lock on %s (will not cancel in-flight user run)",
+                thread_id,
+            )
             async with lock:
+                # 与用户 openai 流式任务共用 task_key：必须在持有锁后才 register，
+                # 否则会在等锁阶段覆盖 registry 中仍活跃的用户任务。
+                self.agent.register_task(task_key, asyncio.current_task())
                 self.agent.set_thread_busy_source(thread_id, "system")
                 logger.info("Acquired lock on %s, invoking graph ...", thread_id)
                 try:
@@ -170,7 +177,7 @@ class SystemService:
                             if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
                                 tool_messages = [
                                     ToolMessage(
-                                        content="⚠️ 系统调用被用户终止",
+                                        content="⚠️ 工具调用被用户终止",
                                         tool_call_id=tc["id"],
                                     )
                                     for tc in last_msg.tool_calls
@@ -185,8 +192,5 @@ class SystemService:
                     await self.agent.purge_checkpoints(thread_id)
                     self.agent.unregister_task(task_key)
 
-        task_key = f"{req.user_id}#{req.session_id}"
-        await self.agent.cancel_task(task_key)
-        task = asyncio.create_task(wait_and_invoke())
-        self.agent.register_task(task_key, task)
+        asyncio.create_task(wait_and_invoke())
         return {"status": "received", "message": f"系统触发已收到，用户 {req.user_id}"}

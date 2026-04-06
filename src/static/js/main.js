@@ -665,7 +665,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_restart_hint: '修改配置后请先「保存」，再点击「重启服务」使配置生效',
         settings_restart_btn: '🔄 重启服务',
         settings_restarting: '⏳ 正在重启...',
-        settings_restart_ok: '✅ 重启信号已发送，页面将在 15 秒后自动刷新',
+        settings_restart_ok: '✅ 重启信号已发送，页面将在 20 秒后自动刷新',
         settings_restart_fail: '❌ 重启失败',
         settings_restart_confirm: '确定要重启所有服务吗？未保存的配置修改将丢失。',
         menu_settings: '⚙️ 设置',
@@ -1426,7 +1426,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_restart_hint: 'After editing, click "Save" first, then "Restart" to apply changes',
         settings_restart_btn: '🔄 Restart',
         settings_restarting: '⏳ Restarting...',
-        settings_restart_ok: '✅ Restart signal sent, page will auto-refresh in 15 seconds',
+        settings_restart_ok: '✅ Restart signal sent, page will auto-refresh in 20 seconds',
         settings_restart_fail: '❌ Restart failed',
         settings_restart_confirm: 'Restart all services? Unsaved changes will be lost.',
         menu_settings: '⚙️ Settings',
@@ -5352,7 +5352,7 @@ async function restartServices() {
         if (data.status === 'success') {
             appendMessage(t('settings_restart_ok'), false);
             closeSettings();
-            setTimeout(() => location.reload(), 15000);
+            setTimeout(() => location.reload(), 20000);
         } else {
             alert(t('settings_restart_fail') + ': ' + (data.detail || data.error || ''));
             if (btn) { btn.disabled = false; btn.textContent = t('settings_restart_btn'); }
@@ -5361,7 +5361,7 @@ async function restartServices() {
         // 网络断开说明服务已在重启中，属于正常现象
         appendMessage(t('settings_restart_ok'), false);
         closeSettings();
-        setTimeout(() => location.reload(), 15000);
+        setTimeout(() => location.reload(), 20000);
     }
 }
 

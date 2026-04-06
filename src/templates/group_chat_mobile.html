@@ -12,6 +12,17 @@
     if (lang === 'en') document.title = 'Agent Message Center';
   })();
 </script>
+<!-- PWA / iOS Add-to-Home-Screen support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="消息中心">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#ededed">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="https://img.icons8.com/fluency/180/robot-2.png">
+<link rel="apple-touch-icon" sizes="152x152" href="https://img.icons8.com/fluency/152/robot-2.png">
+<link rel="apple-touch-icon" sizes="180x180" href="https://img.icons8.com/fluency/180/robot-2.png">
 <link rel="icon" href="https://img.icons8.com/fluency/32/robot-2.png" type="image/png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
@@ -339,6 +350,77 @@
     background: var(--bg-chat);
     z-index: 200;
   }
+  /* ── Swipe-back edge indicator (fullscreen gesture) ── */
+  .swipe-back-indicator {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 20px;
+    z-index: 210;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+  }
+  .swipe-back-arrow {
+    width: 28px; height: 28px;
+    margin-left: -14px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.08);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0;
+    transition: opacity .15s, transform .15s;
+    transform: scale(0.6);
+  }
+  .swipe-back-arrow.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .swipe-back-arrow svg {
+    width: 16px; height: 16px;
+    fill: none; stroke: #333; stroke-width: 2.5; stroke-linecap: round;
+  }
+  /* Dim overlay behind page during swipe-back */
+  .swipe-back-dim {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.15);
+    z-index: 199;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .28s;
+  }
+  .swipe-back-dim.active {
+    opacity: 1;
+  }
+
+  /* ── New message banner ── */
+  #new-msg-banner {
+    position: absolute;
+    bottom: calc(var(--input-h) + var(--bottom-inset, 0px) + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 210;
+    background: rgba(30,30,30,0.72);
+    color: #fff;
+    font-size: 13px;
+    padding: 6px 16px;
+    border-radius: 16px;
+    cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+    transition: opacity 0.2s;
+    opacity: 0;
+    pointer-events: none;
+  }
+  #new-msg-banner.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  #new-msg-banner .banner-arrow {
+    font-size: 10px;
+    opacity: 0.85;
+  }
   .chat-page .header {
     background: #ededed;
     z-index: 201;
@@ -465,6 +547,37 @@
     margin-top: 2px;
   }
   .msg-row.self .msg-time { text-align: right; }
+
+  /* ── Typing indicator ── */
+  .typing-bar {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: #f7f7f7;
+    border-top: 0.5px solid #e5e5e5;
+    min-height: 24px;
+  }
+  .typing-bar.show { display: flex; }
+  .typing-dots {
+    display: inline-flex;
+    gap: 3px;
+    align-items: center;
+  }
+  .typing-dots span {
+    width: 5px; height: 5px;
+    background: var(--primary);
+    border-radius: 50%;
+    animation: typing-pulse 1.4s infinite ease-in-out;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-pulse {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1.1); }
+  }
 
   /* ── Input bar ── */
   .input-bar-wrap {
@@ -658,6 +771,134 @@
   .chat-action-item:active { background: #f0f0f0; }
   .chat-action-item.danger { color: #f55; }
   .chat-action-icon { font-size: 18px; margin-right: 14px; width: 24px; text-align: center; }
+
+  /* ── Generic Bottom Sheet Modal ── */
+  .tc-sheet-overlay {
+    position: fixed; inset: 0; z-index: 5000;
+    background: rgba(0,0,0,0.35);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.22s;
+  }
+  .tc-sheet-overlay.show { opacity: 1; pointer-events: auto; }
+  .tc-sheet {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    max-width: 480px; margin: 0 auto;
+    background: var(--bg-card);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+    z-index: 5001;
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+    max-height: 80vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .tc-sheet.show { transform: translateY(0); }
+  .tc-sheet-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: #d0d0d0; margin: 10px auto 0; flex-shrink: 0;
+  }
+  .tc-sheet-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px;
+    font-size: 16px; font-weight: 600;
+    flex-shrink: 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .tc-sheet-close {
+    font-size: 20px; color: var(--text-secondary);
+    background: none; border: none; cursor: pointer; padding: 0 2px;
+    line-height: 1;
+  }
+  .tc-sheet-body {
+    flex: 1; overflow-y: auto; padding: 12px 16px 16px;
+  }
+  .tc-sheet-body::-webkit-scrollbar { display: none; }
+  .tc-form-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 0; border-bottom: 0.5px solid var(--border);
+  }
+  .tc-form-row:last-child { border-bottom: none; }
+  .tc-form-label { font-size: 14px; color: var(--text); flex: 1; }
+  .tc-form-hint { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
+  .tc-form-input {
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 6px 10px; font-size: 13px;
+    background: var(--bg); color: var(--text);
+    min-width: 140px; max-width: 200px;
+  }
+  .tc-toggle {
+    width: 44px; height: 26px; border-radius: 13px;
+    background: #ccc; border: none; cursor: pointer;
+    position: relative; flex-shrink: 0; transition: background 0.2s;
+    outline: none; -webkit-appearance: none;
+  }
+  .tc-toggle::after {
+    content: ''; position: absolute;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: #fff; top: 3px; left: 3px;
+    transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .tc-toggle.on { background: #07c160; }
+  .tc-toggle.on::after { transform: translateX(18px); }
+  .tc-sheet-footer {
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top: 0.5px solid var(--border); flex-shrink: 0;
+  }
+  .tc-btn-primary {
+    width: 100%; padding: 12px; border: none; border-radius: 10px;
+    background: #07c160; color: #fff;
+    font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  .tc-btn-primary:active { opacity: 0.85; }
+  .tc-btn-primary:disabled { opacity: 0.5; }
+
+  /* ── Subagent Panel ── */
+  .subagent-panel-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
+  }
+  .subagent-panel-overlay.open { transform: translateX(0); }
+  .subagent-panel-body { flex: 1; overflow-y: auto; }
+  .subagent-item {
+    display: flex; align-items: center;
+    padding: 13px 16px; border-bottom: 0.5px solid var(--border);
+    background: var(--bg-card); gap: 12px;
+  }
+  .subagent-item-avatar {
+    width: 38px; height: 38px; border-radius: 8px;
+    background: #e8f4fd; display: flex; align-items: center;
+    justify-content: center; font-size: 18px; flex-shrink: 0;
+  }
+  .subagent-item-info { flex: 1; min-width: 0; }
+  .subagent-item-name { font-size: 14px; font-weight: 600; }
+  .subagent-item-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .subagent-cancel-btn {
+    padding: 5px 12px; border-radius: 6px;
+    border: 1px solid #f55; background: none;
+    color: #f55; font-size: 13px; cursor: pointer; flex-shrink: 0;
+  }
+  .subagent-cancel-btn:active { background: #fff0f0; }
+  .subagent-status-dot {
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; margin-right: 4px;
+  }
+  .subagent-status-dot.running { background: #07c160; }
+  .subagent-status-dot.idle { background: #aaa; }
+
+  /* ── Tool Policy Panel ── */
+  .tool-policy-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px 0; border-bottom: 0.5px solid var(--border);
+  }
+  .tool-policy-item:last-child { border-bottom: none; }
+  .tool-policy-info { flex: 1; }
+  .tool-policy-name { font-size: 14px; font-weight: 600; font-family: monospace; }
+  .tool-policy-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
   /* ── Mention popup ── */
   .mention-popup {
@@ -2367,7 +2608,13 @@
 </div>
 
 <!-- ═══ Chat Page (slides in from right, covers entire app) ═══ -->
+<div id="swipe-back-dim" class="swipe-back-dim"></div>
 <div id="chat-page" class="sub-page chat-page offscreen">
+  <div class="swipe-back-indicator" id="swipe-back-indicator">
+    <div class="swipe-back-arrow" id="swipe-back-arrow">
+      <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    </div>
+  </div>
   <div class="header">
     <button class="header-back-btn" onclick="goBack()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -2379,6 +2626,14 @@
     </div>
   </div>
   <div class="chat-body" id="chat-body"></div>
+  <div id="new-msg-banner" onclick="dismissNewMsgBanner()">
+    <span class="banner-arrow">▼</span>
+    <span id="new-msg-banner-text"></span>
+  </div>
+  <div class="typing-bar" id="typing-bar">
+    <div class="typing-dots"><span></span><span></span><span></span></div>
+    <span id="typing-text"></span>
+  </div>
   <div class="input-bar-wrap">
     <!-- Workflow selector popup (absolute positioned above input-bar-wrap) -->
     <div class="workflow-popup" id="workflow-popup">
@@ -2434,9 +2689,121 @@
     <span class="chat-action-icon">♻️</span>
     <span data-i18n="reset_all_agents">一次重置所有 agent</span>
   </div>
+  <div class="chat-action-item" onclick="closeChatActions(); openSubagentPanel();">
+    <span class="chat-action-icon">🤖</span>
+    <span data-i18n="subagent_mgmt">子 Agent 管理</span>
+  </div>
+  <div class="chat-action-item" onclick="closeChatActions(); openVoiceConfigSheet();">
+    <span class="chat-action-icon">🎙️</span>
+    <span data-i18n="voice_config">语音配置</span>
+  </div>
+  <div class="chat-action-item" onclick="closeChatActions(); openToolPolicySheet();">
+    <span class="chat-action-icon">🛡️</span>
+    <span data-i18n="tool_policy">工具权限管理</span>
+  </div>
+  <div class="chat-action-item" onclick="closeChatActions(); openSessionRuntimeSheet();">
+    <span class="chat-action-icon">🔍</span>
+    <span data-i18n="session_runtime">会话运行状态</span>
+  </div>
   <div class="chat-action-item danger" onclick="closeChatActions(); deleteGroup();">
     <span class="chat-action-icon">🗑️</span>
     <span data-i18n="dissolve_group">解散群聊</span>
+  </div>
+</div>
+
+<!-- ═══════════════ Subagent Management Panel ═══════════════ -->
+<div id="subagent-panel-overlay" class="subagent-panel-overlay" style="display:none;">
+  <div class="agent-detail-header">
+    <button class="agent-detail-close" onclick="closeSubagentPanel()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="agent-detail-title" id="subagent-panel-title" data-i18n="subagent_mgmt">子 Agent 管理</span>
+    <button class="agent-detail-close" onclick="loadSubagents()" style="font-size:16px;" title="刷新">↻</button>
+  </div>
+  <div class="subagent-panel-body" id="subagent-panel-body">
+    <div style="text-align:center;padding:40px;color:var(--text-hint);" data-i18n="subagent_loading">正在加载子 Agent...</div>
+  </div>
+</div>
+
+<!-- ═══════════════ Voice Config Bottom Sheet ═══════════════ -->
+<div class="tc-sheet-overlay" id="voice-sheet-overlay" onclick="closeVoiceConfigSheet()"></div>
+<div class="tc-sheet" id="voice-sheet">
+  <div class="tc-sheet-handle"></div>
+  <div class="tc-sheet-header">
+    <span data-i18n="voice_config">语音配置</span>
+    <button class="tc-sheet-close" onclick="closeVoiceConfigSheet()">✕</button>
+  </div>
+  <div class="tc-sheet-body">
+    <div class="tc-form-row">
+      <div>
+        <div class="tc-form-label" data-i18n="voice_enabled">启用语音</div>
+      </div>
+      <button class="tc-toggle" id="voice-enabled-toggle" onclick="tcToggle(this)"></button>
+    </div>
+    <div class="tc-form-row">
+      <div>
+        <div class="tc-form-label" data-i18n="voice_auto_read">自动朗读回复</div>
+      </div>
+      <button class="tc-toggle" id="voice-auto-read-toggle" onclick="tcToggle(this)"></button>
+    </div>
+    <div class="tc-form-row">
+      <div class="tc-form-label" data-i18n="voice_tts_model">TTS 模型</div>
+      <input class="tc-form-input" id="voice-tts-model" placeholder="自动" data-i18n-placeholder="auto">
+    </div>
+    <div class="tc-form-row">
+      <div class="tc-form-label" data-i18n="voice_tts_voice">TTS 声音</div>
+      <input class="tc-form-input" id="voice-tts-voice" placeholder="自动" data-i18n-placeholder="auto">
+    </div>
+    <div class="tc-form-row">
+      <div class="tc-form-label" data-i18n="voice_stt_model">STT 模型</div>
+      <input class="tc-form-input" id="voice-stt-model" placeholder="自动" data-i18n-placeholder="auto">
+    </div>
+    <div class="tc-form-row">
+      <div>
+        <div class="tc-form-label" data-i18n="voice_session_id">会话 ID（留空则自动）</div>
+        <div class="tc-form-hint">留空时对当前用户的活跃会话生效</div>
+      </div>
+      <input class="tc-form-input" id="voice-session-id" placeholder="" style="min-width:100px;">
+    </div>
+  </div>
+  <div class="tc-sheet-footer">
+    <button class="tc-btn-primary" id="voice-save-btn" onclick="saveVoiceConfig()" data-i18n="voice_save">保存语音设置</button>
+  </div>
+</div>
+
+<!-- ═══════════════ Tool Policy Bottom Sheet ═══════════════ -->
+<div class="tc-sheet-overlay" id="tool-policy-sheet-overlay" onclick="closeToolPolicySheet()"></div>
+<div class="tc-sheet" id="tool-policy-sheet">
+  <div class="tc-sheet-handle"></div>
+  <div class="tc-sheet-header">
+    <span data-i18n="tool_policy">工具权限管理</span>
+    <button class="tc-sheet-close" onclick="closeToolPolicySheet()">✕</button>
+  </div>
+  <div class="tc-sheet-body" id="tool-policy-body">
+    <div style="text-align:center;padding:24px;color:var(--text-hint);" data-i18n="tool_policy_loading">正在加载工具权限...</div>
+  </div>
+  <div class="tc-sheet-footer">
+    <button class="tc-btn-primary" id="tool-policy-save-btn" onclick="saveToolPolicy()" data-i18n="tool_policy_save">保存权限设置</button>
+  </div>
+</div>
+
+<!-- ═══════════════ Session Runtime Bottom Sheet ═══════════════ -->
+<div class="tc-sheet-overlay" id="runtime-sheet-overlay" onclick="closeSessionRuntimeSheet()"></div>
+<div class="tc-sheet" id="runtime-sheet">
+  <div class="tc-sheet-handle"></div>
+  <div class="tc-sheet-header">
+    <span data-i18n="session_runtime">会话运行状态</span>
+    <button class="tc-sheet-close" onclick="closeSessionRuntimeSheet()">✕</button>
+  </div>
+  <div class="tc-sheet-body">
+    <div class="tc-form-row" style="padding-top:0;">
+      <div class="tc-form-label" data-i18n="session_runtime_session_id">会话 ID</div>
+      <div style="display:flex;gap:6px;">
+        <input class="tc-form-input" id="runtime-session-id" placeholder="留空自动" style="min-width:120px;">
+        <button onclick="querySessionRuntime()" style="padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg);font-size:13px;cursor:pointer;" data-i18n="session_runtime_query">查询</button>
+      </div>
+    </div>
+    <div id="runtime-result" style="margin-top:8px;"></div>
   </div>
 </div>
 
@@ -2486,7 +2853,7 @@
         </div>
       </div>
       <!-- 选项2: 上传导入 -->
-      <div onclick="document.getElementById('contacts-import-upload-input').click()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--bg);cursor:pointer;border:1px solid var(--border);">
+      <div onclick="document.getElementById('contacts-import-upload-input').click()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border-radius:8px;background:var(--bg);cursor:pointer;border:1px solid var(--border);">
         <span style="font-size:20px;">📁</span>
         <div>
           <div style="font-size:14px;font-weight:600;color:var(--text);" data-i18n="upload_zip">上传 .zip 文件导入</div>
@@ -2494,6 +2861,52 @@
         </div>
       </div>
       <input type="file" id="contacts-import-upload-input" accept=".zip" style="display:none;" onchange="importTeamFromZip(this)">
+      <!-- 关系型 Skill 导入 -->
+      <div onclick="togglePersonalSkillImport()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--bg);cursor:pointer;border:1px solid var(--border);">
+        <span style="font-size:20px;">💝</span>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">关系型 Skill 导入</div>
+          <div style="font-size:11px;color:var(--text-hint);margin-top:2px;">前任 / crush / yourself / 群友 等角色 skill</div>
+        </div>
+        <span id="personal-skill-arrow" style="font-size:12px;color:var(--text-secondary);transition:transform .2s;">▼</span>
+      </div>
+      <div id="personal-skill-import-panel" style="display:none;margin-top:8px;padding:12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">
+          支持：<a href="https://github.com/therealXiaomanChu/ex-skill" target="_blank" style="color:var(--primary);">前任.skill</a>、
+          <a href="https://github.com/xiaoheizi8/crush-skills" target="_blank" style="color:var(--primary);">crush.skill</a>、
+          <a href="https://github.com/notdog1998/yourself-skill" target="_blank" style="color:var(--primary);">yourself.skill</a>、
+          <a href="https://github.com/Neko-Suwako/pig-skill" target="_blank" style="color:var(--primary);">群友.skill</a>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">Skill 类型</label>
+          <select id="personal-skill-type" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);color:var(--text);font-size:13px;">
+            <option value="ex">前任 (ex-skill)</option>
+            <option value="crush">暗恋对象 (crush-skill)</option>
+            <option value="yourself">自己 (yourself-skill)</option>
+            <option value="pig">群友 (pig-skill)</option>
+          </select>
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">meta.json <span style="color:#f55;">*</span></label>
+          <input type="file" id="personal-skill-meta" accept=".json" style="width:100%;font-size:12px;">
+        </div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">persona.md <span style="color:#f55;">*</span></label>
+          <input type="file" id="personal-skill-persona" accept=".md,.txt" style="width:100%;font-size:12px;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">memory.md / self.md（可选）</label>
+          <input type="file" id="personal-skill-memory" accept=".md,.txt" style="width:100%;font-size:12px;">
+        </div>
+        <div style="margin-bottom:10px;">
+          <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">导入到团队（可选）</label>
+          <input type="text" id="personal-skill-team" placeholder="留空则自动创建" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--bg-card);color:var(--text);font-size:13px;">
+        </div>
+        <button onclick="importPersonalSkill()" id="personal-skill-import-btn" style="width:100%;padding:10px;border:none;border-radius:8px;background:#07c160;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">
+          导入角色
+        </button>
+        <div id="personal-skill-status" style="margin-top:8px;font-size:12px;color:var(--text-secondary);"></div>
+      </div>
     </div>
     <!-- 添加 Agent -->
     <div onclick="showCreateAgentModal(document.getElementById('contacts-team-select').value)" style="display:flex;align-items:center;gap:8px;padding:12px 16px;cursor:pointer;user-select:none;background:var(--bg-card);border-bottom:0.5px solid var(--border);">
@@ -2964,6 +3377,8 @@ const I18N = {
     unknown: '未知',
     unnamed: '未命名',
     success: '成功',
+    typing_indicator: '正在输入…',
+    typing_indicator_more: '等{count}人正在输入…',
     failed: '失败',
     operation_failed: '操作失败',
 
@@ -3083,6 +3498,42 @@ const I18N = {
     contacts_level4_preset_experts: '4. 预设专家',
     external_agent_desc: '此为外部 Agent（通过 ACP/HTTP 连接），详细配置请查看外部 Agent 配置文件。',
     reset_all_agents: '一次重置所有 agent',
+    subagent_mgmt: '子 Agent 管理',
+    subagent_loading: '正在加载子 Agent...',
+    subagent_empty: '暂无运行中的子 Agent',
+    subagent_cancel: '取消',
+    subagent_cancel_confirm: '确定取消此子 Agent？',
+    subagent_cancelled: '已发送取消指令',
+    subagent_status_running: '运行中',
+    subagent_status_idle: '空闲',
+    subagent_refresh: '刷新',
+    voice_config: '语音配置',
+    voice_enabled: '启用语音',
+    voice_auto_read: '自动朗读回复',
+    voice_tts_model: 'TTS 模型',
+    voice_tts_voice: 'TTS 声音',
+    voice_stt_model: 'STT 模型',
+    voice_session_id: '会话 ID（留空则自动）',
+    voice_save: '保存语音设置',
+    voice_saved: '✅ 语音设置已保存',
+    tool_policy: '工具权限管理',
+    tool_policy_loading: '正在加载工具权限...',
+    tool_policy_empty: '暂无工具权限数据',
+    tool_policy_allow: '允许',
+    tool_policy_deny: '拒绝',
+    tool_policy_save: '保存权限设置',
+    tool_policy_saved: '✅ 权限设置已保存',
+    tool_policy_hint: '配置哪些工具允许执行，哪些需要拒绝',
+    session_runtime: '会话运行状态',
+    session_runtime_loading: '正在获取运行状态...',
+    session_runtime_no_session: '请输入会话 ID 查询',
+    session_runtime_session_id: '会话 ID',
+    session_runtime_query: '查询',
+    oasis_report: '生成报告',
+    oasis_report_question: '报告问题（留空则自动生成摘要）',
+    oasis_report_submit: '生成',
+    oasis_report_submitted: '✅ 报告生成请求已提交',
+    oasis_report_failed: '❌ 报告生成失败',
     reset_all_confirm: '确定要一次重置当前群里的全部 agent 吗？\n\n- 外部 agent：创建新会话并重置上下文\n- 内部 agent：终止当前任务并清空历史',
     reset_all_none: '当前群里没有可重置的 agent',
     reset_all_running: '正在重置全部 agent...',
@@ -3235,11 +3686,11 @@ const I18N = {
     local_login_banner_body: '当前用户名「{user_id}」还没有密码。如需后续密码登录或远程访问，可在 Settings 里设置密码并保存为用户。',
     local_login_banner_action: '去设置',
     confirm_restart: '确定要重启所有服务吗？这将中断当前所有连接。',
-    restart_success: '✅ 服务正在重启，页面将在 15 秒后刷新',
+    restart_success: '✅ 服务正在重启，页面将在 20 秒后刷新',
     restart_failed: '❌ 重启失败',
     restarting: '⏳ 重启中...',
-    confirm_restart_teamclaw: '确定要重启 Teamclaw 吗？这将中断当前所有连接，服务将在约 15 秒后恢复。',
-    restart_signal_sent: '✅ 重启信号已发送，页面将在 15 秒后刷新',
+    confirm_restart_teamclaw: '确定要重启 Teamclaw 吗？这将中断当前所有连接，服务将在约 20 秒后恢复。',
+    restart_signal_sent: '✅ 重启信号已发送，页面将在 20 秒后刷新',
     about_text: 'Agent 消息中心 v1.0',
     settings_user_password_title: '当前用户密码',
     settings_user_password_hint_local: '你现在以本机免密方式登录。为「{user_id}」设置密码后，这个用户名就可以用于密码登录。',
@@ -3511,6 +3962,8 @@ const I18N = {
     unnamed: 'Unnamed',
     success: 'Success',
     failed: 'Failed',
+    typing_indicator: 'is typing…',
+    typing_indicator_more: 'and {count} more are typing…',
     operation_failed: 'Operation failed',
 
     input_placeholder: 'Type a message…',
@@ -3623,6 +4076,42 @@ const I18N = {
     contacts_level4_preset_experts: '4. Preset Experts',
     external_agent_desc: 'This is an external Agent (connected via ACP/HTTP). Check the external Agent config for details.',
     reset_all_agents: 'Reset All Agents',
+    subagent_mgmt: 'Sub-Agent Manager',
+    subagent_loading: 'Loading sub-agents...',
+    subagent_empty: 'No sub-agents running',
+    subagent_cancel: 'Cancel',
+    subagent_cancel_confirm: 'Cancel this sub-agent?',
+    subagent_cancelled: 'Cancel signal sent',
+    subagent_status_running: 'Running',
+    subagent_status_idle: 'Idle',
+    subagent_refresh: 'Refresh',
+    voice_config: 'Voice Config',
+    voice_enabled: 'Enable Voice',
+    voice_auto_read: 'Auto Read Replies',
+    voice_tts_model: 'TTS Model',
+    voice_tts_voice: 'TTS Voice',
+    voice_stt_model: 'STT Model',
+    voice_session_id: 'Session ID (auto if empty)',
+    voice_save: 'Save Voice Settings',
+    voice_saved: '✅ Voice settings saved',
+    tool_policy: 'Tool Permissions',
+    tool_policy_loading: 'Loading tool policy...',
+    tool_policy_empty: 'No tool policy data',
+    tool_policy_allow: 'Allow',
+    tool_policy_deny: 'Deny',
+    tool_policy_save: 'Save Permissions',
+    tool_policy_saved: '✅ Permissions saved',
+    tool_policy_hint: 'Configure which tools are allowed or denied',
+    session_runtime: 'Session Runtime',
+    session_runtime_loading: 'Loading runtime...',
+    session_runtime_no_session: 'Enter a session ID to query',
+    session_runtime_session_id: 'Session ID',
+    session_runtime_query: 'Query',
+    oasis_report: 'Generate Report',
+    oasis_report_question: 'Report question (leave empty for auto summary)',
+    oasis_report_submit: 'Generate',
+    oasis_report_submitted: '✅ Report request submitted',
+    oasis_report_failed: '❌ Report generation failed',
     reset_all_confirm: 'Reset all agents in this group?\n\n- External agents: create a new session and reset context\n- Internal agents: cancel current task and clear history',
     reset_all_none: 'No agents to reset in this group',
     reset_all_running: 'Resetting all agents...',
@@ -3768,11 +4257,11 @@ const I18N = {
     local_login_banner_body: 'The current username "{user_id}" does not have a password yet. Open Settings to save one for future password or remote login.',
     local_login_banner_action: 'Open Settings',
     confirm_restart: 'Restart all services? This will interrupt all active connections.',
-    restart_success: '✅ Services restarting. Page will refresh in 15 seconds.',
+    restart_success: '✅ Services restarting. Page will refresh in 20 seconds.',
     restart_failed: '❌ Restart failed',
     restarting: '⏳ Restarting...',
-    confirm_restart_teamclaw: 'Restart Teamclaw? All connections will be interrupted. Service will recover in ~15 seconds.',
-    restart_signal_sent: '✅ Restart signal sent. Page will refresh in 15 seconds.',
+    confirm_restart_teamclaw: 'Restart Teamclaw? All connections will be interrupted. Service will recover in ~20 seconds.',
+    restart_signal_sent: '✅ Restart signal sent. Page will refresh in 20 seconds.',
     about_text: 'Agent Message Center v1.0',
     settings_user_password_title: 'Current User Password',
     settings_user_password_hint_local: 'You are currently using local no-password login. Set a password for "{user_id}" to enable password login for this username.',
@@ -4652,6 +5141,115 @@ document.addEventListener('touchstart', e => {
     swipeClose(_swipeActiveWrapper);
   }
 }, {passive: true});
+
+// ══════════════════════════════════════════════════════════
+// Swipe-back gesture (fullscreen navigation)
+// ══════════════════════════════════════════════════════════
+(function() {
+  const EDGE_WIDTH = 24;          // px from left edge to trigger
+  const BACK_THRESHOLD = 0.30;    // 30% of screen width to commit
+  const BACK_SLOP = 10;           // min movement before committing direction
+  const BACK_RATIO = 1.5;         // dx must dominate dy
+
+  const chatPage = document.getElementById('chat-page');
+  const dim = document.getElementById('swipe-back-dim');
+  const arrow = document.getElementById('swipe-back-arrow');
+
+  let active = false, committed = false;
+  let sx = 0, sy = 0, dx = 0;
+  let vw = window.innerWidth;
+
+  window.addEventListener('resize', () => { vw = window.innerWidth; });
+
+  chatPage.addEventListener('touchstart', e => {
+    if (chatPage.classList.contains('offscreen')) return;
+    const t = e.touches[0];
+    // Only trigger from the left edge
+    if (t.clientX > EDGE_WIDTH) return;
+    active = true;
+    committed = false;
+    sx = t.clientX;
+    sy = t.clientY;
+    dx = 0;
+    chatPage.style.transition = 'none';
+  }, {passive: true});
+
+  chatPage.addEventListener('touchmove', e => {
+    if (!active) return;
+    const t = e.touches[0];
+    dx = t.clientX - sx;
+    const dy = t.clientY - sy;
+
+    if (!committed) {
+      if (Math.abs(dx) < BACK_SLOP && Math.abs(dy) < BACK_SLOP) return;
+      if (dx <= 0 || Math.abs(dx) < Math.abs(dy) * BACK_RATIO) {
+        active = false;
+        return;
+      }
+      committed = true;
+      chatPage.style.willChange = 'transform';
+      dim.classList.add('active');
+    }
+
+    // Clamp to [0, vw]
+    const offset = Math.max(0, Math.min(dx, vw));
+    chatPage.style.transform = `translateX(${offset}px)`;
+    // Dim overlay fades as page slides
+    dim.style.opacity = String(Math.max(0, 1 - offset / vw) * 0.15);
+    // Arrow indicator
+    const progress = offset / (vw * BACK_THRESHOLD);
+    if (progress > 0.3) {
+      arrow.classList.add('visible');
+      arrow.style.marginLeft = Math.min(offset * 0.3, 20) + 'px';
+    } else {
+      arrow.classList.remove('visible');
+    }
+    e.preventDefault();
+  }, {passive: false});
+
+  function endSwipe() {
+    if (!active && !committed) return;
+    const wasCommitted = committed;
+    active = false;
+    committed = false;
+
+    if (!wasCommitted) return;
+
+    chatPage.style.willChange = '';
+    arrow.classList.remove('visible');
+    arrow.style.marginLeft = '';
+
+    if (dx > vw * BACK_THRESHOLD) {
+      // Complete the back transition
+      chatPage.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1)';
+      chatPage.style.transform = `translateX(${vw}px)`;
+      dim.style.transition = 'opacity .22s';
+      dim.style.opacity = '0';
+      setTimeout(() => {
+        chatPage.style.transition = '';
+        chatPage.style.transform = '';
+        dim.classList.remove('active');
+        dim.style.transition = '';
+        dim.style.opacity = '';
+        goBack();
+      }, 230);
+    } else {
+      // Snap back
+      chatPage.style.transition = 'transform .22s cubic-bezier(.4,0,.2,1)';
+      chatPage.style.transform = 'translateX(0)';
+      dim.style.transition = 'opacity .22s';
+      dim.style.opacity = '';
+      setTimeout(() => {
+        chatPage.style.transition = '';
+        dim.classList.remove('active');
+        dim.style.transition = '';
+      }, 230);
+    }
+  }
+
+  chatPage.addEventListener('touchend', endSwipe, {passive: true});
+  chatPage.addEventListener('touchcancel', endSwipe, {passive: true});
+})();
 
 function swipeTogglePin(gid) {
   let pinned = JSON.parse(localStorage.getItem('teamclaw_pinned_groups') || '[]');
@@ -5630,6 +6228,7 @@ async function openChat(groupId, name) {
   lastMsgId = 0;
   renderedMsgIds.clear();
   clearGroupUnread(groupId, false);
+  _hideNewMsgBanner();
 
   document.getElementById('chat-title').textContent = name;
   document.getElementById('chat-body').innerHTML = '<div style="text-align:center;padding:40px"><div class="spinner"></div></div>';
@@ -5684,13 +6283,46 @@ function renderMessages(msgs) {
   scrollToBottom();
 }
 
+let _pendingNewMsgCount = 0;
+
+function _isNearBottom() {
+  const body = document.getElementById('chat-body');
+  if (!body) return true;
+  // 与 appendMessages 里「插入前」判断阈值一致（见 main-local）
+  return body.scrollHeight - body.scrollTop - body.clientHeight < 100;
+}
+
+function _showNewMsgBanner(count) {
+  const banner = document.getElementById('new-msg-banner');
+  const text = document.getElementById('new-msg-banner-text');
+  if (!banner || !text) return;
+  text.textContent = count + ' 条新消息';
+  banner.classList.add('visible');
+}
+
+function _hideNewMsgBanner() {
+  const banner = document.getElementById('new-msg-banner');
+  if (banner) banner.classList.remove('visible');
+  _pendingNewMsgCount = 0;
+}
+
+function dismissNewMsgBanner() {
+  _hideNewMsgBanner();
+  scrollToBottom();
+}
+
 function appendMessages(msgs) {
   if (!msgs.length) return;
   const body = document.getElementById('chat-body');
   // Remove empty hint if present
   const hint = body.querySelector('.refresh-hint');
   if (hint) hint.remove();
-  
+
+  // 必须在插入 DOM 之前判断：插入后 scrollHeight 变大，若在底部会被误判为「不在底部」，
+  // 导致不自动滚到底、且把自己的消息也算进「新消息」提示（对齐 main-local）
+  const distFromBottomBefore = body.scrollHeight - body.scrollTop - body.clientHeight;
+  const wasAtBottom = distFromBottomBefore < 100;
+
   const appended = [];
   msgs.forEach(m => {
     // 去重：跳过已经渲染过的消息
@@ -5704,7 +6336,16 @@ function appendMessages(msgs) {
   if (!appended.length) return;
   updateLastMsgId(appended);
   updateCurrentGroupSnapshotFromMessages(currentGroupId, appended);
-  scrollToBottom();
+
+  const me = getCurrentUser();
+  const othersCount = appended.filter(m => (m.sender || '') !== me).length;
+
+  if (wasAtBottom) {
+    requestAnimationFrame(() => scrollToBottom());
+  } else if (othersCount > 0) {
+    _pendingNewMsgCount += othersCount;
+    _showNewMsgBanner(_pendingNewMsgCount);
+  }
 }
 
 function updateLastMsgId(msgs) {
@@ -6066,6 +6707,7 @@ async function sendMessage() {
       await api('POST', `/proxy_groups/${encodeURIComponent(currentGroupId)}/messages`, body);
       // Poll will pick up the message
       await pollNewMessages();
+      scrollToBottom();  // 发消息后滚到底（对齐 main-local）
     }
   } catch (e) {
     toast(t('send_failed') + ': ' + e.message);
@@ -6557,6 +7199,9 @@ function renderOasisDetail(detail) {
   }
   if (isRunning) {
     btns += `<button onclick="cancelOasisTopic('${detail.topic_id}')" class="oasis-detail-action-btn cancel">${t('oasis_cancel')}</button>`;
+  }
+  if (!isRunning && hasData) {
+    btns += `<button onclick="showOasisReportModal('${detail.topic_id}')" class="oasis-detail-action-btn overview" style="background:#e8f4fd;color:#1a6fad;">${t('oasis_report')}</button>`;
   }
   btns += `<button onclick="deleteOasisTopic('${detail.topic_id}')" class="oasis-detail-action-btn delete">${t('oasis_delete')}</button>`;
   actionsEl.innerHTML = btns;
@@ -7085,14 +7730,19 @@ function openTeamCreator() {
 
 // ── Polling ──
 let _polling = false;  // 互斥锁，防止并发 poll 导致重复消息
+let _typingTimer = null;
 
 function startPolling() {
   stopPolling();
   pollTimer = setInterval(pollNewMessages, 3000);
+  // 输入状态轮询（更高频率以保持响应性）
+  _typingTimer = setInterval(pollTypingStatus, 2000);
 }
 
 function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  if (_typingTimer) { clearInterval(_typingTimer); _typingTimer = null; }
+  updateTypingBar([]);  // 切走时清空
 }
 
 async function pollNewMessages() {
@@ -7106,6 +7756,37 @@ async function pollNewMessages() {
   } catch (_) { /* silent */ } finally {
     _polling = false;
   }
+}
+
+// ── Typing indicator ──
+async function pollTypingStatus() {
+  if (!currentGroupId) return;
+  try {
+    const data = await api('GET', `/proxy_groups/${encodeURIComponent(currentGroupId)}/typing`);
+    updateTypingBar(data.typing || []);
+  } catch (_) {
+    // silent - don't break polling on error
+  }
+}
+
+function updateTypingBar(names) {
+  const bar = document.getElementById('typing-bar');
+  const text = document.getElementById('typing-text');
+  if (!bar || !text) return;
+  if (!names.length) {
+    bar.classList.remove('show');
+    return;
+  }
+  let label;
+  if (names.length === 1) {
+    label = `${names[0]} ${t('typing_indicator')}`;
+  } else if (names.length <= 3) {
+    label = `${names.join('、')} ${t('typing_indicator')}`;
+  } else {
+    label = `${names.slice(0, 2).join('、')} ${t('typing_indicator_more', { count: names.length - 2 })}`;
+  }
+  text.textContent = label;
+  bar.classList.add('show');
 }
 
 // ── Members drawer ──
@@ -8571,6 +9252,314 @@ function formatTime(ts) {
 function scrollToBottom() {
   const body = document.getElementById('chat-body');
   requestAnimationFrame(() => { body.scrollTop = body.scrollHeight; });
+  _hideNewMsgBanner();
+}
+
+// ════════════════════════════════════════════════════
+// ── Personal Skill Import (前任 / crush / yourself / 群友) ──
+// ════════════════════════════════════════════════════
+function togglePersonalSkillImport() {
+  const panel = document.getElementById('personal-skill-import-panel');
+  const arrow = document.getElementById('personal-skill-arrow');
+  const isVisible = panel.style.display !== 'none';
+  panel.style.display = isVisible ? 'none' : 'block';
+  if (arrow) arrow.style.transform = isVisible ? '' : 'rotate(180deg)';
+}
+
+async function importPersonalSkill() {
+  const metaFile = document.getElementById('personal-skill-meta').files[0];
+  const personaFile = document.getElementById('personal-skill-persona').files[0];
+  const memoryFile = document.getElementById('personal-skill-memory').files[0];
+  const skillType = document.getElementById('personal-skill-type').value;
+  const teamName = document.getElementById('personal-skill-team').value.trim();
+  const btn = document.getElementById('personal-skill-import-btn');
+  const status = document.getElementById('personal-skill-status');
+
+  if (!metaFile) { toast('请选择 meta.json 文件'); return; }
+  if (!personaFile) { toast('请选择 persona.md 文件'); return; }
+
+  btn.disabled = true;
+  status.textContent = '⏳ 正在导入...';
+
+  try {
+    const readFile = f => new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = e => res(e.target.result);
+      r.onerror = rej;
+      r.readAsText(f, 'utf-8');
+    });
+
+    const metaText = await readFile(metaFile);
+    const personaMd = await readFile(personaFile);
+    const memoryMd = memoryFile ? await readFile(memoryFile) : '';
+
+    let metaJson;
+    try { metaJson = JSON.parse(metaText); }
+    catch(e) { throw new Error('meta.json 格式错误: ' + e.message); }
+
+    const resp = await fetch('/api/team-creator/import-personal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        meta_json: metaJson,
+        persona_md: personaMd,
+        memory_md: memoryMd,
+        skill_type: skillType,
+        team_name: teamName,
+      }),
+    });
+    const data = await resp.json();
+
+    if (!resp.ok || !data.ok) {
+      throw new Error(data.error || '导入失败');
+    }
+
+    const expertName = data.team_config?.oasis_experts?.[0]?.name || metaJson.name || '角色';
+    status.textContent = `✅ 已导入「${expertName}」`;
+    toast(`✅ ${expertName} 导入成功！`);
+    // Refresh contacts list
+    setTimeout(() => refreshContacts(), 1000);
+
+  } catch (e) {
+    status.textContent = '❌ ' + e.message;
+    toast('❌ 导入失败: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ════════════════════════════════════════════════════
+// ── Subagent Management Panel ──
+// ════════════════════════════════════════════════════
+function openSubagentPanel() {
+  const overlay = document.getElementById('subagent-panel-overlay');
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  loadSubagents();
+}
+
+function closeSubagentPanel() {
+  const overlay = document.getElementById('subagent-panel-overlay');
+  overlay.classList.remove('open');
+  setTimeout(() => { overlay.style.display = 'none'; }, 300);
+}
+
+async function loadSubagents() {
+  const body = document.getElementById('subagent-panel-body');
+  body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-hint);">${t('subagent_loading')}</div>`;
+  try {
+    const data = await api('GET', '/proxy_teambot_subagents');
+    const agents = Array.isArray(data) ? data : (data.subagents || data.agents || []);
+    if (!agents.length) {
+      body.innerHTML = `
+        <div style="text-align:center;padding:48px 24px;">
+          <div style="font-size:40px;margin-bottom:12px;">🤖</div>
+          <div style="color:var(--text-secondary);font-size:14px;">${t('subagent_empty')}</div>
+        </div>`;
+      return;
+    }
+    body.innerHTML = agents.map(a => {
+      const name = esc(a.name || a.agent_ref || a.agent || JSON.stringify(a));
+      const ref = esc(a.agent_ref || a.id || '');
+      const status = a.status || 'running';
+      const isRunning = status === 'running' || status === 'active' || status === 'busy';
+      const dotCls = isRunning ? 'running' : 'idle';
+      const statusLabel = isRunning ? t('subagent_status_running') : t('subagent_status_idle');
+      const meta = [a.session_id ? `session: ${esc(a.session_id)}` : '', a.task ? esc(a.task.slice(0,40)) : ''].filter(Boolean).join(' · ');
+      return `
+        <div class="subagent-item">
+          <div class="subagent-item-avatar">🤖</div>
+          <div class="subagent-item-info">
+            <div class="subagent-item-name">${name}</div>
+            <div class="subagent-item-meta">
+              <span class="subagent-status-dot ${dotCls}"></span>${statusLabel}${meta ? ' · ' + meta : ''}
+            </div>
+          </div>
+          ${isRunning ? `<button class="subagent-cancel-btn" onclick="cancelSubagent('${ref}')">${t('subagent_cancel')}</button>` : ''}
+        </div>`;
+    }).join('');
+  } catch (e) {
+    body.innerHTML = `<div style="text-align:center;padding:40px;color:#f55;">❌ ${esc(e.message)}</div>`;
+  }
+}
+
+async function cancelSubagent(agentRef) {
+  if (!confirm(t('subagent_cancel_confirm'))) return;
+  try {
+    await api('POST', '/proxy_teambot_subagent_cancel', { agent_ref: agentRef });
+    toast(t('subagent_cancelled'));
+    setTimeout(() => loadSubagents(), 800);
+  } catch (e) {
+    toast('❌ ' + e.message);
+  }
+}
+
+// ════════════════════════════════════════════════════
+// ── Generic Toggle Helper ──
+// ════════════════════════════════════════════════════
+function tcToggle(btn) {
+  btn.classList.toggle('on');
+}
+
+function tcIsOn(btn) {
+  return btn ? btn.classList.contains('on') : false;
+}
+
+// ════════════════════════════════════════════════════
+// ── Voice Config Sheet ──
+// ════════════════════════════════════════════════════
+function openVoiceConfigSheet() {
+  document.getElementById('voice-sheet-overlay').classList.add('show');
+  document.getElementById('voice-sheet').classList.add('show');
+}
+
+function closeVoiceConfigSheet() {
+  document.getElementById('voice-sheet-overlay').classList.remove('show');
+  document.getElementById('voice-sheet').classList.remove('show');
+}
+
+async function saveVoiceConfig() {
+  const btn = document.getElementById('voice-save-btn');
+  btn.disabled = true;
+  try {
+    const payload = {
+      session_id: document.getElementById('voice-session-id').value.trim(),
+      enabled: tcIsOn(document.getElementById('voice-enabled-toggle')),
+      auto_read_aloud: tcIsOn(document.getElementById('voice-auto-read-toggle')),
+      tts_model: document.getElementById('voice-tts-model').value.trim(),
+      tts_voice: document.getElementById('voice-tts-voice').value.trim(),
+      stt_model: document.getElementById('voice-stt-model').value.trim(),
+    };
+    await api('POST', '/proxy_teambot_voice', payload);
+    toast(t('voice_saved'));
+    closeVoiceConfigSheet();
+  } catch (e) {
+    toast('❌ ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ════════════════════════════════════════════════════
+// ── Tool Policy Sheet ──
+// ════════════════════════════════════════════════════
+let _toolPolicyData = {};
+
+async function openToolPolicySheet() {
+  document.getElementById('tool-policy-sheet-overlay').classList.add('show');
+  document.getElementById('tool-policy-sheet').classList.add('show');
+  await loadToolPolicy();
+}
+
+function closeToolPolicySheet() {
+  document.getElementById('tool-policy-sheet-overlay').classList.remove('show');
+  document.getElementById('tool-policy-sheet').classList.remove('show');
+}
+
+async function loadToolPolicy() {
+  const body = document.getElementById('tool-policy-body');
+  body.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-hint);">${t('tool_policy_loading')}</div>`;
+  try {
+    const data = await api('GET', '/proxy_teambot_tool_policy');
+    _toolPolicyData = data.policy || data || {};
+    renderToolPolicy(_toolPolicyData);
+  } catch (e) {
+    body.innerHTML = `<div style="text-align:center;padding:24px;color:#f55;">❌ ${esc(e.message)}</div>`;
+  }
+}
+
+function renderToolPolicy(policy) {
+  const body = document.getElementById('tool-policy-body');
+  const keys = Object.keys(policy);
+  if (!keys.length) {
+    body.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-hint);">${t('tool_policy_empty')}</div>
+      <div style="font-size:12px;color:var(--text-hint);padding:0 4px 8px;">${t('tool_policy_hint')}</div>`;
+    return;
+  }
+  body.innerHTML = `<div style="font-size:12px;color:var(--text-hint);padding:0 0 10px;">${t('tool_policy_hint')}</div>` +
+    keys.map(tool => {
+      const val = policy[tool]; // true = allow, false = deny
+      const isAllow = val !== false;
+      return `
+        <div class="tool-policy-item">
+          <div class="tool-policy-info">
+            <div class="tool-policy-name">${esc(tool)}</div>
+          </div>
+          <button class="tc-toggle ${isAllow ? 'on' : ''}" data-tool="${esc(tool)}" onclick="tcToggle(this)"></button>
+        </div>`;
+    }).join('');
+}
+
+async function saveToolPolicy() {
+  const btn = document.getElementById('tool-policy-save-btn');
+  btn.disabled = true;
+  try {
+    const toggles = document.querySelectorAll('#tool-policy-body .tc-toggle[data-tool]');
+    const policy = {};
+    toggles.forEach(tog => {
+      policy[tog.dataset.tool] = tog.classList.contains('on');
+    });
+    await api('POST', '/proxy_teambot_tool_policy', { policy });
+    toast(t('tool_policy_saved'));
+    closeToolPolicySheet();
+  } catch (e) {
+    toast('❌ ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ════════════════════════════════════════════════════
+// ── Session Runtime Sheet ──
+// ════════════════════════════════════════════════════
+function openSessionRuntimeSheet() {
+  document.getElementById('runtime-sheet-overlay').classList.add('show');
+  document.getElementById('runtime-sheet').classList.add('show');
+  document.getElementById('runtime-result').innerHTML = `<div style="color:var(--text-hint);font-size:13px;">${t('session_runtime_no_session')}</div>`;
+}
+
+function closeSessionRuntimeSheet() {
+  document.getElementById('runtime-sheet-overlay').classList.remove('show');
+  document.getElementById('runtime-sheet').classList.remove('show');
+}
+
+async function querySessionRuntime() {
+  const sessionId = document.getElementById('runtime-session-id').value.trim();
+  const resultEl = document.getElementById('runtime-result');
+  resultEl.innerHTML = `<div style="color:var(--text-hint);font-size:13px;">${t('session_runtime_loading')}</div>`;
+  try {
+    const params = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
+    const data = await api('GET', `/proxy_teambot_session_runtime${params}`);
+    // Render as a clean key-value table
+    const rows = Object.entries(data).map(([k, v]) => {
+      const val = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
+      return `<div style="display:flex;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px;">
+        <span style="color:var(--text-secondary);min-width:90px;flex-shrink:0;">${esc(k)}</span>
+        <span style="flex:1;word-break:break-all;font-family:monospace;">${esc(val)}</span>
+      </div>`;
+    });
+    resultEl.innerHTML = rows.length
+      ? rows.join('')
+      : `<div style="color:var(--text-hint);font-size:13px;padding:12px 0;">（无数据）</div>`;
+  } catch (e) {
+    resultEl.innerHTML = `<div style="color:#f55;font-size:13px;">❌ ${esc(e.message)}</div>`;
+  }
+}
+
+// ════════════════════════════════════════════════════
+// ── OASIS Report Modal ──
+// ════════════════════════════════════════════════════
+async function showOasisReportModal(topicId) {
+  const question = prompt(t('oasis_report_question'), '');
+  if (question === null) return; // user cancelled
+  try {
+    await api('POST', `/proxy_oasis/topics/${encodeURIComponent(topicId)}/report/ask`, {
+      question: question.trim(),
+    });
+    toast(t('oasis_report_submitted'));
+  } catch (e) {
+    toast(t('oasis_report_failed') + ': ' + e.message);
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -10556,7 +11545,7 @@ async function restartServices() {
         if (data.status === 'success') {
             toast(t('restart_success'));
             closeSettings();
-            setTimeout(() => location.reload(), 15000);
+            setTimeout(() => location.reload(), 20000);
         } else {
             toast(t('restart_failed') + ': ' + (data.detail || data.error || ''));
             if (btn) { btn.disabled = false; btn.textContent = t('settings_restart'); }
@@ -10565,7 +11554,7 @@ async function restartServices() {
         // 网络断开说明服务已在重启中
         toast(t('restart_success'));
         closeSettings();
-        setTimeout(() => location.reload(), 15000);
+        setTimeout(() => location.reload(), 20000);
     }
 }
 
@@ -10758,11 +11747,11 @@ async function restartTeamclaw() {
             headers: { 'Content-Type': 'application/json' },
         });
         toast(t('restart_signal_sent'));
-        setTimeout(() => location.reload(), 15000);
+        setTimeout(() => location.reload(), 20000);
     } catch (e) {
         // 网络断开说明服务已在重启中
         toast(t('restart_success'));
-        setTimeout(() => location.reload(), 15000);
+        setTimeout(() => location.reload(), 20000);
     }
 }
 
@@ -10915,10 +11904,20 @@ window.location.href = '/studio?redirect=group_chat&tab=group';
 }
 
 // ── Init ──
+// Register Service Worker for PWA support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   document.documentElement.lang = _currentLang === 'zh' ? 'zh-CN' : 'en';
   document.title = t('page_title');
   applyLangToDOM();
+
+  // Hide new-msg banner when user scrolls to bottom manually
+  document.getElementById('chat-body').addEventListener('scroll', () => {
+    if (_isNearBottom()) _hideNewMsgBanner();
+  }, { passive: true });
 
   const _boot = { timer: null, visible: false, startTime: 0, DELAY: 300, MIN_VISIBLE: 400 };
   function showBootLoading(text) {

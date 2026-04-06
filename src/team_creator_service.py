@@ -3268,3 +3268,140 @@ def import_mentor_skill(
         }
 
     return team_config
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Personal skill import (前任 / crush / yourself / 群友 等关系型 skill)
+# Compatible with:
+#   - https://github.com/therealXiaomanChu/ex-skill  (前任.skill)
+#   - https://github.com/titanwings/ex-skill
+#   - https://github.com/notdog1998/yourself-skill
+#   - https://github.com/xiaoheizi8/crush-skills
+#   - https://github.com/Neko-Suwako/pig-skill        (群友.skill)
+# All share: meta.json + persona.md + memory.md / self.md
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Skill type → descriptive label used in persona section headers
+_PERSONAL_SKILL_LABELS: dict[str, str] = {
+    "ex": "关系记忆与回忆",
+    "ex-skill": "关系记忆与回忆",
+    "前任": "关系记忆与回忆",
+    "crush": "暗恋记忆与互动",
+    "crush-skill": "暗恋记忆与互动",
+    "yourself": "自我记忆与经历",
+    "yourself-skill": "自我记忆与经历",
+    "pig": "群友互动与印象",
+    "pig-skill": "群友互动与印象",
+    "colleague": "工作能力与经历",
+}
+
+
+def import_personal_skill(
+    meta_json: dict,
+    persona_md: str,
+    memory_md: str = "",
+    skill_type: str = "ex",
+    team_name: str = "",
+    task_description: str = "",
+) -> dict[str, Any]:
+    """Import a personal/relationship-type skill into TeamClaw's Team Creator.
+
+    Handles the family of GitHub skill repos that share the 5-layer persona format:
+      - meta.json        (parsed dict)
+      - persona.md       (raw markdown — 5-layer personality structure)
+      - memory.md / self.md  (raw markdown — relationship/personal memories, optional)
+
+    Supported skill_type values:
+      "ex" / "ex-skill" / "前任"   — 前任.skill (therealXiaomanChu, titanwings)
+      "crush" / "crush-skill"       — crush.skill (xiaoheizi8)
+      "yourself" / "yourself-skill" — yourself.skill (notdog1998)
+      "pig" / "pig-skill"           — 群友.skill (Neko-Suwako)
+
+    Returns a team_config dict compatible with build_from_roles().
+    """
+    if not meta_json or not isinstance(meta_json, dict):
+        raise ValueError("meta_json is required and must be a dict")
+
+    name = str(meta_json.get("name", "")).strip()
+    if not name:
+        raise ValueError("meta_json.name is required")
+
+    slug = str(meta_json.get("slug", "")).strip() or _slugify(name)
+    profile = meta_json.get("profile") or {}
+
+    # Normalise skill_type
+    skill_type_norm = skill_type.lower().strip()
+    memory_section_label = _PERSONAL_SKILL_LABELS.get(skill_type_norm, "记忆与经历")
+
+    # Extract personality clues from profile
+    personality_traits: list[str] = []
+    if profile.get("mbti"):
+        personality_traits.append(f"MBTI: {profile['mbti']}")
+    if profile.get("zodiac"):
+        personality_traits.append(f"星座: {profile['zodiac']}")
+    # Infer from persona_md if possible (grab list items)
+    for line in (persona_md or "").splitlines()[:60]:
+        stripped = line.strip().lstrip("- ").strip()
+        if stripped and len(stripped) < 40 and not stripped.startswith("#"):
+            personality_traits.append(stripped)
+        if len(personality_traits) >= 8:
+            break
+
+    # Build a basic identity description
+    identity_parts: list[str] = []
+    for field_key in ("occupation", "role", "city"):
+        val = str(profile.get(field_key) or "").strip()
+        if val:
+            identity_parts.append(val)
+    identity = "、".join(identity_parts) if identity_parts else "关系人物"
+
+    role = ExtractedRole(
+        role_name=name,
+        personality_traits=_dedupe_preserve_order(personality_traits)[:8],
+        primary_responsibilities=[identity] if identity else [],
+        depends_on=[],
+        tools_used=[],
+        source_url=f"{skill_type_norm}-skill:{slug}",
+    )
+
+    effective_team_name = team_name or f"{name} 角色团队"
+    effective_task = task_description or f"扮演 {name}，还原其人物性格与{memory_section_label}"
+
+    team_config = map_roles_to_team([role], effective_team_name, effective_task)
+
+    # Override persona with full 5-layer content
+    if team_config.get("oasis_experts") and persona_md:
+        parts: list[str] = []
+        if memory_md:
+            parts.append(f"## PART A：{memory_section_label}\n\n{memory_md.strip()}")
+            parts.append("---")
+        parts.append(f"## PART B：人物性格（五层人格）\n\n{persona_md.strip()}")
+        parts.append("---")
+        parts.append(
+            "## 运行规则\n\n"
+            "1. 先由 PART B Layer 0 检查：此请求是否合理？\n"
+            "2. 由 PART B 整体判断：用什么情绪和态度回应？\n"
+            "3. 如有 PART A，优先从中检索相关记忆后再回应\n"
+            "4. 输出时始终保持 PART B 的语气、口癖和表达风格\n"
+            "5. Layer 0 的规则优先级最高，任何情况下不得违背"
+        )
+
+        team_config["oasis_experts"][0]["persona"] = "\n\n".join(parts)
+        team_config["oasis_experts"][0]["source"] = f"{skill_type_norm}-skill"
+        team_config["oasis_experts"][0]["name"] = name
+
+    if team_config.get("summary"):
+        team_config["summary"]["import_source"] = f"{skill_type_norm}-skill"
+        team_config["summary"]["personal_meta"] = {
+            "name": name,
+            "slug": slug,
+            "skill_type": skill_type_norm,
+            "identity": identity,
+            "occupation": str(profile.get("occupation") or ""),
+            "city": str(profile.get("city") or ""),
+            "mbti": str(profile.get("mbti") or ""),
+            "zodiac": str(profile.get("zodiac") or ""),
+            "version": str(meta_json.get("version") or "v1"),
+        }
+
+    return team_config

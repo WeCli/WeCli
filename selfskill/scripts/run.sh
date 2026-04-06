@@ -294,6 +294,12 @@ stop_teamclaw_service_processes() {
 }
 
 resolve_openclaw_cli() {
+    # 优先使用腾讯内网版 wrapper（自动 source 运行时环境）
+    local internal_wrapper="$HOME/.local/lib/openclaw-internal/bin/openclaw"
+    if [ -x "$internal_wrapper" ]; then
+        echo "$internal_wrapper"
+        return 0
+    fi
     if command -v openclaw.cmd >/dev/null 2>&1; then
         command -v openclaw.cmd
         return 0
@@ -660,12 +666,27 @@ case "${1:-help}" in
     check-openclaw)
         echo "=== OpenClaw 检测 ==="
 
-        # 1. 检测 openclaw 是否已安装
-        if command -v openclaw &>/dev/null; then
+        # 1. 检测 openclaw 是否已安装（优先内网版 wrapper）
+        INTERNAL_WRAPPER="$HOME/.local/lib/openclaw-internal/bin/openclaw"
+        if [ -x "$INTERNAL_WRAPPER" ]; then
+            # 加载内网版运行时环境
+            INIT_ENV="$HOME/.local/lib/openclaw-internal/runtime/init_env.sh"
+            if [ -f "$INIT_ENV" ]; then
+                source "$INIT_ENV" 2>/dev/null || true
+            fi
+            OC_VERSION=$("$INTERNAL_WRAPPER" --version 2>/dev/null | head -1 || echo "unknown")
+            echo "✅ 腾讯内网版 OpenClaw 已安装: $OC_VERSION"
+            echo "   路径: $INTERNAL_WRAPPER"
+            echo "   默认 Gateway 端口: 23001"
+            OC_BIN="$INTERNAL_WRAPPER"
+        elif command -v openclaw &>/dev/null; then
             OC_VERSION=$(openclaw --version 2>/dev/null | head -1 || echo "unknown")
             echo "✅ OpenClaw 已安装: $OC_VERSION"
             OC_BIN=$(which openclaw)
             echo "   路径: $OC_BIN"
+        fi
+
+        if [ -n "${OC_BIN:-}" ]; then
 
             # 自动探测并配置 + 初始化 workspace 模板
             echo ""

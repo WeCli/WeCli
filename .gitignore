@@ -67,8 +67,11 @@ logs/
 data/*.db
 data/*.db-wal
 data/*.db-shm
+data/*.db-journal
+data/checkpoint_export_*.json
 data/user_files/
 data/oasis_discussions/
 
 # 临时 LLM 请求调试导出（TEAMCLAW_DEBUG_LLM_PAYLOAD=1）
 data/debug_llm_payload_last.json
+.claude/settings.local.json

@@ -81,6 +81,10 @@ def create_group_router(
     async def group_mute_status(group_id: str, authorization: str | None = Header(None)):
         return await service.group_mute_status(group_id, authorization)
 
+    @router.get("/groups/{group_id}/typing")
+    async def group_typing_status(group_id: str, authorization: str | None = Header(None)):
+        return await service.get_typing_status(group_id, authorization)
+
     @router.get("/groups/{group_id}/sessions")
     async def list_available_sessions(group_id: str, authorization: str | None = Header(None)):
         return await service.list_available_sessions(group_id, authorization)

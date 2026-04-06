@@ -207,6 +207,21 @@ def register_group_routes(app, *, port_agent: int, internal_token: str) -> None:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/proxy_groups/<group_id>/typing", methods=["GET"])
+    def proxy_group_typing(group_id):
+        try:
+            r = requests.get(
+                "http://127.0.0.1:{port}/groups/{gid}/typing".format(
+                    port=port_agent,
+                    gid=_enc_group_seg(group_id),
+                ),
+                headers=_group_auth_headers(),
+                timeout=5,
+            )
+            return jsonify(r.json()), r.status_code
+        except Exception:
+            return jsonify({"typing": []}), 200
+
     @app.route("/proxy_groups/<group_id>/sessions", methods=["GET"])
     def proxy_group_sessions(group_id):
         try:
