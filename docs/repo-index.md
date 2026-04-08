@@ -38,7 +38,7 @@ Read these first for setup or environment changes:
 | `selfskill/scripts/configure.py` | `.env` initialization and configuration logic |
 | `selfskill/scripts/configure_openclaw.py` | OpenClaw detection plus Wecli/OpenClaw LLM sync logic |
 | `config/.env.example` | config template and inline guidance |
-| `config/tinyfish_targets.example.json` | example TinyFish competitor target schema |
+| `config/tinyfish_targets.example.json` | example TinyFish search target schema |
 | `scripts/setup_apikey.sh` | legacy API key helper |
 | `scripts/setup_apikey.ps1` | legacy Windows API key helper |
 | `manual_run.sh` | manual startup helper with guardrails |
@@ -351,7 +351,7 @@ Read:
 - `selfskill/scripts/configure.py`
 - `config/.env.example`
 
-### "TinyFish monitor or pricing change detection is wrong"
+### "TinyFish search agent or data extraction is wrong"
 
 Read:
 

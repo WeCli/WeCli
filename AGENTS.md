@@ -1,6 +1,6 @@
 ---
 name: "Wecli"
-description: "A multi-agent orchestration platform with visual workflow (OASIS). Create and configure agents (OpenClaw/external API), orchestrate them into Teams, build new Teams with WeCli Creator, and design workflows via visual canvas. Supports Team conversations, OASIS Town with living GraphRAG memory, scheduled tasks, Telegram/QQ bots, TinyFish competitor monitoring, and Cloudflare Tunnel for remote access."
+description: "A multi-agent orchestration platform with visual workflow (OASIS). Create and configure agents (OpenClaw/external API), orchestrate them into Teams, build new Teams with WeCli Creator, and design workflows via visual canvas. Supports Team conversations, OASIS Town with living GraphRAG memory, scheduled tasks, Telegram/QQ bots, TinyFish internet search agent, and Cloudflare Tunnel for remote access."
 user-invokable: true
 compatibility:
   - "deepseek"
@@ -73,7 +73,7 @@ Read only the docs relevant to the current task:
 | Workflow YAML | [`docs/create_workflow.md`](./docs/create_workflow.md) | [`docs/example_team.md`](./docs/example_team.md) |
 | OpenClaw integration | [`docs/openclaw-commands.md`](./docs/openclaw-commands.md) | [`docs/build_team.md`](./docs/build_team.md) |
 | ACP / acpx | [`docs/runtime-reference.md`](./docs/runtime-reference.md) | [`docs/oasis-reference.md`](./docs/oasis-reference.md) |
-| TinyFish monitoring | [`docs/tinyfish-monitor.md`](./docs/tinyfish-monitor.md) | [`docs/runtime-reference.md`](./docs/runtime-reference.md) |
+| TinyFish internet search | [`docs/tinyfish-monitor.md`](./docs/tinyfish-monitor.md) | [`docs/runtime-reference.md`](./docs/runtime-reference.md) |
 | Debug ports / proxies | [`docs/ports.md`](./docs/ports.md) | [`docs/repo-index.md`](./docs/repo-index.md) |
 
 ## Repository Indexing

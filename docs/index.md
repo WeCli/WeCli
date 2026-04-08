@@ -35,7 +35,7 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 | Create / debug workflow YAML | [`create_workflow.md`](./create_workflow.md) | [`example_team.md`](./example_team.md) |
 | Configure OpenClaw or external agents | [`openclaw-commands.md`](./openclaw-commands.md) | [`build_team.md`](./build_team.md) |
 | Configure or debug ACP / acpx (external agent communication) | [`runtime-reference.md`](./runtime-reference.md) | [`build_team.md`](./build_team.md), [`oasis-reference.md`](./oasis-reference.md), [`repo-index.md`](./repo-index.md) |
-| Configure TinyFish competitor monitoring | [`tinyfish-monitor.md`](./tinyfish-monitor.md) | [`runtime-reference.md`](./runtime-reference.md), [`repo-index.md`](./repo-index.md) |
+| Configure TinyFish internet search agent | [`tinyfish-monitor.md`](./tinyfish-monitor.md) | [`runtime-reference.md`](./runtime-reference.md), [`repo-index.md`](./repo-index.md) |
 | Inspect ports, proxies, or service boundaries | [`ports.md`](./ports.md) | [`repo-index.md`](./repo-index.md) |
 
 ## Document Groups
@@ -56,7 +56,7 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 - [`webot-claude-gap-analysis.md`](./webot-claude-gap-analysis.md): feature matrix vs Claude Code and the outstanding parity checklist
 - [`example_team.md`](./example_team.md): concrete file layout for a Team
 - [`openclaw-commands.md`](./openclaw-commands.md): OpenClaw command and config reference
-- [`tinyfish-monitor.md`](./tinyfish-monitor.md): TinyFish competitor monitoring, live crawl, and price-change persistence
+- [`tinyfish-monitor.md`](./tinyfish-monitor.md): TinyFish internet search agent, live crawl, and data persistence
 - [`ports.md`](./ports.md): ports, proxy routes, exposure rules
 
 ### Maintainer / Developer Docs

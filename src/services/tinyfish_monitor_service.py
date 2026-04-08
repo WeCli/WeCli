@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TinyFish competitor monitor service for Wecli.
+"""TinyFish internet search agent service for Wecli.
 
 Shared by:
 - CLI script
@@ -161,8 +161,8 @@ def detect_availability(item: dict[str, Any]) -> str | None:
 
 def build_default_goal(target_name: str, url: str) -> str:
     return (
-        f"Inspect {target_name} starting from {url}. Find the public pricing information for this competitor. "
-        "Extract all plans, packages, products, or pricing rows you can find. "
+        f"Inspect {target_name} starting from {url}. Extract the structured data from this page. "
+        "Find all relevant items, entries, or data rows you can identify. "
         "Return strict JSON only with this schema: "
         '{"items":[{"item_key":"","name":"","plan_name":"","sku":"","price":"","currency":"","amount":0,'
         '"billing_period":"","availability":"","source_url":"","notes":""}]}'
@@ -183,7 +183,7 @@ class Target:
             "url": self.url,
             "goal": self.goal,
             "browser_profile": self.browser_profile,
-            "api_integration": "wecli-competitor-monitor",
+            "api_integration": "wecli-search-agent",
         }
         payload.update(self.extra_payload)
         return payload
@@ -1389,11 +1389,11 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="TinyFish competitor monitor for Wecli")
+    parser = argparse.ArgumentParser(description="TinyFish internet search agent for Wecli")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser("run", help="Submit targets to TinyFish, wait, and store results")
-    run_parser.add_argument("--targets", default=str(get_targets_path()), help="Path to competitor target JSON")
+    run_parser.add_argument("--targets", default=str(get_targets_path()), help="Path to search target JSON")
     run_parser.add_argument("--db", default=str(get_db_path()), help="SQLite path for TinyFish monitor data")
     run_parser.add_argument("--site", action="append", help="Filter by site_key or target name (repeatable)")
     run_parser.add_argument("--poll-interval", type=float, default=5.0, help="Seconds between polling requests")
@@ -1410,7 +1410,7 @@ def build_parser() -> argparse.ArgumentParser:
     poll_parser.add_argument("--request-timeout", type=int, default=60, help="HTTP timeout in seconds")
     poll_parser.set_defaults(func=cmd_poll)
 
-    report_parser = subparsers.add_parser("report", help="Show recently detected pricing changes")
+    report_parser = subparsers.add_parser("report", help="Show recently detected data changes")
     report_parser.add_argument("--db", default=str(get_db_path()), help="SQLite path for TinyFish monitor data")
     report_parser.add_argument("--limit", type=int, default=20, help="How many recent change rows to print")
     report_parser.set_defaults(func=cmd_report)

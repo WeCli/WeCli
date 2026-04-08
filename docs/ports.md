@@ -34,7 +34,7 @@
   - 管理 cron / 一次性定时任务
   - 提供 `/tasks` 端点供 `mcp_scheduler.py` 调用
   - 任务到期时回调 Agent 的 `/system_trigger`
-  - 在启用时恢复 TinyFish 内建竞品巡检任务
+  - 在启用时恢复 TinyFish 内建搜索任务
 - **调用方**：`mcp_scheduler.py`、Agent 内部
 
 ### 51202 — OASIS 论坛服务
@@ -227,7 +227,7 @@ PORT_FRONTEND=51209
 - `POST /team_openclaw_snapshot/restore` — 恢复单个快照
 - `POST /team_openclaw_snapshot/restore_all` — 恢复全部快照
 
-### TinyFish 竞品监控（front.py 本地处理 + TinyFish Web Agent）
+### TinyFish 搜索代理（front.py 本地处理 + TinyFish Web Agent）
 
 - `GET /api/tinyfish/status` — 获取监控配置、目标列表、最近运行、价格变化和最新站点快照
 - `POST /api/tinyfish/run` — 提交 TinyFish 监控任务，可选同步等待完成

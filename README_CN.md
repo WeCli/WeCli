@@ -116,7 +116,7 @@ bash selfskill/scripts/run.sh stop      # 停止所有服务
 - **Bot 集成** — Telegram / QQ，支持白名单访问控制
 - **多模态 I/O** — 图片、文件、语音输入、TTS
 - **自动化** — 定时任务、长流程工作流执行
-- **TinyFish 竞品监控** — 抓取竞品定价页、保存快照、检测变化
+- **TinyFish 搜索代理** — 基于 TinyFish Web Agent API 的互联网搜索代理
 - **远程访问** — Cloudflare Tunnel + token / 密码登录
 - **Flow 分发** — 通过 [WecliHub](https://wecli.net) 浏览和分享工作流
 
@@ -139,7 +139,7 @@ bash selfskill/scripts/run.sh stop      # 停止所有服务
 | **多模态 I/O** | 图片、文件、语音输入、TTS |
 | **Bot 集成** | Telegram / QQ |
 | **自动化** | 定时任务、长流程工作流执行 |
-| **TinyFish 竞品监控** | 抓取竞品页面、保存快照、检测变化 |
+| **TinyFish 搜索代理** | 互联网搜索代理，支持网页抓取与结构化数据提取 |
 | **Flow 分发平台** | 通过 [WecliHub](https://wecli.net) 浏览和分享 |
 | **远程访问** | Cloudflare Tunnel + token / 密码登录 |
 
@@ -156,7 +156,7 @@ bash selfskill/scripts/run.sh stop      # 停止所有服务
 - **委托式 Agent 工作** — 用 WeBot 将研究、编码或审阅任务委托给角色化子 Agent
 - **预测 / GraphRAG 控制台** — 追踪节点、边、证据和报告
 - **AI 集成中枢** — 接 Bot、接 OpenClaw、接外部 API Agent
-- **竞品价格巡检** — 定时抓取公开定价页，检测变化
+- **TinyFish 搜索代理** — 基于 TinyFish Web Agent 的互联网搜索与数据提取
 - **运维控制面板** — 统一管理设置、音频、端口、用户、工作流和公网访问
 
 ## 致谢

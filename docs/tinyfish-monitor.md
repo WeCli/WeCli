@@ -1,13 +1,13 @@
-# TinyFish Monitor
+# TinyFish Search Agent
 
-Use this page when you need to configure, operate, or debug Wecli's TinyFish competitor-site monitor.
+Use this page when you need to configure, operate, or debug Wecli's TinyFish internet search agent.
 
 ## What It Does
 
-The TinyFish monitor adds a focused competitor-pricing workflow on top of Wecli:
+The TinyFish search agent adds web crawling and data extraction capabilities to Wecli:
 
 - submit site-crawl jobs to the TinyFish Web Agent API
-- persist each run and normalized price snapshot into SQLite
+- persist each run and extracted data snapshots into SQLite
 - detect `NEW`, `UPDATED`, and `REMOVED` items between runs
 - expose REST endpoints for the settings UI
 - support a live SSE crawl view that also persists the final result
@@ -36,7 +36,7 @@ Wecli reads these keys from `config/.env`:
 | `TINYFISH_API_KEY` | TinyFish Web Agent API key sent as `X-API-Key` | required |
 | `TINYFISH_BASE_URL` | TinyFish API base URL | `https://agent.tinyfish.ai` |
 | `TINYFISH_MONITOR_DB_PATH` | SQLite file for runs, snapshots, and changes | `data/tinyfish_monitor.db` |
-| `TINYFISH_MONITOR_TARGETS_PATH` | competitor target JSON path | `config/tinyfish_targets.json` |
+| `TINYFISH_MONITOR_TARGETS_PATH` | search target JSON path | `config/tinyfish_targets.json` |
 | `TINYFISH_MONITOR_ENABLED` | enable the built-in scheduled monitor | `false` |
 | `TINYFISH_MONITOR_CRON` | five-field cron expression for the scheduled run | unset |
 
@@ -85,7 +85,7 @@ Important fields:
 The TinyFish settings group supports three main operator actions:
 
 - `Run Now`: submit the configured targets immediately
-- `Refresh`: reload config, pending runs, recent runs, latest site snapshots, and recent price changes
+- `Refresh`: reload config, pending runs, recent runs, latest site snapshots, and recent data changes
 - `Live Crawl`: open a real-time SSE-backed crawl for one target and persist the final result into the same SQLite database
 
 ### From HTTP Endpoints
@@ -143,7 +143,7 @@ The monitor DB stores three layers of data:
 Change detection is item-key based:
 
 - `NEW`: item appears for the first time
-- `UPDATED`: existing item changes price or related fields
+- `UPDATED`: existing item changes value or related fields
 - `REMOVED`: item existed previously but is absent from the latest result
 
 The service keeps both raw text values and parsed numeric amounts when it can extract them.

@@ -116,7 +116,7 @@ For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI conf
 - **Bots** — Telegram and QQ integrations with whitelist access control
 - **Multimodal I/O** — images, files, voice input, TTS, provider-aware audio defaults
 - **Automation** — scheduled tasks and long-running workflow execution
-- **TinyFish monitor** — crawl competitor pricing pages, store snapshots, detect price changes
+- **TinyFish** — internet search agent powered by TinyFish Web Agent API
 - **Remote access** — Cloudflare Tunnel with login-token / password flows
 - **Flow distribution** — browse and share workflows on [WecliHub](https://wecli.net)
 
@@ -139,7 +139,7 @@ For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI conf
 | **Multimodal I/O** | Images, files, voice input, TTS |
 | **Bots** | Telegram and QQ integrations |
 | **Automation** | Scheduled tasks and long-running workflow execution |
-| **TinyFish monitor** | Competitor pricing crawls, snapshots, and change detection |
+| **TinyFish** | Internet search agent for web crawling and structured data extraction |
 | **Flow distribution** | Browse and share flows on [WecliHub](https://wecli.net) |
 | **Remote access** | Cloudflare Tunnel plus login-token / password flows |
 
