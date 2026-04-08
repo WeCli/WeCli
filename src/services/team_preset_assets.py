@@ -9,7 +9,7 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PRESET_ROOT = PROJECT_ROOT / "data" / "team_presets" / "danghuangshang"
+PRESET_ROOT = PROJECT_ROOT / "data" / "team_presets"
 
 
 def _read_json(path: Path) -> Any:

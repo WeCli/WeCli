@@ -633,8 +633,8 @@ class GroupService:
     ):
         """Send message to external agent and handle reply.
 
-        ACP response is NOT automatically posted to group.
-        Agent should use CLI tool `groups send` to send messages if needed.
+        Private chat (<=2 members): reply is inserted directly into messages.
+        Group chat (>2 members): reply is logged only; agent uses CLI `groups send`.
         """
         # 标记正在输入
         self.set_typing(group_id, agent_name)
@@ -673,9 +673,23 @@ class GroupService:
             self.clear_typing(group_id, agent_name)
             return
 
-        # Auto-post reply to group so the user can see it
-        logger.info("External agent %s replied: %s", agent_name, reply[:200] if reply else "")
-        await self.broadcast_to_group(group_id, agent_name, reply, user_id=agent_name)
+        # Private chat: insert reply directly so user sees it
+        # Group chat: don't auto-post, agent uses CLI tools to send messages
+        members = await list_group_member_targets(self.group_db_path, group_id)
+        is_private = len(members) <= 2
+        if is_private:
+            import time as _time
+            logger.info("Private chat: agent %s replied: %s", agent_name, reply[:200] if reply else "")
+            await insert_group_message(
+                self.group_db_path,
+                group_id=group_id,
+                sender=agent_name,
+                sender_display=agent_name,
+                content=reply,
+                timestamp=_time.time(),
+            )
+        else:
+            logger.info("Group chat: agent %s replied (not auto-posting): %s", agent_name, reply[:200] if reply else "")
         # ACP/HTTP 已返回，清除输入状态
         self.clear_typing(group_id, agent_name)
 

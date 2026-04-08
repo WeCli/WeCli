@@ -14,14 +14,14 @@ import services.team_preset_assets as team_preset_assets
 
 
 class TeamPresetAssetsTests(unittest.TestCase):
-    def test_repo_ships_expected_danghuangshang_presets(self):
+    def test_repo_ships_expected_presets(self):
         preset_ids = {item["preset_id"] for item in team_preset_assets.list_team_presets()}
         self.assertTrue({"ming-neige", "tang-sansheng-beta", "modern-ceo", "hanlin-novel-studio"}.issubset(preset_ids))
 
     def test_list_and_install_team_preset(self):
         with TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            preset_root = root / "assets" / "danghuangshang"
+            preset_root = root / "assets"
             preset_dir = preset_root / "modern-ceo"
             workflow_dir = preset_dir / "oasis" / "yaml"
             workflow_dir.mkdir(parents=True, exist_ok=True)
