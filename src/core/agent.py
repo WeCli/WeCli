@@ -34,6 +34,11 @@ from webot.context import (
     render_runtime_context_block,
 )
 from webot.memory import ensure_memory_state
+from webot.skills import build_skills_prompt
+from webot.soul import build_soul_prompt
+from webot.trajectory import save_trajectory
+from utils.context_references import expand_context_references
+from services.smart_routing import resolve_turn_route
 from webot.permission_context import (
     create_or_reuse_permission_request,
     resolve_permission_context,
@@ -132,6 +137,10 @@ USER_INJECTED_TOOLS = {
     "ultraplan_start", "ultraplan_status",
     "ultrareview_start", "ultrareview_status",
     "enter_plan_mode", "exit_plan_mode", "get_session_mode",
+    # Self-evolution tools
+    "skill_manage", "skill_view", "skill_list",
+    "search_sessions", "get_insights", "get_trajectory_stats",
+    "manage_personality",
 }
 
 # Tools that need session_id auto-injected (in addition to username)
@@ -177,6 +186,8 @@ SESSION_INJECTED_TOOLS = {
     "enter_plan_mode": "source_session",
     "exit_plan_mode": "source_session",
     "get_session_mode": "source_session",
+    # Self-evolution tools
+    "search_sessions": "session_id",
 }
 
 # --- State definition ---
@@ -901,6 +912,11 @@ class TeamAgent:
                 "args": [os.path.join(self._src_dir, "mcp_servers", "webot.py")],
                 "transport": "stdio",
             },
+            "self_evolution_service": {
+                "command": python_command,
+                "args": [os.path.join(self._src_dir, "mcp_servers", "skills.py")],
+                "transport": "stdio",
+            },
         })
 
         # 3. Fetch tool definitions (new API: no context manager needed)
@@ -1086,6 +1102,23 @@ class TeamAgent:
 
         base_model = self._get_model(response_max_tokens)
 
+        # --- Smart model routing (new: ported from Hermes Agent) ---
+        # Route simple messages to cheaper model if configured
+        if not is_subagent and not llm_ov and isinstance(last_input_message, HumanMessage):
+            msg_text = str(last_input_message.content) if isinstance(last_input_message.content, str) else ""
+            if msg_text:
+                cheap_route = resolve_turn_route(msg_text)
+                if cheap_route and cheap_route.get("model"):
+                    from services.llm_factory import create_chat_model as _create_cheap
+                    base_model = _create_cheap(
+                        model=cheap_route["model"],
+                        provider=cheap_route.get("provider"),
+                        api_key=cheap_route.get("api_key"),
+                        base_url=cheap_route.get("base_url"),
+                        max_tokens=response_max_tokens or 2048,
+                    )
+                    print(f">>> [routing] cheap model route: {cheap_route['model']} reason={cheap_route.get('routing_reason')}")
+
         # --- Model hot-swap: check for pending model swap request ---
         model_swap = consume_model_swap(user_id, session_id)
         if model_swap:
@@ -1159,6 +1192,18 @@ class TeamAgent:
         if (not is_subagent) or (subagent_profile and subagent_profile.include_user_skills):
             # 注入用户技能列表（总是显示位置信息）
             base_prompt += self._get_user_skills(user_id) + "\n"
+
+        # --- SOUL.md personality injection (new: ported from Hermes Agent) ---
+        if not is_subagent:
+            soul_prompt = build_soul_prompt(user_id)
+            if soul_prompt:
+                base_prompt += soul_prompt
+
+        # --- Self-evolution skills prompt injection (new: ported from Hermes Agent) ---
+        if not is_subagent:
+            skills_prompt = build_skills_prompt(user_id)
+            if skills_prompt:
+                base_prompt += skills_prompt + "\n"
 
         runtime_plan = get_session_plan(user_id, session_id)
         runtime_todos = get_session_todos(user_id, session_id)
@@ -1245,6 +1290,26 @@ class TeamAgent:
         self._tool_state_cache[tool_state_key] = current_enabled
 
         history_messages = list(state["messages"])
+
+        # --- Context references expansion (new: ported from Hermes Agent) ---
+        # Expand @file:, @diff, @staged, @folder:, @git: references in latest user message
+        if history_messages and isinstance(history_messages[-1], HumanMessage):
+            last_content = history_messages[-1].content
+            if isinstance(last_content, str) and "@" in last_content:
+                from webot.workspace import resolve_session_workspace
+                ws = resolve_session_workspace(user_id, session_id)
+                cwd_path = str(ws.cwd or ws.root or "")
+                if cwd_path:
+                    ctx_result = expand_context_references(
+                        last_content,
+                        cwd=cwd_path,
+                        context_limit=12000 if is_subagent else 24000,
+                        allowed_root=cwd_path,
+                    )
+                    if ctx_result.references_expanded > 0:
+                        history_messages[-1] = HumanMessage(content=ctx_result.expanded_message)
+                        if ctx_result.warnings:
+                            print(f">>> [context-ref] warnings: {ctx_result.warnings}")
 
         # 清理历史消息中的多模态内容（file/image/audio parts），只保留文本
         # 避免旧的二进制附件在后续轮次反复发送给 LLM 导致上游 API 报错
@@ -1510,6 +1575,29 @@ class TeamAgent:
                     "content": self._extract_text(response.content)[:500],
                 },
             )
+
+        # --- Trajectory saving (new: ported from Hermes Agent) ---
+        # Save conversation trajectory when no more tool calls (session ending)
+        if not getattr(response, "tool_calls", None) and next_turn_count > 1:
+            with contextlib.suppress(Exception):
+                model_name = getattr(llm, "model_name", "") or getattr(llm, "model", "") or ""
+                traj_messages = [
+                    {"role": type(m).__name__.replace("Message", "").lower(), "content": self._extract_text(m.content)}
+                    for m in history_messages[:20]
+                ]
+                traj_messages.append({"role": "assistant", "content": self._extract_text(response.content)[:2000]})
+                save_trajectory(
+                    user_id=user_id,
+                    session_id=session_id,
+                    messages=traj_messages,
+                    model=model_name,
+                    completed=True,
+                    tool_calls_count=current_turn_count,
+                    token_usage={
+                        "input_tokens": usage_meta.get("input_tokens", 0) if isinstance(usage_meta, dict) else 0,
+                        "output_tokens": usage_meta.get("output_tokens", 0) if isinstance(usage_meta, dict) else 0,
+                    },
+                )
 
         return {"messages": [response], "turn_count": next_turn_count}
 

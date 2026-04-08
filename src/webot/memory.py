@@ -149,6 +149,16 @@ def append_memory_entry(
     mem_type: str = "project",
     description: str = "",
 ) -> Path:
+    # --- Memory injection detection (new: ported from Hermes Agent) ---
+    from webot.memory_guard import scan_memory_content
+    scan = scan_memory_content(content)
+    if not scan.safe:
+        import logging
+        logging.getLogger("memory").warning(
+            "Memory injection blocked for user=%s: %s", user_id, "; ".join(scan.violations)
+        )
+        raise ValueError(f"Memory content blocked by security scan: {'; '.join(scan.violations)}")
+
     memory_dir = get_memory_dir(user_id, session_id)
     filename = f"{slugify(name, 'memory')}.md"
     path = memory_dir / "entries" / filename
