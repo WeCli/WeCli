@@ -17,7 +17,6 @@ import subprocess
 import sys
 import asyncio
 import uuid
-import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -93,7 +92,7 @@ from oasis.models import (
     TimelineEventInfo,
     DiscussionStatus,
 )
-from oasis.forum import DiscussionForum
+from oasis.forum import DiscussionForum, coerce_optional_post_id
 from oasis.engine import DiscussionEngine
 from oasis.experts import _apply_response
 from oasis.swarm_engine import build_pending_swarm, generate_swarm_blueprint
@@ -110,7 +109,7 @@ _src_path = os.path.join(_project_root, "src")
 if _src_path not in sys.path:
     sys.path.insert(0, _src_path)
 try:
-    from mcp_oasis import _yaml_to_layout_data
+    from mcp_servers.oasis import _yaml_to_layout_data
 except Exception:
     _yaml_to_layout_data = None
 
@@ -557,6 +556,72 @@ async def add_human_reply(topic_id: str, req: HumanReplyRequest):
     )
 
 
+def _coerce_discussion_status(raw: str) -> DiscussionStatus:
+    try:
+        return DiscussionStatus(raw)
+    except ValueError:
+        return DiscussionStatus.ERROR
+
+
+def _sanitize_swarm_for_api(obj):
+    """Ensure swarm dict is JSON-serializable (no datetime / odd types breaking OpenAPI)."""
+    if obj is None:
+        return None
+    try:
+        return json.loads(json.dumps(obj, default=str))
+    except (TypeError, ValueError):
+        return {"_error": "swarm payload could not be normalized"}
+
+
+def _build_topic_detail(forum: DiscussionForum, posts: list) -> TopicDetail:
+    """Build TopicDetail with defensive coercion so bad persisted data cannot 500 the API."""
+    return TopicDetail(
+        topic_id=str(forum.topic_id),
+        question=str(forum.question or ""),
+        user_id=str(forum.user_id or "anonymous"),
+        status=_coerce_discussion_status(str(forum.status or "error")),
+        current_round=int(forum.current_round or 0),
+        max_rounds=int(forum.max_rounds or 5),
+        posts=[
+            PostInfo(
+                id=int(getattr(p, "id", 0) or 0),
+                author=str(getattr(p, "author", None) or ""),
+                content=str(getattr(p, "content", None) or ""),
+                reply_to=coerce_optional_post_id(getattr(p, "reply_to", None)),
+                upvotes=int(getattr(p, "upvotes", 0) or 0),
+                downvotes=int(getattr(p, "downvotes", 0) or 0),
+                timestamp=float(getattr(p, "timestamp", 0) or 0),
+                elapsed=float(getattr(p, "elapsed", 0) or 0),
+            )
+            for p in posts
+        ],
+        timeline=[
+            TimelineEventInfo(
+                elapsed=float(getattr(e, "elapsed", 0) or 0),
+                event=str(getattr(e, "event", None) or "unknown"),
+                agent=str(getattr(e, "agent", None) or ""),
+                detail=str(getattr(e, "detail", None) or ""),
+            )
+            for e in forum.timeline
+        ],
+        discussion=bool(forum.discussion),
+        conclusion=forum.conclusion,
+        swarm_mode=forum.swarm_mode or None,
+        swarm=_sanitize_swarm_for_api(forum.swarm),
+        pending_human=(
+            HumanWaitInfo(
+                node_id=str(forum.pending_human.node_id),
+                prompt=str(forum.pending_human.prompt or ""),
+                author=str(forum.pending_human.author or ""),
+                round_num=int(forum.pending_human.round_num or 0),
+                reply_to=coerce_optional_post_id(forum.pending_human.reply_to),
+            )
+            if forum.pending_human
+            else None
+        ),
+    )
+
+
 @app.get("/topics/{topic_id}", response_model=TopicDetail)
 async def get_topic(topic_id: str, user_id: str = Query(...)):
     """Get full discussion detail."""
@@ -564,51 +629,14 @@ async def get_topic(topic_id: str, user_id: str = Query(...)):
     _check_owner(forum, user_id)
 
     posts = await forum.browse()
-    return TopicDetail(
-        topic_id=forum.topic_id,
-        question=forum.question,
-        user_id=forum.user_id,
-        status=DiscussionStatus(forum.status),
-        current_round=forum.current_round,
-        max_rounds=forum.max_rounds,
-        posts=[
-            PostInfo(
-                id=p.id,
-                author=p.author,
-                content=p.content,
-                reply_to=p.reply_to,
-                upvotes=p.upvotes,
-                downvotes=p.downvotes,
-                timestamp=p.timestamp,
-                elapsed=p.elapsed,
-            )
-            for p in posts
-        ],
-        timeline=[
-            TimelineEventInfo(
-                elapsed=e.elapsed,
-                event=e.event,
-                agent=e.agent,
-                detail=e.detail,
-            )
-            for e in forum.timeline
-        ],
-        discussion=forum.discussion,
-        conclusion=forum.conclusion,
-        swarm_mode=forum.swarm_mode or None,
-        swarm=forum.swarm,
-        pending_human=(
-            HumanWaitInfo(
-                node_id=forum.pending_human.node_id,
-                prompt=forum.pending_human.prompt,
-                author=forum.pending_human.author,
-                round_num=forum.pending_human.round_num,
-                reply_to=forum.pending_human.reply_to,
-            )
-            if forum.pending_human
-            else None
-        ),
-    )
+    try:
+        return _build_topic_detail(forum, posts)
+    except Exception as exc:
+        print(f"[OASIS] ❌ get_topic serialize failed topic_id={topic_id}: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to serialize topic (check discussion JSON on disk): {exc}",
+        ) from exc
 
 
 @app.get("/topics/{topic_id}/stream")

@@ -25,6 +25,7 @@ import sys
 import tempfile
 import threading
 import time
+import utils.scheduler_service
 from collections import deque
 from pathlib import Path
 

@@ -2,7 +2,7 @@
 """Build WeCli team presets from awesome-human-distillation public-figure skills.
 
 Reads SKILL.md files from cloned repos under /tmp/awesome-skills/,
-and generates team preset directories under data/team_presets/danghuangshang/.
+and generates team preset directories under data/team_presets/.
 
 Covers:
   - qiushi-skill (9 methodology sub-skills)
@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PRESET_ROOT = PROJECT_ROOT / "data" / "team_presets" / "danghuangshang"
+PRESET_ROOT = PROJECT_ROOT / "data" / "team_presets"
 SOURCE = Path("/tmp/awesome-skills")
 
 # ── Helpers (reused from build_nuwa_presets) ──────────────────

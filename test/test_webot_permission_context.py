@@ -10,14 +10,14 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-import webot_policy
-import webot_runtime_store
-from webot_permission_context import (
+import webot.policy as webot_policy
+import webot.runtime_store as webot_runtime_store
+from webot.permission_context import (
     create_or_reuse_permission_request,
     resolve_permission_context,
     resolve_permission_request,
 )
-from webot_policy import save_tool_policy_config
+from webot.policy import save_tool_policy_config
 
 
 class WeBotPermissionContextTests(unittest.TestCase):

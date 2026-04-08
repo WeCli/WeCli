@@ -153,7 +153,7 @@ For external ACP agents (tag = `openclaw`, `codex`, `claude`, `gemini`, `aider`,
   model: "agent:my_agent"              # Supports session extension: agent:name or agent:name:session
 ```
 
-**ACP communication**: External agents with supported tags use the `acpx` CLI adapter (`src/acpx_adapter.py`) for Agent Client Protocol communication. `acpx` is auto-installed during `setup`. If `acpx` is not available, the system falls back to HTTP-only communication.
+**ACP communication**: External agents with supported tags use the `acpx` CLI adapter (`src/integrations/acpx_adapter.py`) for Agent Client Protocol communication. `acpx` is auto-installed during `setup`. If `acpx` is not available, the system falls back to HTTP-only communication.
 
 **Key configuration requirements:**
 - **expert field**: Must use `tag#ext#id` format (tag can be openclaw, codex, etc.)

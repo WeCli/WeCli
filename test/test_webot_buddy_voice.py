@@ -20,9 +20,9 @@ if "langchain_core.language_models.chat_models" not in sys.modules:
     chat_models_module.BaseChatModel = BaseChatModel
     sys.modules["langchain_core.language_models.chat_models"] = chat_models_module
 
-import webot_runtime_store as runtime_store
-from webot_buddy import apply_buddy_action, ensure_buddy_state, get_buddy_state
-from webot_voice import get_voice_state
+import webot.runtime_store as runtime_store
+from webot.buddy import apply_buddy_action, ensure_buddy_state, get_buddy_state
+from webot.voice import get_voice_state
 
 
 class WeBotBuddyTests(unittest.TestCase):

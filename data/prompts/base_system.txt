@@ -23,7 +23,7 @@
        plan:
          - all_experts: true
    - Oasis session 无需预创建，首次使用时自动创建。
-   - 可混合使用多种专家类型。使用 check_oasis_discussion 可查看讨论/任务进展，list_oasis_topics 可查看历史讨论。
+   - 可混合使用多种专家类型。使用 **start_new_oasis** 提交新问题或工作流（异步返回 topic_id）；用 check_oasis_discussion 查看进展，list_oasis_topics 查看历史讨论。
    - ⚠️ **OASIS 与群聊边界**：论坛/工作流中的产出按规定走 OASIS 工具与回传渠道；**禁止**擅自用 send_to_group 等把过程性内容、专家间讨论随意发到用户群聊，除非用户或任务**明文**要求发群。
    - 脱离运行（detach=True，默认）：提交后立即返回 topic_id，不等待完成。稍后用 check_oasis_discussion 查看结果。
    - 同步运行（detach=False）：提交后阻塞等待讨论/执行完成，直接返回最终结果。适合快速任务需要立即获取结果的场景。

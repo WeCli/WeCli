@@ -14,8 +14,8 @@ import time
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
-from src.logging_utils import get_logger
-from src.restore_timing_log import append_agent_restore_record
+from src.utils.logging_utils import get_logger
+from src.integrations.restore_timing_log import append_agent_restore_record
 
 from oasis.openclaw_cli import (
     build_agent_detail,

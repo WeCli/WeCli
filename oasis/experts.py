@@ -54,8 +54,8 @@ _ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # 确保 src/ 在 import 路径中，以便导入 llm_factory
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
-from acpx_adapter import AcpxError, get_acpx_adapter
-from llm_factory import create_chat_model, extract_text
+from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+from services.llm_factory import create_chat_model, extract_text
 
 from oasis.forum import DiscussionForum
 
@@ -383,12 +383,10 @@ except FileNotFoundError:
 
 # Common behavior rules injected into all expert prompts (discussion & execute mode)
 _BEHAVIOR_RULES = (
-    '\n\n**重要行为规则：**\n'
-    '0. **子 Agent 身份**：你是被上级调度系统（OASIS 工作流引擎）调用的子 Agent，你的职责是按照指令完成当前任务并返回结果，不要试图接管整个讨论流程或代替其他专家发言\n'
-    '1. **禁止自动开启子工作流**：除非明确收到点名要求开启子工作流，否则不得自行开启任何子讨论或子工作流\n'
-    '2. **单级讨论原则**：保持当前讨论层级，不创建多级嵌套讨论\n'
-    '3. **任务专注**：专注于当前论坛主题，不偏离到其他无关话题\n'
-    '4. **禁止随意发到群聊**：与当前 OASIS 论坛/工作流相关的产出，只能按系统规定的格式与渠道回传（如论坛 JSON、callback 等）；**禁止**擅自使用 send_to_group 或等价能力把过程稿、内部推演、专家间讨论随意推到用户群聊，除非用户或当前任务**明文**要求发群。\n'
+    "\n\n**OASIS 子 Agent 原则：**\n"
+    "你是被调度执行的子 Agent：只完成当前轮任务，按协议（JSON / callback）回传；不得接管他人发言或整条工作流。\n"
+    "**禁止调用 start_new_oasis**（或任何等价「新开 OASIS 讨论/工作流」），避免嵌套失控；嵌套须由用户或主 Agent 明确授权。\n"
+    "产出只走规定渠道；**禁止**擅自用 send_to_group 等把过程稿、内部推演推到用户群聊，除非用户或任务明文要求。\n"
 )
 
 
@@ -452,12 +450,7 @@ def _build_discuss_prompt(
         "在接下来的讨论中，你将收到论坛的新增内容，需要以 JSON 格式回复你的观点和投票。",
         "你拥有工具调用能力，如需搜索资料、分析数据来支撑你的观点，可以使用可用的工具。",
         "注意：后续轮次只会发送新增帖子，之前的帖子请参考你的对话记忆。",
-        "**重要行为规则：**\n"
-        "0. **子 Agent 身份**：你是被上级调度系统（OASIS 工作流引擎）调用的子 Agent，你的职责是按照指令在当前讨论中发表你自己角色的观点并返回结果，不要试图接管整个讨论流程或代替其他专家发言\n"
-        "1. **禁止自动开启子工作流**：除非明确收到点名要求开启子工作流，否则不得自行开启任何子讨论或子工作流\n"
-        "2. **单级讨论原则**：保持当前讨论层级，不创建多级嵌套讨论\n"
-        "3. **任务专注**：专注于当前论坛主题，不偏离到其他无关话题\n"
-        "4. **禁止随意发到群聊**：与当前 OASIS 论坛/工作流相关的产出，只能按系统规定的格式与渠道回传（如论坛 JSON、callback 等）；**禁止**擅自使用 send_to_group 或等价能力把过程稿、内部推演、专家间讨论随意推到用户群聊，除非用户或当前任务**明文**要求发群。",
+        _BEHAVIOR_RULES.strip(),
     ] if p]
     system_prompt = "\n".join(sys_parts)
 
@@ -508,11 +501,7 @@ def _build_discuss_callback_prompt(
             "换句话说：如果你没有执行 callback 命令/工具，哪怕你在 ACP 正文里写了完整答案，也会被视为本轮没有回复。",
             "每一轮都必须至少调用一次 callback/工具回传；即使本轮无新观点、无票可投，也要通过工具提交合规单行 JSON"
             "（例如 content 写「本轮无补充」，votes 为 []），不得以纯 ACP 正文代替工具回传。",
-            "**重要行为规则：**\n"
-            "0. **子 Agent 身份**：你是被上级调度系统（OASIS 工作流引擎）调用的子 Agent，只负责当前轮次的思考与回传\n"
-            "1. **禁止自动开启子工作流**：除非明确点名，否则不得自行开启任何子讨论或子工作流\n"
-            "2. **单级讨论原则**：保持当前讨论层级，不创建多级嵌套讨论\n"
-            "3. **任务专注**：专注于当前论坛主题，不偏离到其他无关话题",
+            _BEHAVIOR_RULES.strip(),
         ] if p
     )
     user_parts = [
@@ -560,6 +549,7 @@ def _build_execute_callback_prompt(
     if prior_posts_text:
         label = "前序 agent 的执行结果" if first_turn else "其他 agent 的新结果"
         parts.append(f"\n{label}:\n{prior_posts_text}")
+    parts.append(_BEHAVIOR_RULES)
     parts.append("\n请不要把最终 JSON 直接写在 ACP 回复正文里；结构化结果必须通过工具/callback 回传。")
     parts.append("每一轮都必须主动执行以下命令至少一次，把合规单行 JSON 回传到 OASIS（系统以工具返回为准）：")
     parts.append(callback_hint)
@@ -570,7 +560,6 @@ def _build_execute_callback_prompt(
         "\n即使本轮没有新的执行产出，也必须仍通过上述命令/工具回传一次合规 JSON"
         "（例如 content 写「本轮无新增结果」、votes 为 []），禁止仅回复自然语言而省略 callback。"
     )
-    parts.append(_BEHAVIOR_RULES)
     return "\n".join(parts)
 
 
@@ -820,8 +809,8 @@ class ExpertAgent:
             if others:
                 task_prompt += f"\n前序 agent 的执行结果:\n{_format_posts(others)}\n"
             task_prompt += "\n请直接执行任务并返回结果。"
-            task_prompt += _EXEC_JSON_HINT
             task_prompt += _BEHAVIOR_RULES
+            task_prompt += _EXEC_JSON_HINT
 
             try:
                 resp = await self.llm.ainvoke([HumanMessage(content=task_prompt)])
@@ -988,8 +977,8 @@ class SessionExpert:
                 if others:
                     task_parts.append(f"\n前序 agent 的执行结果:\n{_format_posts(others)}")
                 task_parts.append("\n请直接执行任务并返回结果。")
-                task_parts.append(_EXEC_JSON_HINT)
                 task_parts.append(_BEHAVIOR_RULES)
+                task_parts.append(_EXEC_JSON_HINT)
                 messages.append({"role": "user", "content": "\n".join(task_parts)})
                 self._initialized = True
             else:
@@ -1000,8 +989,8 @@ class SessionExpert:
                 if new_posts:
                     ctx_parts.append(f"其他 agent 的新结果:\n{_format_posts(new_posts)}")
                 ctx_parts.append("请继续执行任务并返回结果。")
-                ctx_parts.append(_EXEC_JSON_HINT)
                 ctx_parts.append(_BEHAVIOR_RULES)
+                ctx_parts.append(_EXEC_JSON_HINT)
                 messages.append({"role": "user", "content": "\n".join(ctx_parts)})
 
             body: dict = {
@@ -1823,8 +1812,8 @@ class ExternalExpert:
                 if others:
                     task_parts.append(f"\n前序 agent 的执行结果:\n{_format_posts(others)}")
                 task_parts.append("\n请直接执行任务并返回结果。")
-                task_parts.append(_EXEC_JSON_HINT)
                 task_parts.append(_BEHAVIOR_RULES)
+                task_parts.append(_EXEC_JSON_HINT)
                 messages.append({"role": "user", "content": "\n".join(task_parts)})
                 self._initialized = True
             else:
@@ -1834,8 +1823,8 @@ class ExternalExpert:
                 if new_posts:
                     ctx_parts.append(f"其他 agent 的新结果:\n{_format_posts(new_posts)}")
                 ctx_parts.append("请继续执行任务并返回结果。")
-                ctx_parts.append(_EXEC_JSON_HINT)
                 ctx_parts.append(_BEHAVIOR_RULES)
+                ctx_parts.append(_EXEC_JSON_HINT)
                 messages.append({"role": "user", "content": "\n".join(ctx_parts)})
 
             try:
@@ -1923,8 +1912,10 @@ class ExternalExpert:
                     f"{new_text}\n\n"
                     "请基于这些新观点以及你之前看到的讨论内容，在回复中包含一个 JSON 对象"
                     "（不要包含 markdown 代码块标记，不要包含注释）：\n"
-                    '{"wecli_type": "oasis reply", "reply_to": <某个帖子ID>, '                    '"content": "你的观点（200字以内，观点鲜明）", '
-                    '"votes": [{"post_id": <ID>, "direction": "up或down"}]}\n\n'                    "JSON 前后可以有其他文字。回复最后请添加：\n"
+                    '{"wecli_type": "oasis reply", "reply_to": <某个帖子ID>, '
+                    '"content": "你的观点（200字以内，观点鲜明）", '
+                    '"votes": [{"post_id": <ID>, "direction": "up或down"}]}\n\n'
+                    "JSON 前后可以有其他文字。回复最后请添加：\n"
                     "[end padding]\n"
                     "[end padding]\n"
                     "[end padding]\n"
@@ -1935,7 +1926,8 @@ class ExternalExpert:
                     "本轮没有新的帖子。如果你有新的想法或补充，可以继续发言；"
                     "如果没有，回复一个空 content 即可。\n"
                     '{"wecli_type": "oasis reply", "reply_to": null, "content": "", "votes": []}\n\n'
-                    "回复最后请添加：\n"                    "[end padding]\n"
+                    "回复最后请添加：\n"
+                    "[end padding]\n"
                     "[end padding]\n"
                     "[end padding]\n"
                 )

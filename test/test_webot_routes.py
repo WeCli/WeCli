@@ -18,10 +18,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-import webot_memory
-import webot_runtime_store as runtime_store
-from webot_bridge import issue_bridge_session
-from webot_routes import create_webot_router
+import webot.memory as memory
+import webot.runtime_store as runtime_store
+from webot.bridge import issue_bridge_session
+from webot.routes import create_webot_router
 
 
 class _FakeAgent:
@@ -80,9 +80,9 @@ class WeBotRoutesTests(unittest.TestCase):
     def test_bridge_websocket_connects_refreshes_and_cleans_up(self):
         with TemporaryDirectory() as tmpdir:
             original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
-            original_user_files_dir = webot_memory.USER_FILES_DIR
+            original_user_files_dir = memory.USER_FILES_DIR
             runtime_store.DEFAULT_DB_PATH = Path(tmpdir) / "runtime.db"
-            webot_memory.USER_FILES_DIR = Path(tmpdir) / "user_files"
+            memory.USER_FILES_DIR = Path(tmpdir) / "user_files"
             try:
                 app = FastAPI()
                 app.include_router(
@@ -130,7 +130,7 @@ class WeBotRoutesTests(unittest.TestCase):
                     self.assertEqual(detached.connection_count, 0)
             finally:
                 runtime_store.DEFAULT_DB_PATH = original_runtime_db_path
-                webot_memory.USER_FILES_DIR = original_user_files_dir
+                memory.USER_FILES_DIR = original_user_files_dir
 
     def test_bridge_websocket_missing_record_closes_with_4404(self):
         app = FastAPI()

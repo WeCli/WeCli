@@ -2,30 +2,56 @@
 
 **[中文版 README](./README_CN.md)**
 
-![Wecli Poster](docs/poster.png)
+<p align="center">
+  <img src="docs/poster_en.png" alt="Wecli — Open-Source Multi-Agent Collaboration System" width="360" />
+</p>
 
-> **An OpenAI-compatible local AI workspace with Teams, visual multi-agent orchestration, OASIS Town, living GraphRAG memory, multimodal I/O, bots, scheduled tasks, and one-click public access.**
+> **A local AI workspace where multiple expert agents collaborate, debate, and execute — with a visual workflow engine, living memory, and one-click public access.**
+
+## What is Wecli?
+
+Wecli turns a single chatbot into a **programmable multi-expert system**. You create a **Team** — a group of AI agents with distinct roles and personas — and let them collaborate on tasks through visual workflows. Each discussion builds a **living knowledge graph** that persists across sessions.
+
+**Key concepts at a glance:**
+
+| Term | Meaning |
+|------|---------|
+| **Team** | A group of internal agents, external agents, and personas that work together |
+| **OASIS** | The visual workflow engine that orchestrates multi-expert discussions (sequential, parallel, branching, DAG) |
+| **OASIS Town** | A pixel-town visualization in the Studio sidebar where you watch live discussions and inspect the swarm graph |
+| **WeBot** | A Claude-Code-style delegated runtime with role-based subagents, plan/todo/verification, and approval-aware tool policies |
+| **GraphRAG** | A living knowledge graph built from each discussion, stored locally in SQLite (optionally mirrored to Zep) |
+| **Team Presets** | 15 ready-to-use expert teams — strategists, content creators, tech titans, and more — installable in one click |
+| **ACP (acpx)** | Agent Client Protocol for communicating with external AI agents (OpenClaw, Codex, Claude, Gemini, Aider) |
+| **OpenClaw** | An external agent runtime that can be integrated into Teams alongside internal agents |
 
 ## Product Video
 
 <p align="center">
-  <a href="https://youtu.be/amg87hiLRW0">
-    <img src="./docs/media/wecli-demo-poster.jpg" alt="Wecli demo video" width="100%" />
+  <a href="https://youtube.com/shorts/OKuZNwz-CP0">
+    <img src="./docs/media/wecli-demo-poster-en.png" alt="Wecli demo video" width="360" />
   </a>
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/amg87hiLRW0">Watch the Wecli demo video on YouTube</a>
+  <a href="https://youtube.com/shorts/OKuZNwz-CP0">Watch the Wecli demo video on YouTube (Chinese version; English version coming soon)</a>
 </p>
 
 ## Quick Start
+
+### Prerequisites
+
+- **Python 3.11+**
+- **Node.js 18+** (for acpx and frontend builds)
+- **Git**
+- macOS / Linux / Windows (WSL or PowerShell)
 
 ### Install via AI Code CLI
 
 Open any AI coding assistant such as **Codex**, **Cursor**, **Claude Code**, **CodeBuddy**, or **Trae**, and say:
 
 ```text
-Clone https://github.com/BorisGuo6/Wecli.git, read AGENTS.md, and install Wecli.
+Clone https://github.com/WeCli/WeCli.git, read AGENTS.md, and install Wecli.
 ```
 
 ### Manual Setup
@@ -37,9 +63,9 @@ Clone https://github.com/BorisGuo6/Wecli.git, read AGENTS.md, and install Wecli.
 
 ```bash
 bash selfskill/scripts/run.sh start
-# start 会按需执行与 setup 相同的环境脚本（venv、依赖、acpx 等），并初始化 .env、启动服务
+# start automatically handles venv, dependencies, acpx, .env init, and service startup
 # → Open http://127.0.0.1:51209
-# → First login: passwordless on localhost (或使用终端打印的 Magic link)
+# → First login: passwordless on localhost (or use the Magic Link printed in terminal)
 # → Setup wizard auto-appears if LLM not configured
 ```
 
@@ -49,7 +75,14 @@ bash selfskill/scripts/run.sh start
 powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 start
 ```
 
-Open the UI at `http://127.0.0.1:<PORT_FRONTEND>`.
+**Verify & manage services**
+
+```bash
+bash selfskill/scripts/run.sh status    # check all services
+bash selfskill/scripts/run.sh stop      # stop all services
+```
+
+Open the UI at `http://127.0.0.1:51209`.
 
 </details>
 
@@ -57,37 +90,58 @@ For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI conf
 
 ## Why Wecli
 
-- **Team: unified multi-agent orchestration** — combine internal agents, OpenClaw agents, and external API agents into a single Team with one-click import/export
-- **ACP-powered external agent communication** — use `acpx` to broadcast messages to OpenClaw, Codex, Claude, Gemini, and Aider through the Agent Client Protocol
-- **AI team builder built in** — use WeCli Creator to discover SOP pages, extract roles with TinyFish, and generate editable personas plus a DAG workflow
-- **OpenAI-compatible from day one** — expose a local `/v1/chat/completions` endpoint that works with standard clients and custom tools
-- **Claude-Code-style delegation inside WeBot** — role-based subagents, persisted run/task state, plan/todo/verification primitives, approval-aware tool policy hooks
-- **Visual orchestration included** — design workflows in OASIS, or save / run YAML workflows directly
-- **Live observability built in** — open the OASIS Town sidebar in WeCli Studio, watch the pixel town, inspect the swarm graph, and nudge the discussion in real time
-- **GraphRAG included** — seed each topic with a swarm blueprint, keep a living graph, and optionally mirror retrieval to Zep
-- **Real operator features** — settings UI, group chat, scheduled tasks, voice input, TTS, login tokens, and public tunnel support
-- **Agent-first operations** — `AGENTS.md` + `SKILL.md` + `docs/index.md` let AI coding agents install and manage Wecli with progressive disclosure
+### Multi-Expert Collaboration, Not Just Chat
+
+- **Team-based orchestration** — combine internal agents, OpenClaw agents, and external API agents into a single Team with one-click import/export
+- **15 built-in Team Presets** — LLM Council, Nuwa All-Stars, Content Empire, Strategists, Tech Titans, and more — install and run immediately
+- **AI team builder** — WeCli Creator discovers SOP pages, extracts roles with TinyFish, and generates editable personas plus a DAG workflow
+- **Visual orchestration** — design workflows in OASIS with sequential, parallel, branching, or DAG-style expert coordination
+
+### Claude-Code-Style Delegation with WeBot
+
+- **Role-based subagents** — profiles for general, research, planner, coder, reviewer, and verifier modes
+- **Persisted state** — run/task lifecycle, plan/todo/verification primitives, context compression, and artifact logging
+- **Approval-aware tool policies** — configure which tools require human approval, with event logging and hooks
+- **Bridge sessions** — real-time WebSocket connections between WeBot runtime and the UI
+
+### Living Memory and Observability
+
+- **GraphRAG** — every discussion builds a living knowledge graph, persisted locally with optional Zep mirroring
+- **OASIS Town** — watch discussions unfold in a pixel-town visualization, inspect the swarm graph, and inject nudges in real time
+- **ReportAgent** — ask why the current prediction leans a certain way and get graph-backed evidence
+
+### Real Operator Features
+
+- **OpenAI-compatible API** — local `/v1/chat/completions` endpoint that works with standard clients and MCP tools
+- **Bots** — Telegram and QQ integrations with whitelist access control
+- **Multimodal I/O** — images, files, voice input, TTS, provider-aware audio defaults
+- **Automation** — scheduled tasks and long-running workflow execution
+- **TinyFish** — internet search agent powered by TinyFish Web Agent API
+- **Remote access** — Cloudflare Tunnel with login-token / password flows
+- **Flow distribution** — browse and share workflows on [WecliHub](https://wecli.net)
 
 ## What You Can Do Today
 
 | Capability | What It Gives You |
 |---|---|
 | **OpenAI-compatible API** | Local chat completions endpoint for apps, tools, and clients |
-| **Web UI** | Chat, settings, OASIS panel, group chat, tunnel control |
-| **WeCli Creator** | Turn a task description or discovered SOP pages into roles, personas, and an OASIS DAG |
+| **Web UI** | Chat, settings, OASIS panel, group chat, tunnel control, WeBot runtime panel |
+| **Team Presets** | 15 ready-to-use expert teams — install and start collaborating immediately |
+| **WeCli Creator** | Turn a task description or SOP pages into roles, personas, and an OASIS workflow |
 | **OASIS workflows** | Sequential, parallel, branching, and DAG-style expert orchestration |
-| **OASIS Town** | WeCli Studio sidebar with pixel-town mode, live residents, nudges, and swarm graph |
+| **OASIS Town** | Pixel-town visualization with live residents, nudges, and swarm graph |
+| **WeBot runtime** | Claude-Code-style delegation with profiles, modes, tool policies, and bridge sessions |
 | **GraphRAG memory** | Persist each topic as a living graph in local SQLite, with optional Zep mirroring |
-| **ReportAgent** | Ask why the current prediction leans a certain way and get graph-backed evidence |
-| **Team system** | Public/private agents, personas, workflows, and Team snapshots |
-| **OpenClaw + external agents** | Bring in external runtimes and API-based agents |
-| **Multimodal I/O** | Images, files, voice input, TTS, provider-aware audio defaults |
+| **ReportAgent** | Graph-backed evidence for predictions and decisions |
+| **MCP tools** | Built-in tools for commands, files, sessions, search, scheduler, OASIS, WeBot, and LLM API |
+| **Team system** | Public/private agents, personas, workflows, and Team snapshots with import/export |
+| **ACP communication** | Broadcast to OpenClaw, Codex, Claude, Gemini, Aider via Agent Client Protocol |
+| **Multimodal I/O** | Images, files, voice input, TTS |
 | **Bots** | Telegram and QQ integrations |
 | **Automation** | Scheduled tasks and long-running workflow execution |
-| **TinyFish monitor** | Crawl competitor pricing pages, store snapshots, detect price changes |
-| **Flow distribution** | Use [WecliHub](https://wecli.net) to browse, distribute, and share flows |
+| **TinyFish** | Internet search agent for web crawling and structured data extraction |
+| **Flow distribution** | Browse and share flows on [WecliHub](https://wecli.net) |
 | **Remote access** | Cloudflare Tunnel plus login-token / password flows |
-| **Import / export** | Share or restore Teams and related assets |
 
 ## Flow Distribution Platform
 
@@ -101,34 +155,13 @@ For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI conf
 
 - **Local AI workspace** — run a private AI assistant with a browser UI and OpenAI-compatible API
 - **Team debate and execution** — let multiple experts challenge, refine, and conclude on the same task
+- **Ready-made expert councils** — install a preset team (LLM Council, strategists, content creators) and run it immediately
 - **Live debate observability** — watch an OASIS discussion from the Town sidebar, inspect the swarm graph, and inject nudges
+- **Delegated agent work** — use WeBot to delegate research, coding, or review tasks to role-based subagents
 - **Prediction / GraphRAG cockpit** — use OASIS topics as living world models with evidence-backed report answers
 - **AI integration hub** — connect bots, external agent runtimes, and other OpenAI-compatible clients
 - **Competitor monitoring** — schedule daily pricing crawls, compare stored snapshots, and detect changes
 - **Operational cockpit** — manage settings, ports, audio, workflows, public access, and users from one place
-
-## Product Highlights
-
-### OASIS Orchestration
-
-OASIS turns Wecli from a chatbot into a programmable multi-expert system:
-
-- Mix stateless experts, stateful sessions, OpenClaw agents, and external API agents
-- Run sequential, parallel, selector-based, or DAG-style workflows
-- Seed a Town Genesis scaffold, then upgrade it into a richer swarm graph
-- Persist topic memory as a living graph and optionally mirror retrieval into Zep
-- Open the current discussion in WeCli Studio's OASIS Town sidebar for live pixel-town view and report queries
-
-### Teams and Personas
-
-Each Team can combine built-in internal agents, OpenClaw agents, external API agents, public/private expert personas, and reusable workflows. WeCli Creator can draft a Team from a task description, discovered SOP pages, or a workflow canvas.
-
-### Bots, Audio, and Operations
-
-- Telegram and QQ bot integration
-- Voice input and text-to-speech with provider-aware defaults
-- TinyFish competitor-site monitoring with scheduled runs and price-change history
-- Settings UI, login tokens, password-based remote access, and scheduled tasks
 
 ## Acknowledgements
 
@@ -145,6 +178,11 @@ Wecli benefited from several open-source projects:
 | [`AGENTS.md`](./AGENTS.md) | AI Agents | Behavior rules, task router, progressive disclosure |
 | [`SKILL.md`](./SKILL.md) | Agents + Humans | Complete install, config, debug, and troubleshooting guide |
 | [`docs/index.md`](./docs/index.md) | Both | Task-based documentation map to all deep-dive docs |
+
+## Community
+
+- Issues & feature requests: [GitHub Issues](https://github.com/WeCli/WeCli/issues)
+- Flows & presets: [WecliHub](https://wecli.net)
 
 ## License
 

@@ -60,7 +60,7 @@ from langchain_core.messages import HumanMessage
 
 # 确保 src/ 在 import 路径中，以便导入 llm_factory
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
-from llm_factory import create_chat_model, extract_text
+from services.llm_factory import create_chat_model, extract_text
 
 from oasis.forum import DiscussionForum
 from oasis.experts import ExpertAgent, SessionExpert, ExternalExpert, get_all_experts

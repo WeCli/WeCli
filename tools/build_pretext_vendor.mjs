@@ -6,7 +6,7 @@ import esbuild from 'esbuild';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
-const outdir = path.join(projectRoot, 'src', 'static', 'vendor');
+const outdir = path.join(projectRoot, 'frontend', 'vendor');
 
 await mkdir(outdir, { recursive: true });
 

@@ -9,7 +9,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-import webot_runtime_store as runtime_store
+import webot.runtime_store as runtime_store
 
 
 class WeBotRuntimeStoreTests(unittest.TestCase):

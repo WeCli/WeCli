@@ -1097,7 +1097,7 @@ def load_layouts():
 @app.route("/api/load-layout/<name>", methods=["GET"])
 def load_layout(name: str):
     """通过即时读取 YAML 文件并转换到布局来加载布局。"""
-    from mcp_oasis import _yaml_to_layout_data
+    from mcp_servers.oasis import _yaml_to_layout_data
 
     team = request.args.get("team", "").strip()
     safe_name = "".join(c for c in name if c.isalnum() or c in "-_ ").strip()

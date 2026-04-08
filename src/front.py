@@ -9,19 +9,19 @@ import re
 import subprocess
 from pathlib import Path
 
-from acpx_cli_tools import acpx_agent_command_names
+from integrations.acpx_cli_tools import acpx_agent_command_names
 from typing import Any
 from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
-from env_settings import read_env_all, write_env_settings
+from utils.env_settings import read_env_all, write_env_settings
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from cron_utils import get_agent_cron_jobs, restore_cron_jobs
-from llm_factory import infer_provider
-from front_group_routes import register_group_routes
-from front_oasis_routes import register_oasis_routes
-from front_session_routes import register_session_routes
-from front_webot_routes import register_webot_routes
-from tinyfish_monitor_service import (
+from utils.cron_utils import get_agent_cron_jobs, restore_cron_jobs
+from services.llm_factory import infer_provider
+from routes.front_group_routes import register_group_routes
+from routes.front_oasis_routes import register_oasis_routes
+from routes.front_session_routes import register_session_routes
+from routes.front_webot_routes import register_webot_routes
+from services.tinyfish_monitor_service import (
     DEFAULT_BASE_URL as TINYFISH_DEFAULT_BASE_URL,
     DEFAULT_DB_PATH as TINYFISH_DEFAULT_DB_PATH,
     DEFAULT_TARGETS_PATH as TINYFISH_DEFAULT_TARGETS_PATH,
@@ -32,7 +32,7 @@ from tinyfish_monitor_service import (
     stream_live_run,
     submit_monitor_run,
 )
-from team_creator_service import (
+from services.team_creator_service import (
     build_from_roles,
     build_attachment_content_disposition,
     build_team_zip,
@@ -54,7 +54,7 @@ from team_creator_service import (
     update_job,
     PRESET_POOL,
 )
-from team_preset_assets import install_team_preset, list_team_presets
+from services.team_preset_assets import install_team_preset, list_team_presets
 
 # 加载 .env 配置
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -62,8 +62,9 @@ root_dir = os.path.dirname(current_dir)
 load_dotenv(dotenv_path=os.path.join(root_dir, "config", ".env"))
 
 app = Flask(__name__,
-            template_folder=os.path.join(current_dir, 'templates'),
-            static_folder=os.path.join(current_dir, 'static'))
+            template_folder=os.path.join(root_dir, 'frontend', 'templates'),
+            static_folder=os.path.join(root_dir, 'frontend'),
+            static_url_path='/static')
 
 # 信任反向代理的 X-Forwarded-Proto / X-Forwarded-For 等头
 # 这样 Cloudflare Tunnel 转发的 HTTPS 请求会被正确识别为 HTTPS，
@@ -110,11 +111,12 @@ OASIS_BASE_URL = f"http://127.0.0.1:{PORT_OASIS}"
 # Using INTERNAL_TOKEN + user_id + timestamp with HMAC signature
 # ============================================================================
 import time
+import utils.scheduler_service
 import secrets
 import hmac
 import hashlib
-from logging_utils import get_logger
-from openclaw_restore_naming import (
+from utils.logging_utils import get_logger
+from integrations.openclaw_restore_naming import (
     openclaw_entries_ordered,
     restore_agent_id,
     restore_display_name,
@@ -1344,7 +1346,7 @@ def team_creator_arxiv_search():
       - max_results: int (optional, default 20)
       - auto_import: bool (optional, default false — if true, also runs import_mentor_skill)
     """
-    from skill_import_tools import search_arxiv, arxiv_papers_to_mentor_json
+    from services.skill_import_tools import search_arxiv, arxiv_papers_to_mentor_json
 
     body = request.get_json(silent=True) or {}
     author_name = str(body.get("author_name") or body.get("name") or "").strip()
@@ -1410,7 +1412,7 @@ def team_creator_feishu_collect():
       - auto_import: bool (optional; implies auto_distill)
       - team_name / task_description: string (optional, used when auto_import=true)
     """
-    from skill_import_tools import feishu_collect_user_messages, feishu_messages_to_colleague_meta
+    from services.skill_import_tools import feishu_collect_user_messages, feishu_messages_to_colleague_meta
 
     body = request.get_json(silent=True) or {}
     app_id = str(body.get("app_id") or "").strip()
@@ -2580,7 +2582,7 @@ def proxy_acpx_sessions():
         return jsonify({"ok": False, "error": "unsupported tool", "sessions": []}), 400
 
     try:
-        from acpx_adapter import AcpxError, get_acpx_adapter
+        from integrations.acpx_adapter import AcpxError, get_acpx_adapter
     except ImportError as e:
         return jsonify({"ok": False, "error": str(e), "sessions": []}), 500
 
@@ -2647,7 +2649,7 @@ def proxy_acpx_chat():
     stream = body.get("stream", True)
 
     try:
-        from acpx_adapter import AcpxError, get_acpx_adapter
+        from integrations.acpx_adapter import AcpxError, get_acpx_adapter
     except ImportError as e:
         return jsonify({"error": f"acpx adapter unavailable: {e}"}), 500
 
@@ -2754,7 +2756,7 @@ def proxy_acpx_session_ensure():
         return jsonify({"ok": False, "error": str(e)}), 400
 
     try:
-        from acpx_adapter import AcpxError, get_acpx_adapter
+        from integrations.acpx_adapter import AcpxError, get_acpx_adapter
     except ImportError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
@@ -3248,7 +3250,7 @@ except Exception:
 
 # Import YAML→Layout converter (used for on-the-fly layout generation from saved YAML)
 try:
-    from mcp_oasis import _yaml_to_layout_data as _vis_yaml_to_layout
+    from mcp_servers.oasis import _yaml_to_layout_data as _vis_yaml_to_layout
 except Exception:
     _vis_yaml_to_layout = None
 

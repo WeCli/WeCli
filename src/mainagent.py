@@ -21,21 +21,21 @@ import uvicorn
 from dotenv import load_dotenv
 
 # API patch（提供音频格式适配和 MIME 修复）
-from api_patch import patch_langchain_file_mime
+from utils.api_patch import patch_langchain_file_mime
 patch_langchain_file_mime()
 
-from agent import TeamAgent
-from llm_factory import extract_text as _extract_text
-from user_auth import load_users as load_users_from_file, verify_password as verify_password_from_file
-from group_routes import create_group_router, init_group_db
-from openai_routes import create_openai_router
-from ops_routes import create_ops_router
-from session_routes import create_session_router
-from settings_routes import create_settings_router
-from system_routes import create_system_router
-from webot_routes import create_webot_router
-from message_builder import build_human_message
-from logging_utils import get_logger, request_id_ctx
+from core.agent import TeamAgent
+from services.llm_factory import extract_text as _extract_text
+from utils.user_auth import load_users as load_users_from_file, verify_password as verify_password_from_file
+from api.group_routes import create_group_router, init_group_db
+from api.openai_routes import create_openai_router
+from api.ops_routes import create_ops_router
+from api.session_routes import create_session_router
+from api.settings_routes import create_settings_router
+from api.system_routes import create_system_router
+from webot.routes import create_webot_router
+from services.message_builder import build_human_message
+from utils.logging_utils import get_logger, request_id_ctx
 
 # --- Path setup ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
