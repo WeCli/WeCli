@@ -1,10 +1,10 @@
 # TinyFish Monitor
 
-Use this page when you need to configure, operate, or debug TeamClaw's TinyFish competitor-site monitor.
+Use this page when you need to configure, operate, or debug Wecli's TinyFish competitor-site monitor.
 
 ## What It Does
 
-The TinyFish monitor adds a focused competitor-pricing workflow on top of TeamClaw:
+The TinyFish monitor adds a focused competitor-pricing workflow on top of Wecli:
 
 - submit site-crawl jobs to the TinyFish Web Agent API
 - persist each run and normalized price snapshot into SQLite
@@ -29,7 +29,7 @@ This feature is shared by the frontend, the scheduler, and a standalone CLI wrap
 
 ## Configuration
 
-TeamClaw reads these keys from `config/.env`:
+Wecli reads these keys from `config/.env`:
 
 | Key | Purpose | Default |
 |---|---|---|
@@ -44,7 +44,7 @@ Recommended operator flow:
 
 1. Configure the keys from the settings UI's `TinyFish Monitor` group, or edit `config/.env` directly.
 2. Copy `config/tinyfish_targets.example.json` to `config/tinyfish_targets.json`.
-3. Save and restart TeamClaw if you changed the cron or target path so `src/time.py` can restore the scheduler job with the new values.
+3. Save and restart Wecli if you changed the cron or target path so `src/time.py` can restore the scheduler job with the new values.
 
 ## Target File Format
 

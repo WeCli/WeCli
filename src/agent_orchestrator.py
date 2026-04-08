@@ -749,7 +749,7 @@ def save_council_transcript(session: CouncilFullSession, log_dir: str = "") -> s
 
     if not log_dir:
         home = os.path.expanduser("~")
-        log_dir = os.path.join(home, ".teamclaw", "council-logs")
+        log_dir = os.path.join(home, ".wecli", "council-logs")
 
     _Path(log_dir).mkdir(parents=True, exist_ok=True)
 

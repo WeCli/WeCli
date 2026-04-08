@@ -1,5 +1,5 @@
 #!/bin/bash
-# TeamBot 启动脚本（直接启动服务，跳过环境配置）
+# WeBot 启动脚本（直接启动服务，跳过环境配置）
 # 实际启动逻辑统一由 launcher.py 管理
 
 cd "$(dirname "$0")/.."

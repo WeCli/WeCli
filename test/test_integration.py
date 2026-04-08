@@ -43,10 +43,10 @@ class FrontendIntegrationTests(unittest.TestCase):
         self.assertIn('id="settings-modal"', html)
         self.assertIn('id="oasis-chat-workspace-switcher"', html)
         self.assertIn('id="oasis-chat-graph-host"', html)
-        self.assertIn('id="teambot-subagent-panel"', html)
-        self.assertIn('id="teambot-subagent-list"', html)
-        self.assertIn('id="teambot-policy-panel"', html)
-        self.assertIn('id="teambot-policy-editor"', html)
+        self.assertIn('id="webot-subagent-panel"', html)
+        self.assertIn('id="webot-subagent-list"', html)
+        self.assertIn('id="webot-policy-panel"', html)
+        self.assertIn('id="webot-policy-editor"', html)
         self.assertIn("/static/js/orchestration.js", html)
         self.assertIn("/static/js/tinyfish-live-shared.js", html)
 
@@ -104,13 +104,13 @@ class FrontendIntegrationTests(unittest.TestCase):
         self.assertEqual(kwargs["params"], {"filter": "main"})
         self.assertEqual(kwargs["timeout"], 10)
 
-    def test_proxy_teambot_subagents_forwards_user_context(self):
+    def test_proxy_webot_subagents_forwards_user_context(self):
         with mock.patch.object(
             front.requests,
             "get",
             return_value=_MockJsonResponse({"status": "success", "subagents": []}, 200),
         ) as mock_get:
-            response = self.client.get("/proxy_teambot_subagents")
+            response = self.client.get("/proxy_webot_subagents")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["status"], "success")
@@ -119,14 +119,14 @@ class FrontendIntegrationTests(unittest.TestCase):
         self.assertEqual(kwargs["params"], {"user_id": "integration-user"})
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_subagent_history_forwards_agent_ref(self):
+    def test_proxy_webot_subagent_history_forwards_agent_ref(self):
         with mock.patch.object(
             front.requests,
             "post",
             return_value=_MockJsonResponse({"status": "success", "messages": []}, 200),
         ) as mock_post:
             response = self.client.post(
-                "/proxy_teambot_subagent_history",
+                "/proxy_webot_subagent_history",
                 json={"agent_ref": "worker-1", "limit": 8},
             )
 
@@ -143,14 +143,14 @@ class FrontendIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_subagent_cancel_forwards_agent_ref(self):
+    def test_proxy_webot_subagent_cancel_forwards_agent_ref(self):
         with mock.patch.object(
             front.requests,
             "post",
             return_value=_MockJsonResponse({"status": "success", "cancelled": True}, 200),
         ) as mock_post:
             response = self.client.post(
-                "/proxy_teambot_subagent_cancel",
+                "/proxy_webot_subagent_cancel",
                 json={"agent_ref": "worker-1"},
             )
 
@@ -165,13 +165,13 @@ class FrontendIntegrationTests(unittest.TestCase):
             },
         )
 
-    def test_proxy_teambot_tool_policy_forwards_user_context(self):
+    def test_proxy_webot_tool_policy_forwards_user_context(self):
         with mock.patch.object(
             front.requests,
             "get",
             return_value=_MockJsonResponse({"status": "success", "policy": {"default_approval": "allow"}}, 200),
         ) as mock_get:
-            response = self.client.get("/proxy_teambot_tool_policy")
+            response = self.client.get("/proxy_webot_tool_policy")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["policy"]["default_approval"], "allow")
@@ -179,14 +179,14 @@ class FrontendIntegrationTests(unittest.TestCase):
         self.assertEqual(kwargs["params"], {"user_id": "integration-user"})
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_tool_policy_update_forwards_payload(self):
+    def test_proxy_webot_tool_policy_update_forwards_payload(self):
         with mock.patch.object(
             front.requests,
             "post",
             return_value=_MockJsonResponse({"status": "success", "policy": {"default_approval": "manual"}}, 200),
         ) as mock_post:
             response = self.client.post(
-                "/proxy_teambot_tool_policy",
+                "/proxy_webot_tool_policy",
                 json={"policy": {"default_approval": "manual", "tools": {"run_command": {"approval": "manual"}}}},
             )
 
@@ -202,7 +202,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_session_runtime_forwards_session_context(self):
+    def test_proxy_webot_session_runtime_forwards_session_context(self):
         with mock.patch.object(
             front.requests,
             "get",
@@ -210,7 +210,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 {
                     "status": "success",
                     "session_id": "subagent__coder__worker-1",
-                    "workspace": "/tmp/teamclaw/workers/worker-1",
+                    "workspace": "/tmp/wecli/workers/worker-1",
                     "plan": {"title": "Plan", "status": "active", "items": []},
                     "todos": {"items": []},
                     "verifications": [],
@@ -220,7 +220,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             ),
         ) as mock_get:
             response = self.client.get(
-                "/proxy_teambot_session_runtime?session_id=subagent__coder__worker-1"
+                "/proxy_webot_session_runtime?session_id=subagent__coder__worker-1"
             )
 
         self.assertEqual(response.status_code, 200)
@@ -235,14 +235,14 @@ class FrontendIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_workflow_routes_forward_payloads(self):
+    def test_proxy_webot_workflow_routes_forward_payloads(self):
         with self.subTest("list workflow presets"):
             with mock.patch.object(
                 front.requests,
                 "get",
                 return_value=_MockJsonResponse({"status": "success", "presets": [{"preset_id": "review_gate"}]}, 200),
             ) as mock_get:
-                response = self.client.get("/proxy_teambot_workflow_presets")
+                response = self.client.get("/proxy_webot_workflow_presets")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.get_json()["presets"][0]["preset_id"], "review_gate")
             _, kwargs = mock_get.call_args
@@ -255,7 +255,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success", "preset": {"preset_id": "review_gate"}}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_workflow_apply",
+                    "/proxy_webot_workflow_apply",
                     json={"session_id": "default", "preset_id": "review_gate"},
                 )
             self.assertEqual(response.status_code, 200)
@@ -270,14 +270,14 @@ class FrontendIntegrationTests(unittest.TestCase):
                 },
             )
 
-    def test_proxy_teambot_session_inbox_forwards_query_params(self):
+    def test_proxy_webot_session_inbox_forwards_query_params(self):
         with mock.patch.object(
             front.requests,
             "get",
             return_value=_MockJsonResponse({"status": "success", "items": []}, 200),
         ) as mock_get:
             response = self.client.get(
-                "/proxy_teambot_session_inbox?session_id=subagent__coder__worker-1&target_ref=worker-1&status=queued&limit=9"
+                "/proxy_webot_session_inbox?session_id=subagent__coder__worker-1&target_ref=worker-1&status=queued&limit=9"
             )
 
         self.assertEqual(response.status_code, 200)
@@ -295,14 +295,14 @@ class FrontendIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_session_inbox_send_forwards_payload(self):
+    def test_proxy_webot_session_inbox_send_forwards_payload(self):
         with mock.patch.object(
             front.requests,
             "post",
             return_value=_MockJsonResponse({"status": "success", "created": 1}, 200),
         ) as mock_post:
             response = self.client.post(
-                "/proxy_teambot_session_inbox_send",
+                "/proxy_webot_session_inbox_send",
                 json={
                     "session_id": "default",
                     "target_ref": "worker-1",
@@ -324,14 +324,14 @@ class FrontendIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_session_inbox_deliver_forwards_payload(self):
+    def test_proxy_webot_session_inbox_deliver_forwards_payload(self):
         with mock.patch.object(
             front.requests,
             "post",
             return_value=_MockJsonResponse({"status": "success", "delivered_total": 1}, 200),
         ) as mock_post:
             response = self.client.post(
-                "/proxy_teambot_session_inbox_deliver",
+                "/proxy_webot_session_inbox_deliver",
                 json={"session_id": "default", "target_ref": "worker-1", "limit": 5, "force": True},
             )
 
@@ -350,7 +350,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_runtime_controls_forward_payloads(self):
+    def test_proxy_webot_runtime_controls_forward_payloads(self):
         with self.subTest("session mode"):
             with mock.patch.object(
                 front.requests,
@@ -358,7 +358,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success"}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_session_mode",
+                    "/proxy_webot_session_mode",
                     json={"session_id": "default", "mode": "review", "reason": "triage"},
                 )
             self.assertEqual(response.status_code, 200)
@@ -380,7 +380,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success"}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_run_interrupt",
+                    "/proxy_webot_run_interrupt",
                     json={"session_id": "default", "run_id": "run-1", "agent_ref": "worker-1"},
                 )
             self.assertEqual(response.status_code, 200)
@@ -402,7 +402,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success"}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_voice",
+                    "/proxy_webot_voice",
                     json={
                         "session_id": "default",
                         "enabled": True,
@@ -465,7 +465,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(kwargs["team_name"], "现代企业制")
             self.assertEqual(kwargs["preset_id"], "modern-ceo")
 
-    def test_proxy_teambot_bridge_memory_and_buddy_controls_forward_payloads(self):
+    def test_proxy_webot_bridge_memory_and_buddy_controls_forward_payloads(self):
         with self.subTest("bridge attach"):
             with mock.patch.object(
                 front.requests,
@@ -473,7 +473,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success"}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_bridge_attach",
+                    "/proxy_webot_bridge_attach",
                     json={"session_id": "default", "role": "viewer", "label": "browser"},
                 )
             self.assertEqual(response.status_code, 200)
@@ -495,7 +495,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success"}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_bridge_detach",
+                    "/proxy_webot_bridge_detach",
                     json={"bridge_id": "bridge-123"},
                 )
             self.assertEqual(response.status_code, 200)
@@ -515,7 +515,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success"}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_kairos",
+                    "/proxy_webot_kairos",
                     json={"session_id": "default", "enabled": True, "reason": "ui-toggle"},
                 )
             self.assertEqual(response.status_code, 200)
@@ -537,7 +537,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success"}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_dream",
+                    "/proxy_webot_dream",
                     json={"session_id": "default", "reason": "manual"},
                 )
             self.assertEqual(response.status_code, 200)
@@ -558,7 +558,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 return_value=_MockJsonResponse({"status": "success"}, 200),
             ) as mock_post:
                 response = self.client.post(
-                    "/proxy_teambot_buddy",
+                    "/proxy_webot_buddy",
                     json={"session_id": "default", "action": "pet"},
                 )
             self.assertEqual(response.status_code, 200)
@@ -573,7 +573,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(kwargs["headers"], {"X-Internal-Token": front.INTERNAL_TOKEN})
 
-    def test_proxy_teambot_tool_approval_resolve_forwards_resolution_payload(self):
+    def test_proxy_webot_tool_approval_resolve_forwards_resolution_payload(self):
         with mock.patch.object(
             front.requests,
             "post",
@@ -591,7 +591,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             ),
         ) as mock_post:
             response = self.client.post(
-                "/proxy_teambot_tool_approval_resolve",
+                "/proxy_webot_tool_approval_resolve",
                 json={
                     "approval_id": "approval-1",
                     "action": "approve",
@@ -660,7 +660,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         }
 
         with mock.patch("shutil.which", return_value="/usr/local/bin/openclaw"), mock.patch.object(
-            front, "_read_saved_teamclaw_llm_config", return_value=saved
+            front, "_read_saved_wecli_llm_config", return_value=saved
         ), mock.patch.dict(sys.modules, {"configure_openclaw": stub_module}):
             response = self.client.post("/api/export_openclaw_config", json=payload)
 

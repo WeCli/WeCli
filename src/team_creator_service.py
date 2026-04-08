@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Team Creator Service — convert open-web organizational structures into TeamClaw teams.
+"""WeCli Creator Service — convert open-web organizational structures into Wecli teams.
 
 Three-stage pipeline:
   1. Discovery  — No TINYFISH_API_KEY: one LLM call, task → roles only (no URL list).
                   With key: LLM URL hints, then TinyFish browser if URLs empty.
   2. Extraction — Requires TinyFish to open URLs; optional LLM fallback only if TinyFish fails after a key was set.
-  3. Mapping    — AI-powered conversion to TeamClaw personas + LLM DAG enhancement + YAML workflows + ZIP snapshot
+  3. Mapping    — AI-powered conversion to Wecli personas + LLM DAG enhancement + YAML workflows + ZIP snapshot
 
 Shared by:
 - Flask REST endpoints (front.py)
@@ -272,7 +272,7 @@ def build_discovery_target(task_description: str, search_url: str = "") -> Targe
     goal = DISCOVERY_GOAL_TEMPLATE.format(task_description=task_description)
     return Target(
         site_key="team-creator-discovery",
-        name="Team Creator Discovery",
+        name="WeCli Creator Discovery",
         url=url,
         goal=goal,
         browser_profile="lite",
@@ -362,7 +362,7 @@ EXTRACTION_GOAL_TEMPLATE = (
 )
 
 EXTRACTION_LLM_PAGE_PREAMBLE = (
-    "You are helping TeamClaw Team Creator extract organizational roles for a multi-agent workflow.\n"
+    "You are helping Wecli WeCli Creator extract organizational roles for a multi-agent workflow.\n"
     "There is no live browser; infer reasonable roles from the URL and page title only.\n"
     "Do not invent verbatim quotes from the page. If unsure, propose a small generic role set.\n\n"
     "Target:\n"
@@ -469,7 +469,7 @@ def stream_extraction(page_url: str, page_title: str = "") -> Iterator[dict[str,
 
 
 # ──────────────────────────────────────────────────────────────
-# Stage 3: Mapping — convert extracted roles to TeamClaw team
+# Stage 3: Mapping — convert extracted roles to Wecli team
 # ──────────────────────────────────────────────────────────────
 
 @dataclass
@@ -555,7 +555,7 @@ def serialize_extracted_roles(roles: list[ExtractedRole]) -> list[dict[str, Any]
 TEAM_CREATOR_TASK_TO_ROLES_PROMPT = (
     "From the user's team/task description, propose 4-10 roles for a multi-agent workflow.\n\n"
     "Description:\n{task_description}\n\n"
-    "Output JSON MUST use the same role shape as Team Creator page extraction:\n"
+    "Output JSON MUST use the same role shape as WeCli Creator page extraction:\n"
     "role_name, personality_traits[], primary_responsibilities[], input_dependency[], "
     "output_target[], tools_used[].\n"
     "Use role_name strings consistently in input_dependency and output_target.\n\n"
@@ -1041,7 +1041,7 @@ def _build_persona(role: ExtractedRole) -> str:
 
 
 # ──────────────────────────────────────────────────────────────
-# Stage 3b: Workflow Graph Enhancement — Team Studio graph mode
+# Stage 3b: Workflow Graph Enhancement — WeCli Studio graph mode
 # ──────────────────────────────────────────────────────────────
 
 import logging as _logging
@@ -1054,7 +1054,7 @@ def _emit_full_llm_output_on_failure(context: str, raw_text: str) -> None:
     import sys
 
     text = raw_text if raw_text is not None else ""
-    header = f"[Team Creator] {context} — full LLM output ({len(text)} chars)\n"
+    header = f"[WeCli Creator] {context} — full LLM output ({len(text)} chars)\n"
     try:
         print(header + text, file=sys.stderr, flush=True)
     except Exception:
@@ -1086,7 +1086,7 @@ _SUPPORTED_CONDITION_PREFIXES = (
 )
 
 WORKFLOW_GRAPH_PROMPT = (
-    "You are designing a TeamClaw / OASIS graph-mode workflow for a multi-agent team.\n\n"
+    "You are designing a Wecli / OASIS graph-mode workflow for a multi-agent team.\n\n"
     "Task context: {task_description}\n\n"
     "Roles:\n{roles_summary}\n\n"
     "Available graph features:\n"
@@ -1159,7 +1159,7 @@ def _extract_json_payload(raw_text: str) -> dict | None:
 _TRANSLATION_CACHE: dict[tuple[str, str, str], str] = {}
 
 _TRANSLATION_PROMPT = (
-    "You are a bilingual UI localization engine for TeamClaw Team Creator.\n\n"
+    "You are a bilingual UI localization engine for Wecli WeCli Creator.\n\n"
     "Translate each input string into {target_language}.\n"
     "Return ONLY valid JSON with this schema:\n"
     '{{"translations": ["...", "..."]}}\n\n'
@@ -1167,7 +1167,7 @@ _TRANSLATION_PROMPT = (
     "- Preserve the number of items and their order exactly.\n"
     "- Keep URLs, emails, file paths, JSON/YAML syntax, markdown structure, emojis, code, IDs, and tags intact.\n"
     "- Keep product and brand names unchanged unless the input already contains an accepted localized form.\n"
-    "- TeamClaw, Team Creator, Team Studio, TinyFish, OpenClaw, OASIS should stay unchanged.\n"
+    "- Wecli, WeCli Creator, WeCli Studio, TinyFish, OpenClaw, OASIS should stay unchanged.\n"
     "- If a string is already in the target language or should remain as-is, return it unchanged.\n"
     "- Translate UI-facing prose naturally and concisely.\n"
     "- Do not explain anything.\n\n"
@@ -1184,7 +1184,7 @@ def translate_texts_via_llm(
     source_lang: str = "",
     context: str = "",
 ) -> list[str]:
-    """Translate a batch of UI strings using the configured TeamClaw LLM.
+    """Translate a batch of UI strings using the configured Wecli LLM.
 
     The function is best-effort: on any failure it returns the original strings
     so the frontend can still render without breaking the workflow.
@@ -1246,7 +1246,7 @@ def translate_texts_via_llm(
                 result[idx] = translated_text
         return result
     except Exception as exc:
-        _log.warning("Dynamic Team Creator translation failed: %s", exc)
+        _log.warning("Dynamic WeCli Creator translation failed: %s", exc)
         for key in missing_keys:
             fallback = key[2]
             _TRANSLATION_CACHE[key] = fallback
@@ -1353,9 +1353,9 @@ def _build_default_workflow_graph(
     roles: list[ExtractedRole],
     task_description: str = "",
 ) -> dict[str, Any]:
-    """Build a deterministic Team Studio-style workflow graph.
+    """Build a deterministic WeCli Studio-style workflow graph.
 
-    This uses graph-mode concepts supported in Team Studio:
+    This uses graph-mode concepts supported in WeCli Studio:
     manual begin/end nodes, fan-out/fan-in edges, and a selector review gate
     when the role set includes an obvious QA / reviewer / approver role.
     """
@@ -1933,7 +1933,7 @@ def enhance_workflow_graph_via_llm(
     roles: list[ExtractedRole],
     task_description: str = "",
 ) -> dict[str, Any] | None:
-    """Use the internal LLM to generate a Team Studio-compatible workflow graph."""
+    """Use the internal LLM to generate a WeCli Studio-compatible workflow graph."""
     if len(roles) <= 1:
         return None
 
@@ -2005,7 +2005,7 @@ def map_roles_to_team(
     team_name: str,
     task_description: str = "",
 ) -> dict[str, Any]:
-    """Convert extracted roles into a complete TeamClaw team configuration.
+    """Convert extracted roles into a complete Wecli team configuration.
 
     Returns dict with:
       - oasis_experts: list of persona definitions
@@ -2110,7 +2110,7 @@ def _build_workflow_layout(
     workflow_graph: dict[str, Any],
     experts: list[dict],
 ) -> dict[str, Any]:
-    """Build a lightweight visual layout directly from Team Creator graph data."""
+    """Build a lightweight visual layout directly from WeCli Creator graph data."""
     plan = workflow_graph.get("plan") or []
     edges = workflow_graph.get("edges") or []
     conditional_edges = workflow_graph.get("conditional_edges") or []
@@ -2319,7 +2319,7 @@ def _build_workflow_yaml(
     task_description: str,
     workflow_graph: dict[str, Any] | None = None,
 ) -> str:
-    """Build an OASIS v2 YAML workflow from a Team Studio-style graph."""
+    """Build an OASIS v2 YAML workflow from a WeCli Studio-style graph."""
     role_to_tag = {role.role_name: expert["tag"] for role, expert in zip(roles, experts)}
     role_to_index = {role.role_name: idx + 1 for idx, role in enumerate(roles)}
 
@@ -2327,7 +2327,7 @@ def _build_workflow_yaml(
         workflow_graph = _build_default_workflow_graph(roles, task_description)
 
     lines = [
-        f"# Team Creator auto-generated workflow for: {team_name}",
+        f"# WeCli Creator auto-generated workflow for: {team_name}",
         f"# Task: {task_description[:100]}",
         f"# Generated at: {datetime.now(timezone.utc).isoformat()}",
         f"# Workflow mode: {(workflow_graph.get('meta') or {}).get('mode', 'heuristic')}",
@@ -2394,7 +2394,7 @@ def _build_workflow_yaml(
 
 
 # ──────────────────────────────────────────────────────────────
-# ZIP Assembly — produce TeamClaw-compatible snapshot
+# ZIP Assembly — produce Wecli-compatible snapshot
 # ──────────────────────────────────────────────────────────────
 
 _ARCHIVE_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
@@ -2414,7 +2414,7 @@ def sanitize_archive_segment(value: str, default: str = "team") -> str:
 
 
 def build_team_creator_download_name(team_name: str, timestamp: str) -> str:
-    """Build the user-visible Team Creator zip filename."""
+    """Build the user-visible WeCli Creator zip filename."""
     safe_name = sanitize_archive_segment(team_name, default="team")
     return f"team_{safe_name}_creator_{timestamp}.zip"
 
@@ -2443,7 +2443,7 @@ def build_team_zip(
 ) -> bytes:
     """Assemble a ZIP file in the same format as /teams/snapshot/download.
 
-    The ZIP can be imported via /teams/snapshot/upload or Team Hub.
+    The ZIP can be imported via /teams/snapshot/upload or WeCli Hub.
     """
     buf = io.BytesIO()
 
@@ -2790,7 +2790,7 @@ def _mentor_source_url(mentor_json: dict[str, Any]) -> str:
 
 
 _COLLEAGUE_DISTILL_PROMPT = (
-    "You are converting Feishu/Lark chat materials into colleague-skill artifacts for TeamClaw Team Creator.\n\n"
+    "You are converting Feishu/Lark chat materials into colleague-skill artifacts for Wecli WeCli Creator.\n\n"
     "Return ONLY valid JSON with this schema:\n"
     '{{'
     '"persona_md": "# ...",'
@@ -2982,7 +2982,7 @@ def import_colleague_skill(
     team_name: str = "",
     task_description: str = "",
 ) -> dict[str, Any]:
-    """Import a colleague-skill output into TeamClaw's Team Creator.
+    """Import a colleague-skill output into Wecli's WeCli Creator.
 
     Accepts the output files from https://github.com/titanwings/colleague-skill:
       - meta.json   (parsed dict)
@@ -3023,7 +3023,7 @@ def import_colleague_skill(
         identity_parts.append(str(profile["role"]))
     identity = " ".join(identity_parts) if identity_parts else "同事"
 
-    # Create the ExtractedRole — this is the standard TeamClaw data model
+    # Create the ExtractedRole — this is the standard Wecli data model
     role = ExtractedRole(
         role_name=name,
         personality_traits=_dedupe_preserve_order(personality_traits)[:8],
@@ -3087,7 +3087,7 @@ def import_mentor_skill(
     team_name: str = "",
     task_description: str = "",
 ) -> dict[str, Any]:
-    """Import a supervisor (mentor) skill output into TeamClaw's Team Creator.
+    """Import a supervisor (mentor) skill output into Wecli's WeCli Creator.
 
     Accepts the output files from https://github.com/ybq22/supervisor:
       - {name}.json  (parsed dict — the mentor profile JSON)
@@ -3304,7 +3304,7 @@ def import_personal_skill(
     team_name: str = "",
     task_description: str = "",
 ) -> dict[str, Any]:
-    """Import a personal/relationship-type skill into TeamClaw's Team Creator.
+    """Import a personal/relationship-type skill into Wecli's WeCli Creator.
 
     Handles the family of GitHub skill repos that share the 5-layer persona format:
       - meta.json        (parsed dict)

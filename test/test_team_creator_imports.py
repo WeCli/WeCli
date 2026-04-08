@@ -17,7 +17,7 @@ import skill_import_tools
 import team_creator_service as svc
 
 
-class TeamCreatorImportTests(unittest.TestCase):
+class WecliCreatorImportTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         front.app.config.update(TESTING=True)
@@ -41,7 +41,7 @@ class TeamCreatorImportTests(unittest.TestCase):
     def test_distill_colleague_skill_artifacts_uses_llm_payload(self):
         meta_json = {
             "name": "张三",
-            "profile": {"company": "TeamClaw", "role": "后端工程师"},
+            "profile": {"company": "Wecli", "role": "后端工程师"},
             "tags": {"personality": ["直接"], "culture": ["结果导向"]},
         }
         llm_payload = {
@@ -224,7 +224,7 @@ Always question shallow reasoning.
             (base / "meta.json").write_text(json.dumps({
                 "name": "李四",
                 "slug": "lisi",
-                "profile": {"company": "TeamClaw", "level": "L3", "role": "产品经理"},
+                "profile": {"company": "Wecli", "level": "L3", "role": "产品经理"},
                 "tags": {"personality": ["直接"], "culture": ["效率优先"]},
             }, ensure_ascii=False), encoding="utf-8")
             (base / "persona.md").write_text("## Layer 0：核心性格\n\n- 直接给结论", encoding="utf-8")
@@ -352,7 +352,7 @@ Always question shallow reasoning.
                     "app_id": "app-id",
                     "app_secret": "app-secret",
                     "target_name": "张三",
-                    "company": "TeamClaw",
+                    "company": "Wecli",
                     "role": "后端工程师",
                     "auto_distill": True,
                     "auto_import": True,

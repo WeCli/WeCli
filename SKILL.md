@@ -1,6 +1,6 @@
-# TeamClaw — Install, Configure & Debug Guide
+# Wecli — Install, Configure & Debug Guide
 
-> This is the complete operator manual for installing, configuring, running, and troubleshooting TeamClaw.
+> This is the complete operator manual for installing, configuring, running, and troubleshooting Wecli.
 > For agent behavior rules and task routing, see [`AGENTS.md`](./AGENTS.md).
 > For the product overview, see [`README.md`](./README.md).
 
@@ -10,9 +10,9 @@
 
 **Mandatory before starting services**
 
-1. After you have read this file (or the sections needed for the user’s task), you **must ask the user** whether they want to **start TeamClaw** now (background `start` or foreground `start-foreground`), and **wait for their answer** before running those commands.
-2. **Exception:** if the user already clearly asked to start in the same turn (e.g. “帮我启动 TeamClaw”“run start”“执行 start”), you may run `start` / `start-foreground` without asking again.
-3. When TeamClaw **is** started, copy the **local URL**, Magic link lines, and (if present) **remote** Tunnel URL from the terminal output into your reply — see [`AGENTS.md`](./AGENTS.md) Zero-Question Install Flow.
+1. After you have read this file (or the sections needed for the user’s task), you **must ask the user** whether they want to **start Wecli** now (background `start` or foreground `start-foreground`), and **wait for their answer** before running those commands.
+2. **Exception:** if the user already clearly asked to start in the same turn (e.g. “帮我启动 Wecli”“run start”“执行 start”), you may run `start` / `start-foreground` without asking again.
+3. When Wecli **is** started, copy the **local URL**, Magic link lines, and (if present) **remote** Tunnel URL from the terminal output into your reply — see [`AGENTS.md`](./AGENTS.md) Zero-Question Install Flow.
 
 ---
 
@@ -40,7 +40,7 @@ bash selfskill/scripts/run.sh start          # 按需 setup_env + 创建 .env + 
 bash selfskill/scripts/run.sh start --no-tunnel --no-openclaw   # example: both
 # → Open http://127.0.0.1:51209 (or use the printed Magic link; remote/HTTPS needs the remote link)
 # → First login: Magic link or passwordless localhost
-# → Setup wizard appears if LLM is not yet configured in TeamClaw
+# → Setup wizard appears if LLM is not yet configured in Wecli
 ```
 
 ```powershell
@@ -61,7 +61,7 @@ The `start` command automatically:
 2. Creates `config/.env` from template if missing
 3. **Optionally** tries to copy LLM fields from local OpenClaw into `config/.env` when the key is still empty or placeholder — **failure is OK**; services still start — **skipped entirely** if you pass **`--no-openclaw`**
 4. Starts all services even if LLM is not fully configured yet
-5. Warms an installed OpenClaw gateway and refreshes runtime `OPENCLAW_*` values in `.env` (does not overwrite a **real** user-set `LLM_API_KEY`) — **skipped** if **`--no-openclaw`** (or env `TEAMCLAW_NO_OPENCLAW=1` for the launcher process)
+5. Warms an installed OpenClaw gateway and refreshes runtime `OPENCLAW_*` values in `.env` (does not overwrite a **real** user-set `LLM_API_KEY`) — **skipped** if **`--no-openclaw`** (or env `WECLI_NO_OPENCLAW=1` for the launcher process)
 6. Starts **Cloudflare Tunnel** via `scripts/tunnel.py`, then prints **`🔗 Magic link`**: **local** and **remote** (when `PUBLIC_DOMAIN` is set). Operators and AI agents **must** pass these links to the user after install/start — **skipped** if **`--no-tunnel`** (Magic link text will state that no Tunnel was started).
 
 After startup, the frontend setup wizard handles LLM configuration via the web UI. The wizard detects local OpenClaw and Antigravity-Manager and offers one-click import buttons.
@@ -71,9 +71,9 @@ After startup, the frontend setup wizard handles LLM configuration via the web U
 | Flag | When to use | Behavior |
 |------|-------------|----------|
 | **`--no-tunnel`** | User wants **no** quick public URL (no Cloudflare Tunnel for this run). | Background `start` does **not** run `tunnel.py` or wait on `PUBLIC_DOMAIN`. **`start-foreground`**: tunnel is never started anyway; the flag is **ignored** (a short note is printed). |
-| **`--no-openclaw`** | User does **not** want TeamClaw to tie into OpenClaw for this run (no shared LLM import on start, no gateway warm). | Skips `configure_openclaw.py --import-teamclaw-llm-from-openclaw` when the key is still placeholder. Sets **`TEAMCLAW_NO_OPENCLAW`** for **`scripts/launcher.py`**, which **skips** `ensure_openclaw_gateway_running()` (no `OPENCLAW_*` refresh on startup; restart loop respects the same flag). |
+| **`--no-openclaw`** | User does **not** want Wecli to tie into OpenClaw for this run (no shared LLM import on start, no gateway warm). | Skips `configure_openclaw.py --import-wecli-llm-from-openclaw` when the key is still placeholder. Sets **`WECLI_NO_OPENCLAW`** for **`scripts/launcher.py`**, which **skips** `ensure_openclaw_gateway_running()` (no `OPENCLAW_*` refresh on startup; restart loop respects the same flag). |
 
-Environment variables (for advanced/manual launcher runs): **`TEAMCLAW_NO_OPENCLAW`** and **`TEAMCLAW_NO_TUNNEL`** may be set to `1` / `true` / `yes` / `on` where documented; scripts set them when the flags above are used.
+Environment variables (for advanced/manual launcher runs): **`WECLI_NO_OPENCLAW`** and **`WECLI_NO_TUNNEL`** may be set to `1` / `true` / `yes` / `on` where documented; scripts set them when the flags above are used.
 
 ### For agents using this SKILL (settings are documented — startup does not enforce them)
 
@@ -81,7 +81,7 @@ Follow **[For AI agents that read this SKILL](#for-ai-agents-that-read-this-skil
 
 ### Optional: auto-import OpenClaw LLM at startup
 
-During `start` / `start-foreground`, if `config/.env` has no real `LLM_API_KEY` (missing or placeholder `your_api_key_here`), the scripts **try** to import provider/model/key from OpenClaw into TeamClaw `.env` — **unless** **`--no-openclaw`** was passed. If OpenClaw is missing or has no LLM config, startup **continues** anyway. If you already set a real `LLM_API_KEY`, startup does not overwrite it.
+During `start` / `start-foreground`, if `config/.env` has no real `LLM_API_KEY` (missing or placeholder `your_api_key_here`), the scripts **try** to import provider/model/key from OpenClaw into Wecli `.env` — **unless** **`--no-openclaw`** was passed. If OpenClaw is missing or has no LLM config, startup **continues** anyway. If you already set a real `LLM_API_KEY`, startup does not overwrite it.
 
 ### Magic Prompts for AI Code CLI
 
@@ -115,7 +115,7 @@ If the user explicitly wants OpenClaw integration and it is missing, use this fl
 6. Web entry points after the gateway is up:
    - OpenClaw dashboard / Control UI: `http://127.0.0.1:18789/`
    - OpenClaw OpenAI-compatible HTTP API: `http://127.0.0.1:18789/v1/chat/completions`
-7. Sync TeamClaw integration:
+7. Sync Wecli integration:
    - Linux / macOS: `bash selfskill/scripts/run.sh check-openclaw`
    - Windows: `powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 check-openclaw`
 8. If the OpenClaw dashboard shows `gateway token missing`, either:
@@ -124,11 +124,11 @@ If the user explicitly wants OpenClaw integration and it is missing, use this fl
      - `openclaw config set gateway.auth.mode none`
      - `openclaw config unset gateway.auth.token`
      - `openclaw gateway restart`
-9. If TeamClaw was already running before OpenClaw was installed or reconfigured, restart TeamClaw so OASIS reloads the `openclaw` CLI.
+9. If Wecli was already running before OpenClaw was installed or reconfigured, restart Wecli so OASIS reloads the `openclaw` CLI.
 
 ### Provider Switching Notes
 
-- **DeepSeek**: Update TeamClaw `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_PROVIDER` together. For OpenClaw, define a DeepSeek custom provider in `~/.openclaw/openclaw.json`. See [docs/openclaw-commands.md § 4](./docs/openclaw-commands.md) for the full JSON snippet. Tested stable pair: TeamClaw `LLM_BASE_URL=https://api.deepseek.com`, `LLM_MODEL=deepseek-chat`, `LLM_PROVIDER=deepseek`.
+- **DeepSeek**: Update Wecli `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL`, and `LLM_PROVIDER` together. For OpenClaw, define a DeepSeek custom provider in `~/.openclaw/openclaw.json`. See [docs/openclaw-commands.md § 4](./docs/openclaw-commands.md) for the full JSON snippet. Tested stable pair: Wecli `LLM_BASE_URL=https://api.deepseek.com`, `LLM_MODEL=deepseek-chat`, `LLM_PROVIDER=deepseek`.
 - **Antigravity-Manager** (local reverse proxy, free 67+ models via Google One Pro): `LLM_BASE_URL=http://127.0.0.1:8045`, `LLM_API_KEY=sk-antigravity`, `LLM_MODEL=gemini-3.1-pro`, `LLM_PROVIDER=antigravity`. See [docs/openclaw-commands.md § 4.1](./docs/openclaw-commands.md).
 - **MiniMax** (1M context): `LLM_BASE_URL=https://api.minimaxi.com`, `LLM_MODEL=MiniMax-M2.7`, `LLM_PROVIDER=minimax`. See [docs/openclaw-commands.md § 4.2](./docs/openclaw-commands.md).
 
@@ -157,7 +157,7 @@ openclaw.cmd gateway restart
 powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 bind-openclaw-channel main openclaw-weixin:<account_id>
 ```
 
-Or via TeamClaw CLI:
+Or via Wecli CLI:
 
 ```bash
 uv run scripts/cli.py openclaw channels
@@ -170,15 +170,15 @@ uv run scripts/cli.py openclaw bind --data '{"agent":"main","channel":"openclaw-
 
 ## ACP Tools Integration (Optional)
 
-TeamClaw communicates with external AI coding agents via **acpx** (ACP exchange). `acpx` is installed automatically during `start` / `setup`. Each tool below is an independent CLI agent that acpx can bridge — install only the ones the user wants.
+Wecli communicates with external AI coding agents via **acpx** (ACP exchange). `acpx` is installed automatically during `start` / `setup`. Each tool below is an independent CLI agent that acpx can bridge — install only the ones the user wants.
 
 **Prerequisite for all:** `acpx` must be installed (`npm install -g acpx@latest`; done automatically by `start`).
 
-After installing any tool below, **restart TeamClaw** so the switcher bar picks it up. Verify with:
+After installing any tool below, **restart Wecli** so the switcher bar picks it up. Verify with:
 
 ```bash
 acpx --help          # lists all discovered tools
-# or in browser: the switcher bar in Team Studio shows available ACP tabs
+# or in browser: the switcher bar in WeCli Studio shows available ACP tabs
 ```
 
 ### Codex (OpenAI)
@@ -334,7 +334,7 @@ ByteDance's open-source CLI coding agent (separate from Trae IDE).
 | Cursor CLI | `curl https://cursor.com/install -fsS \| bash` | Cursor subscription | Paid |
 | Trae Agent | `git clone` + `uv sync` | Provider-specific | BYO API key |
 
-> **Note:** `acpx` auto-discovers installed tools. You do not need to register tools manually — just install them and restart TeamClaw.
+> **Note:** `acpx` auto-discovers installed tools. You do not need to register tools manually — just install them and restart Wecli.
 
 ---
 
@@ -364,7 +364,7 @@ Reverse sync to OpenClaw:
 bash selfskill/scripts/run.sh sync-openclaw-llm
 ```
 
-`configure` auto-syncs safe LLM updates when the TeamClaw config is complete. Partial edits intentionally stop short of rewriting OpenClaw.
+`configure` auto-syncs safe LLM updates when the Wecli config is complete. Partial edits intentionally stop short of rewriting OpenClaw.
 
 For managed terminals, CI, or agent runners that clean up child processes, use `start-foreground` instead of `start`.
 
@@ -390,7 +390,7 @@ These keys are recommended but **not required before first start**:
 | `LLM_BASE_URL` | OpenAI-compatible base URL |
 | `LLM_MODEL` | Model name chosen explicitly or after `auto-model` |
 
-If left blank, TeamClaw starts normally but LLM-dependent features won't work until configured via the web UI setup wizard.
+If left blank, Wecli starts normally but LLM-dependent features won't work until configured via the web UI setup wizard.
 
 ### Optional Audio Configuration
 
@@ -425,8 +425,8 @@ Notes:
 
 - On Windows, default ports may be auto-remapped; always trust `config/.env` or `status`.
 - Local `127.0.0.1` access supports passwordless login; **non-localhost / HTTPS** access uses the **magic link** from `start`, `status`, `tunnel-status`, or `start-tunnel` (not `cli.py status` alone).
-- TeamClaw starts even without LLM configured. The setup wizard prompts on first login.
-- `chatbot/setup.py` requires an interactive terminal. In non-interactive contexts, `launcher.py` automatically skips the chatbot menu. Force with `TEAMBOT_HEADLESS=1`.
+- Wecli starts even without LLM configured. The setup wizard prompts on first login.
+- `chatbot/setup.py` requires an interactive terminal. In non-interactive contexts, `launcher.py` automatically skips the chatbot menu. Force with `WEBOT_HEADLESS=1`.
 
 **Mandatory for anyone guiding a user after `start`:** Reproduce or summarize the **Magic link** block (local + remote when available). Do not end the handoff with only “open localhost” if the user needs phone or HTTPS access.
 
@@ -444,7 +444,7 @@ bash selfskill/scripts/run.sh configure --show
 
 **Magic link** (local + remote when Tunnel is ready) is printed by **`run.sh` / `run.ps1`** after `start` (once Tunnel has run), and again by **`status`**, **`tunnel-status`**, and **`start-tunnel`** — each uses `cli.py token generate` so the HMAC token is correct. It is **not** part of `uv run scripts/cli.py status`. Those commands also print a line **directed at AI assistants** asking them to copy the URLs into the user reply.
 
-**Magic link user id** defaults to **`default`** (the `user_id` in `?user=` and in `token generate -u`). To generate links for another user, set **`TEAMCLAW_MAGIC_LINK_USER`** before running the script (Linux/macOS: `export TEAMCLAW_MAGIC_LINK_USER=admin`). Note: CLI chat defaults to `admin` for `-u`; magic link scripts intentionally used `default` unless you override.
+**Magic link user id** defaults to **`default`** (the `user_id` in `?user=` and in `token generate -u`). To generate links for another user, set **`WECLI_MAGIC_LINK_USER`** before running the script (Linux/macOS: `export WECLI_MAGIC_LINK_USER=admin`). Note: CLI chat defaults to `admin` for `-u`; magic link scripts intentionally used `default` unless you override.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1 status
@@ -487,7 +487,7 @@ See [docs/repo-index.md](./docs/repo-index.md) and [docs/example_team.md](./docs
 
 ### Python 2 vs Python 3
 
-On macOS, the system `python` may point to **Python 2.7**. TeamClaw requires **Python 3.11+**.
+On macOS, the system `python` may point to **Python 2.7**. Wecli requires **Python 3.11+**.
 
 **Symptom**: `SyntaxError: Non-ASCII character '\xe5'`
 
@@ -507,7 +507,7 @@ Safety guards: `launcher.py` includes a Python version check and `run.sh` verifi
 
 **Cause**: Non-interactive terminal (agent runners, CI, piped scripts).
 
-**Fix**: Use `selfskill/scripts/run.sh start` (which backgrounds `launcher.py` correctly), or set `TEAMBOT_HEADLESS=1`.
+**Fix**: Use `selfskill/scripts/run.sh start` (which backgrounds `launcher.py` correctly), or set `WEBOT_HEADLESS=1`.
 
 ### OpenClaw Gateway Warnings
 
@@ -530,11 +530,11 @@ openclaw config unset gateway.auth.token
 openclaw gateway restart
 ```
 
-### TeamClaw API Returns "认证失败"
+### Wecli API Returns "认证失败"
 
 **Symptom**: Direct POST to `http://127.0.0.1:<PORT_AGENT>/v1/chat/completions` returns auth error.
 
-**Cause**: TeamClaw's Agent API is authenticated. This doesn't mean LLM config is wrong.
+**Cause**: Wecli's Agent API is authenticated. This doesn't mean LLM config is wrong.
 
 **Fix**: Verify the stack with `run.sh status` or test the LLM directly:
 
@@ -583,10 +583,10 @@ openclaw.cmd channels login --channel openclaw-weixin
 - [docs/index.md](./docs/index.md) — canonical task-based docs map
 - [docs/repo-index.md](./docs/repo-index.md) — codebase and file index
 - [docs/overview.md](./docs/overview.md) — product overview
-- [docs/team-creator.md](./docs/team-creator.md) — Team Creator flow
+- [docs/team-creator.md](./docs/team-creator.md) — WeCli Creator flow
 - [docs/oasis-reference.md](./docs/oasis-reference.md) — OASIS runtime and orchestration
 - [docs/runtime-reference.md](./docs/runtime-reference.md) — architecture and auth
-- [docs/teambot-agent-runtime.md](./docs/teambot-agent-runtime.md) — TeamBot subagents and profiles
+- [docs/webot-agent-runtime.md](./docs/webot-agent-runtime.md) — WeBot subagents and profiles
 - [docs/cli.md](./docs/cli.md) — CLI reference
 - [docs/build_team.md](./docs/build_team.md) — Team creation and member config
 - [docs/create_workflow.md](./docs/create_workflow.md) — workflow YAML format

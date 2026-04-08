@@ -1,4 +1,4 @@
-# TeamClaw Documentation Index
+# Wecli Documentation Index
 
 This repository uses a **progressive-disclosure** documentation layout:
 
@@ -22,10 +22,10 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 
 | Task | Read First | Then Read |
 |---|---|---|
-| Install / configure / start TeamClaw | [`../SKILL.md`](../SKILL.md) | [`ports.md`](./ports.md) if ports matter |
+| Install / configure / start Wecli | [`../SKILL.md`](../SKILL.md) | [`ports.md`](./ports.md) if ports matter |
 | Understand the platform | [`overview.md`](./overview.md) | [`../README.md`](../README.md) |
-| Understand TeamBot agent runtime, subagents, delegated tool boundaries, runtime policy hooks, or the subagent panel | [`teambot-agent-runtime.md`](./teambot-agent-runtime.md) | [`runtime-reference.md`](./runtime-reference.md), [`repo-index.md`](./repo-index.md) |
-| Compare TeamBot with Claude Code and inspect the runtime feature matrix that drives parity work | [`teambot-claude-gap-analysis.md`](./teambot-claude-gap-analysis.md) | [`teambot-agent-runtime.md`](./teambot-agent-runtime.md), [`repo-index.md`](./repo-index.md) |
+| Understand WeBot agent runtime, subagents, delegated tool boundaries, runtime policy hooks, or the subagent panel | [`webot-agent-runtime.md`](./webot-agent-runtime.md) | [`runtime-reference.md`](./runtime-reference.md), [`repo-index.md`](./repo-index.md) |
+| Compare WeBot with Claude Code and inspect the runtime feature matrix that drives parity work | [`webot-claude-gap-analysis.md`](./webot-claude-gap-analysis.md) | [`webot-agent-runtime.md`](./webot-agent-runtime.md), [`repo-index.md`](./repo-index.md) |
 | Build a Team from a task description or discovered SOP pages | [`team-creator.md`](./team-creator.md) | [`build_team.md`](./build_team.md), [`example_team.md`](./example_team.md) |
 | Understand OASIS runtime behavior, Town Mode, GraphRAG memory, or ReportAgent | [`oasis-reference.md`](./oasis-reference.md) | [`runtime-reference.md`](./runtime-reference.md), [`create_workflow.md`](./create_workflow.md), [`build_team.md`](./build_team.md) |
 | Understand runtime architecture / auth / services | [`runtime-reference.md`](./runtime-reference.md) | [`ports.md`](./ports.md), [`repo-index.md`](./repo-index.md) |
@@ -42,18 +42,18 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 
 ### Product / Orientation
 
-- [`overview.md`](./overview.md): brief explanation of what TeamClaw is and how people use it
+- [`overview.md`](./overview.md): brief explanation of what Wecli is and how people use it
 - [`../README.md`](../README.md): user-facing overview, highlights, and public-facing narrative
 
 ### Operator / Builder Guides
 
 - [`cli.md`](./cli.md): command catalog
-- [`team-creator.md`](./team-creator.md): Team Creator flow, jobs, bilingual UI, workflow-to-team bridge
+- [`team-creator.md`](./team-creator.md): WeCli Creator flow, jobs, bilingual UI, workflow-to-team bridge
 - [`build_team.md`](./build_team.md): Team creation, internal agents, OpenClaw members, personas
 - [`create_workflow.md`](./create_workflow.md): workflow YAML grammar and examples
 - [`oasis-reference.md`](./oasis-reference.md): OASIS runtime model, Town Mode, swarm / GraphRAG behavior, ReportAgent
-- [`teambot-agent-runtime.md`](./teambot-agent-runtime.md): TeamBot delegated subagent runtime, profiles, tool boundaries, and the runtime DTO wiring
-- [`teambot-claude-gap-analysis.md`](./teambot-claude-gap-analysis.md): feature matrix vs Claude Code and the outstanding parity checklist
+- [`webot-agent-runtime.md`](./webot-agent-runtime.md): WeBot delegated subagent runtime, profiles, tool boundaries, and the runtime DTO wiring
+- [`webot-claude-gap-analysis.md`](./webot-claude-gap-analysis.md): feature matrix vs Claude Code and the outstanding parity checklist
 - [`example_team.md`](./example_team.md): concrete file layout for a Team
 - [`openclaw-commands.md`](./openclaw-commands.md): OpenClaw command and config reference
 - [`tinyfish-monitor.md`](./tinyfish-monitor.md): TinyFish competitor monitoring, live crawl, and price-change persistence
@@ -61,7 +61,7 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 
 ### Maintainer / Developer Docs
 
-- [`runtime-reference.md`](./runtime-reference.md): runtime architecture, API surface, and the TeamBot control-plane map
+- [`runtime-reference.md`](./runtime-reference.md): runtime architecture, API surface, and the WeBot control-plane map
 - [`repo-index.md`](./repo-index.md): where code and data live
 
 ## Suggested Agent Reading Paths
@@ -80,7 +80,7 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 4. Read [`example_team.md`](./example_team.md)
 5. If behavior looks wrong, inspect the indexed runtime files in [`repo-index.md`](./repo-index.md)
 
-### Use Team Creator or Generate Team from Workflow
+### Use WeCli Creator or Generate Team from Workflow
 
 1. Read [`team-creator.md`](./team-creator.md)
 2. If the output Team shape matters, read [`build_team.md`](./build_team.md)
@@ -105,12 +105,12 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 2. Read the topic doc that matches the area you are changing
 3. Open only the files indexed for that subsystem
 
-### Extend TeamBot Agent Capabilities
+### Extend WeBot Agent Capabilities
 
-1. Read [`teambot-agent-runtime.md`](./teambot-agent-runtime.md)
+1. Read [`webot-agent-runtime.md`](./webot-agent-runtime.md)
 2. Read [`runtime-reference.md`](./runtime-reference.md)
 3. Read [`repo-index.md`](./repo-index.md)
-4. Open the indexed TeamBot runtime and MCP files only as needed
+4. Open the indexed WeBot runtime and MCP files only as needed
 
 ## Current Structure Rationale
 

@@ -259,7 +259,7 @@ def launch_bots() -> None:
 def main() -> None:
     """主入口函数"""
     # Headless 模式：跳过交互菜单（避免后台运行时出现 EOFError）
-    if os.getenv("TEAMBOT_HEADLESS", "0") == "1":
+    if os.getenv("WEBOT_HEADLESS", "0") == "1":
         print("=== Chatbot 设置与启动器 (headless 模式) ===")
         return
 

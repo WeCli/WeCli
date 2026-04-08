@@ -1,0 +1,42 @@
+[
+  {
+    "name": "武装思想",
+    "tag": "arming_thought"
+  },
+  {
+    "name": "矛盾分析法",
+    "tag": "contradiction"
+  },
+  {
+    "name": "实践认识论",
+    "tag": "practice_cognition"
+  },
+  {
+    "name": "调查研究",
+    "tag": "investigation"
+  },
+  {
+    "name": "群众路线",
+    "tag": "mass_line"
+  },
+  {
+    "name": "批评与自我批评",
+    "tag": "self_criticism"
+  },
+  {
+    "name": "持久战略",
+    "tag": "protracted"
+  },
+  {
+    "name": "集中兵力",
+    "tag": "concentrate"
+  },
+  {
+    "name": "星火燎原",
+    "tag": "spark_fire"
+  },
+  {
+    "name": "统筹兼顾",
+    "tag": "overall_planning"
+  }
+]

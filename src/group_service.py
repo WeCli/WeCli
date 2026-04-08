@@ -44,7 +44,7 @@ logger = get_logger("group_service")
 
 # Subcommands accepted by `acpx <tag> ...` (from `acpx --help` + legacy aliases)
 _ACP_TOOL_NAMES: frozenset[str] = acpx_agent_tags_with_legacy()
-_DEFAULT_ACP_SESSION_SUFFIX = "teamclawchat"
+_DEFAULT_ACP_SESSION_SUFFIX = "weclichat"
 _AGENT_MODEL_RE = re.compile(r"^agent:[^:]+(?::(.+))?$")
 
 # ACPX-backed ACP support
@@ -92,7 +92,7 @@ def _select_external_transport(tag: str, platform: str = "") -> Literal["acp", "
     if pl in ("http", "openai", "openai_http"):
         return "http"
     tag_lower = (tag or "").lower()
-    # OpenClaw defaults to HTTP path in TeamClaw (gateway); optional platform=acp overrides.
+    # OpenClaw defaults to HTTP path in Wecli (gateway); optional platform=acp overrides.
     if tag_lower == "openclaw":
         return "http"
     if tag_lower in _ACP_TOOL_NAMES and tag_lower != "openclaw":
@@ -526,7 +526,7 @@ class GroupService:
     ) -> str | None:
         """Fallback: send message to external agent via HTTP API.
         
-        Message already contains teamclaw_type instruction from caller.
+        Message already contains wecli_type instruction from caller.
         Supports multimodal content via OpenAI image_url / input_audio format.
         """
         api_url = agent_info.get("api_url", "")

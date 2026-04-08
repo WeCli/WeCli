@@ -22,24 +22,24 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import ToolNode
 
 from agent_runtime_state import TaskRegistry, ThreadStateRegistry
-from teambot_policy import (
+from webot_policy import (
     ToolPolicyDecision,
     get_tool_policy,
     run_tool_policy_hooks,
 )
-from teambot_context import (
+from webot_context import (
     budget_user_messages,
     budget_tool_messages,
     compact_history_messages,
     render_runtime_context_block,
 )
-from teambot_memory import ensure_memory_state
-from teambot_permission_context import (
+from webot_memory import ensure_memory_state
+from webot_permission_context import (
     create_or_reuse_permission_request,
     resolve_permission_context,
 )
-from teambot_profiles import get_agent_profile, parse_subagent_session_id, render_profile_system_prompt
-from teambot_runtime import (
+from webot_profiles import get_agent_profile, parse_subagent_session_id, render_profile_system_prompt
+from webot_runtime import (
     build_session_mode_message,
     build_turn_limit_message,
     filter_tools_for_mode,
@@ -47,9 +47,9 @@ from teambot_runtime import (
     resolve_max_turns,
     should_stop_for_turn_limit,
 )
-from teambot_bridge import get_bridge_runtime_payload
-from teambot_buddy import serialize_buddy_state
-from teambot_runtime_store import (
+from webot_bridge import get_bridge_runtime_payload
+from webot_buddy import serialize_buddy_state
+from webot_runtime_store import (
     get_session_state,
     get_session_mode,
     list_inbox_messages,
@@ -61,8 +61,8 @@ from teambot_runtime_store import (
     list_verification_records,
     update_tool_approval_status,
 )
-from teambot_voice import get_voice_state as get_teambot_voice_state
-from teambot_workspace import describe_session_workspace
+from webot_voice import get_voice_state as get_webot_voice_state
+from webot_workspace import describe_session_workspace
 
 # --- New feature modules (ported from Claude Code / openclaw / oh-my-codex) ---
 from streaming_tool_executor import (
@@ -98,7 +98,7 @@ from notification_system import (
 )
 
 
-# 调试导出（已关闭）：原 _maybe_debug_dump_llm_payload_for_minimax 在 TEAMCLAW_DEBUG_LLM_PAYLOAD=1 时
+# 调试导出（已关闭）：原 _maybe_debug_dump_llm_payload_for_minimax 在 WECLI_DEBUG_LLM_PAYLOAD=1 时
 # 将 ainvoke 前消息写入 data/debug_llm_payload_last.json；实现已从默认分支移除，需排障时查 git 历史。
 
 # --- Tools that need automatic username injection ---
@@ -123,10 +123,10 @@ USER_INJECTED_TOOLS = {
     "call_llm_api", "send_internal_message",
     # Group chat tools
     "send_to_group",
-    # TeamBot subagent tools
-    "list_teambot_agent_profiles", "spawn_subagent", "list_subagents",
+    # WeBot subagent tools
+    "list_webot_agent_profiles", "spawn_subagent", "list_subagents",
     "send_subagent_message", "get_subagent_history", "cancel_subagent",
-    "list_teambot_workflow_presets", "apply_teambot_workflow_preset",
+    "list_webot_workflow_presets", "apply_webot_workflow_preset",
     "session_send_to", "session_inbox", "session_deliver_inbox",
     "claude_session_send_to", "claude_session_inbox", "claude_session_deliver_inbox",
     "ultraplan_start", "ultraplan_status",
@@ -152,7 +152,7 @@ SESSION_INJECTED_TOOLS = {
     "spawn_subagent": "parent_session",
     "send_subagent_message": "source_session",
     "cancel_subagent": "source_session",
-    "apply_teambot_workflow_preset": "source_session",
+    "apply_webot_workflow_preset": "source_session",
     "write_session_plan": "source_session",
     "read_session_plan": "source_session",
     "clear_session_plan": "source_session",
@@ -222,7 +222,7 @@ class UserAwareToolNode:
                 f"如需继续，请先批准该请求后再重试。{approval_hint}"
             )
         return (
-            f"❌ 工具 '{tool_name}' 被当前 TeamBot tool policy 拒绝。\n"
+            f"❌ 工具 '{tool_name}' 被当前 WeBot tool policy 拒绝。\n"
             f"原因：{reason or '该工具调用不满足当前策略要求。'}"
         )
 
@@ -896,9 +896,9 @@ class TeamAgent:
                 "args": [os.path.join(self._src_dir, "mcp_llmapi.py")],
                 "transport": "stdio",
             },
-            "teambot_service": {
+            "webot_service": {
                 "command": python_command,
-                "args": [os.path.join(self._src_dir, "mcp_teambot.py")],
+                "args": [os.path.join(self._src_dir, "mcp_webot.py")],
                 "transport": "stdio",
             },
         })
@@ -1201,7 +1201,7 @@ class TeamAgent:
         ]
         memory_state = ensure_memory_state(user_id, session_id)
         bridge_state = get_bridge_runtime_payload(user_id, session_id)
-        voice_state = get_teambot_voice_state(user_id, session_id or "default")
+        voice_state = get_webot_voice_state(user_id, session_id or "default")
         buddy_state = serialize_buddy_state(user_id)
         runtime_context_block = render_runtime_context_block(
             workspace=describe_session_workspace(user_id, session_id),

@@ -53,7 +53,7 @@ test('message center loads pretext and uses it for overview label gutter sizing'
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.setItem('teamclaw_lang', 'zh');
+    localStorage.setItem('wecli_lang', 'zh');
   });
 
   await page.goto('/mobile/group_chat');
@@ -61,8 +61,8 @@ test('message center loads pretext and uses it for overview label gutter sizing'
 
   const result = await page.evaluate(() => {
     const names = ['超级超级超级长的中文研究协调员名字 AlphaBetaGammaDelta'];
-    const expectedWidth = window.TeamClawTextLayout
-      ? window.TeamClawTextLayout.measureLabelGutter(names, {
+    const expectedWidth = window.WecliTextLayout
+      ? window.WecliTextLayout.measureLabelGutter(names, {
           font: '600 10px Arial',
           lineHeight: 12,
           minWidth: 108,
@@ -88,7 +88,7 @@ test('message center loads pretext and uses it for overview label gutter sizing'
     showDiscussionOverview();
     const overlay = document.getElementById('oasis-overview-overlay');
     return {
-      ready: Boolean(window.TeamClawTextLayout && typeof window.TeamClawTextLayout.measureLabelGutter === 'function'),
+      ready: Boolean(window.WecliTextLayout && typeof window.WecliTextLayout.measureLabelGutter === 'function'),
       expectedWidth,
       overlayExists: Boolean(overlay),
       htmlHasMeasuredWidth: Boolean(overlay && overlay.innerHTML.includes(`width:${expectedWidth}px;flex-shrink:0;overflow:hidden;border-right:1.5px solid #e2e8f0;`)),

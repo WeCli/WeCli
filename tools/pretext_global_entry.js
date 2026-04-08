@@ -9,7 +9,7 @@ import {
   walkLineRanges,
 } from '@chenglou/pretext';
 
-window.TeamClawPretext = {
+window.WecliPretext = {
   clearCache,
   layout,
   layoutNextLine,

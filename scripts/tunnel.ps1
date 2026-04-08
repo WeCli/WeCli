@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "common.ps1")
 
-Set-TeamClawUtf8
+Set-WecliUtf8
 $python = Ensure-VenvPython -ProjectRoot $projectRoot
 
 Push-Location $projectRoot

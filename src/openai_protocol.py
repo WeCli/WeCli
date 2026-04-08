@@ -118,7 +118,7 @@ class OpenAIProtocolHelper:
         self,
         content: str,
         *,
-        model: str = "teambot",
+        model: str = "webot",
         finish_reason: str = "stop",
         tool_calls: Optional[list] = None,
     ) -> Dict[str, Any]:
@@ -152,7 +152,7 @@ class OpenAIProtocolHelper:
         *,
         completion_id: str,
         content: str = "",
-        model: str = "teambot",
+        model: str = "webot",
         finish_reason: Optional[str] = None,
         meta: Optional[dict] = None,
     ) -> str:
@@ -256,9 +256,9 @@ class OpenAIProtocolHelper:
         return {
             "object": "list",
             "data": [{
-                "id": "teambot",
+                "id": "webot",
                 "object": "model",
                 "created": int(time.time()),
-                "owned_by": "teambot",
+                "owned_by": "webot",
             }],
         }

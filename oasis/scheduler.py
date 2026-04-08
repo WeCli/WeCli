@@ -142,7 +142,7 @@ class SelectorEdge:
 
     The source node (must have is_selector=True) will be prompted with
     the available choices and asked to output a JSON object:
-    {"teamclaw_type": "oasis choose", "choose": N, "content": "reason"}.
+    {"wecli_type": "oasis choose", "choose": N, "content": "reason"}.
     The engine parses N and activates the corresponding target node.
     """
     source: str

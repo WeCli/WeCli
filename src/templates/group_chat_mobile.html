@@ -7,7 +7,7 @@
 <script>
   // Early language detection to avoid flash of wrong lang
   (function(){
-    var lang = localStorage.getItem('teamclaw_lang') || 'zh';
+    var lang = localStorage.getItem('wecli_lang') || 'zh';
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
     if (lang === 'en') document.title = 'Agent Message Center';
   })();
@@ -1822,10 +1822,15 @@
   .toast {
     position: fixed; bottom: 120px; left: 50%; transform: translateX(-50%);
     background: rgba(0,0,0,0.72); color: #fff;
-    padding: 8px 20px; border-radius: 20px;
+    padding: 10px 18px; border-radius: 20px;
     font-size: 14px; z-index: 300;
     opacity: 0; transition: opacity 0.3s;
     pointer-events: none;
+    max-width: min(92vw, 360px);
+    text-align: center;
+    line-height: 1.45;
+    white-space: pre-line;
+    box-sizing: border-box;
   }
   .toast.show { opacity: 1; }
 
@@ -2545,8 +2550,8 @@
 <body>
 
 <div id="app-splash">
-  <img class="splash-icon splash-logo" src="/static/assets/teamclaw-mark.svg" alt="TeamClaw">
-  <div class="splash-title">TeamClaw</div>
+  <img class="splash-icon splash-logo" src="/static/assets/wecli-mark.svg" alt="Wecli">
+  <div class="splash-title">Wecli</div>
   <div class="splash-sub">Message Center</div>
 </div>
 <div id="page-loading-overlay">
@@ -2835,20 +2840,20 @@
           <div style="font-size:11px;color:var(--text-hint);margin-top:2px;" data-i18n="import_preset_desc">Hub / ZIP 之外的第三种：一键安装明·唐·企业制等模板</div>
         </div>
       </div>
-      <!-- TeamClaw Hub -->
+      <!-- Wecli Hub -->
       <div onclick="showContactsHubImport()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border-radius:8px;background:var(--bg);cursor:pointer;border:1px solid var(--border);">
         <span style="font-size:20px;">🌐</span>
         <div>
-          <div style="font-size:14px;font-weight:600;color:var(--text);" data-i18n="import_from_hub">从 TeamClaw Hub 导入</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);" data-i18n="import_from_hub">从 Wecli Hub 导入</div>
           <div style="font-size:11px;color:var(--text-hint);margin-top:2px;" data-i18n="hub_desc">浏览并下载社区团队配置</div>
         </div>
       </div>
       <!-- Hub 导入展开区 -->
       <div id="contacts-hub-import-area" style="display:none;margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);">
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;" data-i18n="paste_hub_cmd">粘贴从 Hub 复制的下载命令：</div>
-        <textarea id="contacts-hub-curl-input" placeholder="curl -L 'https://teamclawhub.com/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
+        <textarea id="contacts-hub-curl-input" placeholder="curl -L 'https://wecli.net/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;">
-          <button onclick="openTeamHub()" style="flex:1;padding:8px;background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
+          <button onclick="openWecliHub()" style="flex:1;padding:8px;background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
           <button onclick="importFromHubContacts()" style="flex:1;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="download_import">📥 下载并导入</button>
         </div>
       </div>
@@ -2932,30 +2937,30 @@
   </div>
   <div class="discover-area">
     <div class="discover-section">
-      <div class="discover-card" onclick="openTeamStudio()">
+      <div class="discover-card" onclick="openWecliStudio()">
         <div class="discover-card-icon">🎨</div>
         <div class="discover-card-body">
-          <div class="discover-card-title" data-i18n="team_studio">Team Studio</div>
+          <div class="discover-card-title" data-i18n="team_studio">WeCli Studio</div>
           <div class="discover-card-desc" data-i18n="discover_studio_desc">管理你的 Agent、编排工作流</div>
         </div>
         <div class="discover-card-arrow">›</div>
       </div>
     </div>
     <div class="discover-section">
-      <div class="discover-card" onclick="openTeamHub()">
+      <div class="discover-card" onclick="openWecliHub()">
         <div class="discover-card-icon">🌐</div>
         <div class="discover-card-body">
-          <div class="discover-card-title" data-i18n="tab_team_hub">Team Hub</div>
+          <div class="discover-card-title" data-i18n="tab_team_hub">WeCli Hub</div>
           <div class="discover-card-desc" data-i18n="discover_hub_desc">浏览社区分享的团队配置</div>
         </div>
         <div class="discover-card-arrow">›</div>
       </div>
     </div>
     <div class="discover-section">
-      <div class="discover-card" onclick="openTeamCreator()">
+      <div class="discover-card" onclick="openWecliCreator()">
         <div class="discover-card-icon">🛠️</div>
         <div class="discover-card-body">
-          <div class="discover-card-title" data-i18n="team_creator">Team Creator</div>
+          <div class="discover-card-title" data-i18n="team_creator">WeCli Creator</div>
           <div class="discover-card-desc" data-i18n="discover_creator_desc">创建并发布新的团队页面</div>
         </div>
         <div class="discover-card-arrow">›</div>
@@ -3122,20 +3127,20 @@
             <div style="font-size:11px;color:var(--text-hint);margin-top:2px;" data-i18n="import_preset_desc">Hub / ZIP 之外的第三种：一键安装明·唐·企业制等模板</div>
           </div>
         </div>
-        <!-- TeamClaw Hub -->
+        <!-- Wecli Hub -->
         <div onclick="showHubImport()" style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:8px;border-radius:8px;background:var(--bg);cursor:pointer;border:1px solid var(--border);">
           <span style="font-size:20px;">🌐</span>
           <div>
-            <div style="font-size:14px;font-weight:600;color:var(--text);" data-i18n="import_from_hub">从 TeamClaw Hub 导入</div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);" data-i18n="import_from_hub">从 Wecli Hub 导入</div>
             <div style="font-size:11px;color:var(--text-hint);margin-top:2px;" data-i18n="hub_desc">浏览并下载社区团队配置</div>
           </div>
         </div>
         <!-- Hub 导入展开区 -->
         <div id="hub-import-area" style="display:none;margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);">
           <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;" data-i18n="paste_hub_cmd">粘贴从 Hub 复制的下载命令：</div>
-          <textarea id="hub-curl-input" placeholder="curl -L 'https://teamclawhub.com/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
+          <textarea id="hub-curl-input" placeholder="curl -L 'https://wecli.net/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
           <div style="display:flex;gap:8px;margin-top:8px;">
-            <button onclick="openTeamHub()" style="flex:1;padding:8px;background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
+            <button onclick="openWecliHub()" style="flex:1;padding:8px;background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
             <button onclick="importFromHub()" style="flex:1;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="download_import">📥 下载并导入</button>
           </div>
         </div>
@@ -3178,7 +3183,7 @@
       <button type="button" onclick="closeMobileBuiltinPresetModal()" style="background:none;border:none;font-size:20px;color:var(--text-hint);cursor:pointer;padding:2px 8px;border-radius:6px;line-height:1;">✕</button>
     </div>
     <div style="padding:16px;display:flex;flex-direction:column;gap:12px;overflow:auto;">
-      <div style="font-size:12px;line-height:1.5;color:var(--text-secondary);" data-i18n="builtin_preset_modal_hint">从 TeamClaw 内置模板创建团队资产。</div>
+      <div style="font-size:12px;line-height:1.5;color:var(--text-secondary);" data-i18n="builtin_preset_modal_hint">从 Wecli 内置模板创建团队资产。</div>
       <div style="display:flex;flex-direction:column;gap:6px;">
         <label style="font-size:12px;font-weight:600;color:var(--text);" data-i18n="builtin_preset_team_label">团队名称</label>
         <input id="mobile-builtin-preset-team-name" type="text" data-i18n-placeholder="builtin_preset_team_placeholder" placeholder="输入团队名称" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);">
@@ -3355,12 +3360,12 @@ const I18N = {
     tab_chats: '对话',
     tab_contacts: '通讯录',
     tab_team: 'Team',
-    tab_team_hub: 'Team Hub',
+    tab_team_hub: 'WeCli Hub',
     tab_discover: '创造',
     header_discover: '创造',
     discover_studio_desc: '管理你的 Agent、编排工作流',
     discover_hub_desc: '浏览社区分享的团队配置',
-    team_creator: 'Team Creator',
+    team_creator: 'WeCli Creator',
     discover_creator_desc: '创建并发布新的团队页面',
     tab_profile: '个人',
 
@@ -3443,7 +3448,7 @@ const I18N = {
     import_team: '导入团队',
     import_preset: '预设型（内置制度）',
     import_preset_desc: 'Hub / ZIP 之外的第三种：一键安装明·唐·企业制等模板',
-    import_from_hub: '从 TeamClaw Hub 导入',
+    import_from_hub: '从 Wecli Hub 导入',
     hub_desc: '浏览并下载社区团队配置',
     paste_hub_cmd: '粘贴从 Hub 复制的下载命令：',
     go_to_hub: '🌐 前往 Hub',
@@ -3465,7 +3470,7 @@ const I18N = {
     load_teams_for_group: '加载团队...',
 
     builtin_preset_modal_title: '🏛️ 预设型：内置制度团队',
-    builtin_preset_modal_hint: '从 TeamClaw 内置模板创建团队资产（internal_agents、experts、yaml 等）。',
+    builtin_preset_modal_hint: '从 Wecli 内置模板创建团队资产（internal_agents、experts、yaml 等）。',
     builtin_preset_team_label: '团队名称',
     builtin_preset_team_placeholder: '输入团队名称',
     builtin_preset_loading: '正在加载预设...',
@@ -3651,7 +3656,7 @@ const I18N = {
     expert_chat_failed: '创建专家 Agent 失败',
 
     // ── Profile ──
-    team_studio: 'Team Studio',
+    team_studio: 'WeCli Studio',
     user_profile_title: '用户画像',
     view_profile: '查看用户画像',
     profile_set: '已设置',
@@ -3663,7 +3668,7 @@ const I18N = {
     profile_save_failed: '保存失败',
     profile_edit_placeholder: '描述你自己，帮助 Agent 更好地了解你...',
     system_settings: '系统设置',
-    restart_teamclaw: '重启 Teamclaw',
+    restart_wecli: '重启 Wecli',
     about: '关于',
     logout: '退出登录',
     confirm_logout: '确定要退出登录吗？',
@@ -3686,11 +3691,11 @@ const I18N = {
     local_login_banner_body: '当前用户名「{user_id}」还没有密码。如需后续密码登录或远程访问，可在 Settings 里设置密码并保存为用户。',
     local_login_banner_action: '去设置',
     confirm_restart: '确定要重启所有服务吗？这将中断当前所有连接。',
-    restart_success: '✅ 服务正在重启，页面将在 20 秒后刷新',
+    restart_success: '✅ 服务正在重启\n（约 20 秒后自动刷新，也可随时手动刷新）',
     restart_failed: '❌ 重启失败',
     restarting: '⏳ 重启中...',
-    confirm_restart_teamclaw: '确定要重启 Teamclaw 吗？这将中断当前所有连接，服务将在约 20 秒后恢复。',
-    restart_signal_sent: '✅ 重启信号已发送，页面将在 20 秒后刷新',
+    confirm_restart_wecli: '确定要重启 Wecli 吗？这将中断当前所有连接，服务将在约 20 秒后恢复。',
+    restart_signal_sent: '✅ 重启信号已发送\n（约 20 秒后自动刷新，也可随时手动刷新）',
     about_text: 'Agent 消息中心 v1.0',
     settings_user_password_title: '当前用户密码',
     settings_user_password_hint_local: '你现在以本机免密方式登录。为「{user_id}」设置密码后，这个用户名就可以用于密码登录。',
@@ -3743,7 +3748,7 @@ const I18N = {
     settings_openclaw_import_hint_ready: '自动读取已配置的 API Key、模型和 Provider',
     settings_openclaw_import_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
     settings_openclaw_export: '🦞 导出到 OpenClaw',
-    settings_openclaw_export_hint_ready: '把当前 TeamClaw 的 LLM 设置写回 OpenClaw 默认模型',
+    settings_openclaw_export_hint_ready: '把当前 Wecli 的 LLM 设置写回 OpenClaw 默认模型',
     settings_openclaw_export_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
     settings_openclaw_importing: '正在从 OpenClaw 读取配置...',
     settings_openclaw_imported: '✅ 已从 OpenClaw 导入配置',
@@ -3907,8 +3912,8 @@ const I18N = {
     acp_status_label: '状态',
     acp_reason_label: '原因',
 
-    // ── Restart / Teamclaw ──
-    restarting_teamclaw: '🔄 正在重启 Teamclaw...',
+    // ── Restart / Wecli ──
+    restarting_wecli: '🔄 正在重启 Wecli...',
 
     // ── Contacts Experts Modal ──
     contacts_experts_title: '添加 Agent',
@@ -3940,12 +3945,12 @@ const I18N = {
     tab_chats: 'Chats',
     tab_contacts: 'Contacts',
     tab_team: 'Team',
-    tab_team_hub: 'Team Hub',
+    tab_team_hub: 'WeCli Hub',
     tab_discover: 'Discover',
     header_discover: 'Discover',
     discover_studio_desc: 'Manage Agents & orchestrate workflows',
     discover_hub_desc: 'Browse community-shared team configs',
-    team_creator: 'Team Creator',
+    team_creator: 'WeCli Creator',
     discover_creator_desc: 'Create and publish new team pages',
     tab_profile: 'Me',
 
@@ -4022,7 +4027,7 @@ const I18N = {
     import_team: 'Import Team',
     import_preset: 'Preset (built-in)',
     import_preset_desc: 'Third option besides Hub / ZIP: install Ming/Tang/enterprise templates',
-    import_from_hub: 'Import from TeamClaw Hub',
+    import_from_hub: 'Import from Wecli Hub',
     hub_desc: 'Browse & download community team configs',
     paste_hub_cmd: 'Paste the download command from Hub:',
     go_to_hub: '🌐 Go to Hub',
@@ -4223,7 +4228,7 @@ const I18N = {
     expert_agent_created: '✅ Expert Agent created',
     expert_chat_failed: 'Failed to create expert Agent',
 
-    team_studio: 'Team Studio',
+    team_studio: 'WeCli Studio',
     user_profile_title: 'User Profile',
     view_profile: 'View User Profile',
     profile_set: 'Set',
@@ -4235,7 +4240,7 @@ const I18N = {
     profile_save_failed: 'Save failed',
     profile_edit_placeholder: 'Describe yourself to help the Agent understand you better...',
     system_settings: 'System Settings',
-    restart_teamclaw: 'Restart Teamclaw',
+    restart_wecli: 'Restart Wecli',
     about: 'About',
     logout: 'Log Out',
     confirm_logout: 'Are you sure you want to log out?',
@@ -4257,11 +4262,11 @@ const I18N = {
     local_login_banner_body: 'The current username "{user_id}" does not have a password yet. Open Settings to save one for future password or remote login.',
     local_login_banner_action: 'Open Settings',
     confirm_restart: 'Restart all services? This will interrupt all active connections.',
-    restart_success: '✅ Services restarting. Page will refresh in 20 seconds.',
+    restart_success: '✅ Services restarting\n(auto-refresh in ~20s, or refresh manually anytime)',
     restart_failed: '❌ Restart failed',
     restarting: '⏳ Restarting...',
-    confirm_restart_teamclaw: 'Restart Teamclaw? All connections will be interrupted. Service will recover in ~20 seconds.',
-    restart_signal_sent: '✅ Restart signal sent. Page will refresh in 20 seconds.',
+    confirm_restart_wecli: 'Restart Wecli? All connections will be interrupted. Service will recover in ~20 seconds.',
+    restart_signal_sent: '✅ Restart signal sent\n(auto-refresh in ~20s, or refresh manually anytime)',
     about_text: 'Agent Message Center v1.0',
     settings_user_password_title: 'Current User Password',
     settings_user_password_hint_local: 'You are currently using local no-password login. Set a password for "{user_id}" to enable password login for this username.',
@@ -4312,7 +4317,7 @@ const I18N = {
     settings_openclaw_import_hint_ready: 'Read the configured API key, model, and provider from OpenClaw',
     settings_openclaw_import_hint_missing: '⚠️ OpenClaw was not detected',
     settings_openclaw_export: '🦞 Export to OpenClaw',
-    settings_openclaw_export_hint_ready: 'Write the current TeamClaw LLM settings back to OpenClaw defaults',
+    settings_openclaw_export_hint_ready: 'Write the current Wecli LLM settings back to OpenClaw defaults',
     settings_openclaw_export_hint_missing: '⚠️ OpenClaw was not detected',
     settings_openclaw_importing: 'Reading configuration from OpenClaw...',
     settings_openclaw_imported: '✅ Imported configuration from OpenClaw',
@@ -4470,8 +4475,8 @@ const I18N = {
     acp_status_label: 'Status',
     acp_reason_label: 'Reason',
 
-    // ── Restart / Teamclaw ──
-    restarting_teamclaw: '🔄 Restarting Teamclaw...',
+    // ── Restart / Wecli ──
+    restarting_wecli: '🔄 Restarting Wecli...',
 
     // ── Contacts Experts Modal ──
     contacts_experts_title: 'Add Agent',
@@ -4496,7 +4501,7 @@ const I18N = {
   },
 };
 
-let _currentLang = localStorage.getItem('teamclaw_lang') || 'zh';
+let _currentLang = localStorage.getItem('wecli_lang') || 'zh';
 window.__currentUserHasPassword = false;
 window.__currentLoginMode = '';
 let _localPasswordBannerDismissed = false;
@@ -4520,7 +4525,7 @@ function getLang() { return _currentLang; }
 function setLang(lang) {
   if (!I18N[lang]) return;
   _currentLang = lang;
-  localStorage.setItem('teamclaw_lang', lang);
+  localStorage.setItem('wecli_lang', lang);
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
   document.title = t('page_title');
   applyLangToDOM();
@@ -4554,7 +4559,7 @@ function applyLangToDOM() {
 }
 
 function _localPasswordBannerDismissKey(userId = window.__currentUser || '') {
-  return userId ? `teamclaw-mobile-local-password-banner-dismissed:${userId}` : '';
+  return userId ? `wecli-mobile-local-password-banner-dismissed:${userId}` : '';
 }
 
 function _syncLocalPasswordBannerDismissedState() {
@@ -4801,6 +4806,9 @@ async function api(method, path, body) {
   return data;
 }
 
+/** 重启后提示需长时间留在屏幕上（自动刷新前用户可能仍在看） */
+const RESTART_PENDING_TOAST_MS = 120000;
+
 function toast(msg, duration = 2000) {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -4811,7 +4819,7 @@ function toast(msg, duration = 2000) {
 
 // ── Group list ──
 let chatSearchKeyword = '';
-const PINNED_KEY = 'teamclaw_pinned_groups';
+const PINNED_KEY = 'wecli_pinned_groups';
 
 function getPinnedIds() {
   try { return JSON.parse(localStorage.getItem(PINNED_KEY) || '[]'); } catch { return []; }
@@ -4915,7 +4923,7 @@ function renderGroupList(list) {
   _swipeActiveWrapper = null;
 
   // Sort: pinned first (by pin order), then by last_message_time desc
-  const pinned = JSON.parse(localStorage.getItem('teamclaw_pinned_groups') || '[]');
+  const pinned = JSON.parse(localStorage.getItem('wecli_pinned_groups') || '[]');
   const pinnedSet = new Set(pinned);
   const sorted = [...filtered].sort((a, b) => {
     const aGid = a.group_id || a.id || '';
@@ -5252,14 +5260,14 @@ document.addEventListener('touchstart', e => {
 })();
 
 function swipeTogglePin(gid) {
-  let pinned = JSON.parse(localStorage.getItem('teamclaw_pinned_groups') || '[]');
+  let pinned = JSON.parse(localStorage.getItem('wecli_pinned_groups') || '[]');
   const idx = pinned.indexOf(gid);
   if (idx >= 0) {
     pinned.splice(idx, 1);
   } else {
     pinned.unshift(gid);
   }
-  localStorage.setItem('teamclaw_pinned_groups', JSON.stringify(pinned));
+  localStorage.setItem('wecli_pinned_groups', JSON.stringify(pinned));
   // Re-render list with new pin order
   if (groups && groups.length) renderGroupList(groups);
 }
@@ -5281,9 +5289,9 @@ async function swipeDeleteGroup(gid) {
   try {
     await api('DELETE', `/proxy_groups/${encodeURIComponent(gid)}`);
     // Remove from pinned if pinned
-    let pinned = JSON.parse(localStorage.getItem('teamclaw_pinned_groups') || '[]');
+    let pinned = JSON.parse(localStorage.getItem('wecli_pinned_groups') || '[]');
     pinned = pinned.filter(id => id !== gid);
-    localStorage.setItem('teamclaw_pinned_groups', JSON.stringify(pinned));
+    localStorage.setItem('wecli_pinned_groups', JSON.stringify(pinned));
     // Remove from local groups array and re-render
     groups = groups.filter(g => (g.group_id || g.id) !== gid);
     renderGroupList(groups);
@@ -6276,7 +6284,7 @@ function renderMessages(msgs) {
     return;
   }
   body.innerHTML = msgs.map(m => renderOneMsgHTML(m)).join('');
-  if (window.TeamClawMarkdown) window.TeamClawMarkdown.highlight(body);
+  if (window.WecliMarkdown) window.WecliMarkdown.highlight(body);
   // 将初始加载的消息 ID 加入去重集合，防止后续 poll 重复渲染
   msgs.forEach(m => { if (m.id) renderedMsgIds.add(m.id); });
   updateLastMsgId(msgs);
@@ -6331,7 +6339,7 @@ function appendMessages(msgs) {
     appended.push(m);
     body.insertAdjacentHTML('beforeend', renderOneMsgHTML(m));
     const lastChild = body.lastElementChild;
-    if (lastChild && window.TeamClawMarkdown) window.TeamClawMarkdown.highlight(lastChild);
+    if (lastChild && window.WecliMarkdown) window.WecliMarkdown.highlight(lastChild);
   });
   if (!appended.length) return;
   updateLastMsgId(appended);
@@ -6378,7 +6386,7 @@ function renderOneMsgHTML(m) {
   let contentHTML;
   let bubbleClass = 'msg-bubble';
   if (!isSelf) {
-    contentHTML = window.TeamClawMarkdown ? window.TeamClawMarkdown.render(rawContent) : esc(rawContent);
+    contentHTML = window.WecliMarkdown ? window.WecliMarkdown.render(rawContent) : esc(rawContent);
     bubbleClass += ' markdown-body tc-markdown';
   } else {
     contentHTML = esc(rawContent);
@@ -7214,8 +7222,8 @@ function renderOasisDetail(detail) {
   // Conclusion
   const conclusionArea = document.getElementById('oasis-conclusion-area');
   if (detail.conclusion && detail.status === 'concluded') {
-    if (window.TeamClawMarkdown) {
-      window.TeamClawMarkdown.renderInto(document.getElementById('oasis-conclusion-text'), detail.conclusion);
+    if (window.WecliMarkdown) {
+      window.WecliMarkdown.renderInto(document.getElementById('oasis-conclusion-text'), detail.conclusion);
     } else {
       document.getElementById('oasis-conclusion-text').innerHTML = esc(detail.conclusion);
     }
@@ -7341,7 +7349,7 @@ function renderOasisPosts(posts, timeline) {
     const isReply = p.reply_to !== null && p.reply_to !== undefined;
     const totalVotes = (p.upvotes || 0) + (p.downvotes || 0);
     const upPct = totalVotes > 0 ? ((p.upvotes || 0) / totalVotes * 100) : 50;
-    const contentHtml = window.TeamClawMarkdown ? window.TeamClawMarkdown.render(p.content || '') : esc(p.content || '');
+    const contentHtml = window.WecliMarkdown ? window.WecliMarkdown.render(p.content || '') : esc(p.content || '');
 
     return `
       <div class="oasis-post-item${isReply ? ' is-reply' : ''}">
@@ -7371,7 +7379,7 @@ function renderOasisPosts(posts, timeline) {
   box.scrollTop = box.scrollHeight;
 
   // Highlight code blocks
-  if (window.TeamClawMarkdown) window.TeamClawMarkdown.highlight(box);
+  if (window.WecliMarkdown) window.WecliMarkdown.highlight(box);
 }
 
 // ── Detail Polling with change detection (1.5s, matches main page) ──
@@ -7532,7 +7540,7 @@ function showDiscussionOverview() {
   const barColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16'];
   const evIconsMap = {start:'🚀',round:'📢',agent_call:'⏳',agent_done:'✅',conclude:'🏁',manual_post:'📝',if_branch:'🔀',post:'💬'};
 
-  const textLayout = (typeof window !== 'undefined' && window.TeamClawTextLayout) ? window.TeamClawTextLayout : null;
+  const textLayout = (typeof window !== 'undefined' && window.WecliTextLayout) ? window.WecliTextLayout : null;
   const overviewNames = rowKeys.map((key) => key === '__system__' ? t('oasis_system') : key);
   const labelW = textLayout && typeof textLayout.measureLabelGutter === 'function'
     ? textLayout.measureLabelGutter(overviewNames, {
@@ -7712,19 +7720,19 @@ setInterval(() => {
   }
 }, 10000);
 
-// ── Team Studio ──
-const TEAM_HUB_URL = 'https://teamclawhub.com';
+// ── WeCli Studio ──
+const TEAM_HUB_URL = 'https://wecli.net';
 
-function openTeamStudio() {
+function openWecliStudio() {
   // 当前窗口进入 Studio（与主站同一标签，便于会话/登录延续），默认打开「团队」Tab
   window.location.assign('/studio?tab=group');
 }
 
-function openTeamHub() {
+function openWecliHub() {
   window.open(TEAM_HUB_URL, '_blank');
 }
 
-function openTeamCreator() {
+function openWecliCreator() {
   window.location.assign('/creator');
 }
 
@@ -8102,9 +8110,9 @@ async function deleteGroup() {
   try {
     await api('DELETE', `/proxy_groups/${encodeURIComponent(gid)}`);
     // Remove from pinned if pinned
-    let pinned = JSON.parse(localStorage.getItem('teamclaw_pinned_groups') || '[]');
+    let pinned = JSON.parse(localStorage.getItem('wecli_pinned_groups') || '[]');
     pinned = pinned.filter(id => id !== gid);
-    localStorage.setItem('teamclaw_pinned_groups', JSON.stringify(pinned));
+    localStorage.setItem('wecli_pinned_groups', JSON.stringify(pinned));
     // Remove from muted set
     mutedGroupIds.delete(gid);
     // Remove from local groups array
@@ -8888,8 +8896,8 @@ function getCurrentUser() {
 
 /** 与 markdown-shared 一致：把字面量 \\n 转成真换行（系统消息 / 自己发的纯文本也会用到） */
 function tcNormalizeEscapedText(s) {
-  if (typeof window.TeamClawMarkdown !== 'undefined' && TeamClawMarkdown.normalizeEscapedNewlines) {
-    return TeamClawMarkdown.normalizeEscapedNewlines(s);
+  if (typeof window.WecliMarkdown !== 'undefined' && WecliMarkdown.normalizeEscapedNewlines) {
+    return WecliMarkdown.normalizeEscapedNewlines(s);
   }
   const str = s == null ? '' : String(s);
   if (str.indexOf('\\') === -1) return str;
@@ -9348,7 +9356,7 @@ async function loadSubagents() {
   const body = document.getElementById('subagent-panel-body');
   body.innerHTML = `<div style="text-align:center;padding:40px;color:var(--text-hint);">${t('subagent_loading')}</div>`;
   try {
-    const data = await api('GET', '/proxy_teambot_subagents');
+    const data = await api('GET', '/proxy_webot_subagents');
     const agents = Array.isArray(data) ? data : (data.subagents || data.agents || []);
     if (!agents.length) {
       body.innerHTML = `
@@ -9386,7 +9394,7 @@ async function loadSubagents() {
 async function cancelSubagent(agentRef) {
   if (!confirm(t('subagent_cancel_confirm'))) return;
   try {
-    await api('POST', '/proxy_teambot_subagent_cancel', { agent_ref: agentRef });
+    await api('POST', '/proxy_webot_subagent_cancel', { agent_ref: agentRef });
     toast(t('subagent_cancelled'));
     setTimeout(() => loadSubagents(), 800);
   } catch (e) {
@@ -9430,7 +9438,7 @@ async function saveVoiceConfig() {
       tts_voice: document.getElementById('voice-tts-voice').value.trim(),
       stt_model: document.getElementById('voice-stt-model').value.trim(),
     };
-    await api('POST', '/proxy_teambot_voice', payload);
+    await api('POST', '/proxy_webot_voice', payload);
     toast(t('voice_saved'));
     closeVoiceConfigSheet();
   } catch (e) {
@@ -9460,7 +9468,7 @@ async function loadToolPolicy() {
   const body = document.getElementById('tool-policy-body');
   body.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-hint);">${t('tool_policy_loading')}</div>`;
   try {
-    const data = await api('GET', '/proxy_teambot_tool_policy');
+    const data = await api('GET', '/proxy_webot_tool_policy');
     _toolPolicyData = data.policy || data || {};
     renderToolPolicy(_toolPolicyData);
   } catch (e) {
@@ -9499,7 +9507,7 @@ async function saveToolPolicy() {
     toggles.forEach(tog => {
       policy[tog.dataset.tool] = tog.classList.contains('on');
     });
-    await api('POST', '/proxy_teambot_tool_policy', { policy });
+    await api('POST', '/proxy_webot_tool_policy', { policy });
     toast(t('tool_policy_saved'));
     closeToolPolicySheet();
   } catch (e) {
@@ -9529,7 +9537,7 @@ async function querySessionRuntime() {
   resultEl.innerHTML = `<div style="color:var(--text-hint);font-size:13px;">${t('session_runtime_loading')}</div>`;
   try {
     const params = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
-    const data = await api('GET', `/proxy_teambot_session_runtime${params}`);
+    const data = await api('GET', `/proxy_webot_session_runtime${params}`);
     // Render as a clean key-value table
     const rows = Object.entries(data).map(([k, v]) => {
       const val = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
@@ -10513,9 +10521,9 @@ async function loadProfile() {
         <span class="profile-row-label">${t('system_settings')}</span>
         <span class="profile-row-arrow">›</span>
       </div>
-      <div class="profile-row" onclick="restartTeamclaw()">
+      <div class="profile-row" onclick="restartWecli()">
         <span class="profile-row-icon">🔄</span>
-        <span class="profile-row-label">${t('restart_teamclaw')}</span>
+        <span class="profile-row-label">${t('restart_wecli')}</span>
         <span class="profile-row-arrow">›</span>
       </div>
       <div class="profile-row" onclick="showAbout()">
@@ -11543,7 +11551,7 @@ async function restartServices() {
         });
         const data = await r.json();
         if (data.status === 'success') {
-            toast(t('restart_success'));
+            toast(t('restart_success'), RESTART_PENDING_TOAST_MS);
             closeSettings();
             setTimeout(() => location.reload(), 20000);
         } else {
@@ -11552,7 +11560,7 @@ async function restartServices() {
         }
     } catch (e) {
         // 网络断开说明服务已在重启中
-        toast(t('restart_success'));
+        toast(t('restart_success'), RESTART_PENDING_TOAST_MS);
         closeSettings();
         setTimeout(() => location.reload(), 20000);
     }
@@ -11738,19 +11746,19 @@ async function resetAllGroupAgents() {
     }
 }
 
-async function restartTeamclaw() {
-    if (!confirm(t('confirm_restart_teamclaw'))) return;
-    toast(t('restarting_teamclaw'));
+async function restartWecli() {
+    if (!confirm(t('confirm_restart_wecli'))) return;
+    toast(t('restarting_wecli'));
     try {
         await fetch('/proxy_restart', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         });
-        toast(t('restart_signal_sent'));
+        toast(t('restart_signal_sent'), RESTART_PENDING_TOAST_MS);
         setTimeout(() => location.reload(), 20000);
     } catch (e) {
         // 网络断开说明服务已在重启中
-        toast(t('restart_success'));
+        toast(t('restart_success'), RESTART_PENDING_TOAST_MS);
         setTimeout(() => location.reload(), 20000);
     }
 }

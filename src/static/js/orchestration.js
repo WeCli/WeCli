@@ -91,7 +91,7 @@ function orchCanDeleteOpenClawAgent(agentName) {
 
 function orchGetTextLayout() {
     if (typeof window === 'undefined') return null;
-    return window.TeamClawTextLayout || null;
+    return window.WecliTextLayout || null;
 }
 
 async function orchDeleteOpenClawAgent(agentName, options = {}) {

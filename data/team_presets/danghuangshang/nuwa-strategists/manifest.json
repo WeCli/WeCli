@@ -1,0 +1,18 @@
+{
+  "preset_id": "nuwa-strategists",
+  "name": "战略分析团",
+  "description": "毛泽东 × 马克思方法论——战略竞争分析、权力结构解读、系统性问题诊断的双重视角。",
+  "source": "awesome-human-distillation",
+  "regime": "nuwa-strategists",
+  "role_count": 2,
+  "workflow_files": [
+    "nuwa_strategists_advisory.yaml"
+  ],
+  "default_team_name": "战略分析团",
+  "tags": [
+    "nuwa",
+    "strategy",
+    "structural",
+    "methodology"
+  ]
+}

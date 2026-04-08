@@ -45,7 +45,7 @@ _TOOL_ACCESS_MODES: dict[str, ToolAccessMode] = {
     "list_oasis_workflows": ToolAccessMode.READ_ONLY,
     "list_subagents": ToolAccessMode.READ_ONLY,
     "get_subagent_history": ToolAccessMode.READ_ONLY,
-    "list_teambot_agent_profiles": ToolAccessMode.READ_ONLY,
+    "list_webot_agent_profiles": ToolAccessMode.READ_ONLY,
     "session_inbox": ToolAccessMode.READ_ONLY,
     "claude_session_inbox": ToolAccessMode.READ_ONLY,
     "get_session_mode": ToolAccessMode.READ_ONLY,

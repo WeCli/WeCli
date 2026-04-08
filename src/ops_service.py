@@ -30,7 +30,7 @@ _ACP_KNOWN_TOOLS: frozenset = frozenset({
 })
 
 # Session suffix rule aligned with group_service (model `agent:…:suffix` → suffix; else default)
-_DEFAULT_ACP_SESSION_SUFFIX = "teamclawchat"
+_DEFAULT_ACP_SESSION_SUFFIX = "weclichat"
 _AGENT_MODEL_RE = re.compile(r"^agent:[^:]+(?::(.+))?$")
 _ACPX_AGENT_TAGS: frozenset[str] = acpx_agent_tags_with_legacy()
 

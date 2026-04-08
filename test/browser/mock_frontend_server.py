@@ -12,5 +12,5 @@ import front
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("TEAMCLAW_BROWSER_PORT", "51219"))
+    port = int(os.environ.get("WECLI_BROWSER_PORT", "51219"))
     front.app.run(host="127.0.0.1", port=port, debug=False, use_reloader=False)

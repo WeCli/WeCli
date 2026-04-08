@@ -1,0 +1,45 @@
+{
+  "preset_id": "nuwa-qiushi",
+  "roles": {
+    "arming_thought": {
+      "name": "武装思想",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "contradiction": {
+      "name": "矛盾分析法",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "practice_cognition": {
+      "name": "实践认识论",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "investigation": {
+      "name": "调查研究",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "mass_line": {
+      "name": "群众路线",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "self_criticism": {
+      "name": "批评与自我批评",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "protracted": {
+      "name": "持久战略",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "concentrate": {
+      "name": "集中兵力",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "spark_fire": {
+      "name": "星火燎原",
+      "source_repo": "HughYau/qiushi-skill"
+    },
+    "overall_planning": {
+      "name": "统筹兼顾",
+      "source_repo": "HughYau/qiushi-skill"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 (function (root, factory) {
-    const api = factory(root.TeamClawPretext || null);
-    root.TeamClawTextLayout = api;
+    const api = factory(root.WecliPretext || null);
+    root.WecliTextLayout = api;
     if (typeof module === 'object' && module.exports) {
         module.exports = api;
     }
@@ -54,10 +54,10 @@
 
     function getCanvasContext() {
         if (typeof document === 'undefined' || !document.createElement) return null;
-        if (!root.__teamclawTextMeasureCanvas) {
-            root.__teamclawTextMeasureCanvas = document.createElement('canvas');
+        if (!root.__wecliTextMeasureCanvas) {
+            root.__wecliTextMeasureCanvas = document.createElement('canvas');
         }
-        return root.__teamclawTextMeasureCanvas.getContext('2d');
+        return root.__wecliTextMeasureCanvas.getContext('2d');
     }
 
     function heuristicCharWidth(ch) {

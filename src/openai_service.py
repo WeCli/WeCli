@@ -116,7 +116,7 @@ class OpenAIChatService:
     def make_openai_response(
         self,
         content: str,
-        model: str = "teambot",
+        model: str = "webot",
         finish_reason: str = "stop",
         tool_calls: list[dict] | None = None,
     ) -> dict:
@@ -130,7 +130,7 @@ class OpenAIChatService:
     def make_openai_chunk(
         self,
         content: str = "",
-        model: str = "teambot",
+        model: str = "webot",
         finish_reason: str | None = None,
         completion_id: str = "",
         meta: dict | None = None,
@@ -253,7 +253,7 @@ class OpenAIChatService:
             async with ctx.thread_lock:
                 self.agent.set_thread_busy_source(ctx.thread_id, "user")
                 try:
-                    result = await self.agent.agent_app.ainvoke(ctx.user_input, ctx.config)
+                    result = await self.agent.agent_app.ainvoke(ctx.user_input, ctx.config, durability="exit")
                     await self.agent.purge_checkpoints(ctx.thread_id)
                     return result
                 finally:
@@ -299,7 +299,7 @@ class OpenAIChatService:
                 try:
                     await queue.put(self.make_openai_chunk("", model=ctx.model_name, completion_id=completion_id))
 
-                    async for event in self.agent.agent_app.astream_events(ctx.user_input, ctx.config, version="v2"):
+                    async for event in self.agent.agent_app.astream_events(ctx.user_input, ctx.config, version="v2", durability="exit"):
                         kind = event.get("event", "")
                         ev_name = event.get("name", "")
 
@@ -463,7 +463,7 @@ class OpenAIChatService:
         if req.llm_override:
             user_input["llm_override"] = req.llm_override
 
-        model_name = req.model or "teambot"
+        model_name = req.model or "webot"
         thread_lock = await self.agent.get_thread_lock(thread_id)
         ctx = OpenAIExecutionContext(
             user_id=user_id,

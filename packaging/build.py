@@ -1,5 +1,5 @@
 """
-TeamBot.exe 打包脚本
+WeBot.exe 打包脚本
 用法：python packaging/build.py
 将 launcher.py 打包为单个可执行文件。
 """
@@ -24,7 +24,7 @@ def check_pyinstaller():
 
 
 def build_exe():
-    """打包 launcher.py 为 TeamBot.exe。"""
+    """打包 launcher.py 为 WeBot.exe。"""
     if not check_pyinstaller():
         print("[错误] 请先安装 PyInstaller：pip install pyinstaller")
         sys.exit(1)
@@ -35,7 +35,7 @@ def build_exe():
     build_cmd = [
         sys.executable, "-m", "PyInstaller",
         "--onefile",
-        "--name", "TeamBot",
+        "--name", "WeBot",
         "--distpath", DIST_DIR,
         "--workpath", os.path.join(PROJECT_ROOT, "build"),
         "--specpath", os.path.join(PROJECT_ROOT, "build"),
@@ -50,7 +50,7 @@ def build_exe():
     # 保留控制台（run.ps1 需要交互：用户输入 y/N）
     build_cmd.append(launcher_path)
 
-    print(f"[构建] 正在打包 TeamBot.exe ...")
+    print(f"[构建] 正在打包 WeBot.exe ...")
     print(f"  命令: {' '.join(build_cmd)}")
     result = subprocess.run(build_cmd, cwd=PROJECT_ROOT)
 
@@ -58,10 +58,10 @@ def build_exe():
         print("[错误] 打包失败")
         sys.exit(1)
 
-    exe_path = os.path.join(DIST_DIR, "TeamBot.exe")
+    exe_path = os.path.join(DIST_DIR, "WeBot.exe")
     if os.path.exists(exe_path):
         # 复制到项目根目录
-        dest_path = os.path.join(PROJECT_ROOT, "TeamBot.exe")
+        dest_path = os.path.join(PROJECT_ROOT, "WeBot.exe")
         shutil.copy2(exe_path, dest_path)
         print(f"\n[完成] 打包成功！")
         print(f"  exe 位置: {dest_path}")
@@ -73,7 +73,7 @@ def build_exe():
 
 def main():
     print("=" * 50)
-    print("  TeamBot 打包工具")
+    print("  WeBot 打包工具")
     print("=" * 50)
     build_exe()
     print("\n[提示] 打包完成后可用 Inno Setup 打开 packaging/installer.iss 制作安装包")

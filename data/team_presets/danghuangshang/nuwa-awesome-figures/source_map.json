@@ -1,0 +1,29 @@
+{
+  "preset_id": "nuwa-awesome-figures",
+  "roles": {
+    "maoxuan": {
+      "name": "毛泽东",
+      "source_repo": "awesome-human-distillation/maoxuan-skill"
+    },
+    "tong_jincheng": {
+      "name": "童锦程",
+      "source_repo": "awesome-human-distillation/tong-jincheng-skill"
+    },
+    "karlmarx": {
+      "name": "马克思方法论",
+      "source_repo": "awesome-human-distillation/karlmarx-skill"
+    },
+    "hu_chenfeng": {
+      "name": "户晨风",
+      "source_repo": "awesome-human-distillation/hu-chen-feng-skill"
+    },
+    "fengge": {
+      "name": "峰哥",
+      "source_repo": "awesome-human-distillation/fengge-wangmingtianya-perspective"
+    },
+    "zhen_ge": {
+      "name": "陈震",
+      "source_repo": "awesome-human-distillation/zhen-ge-skill"
+    }
+  }
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate repo-owned TeamClaw team presets from danghuangshang source material.
+Generate repo-owned Wecli team presets from danghuangshang source material.
 
 The generated assets live under:
   data/team_presets/danghuangshang/<preset_id>/
@@ -18,7 +18,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_ROOT = Path("/tmp/teamclaw-repo-compare/danghuangshang")
+SOURCE_ROOT = Path("/tmp/wecli-repo-compare/danghuangshang")
 OUTPUT_ROOT = REPO_ROOT / "data" / "team_presets" / "danghuangshang"
 
 TANG_ROLE_MAP = {
@@ -86,7 +86,7 @@ def _workflow_yaml(
     selector_edges: list[dict[str, Any]] | None = None,
 ) -> str:
     lines = [
-        f"# Auto-generated TeamClaw preset workflow: {title}",
+        f"# Auto-generated Wecli preset workflow: {title}",
         "version: 2",
         "repeat: false",
         "plan:",

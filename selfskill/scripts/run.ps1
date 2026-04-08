@@ -10,13 +10,13 @@ $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 . (Join-Path $projectRoot "scripts\common.ps1")
 
-Set-TeamClawUtf8
+Set-WecliUtf8
 
-$pidFile = Join-Path $projectRoot ".teamclaw.pid"
+$pidFile = Join-Path $projectRoot ".wecli.pid"
 $tunnelPidFile = Join-Path $projectRoot ".tunnel.pid"
 $envPath = Join-Path $projectRoot "config\.env"
 
-function Stop-TeamClawTunnelForFreshStart {
+function Stop-WecliTunnelForFreshStart {
     $touched = $false
     if (Test-TrackedProcessRunning -PidFile $tunnelPidFile) {
         Write-Host "Stopping existing Tunnel before starting a new one..."
@@ -37,7 +37,7 @@ function Stop-TeamClawTunnelForFreshStart {
     }
 }
 
-function Invoke-TeamClawPython {
+function Invoke-WecliPython {
     param(
         [Parameter(Mandatory = $true)]
         [string[]]$Arguments
@@ -53,7 +53,7 @@ function Invoke-TeamClawPython {
     }
 }
 
-function Get-TeamClawStartOptions {
+function Get-WecliStartOptions {
     param([string[]]$FlagArgs)
     $noTunnel = $false
     $noOpenclaw = $false
@@ -69,7 +69,7 @@ function Get-TeamClawStartOptions {
 }
 
 function Write-MagicLinks {
-    $mlUser = $env:TEAMCLAW_MAGIC_LINK_USER
+    $mlUser = $env:WECLI_MAGIC_LINK_USER
     if ([string]::IsNullOrWhiteSpace($mlUser)) { $mlUser = "default" }
     $python = Ensure-VenvPython -ProjectRoot $projectRoot
     Push-Location $projectRoot
@@ -85,18 +85,18 @@ function Write-MagicLinks {
             break
         }
     }
-    $ports = Get-TeamClawPortMap -EnvPath $envPath
+    $ports = Get-WecliPortMap -EnvPath $envPath
     $fe = $ports["PORT_FRONTEND"]
     Write-Host ""
     Write-Host "Magic link (passwordless login; do not share publicly):"
-    Write-Host "  Login user_id=$mlUser (must match ?user= in URL). Override: `$env:TEAMCLAW_MAGIC_LINK_USER='your_id'"
+    Write-Host "  Login user_id=$mlUser (must match ?user= in URL). Override: `$env:WECLI_MAGIC_LINK_USER='your_id'"
     if (-not $token) {
         Write-Host "  Could not generate token (set INTERNAL_TOKEN in config\.env)."
         Write-Host "  Manual: uv run scripts\cli.py token generate -u $mlUser --valid-hours 24"
         return
     }
     Write-Host "  Local:  http://127.0.0.1:$fe/login-link/${token}?user=$mlUser"
-    if ($env:TEAMCLAW_NO_TUNNEL -eq "1") {
+    if ($env:WECLI_NO_TUNNEL -eq "1") {
         Write-Host "  Remote: (This start used --no-tunnel; Cloudflare Tunnel was not started.)"
         Write-Host ""
         Write-Host "FOR AI ASSISTANTS: Only the Local URL applies; do not claim a public/mobile URL was provided."
@@ -121,7 +121,7 @@ function Get-EnvValue {
         [string]$DefaultValue = ""
     )
 
-    $envValues = Read-TeamClawEnvFile -Path $envPath
+    $envValues = Read-WecliEnvFile -Path $envPath
     if ($envValues.ContainsKey($Key) -and -not [string]::IsNullOrWhiteSpace($envValues[$Key])) {
         return $envValues[$Key]
     }
@@ -294,7 +294,7 @@ function Get-OpenClawAgentBindings {
 }
 
 function Show-Help {
-    Write-Host "TeamClaw Windows PowerShell entry point"
+    Write-Host "Wecli Windows PowerShell entry point"
     Write-Host ""
     Write-Host "Usage:"
     Write-Host "  powershell -ExecutionPolicy Bypass -File selfskill\scripts\run.ps1 <command> [args]"
@@ -308,7 +308,7 @@ function Show-Help {
     Write-Host "  add-user <name> <password>     Create or update a password user"
     Write-Host "  configure ...                  Run selfskill/scripts/configure.py"
     Write-Host "  auto-model                     Query available models from the configured API"
-    Write-Host "  sync-openclaw-llm              Sync TeamClaw's current LLM config back to OpenClaw"
+    Write-Host "  sync-openclaw-llm              Sync Wecli's current LLM config back to OpenClaw"
     Write-Host "  cli ...                        Run scripts/cli.py"
     Write-Host "  check-openclaw                 Detect or install OpenClaw"
     Write-Host "  check-openclaw-weixin          Install or inspect the OpenClaw Weixin plugin"
@@ -346,23 +346,23 @@ function Show-PortChecks {
     }
 }
 
-function Prepare-TeamClawPorts {
-    $resolution = Resolve-TeamClawPortConfiguration -EnvPath $envPath
+function Prepare-WecliPorts {
+    $resolution = Resolve-WecliPortConfiguration -EnvPath $envPath
 
     if ($resolution.AutoUpdated) {
-        Write-Host "The default TeamClaw ports are blocked on this Windows machine."
+        Write-Host "The default Wecli ports are blocked on this Windows machine."
         Write-Host "Updated config/.env to use a safe local port set:"
         foreach ($entry in $resolution.NewPorts.GetEnumerator()) {
             Write-Host "  $($entry.Key): $($resolution.CurrentPorts[$entry.Key]) -> $($entry.Value)"
         }
     } elseif ($resolution.RequiresManualUpdate) {
-        Write-Host "The configured TeamClaw ports are blocked and were not auto-changed because they are custom values."
+        Write-Host "The configured Wecli ports are blocked and were not auto-changed because they are custom values."
         Show-PortChecks -Checks $resolution.Checks -Ports $resolution.CurrentPorts
         Write-Host "Update PORT_AGENT / PORT_SCHEDULER / PORT_OASIS / PORT_FRONTEND in config/.env, then try again."
         return $null
     }
 
-    return Get-TeamClawPortMap -EnvPath $envPath
+    return Get-WecliPortMap -EnvPath $envPath
 }
 
 function Show-StartupFailureDiagnostics {
@@ -373,7 +373,7 @@ function Show-StartupFailureDiagnostics {
         [string]$StdErrLog
     )
 
-    $stderrTail = Get-TeamClawLogTail -Path $StdErrLog -LineCount 25
+    $stderrTail = Get-WecliLogTail -Path $StdErrLog -LineCount 25
     if ($stderrTail.Count -gt 0) {
         Write-Host ""
         Write-Host "Last stderr lines:"
@@ -382,7 +382,7 @@ function Show-StartupFailureDiagnostics {
         }
     }
 
-    $stdoutTail = Get-TeamClawLogTail -Path $StdOutLog -LineCount 15
+    $stdoutTail = Get-WecliLogTail -Path $StdOutLog -LineCount 15
     if ($stdoutTail.Count -gt 0) {
         Write-Host ""
         Write-Host "Last stdout lines:"
@@ -392,7 +392,7 @@ function Show-StartupFailureDiagnostics {
     }
 }
 
-function Get-TeamClawServiceProcesses {
+function Get-WecliServiceProcesses {
     $scriptPatterns = @(
         "scripts[\\/]+launcher\.py",
         "src[\\/]+time\.py",
@@ -408,7 +408,7 @@ function Get-TeamClawServiceProcesses {
     }
 
     if (Test-Path $envPath) {
-        $ports = Get-TeamClawPortMap -EnvPath $envPath
+        $ports = Get-WecliPortMap -EnvPath $envPath
         foreach ($port in $ports.Values) {
             $listener = Get-ListeningPortInfo -Port $port
             if ($listener) {
@@ -441,13 +441,13 @@ function Get-TeamClawServiceProcesses {
     return @($matched | Sort-Object ProcessId -Unique)
 }
 
-function Stop-TeamClawServiceProcesses {
-    $serviceProcesses = @(Get-TeamClawServiceProcesses)
+function Stop-WecliServiceProcesses {
+    $serviceProcesses = @(Get-WecliServiceProcesses)
     if ($serviceProcesses.Count -eq 0) {
         return $false
     }
 
-    Write-Host "Found existing TeamClaw service processes. Stopping them first..."
+    Write-Host "Found existing Wecli service processes. Stopping them first..."
     foreach ($proc in $serviceProcesses) {
         Write-Host "  PID $($proc.ProcessId): $($proc.CommandLine)"
         Stop-Process -Id $proc.ProcessId -Force -ErrorAction SilentlyContinue
@@ -457,8 +457,8 @@ function Stop-TeamClawServiceProcesses {
     return $true
 }
 
-# 等价于 run.sh run_teamclaw_setup_if_needed：缺 venv / 缺依赖 / 有 npm 无 acpx 时跑 setup_env.ps1
-function Invoke-TeamClawSetupIfNeeded {
+# 等价于 run.sh run_wecli_setup_if_needed：缺 venv / 缺依赖 / 有 npm 无 acpx 时跑 setup_env.ps1
+function Invoke-WecliSetupIfNeeded {
     $venvPy = Get-VenvPython -ProjectRoot $projectRoot
     if (-not $venvPy) {
         Write-Host "📋 Virtualenv missing — running scripts\setup_env.ps1 ..."
@@ -529,38 +529,38 @@ switch ($Command) {
     }
 
     "start" {
-        $startOpts = Get-TeamClawStartOptions -FlagArgs $Rest
-        Invoke-TeamClawSetupIfNeeded
+        $startOpts = Get-WecliStartOptions -FlagArgs $Rest
+        Invoke-WecliSetupIfNeeded
         # Auto-create .env if missing
         if (-not (Test-Path $envPath)) {
             Write-Host "config/.env is missing, auto-initializing from template..."
-            Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
+            Invoke-WecliPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
         }
 
         if ($startOpts.NoOpenclaw) {
             Write-Host ""
             Write-Host "⏭️  --no-openclaw: skipping LLM import from OpenClaw; launcher will not warm OpenClaw gateway."
-            $env:TEAMCLAW_NO_OPENCLAW = "1"
+            $env:WECLI_NO_OPENCLAW = "1"
         } else {
-            Remove-Item Env:\TEAMCLAW_NO_OPENCLAW -ErrorAction SilentlyContinue
-            $envValues = Read-TeamClawEnvFile -Path $envPath
+            Remove-Item Env:\WECLI_NO_OPENCLAW -ErrorAction SilentlyContinue
+            $envValues = Read-WecliEnvFile -Path $envPath
             $llmKey = ""
             if ($envValues.ContainsKey("LLM_API_KEY")) { $llmKey = $envValues["LLM_API_KEY"] }
             if ([string]::IsNullOrWhiteSpace($llmKey) -or $llmKey -eq "your_api_key_here") {
                 Write-Host ""
-                Write-Host "🔄 LLM_API_KEY still empty/placeholder: trying OpenClaw -> TeamClaw .env (optional)..."
+                Write-Host "🔄 LLM_API_KEY still empty/placeholder: trying OpenClaw -> Wecli .env (optional)..."
                 try {
-                    Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-teamclaw-llm-from-openclaw") | Out-Null
+                    Invoke-WecliPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-wecli-llm-from-openclaw") | Out-Null
                 } catch {
                     Write-Host "⚠️ OpenClaw import skipped or failed; continuing startup."
                 }
             }
         }
 
-        Stop-TeamClawServiceProcesses | Out-Null
+        Stop-WecliServiceProcesses | Out-Null
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
 
-        $ports = Prepare-TeamClawPorts
+        $ports = Prepare-WecliPorts
         if (-not $ports) {
             exit 1
         }
@@ -574,11 +574,11 @@ switch ($Command) {
         }
 
         $python = Ensure-VenvPython -ProjectRoot $projectRoot
-        $env:TEAMBOT_HEADLESS = "1"
+        $env:WEBOT_HEADLESS = "1"
         if ($startOpts.NoOpenclaw) {
-            $env:TEAMCLAW_NO_OPENCLAW = "1"
+            $env:WECLI_NO_OPENCLAW = "1"
         } else {
-            Remove-Item Env:\TEAMCLAW_NO_OPENCLAW -ErrorAction SilentlyContinue
+            Remove-Item Env:\WECLI_NO_OPENCLAW -ErrorAction SilentlyContinue
         }
         $stdoutLog = Join-Path $projectRoot "logs\launcher.out.log"
         $stderrLog = Join-Path $projectRoot "logs\launcher.err.log"
@@ -606,7 +606,7 @@ switch ($Command) {
             Write-Host "Web UI: http://127.0.0.1:$frontendPort"
             Write-Host ""
             Write-Host "==================================================="
-            Invoke-TeamClawPython -Arguments @("scripts\cli.py", "status") | Out-Null
+            Invoke-WecliPython -Arguments @("scripts\cli.py", "status") | Out-Null
             Write-Host ""
         } else {
             Start-Sleep -Seconds 1
@@ -619,12 +619,12 @@ switch ($Command) {
             Write-Host "Web UI (when ready): http://127.0.0.1:$frontendPort"
             Write-Host ""
             Write-Host "==================================================="
-            Invoke-TeamClawPython -Arguments @("scripts\cli.py", "status") | Out-Null
+            Invoke-WecliPython -Arguments @("scripts\cli.py", "status") | Out-Null
             Write-Host ""
         }
 
         if (-not $startOpts.NoTunnel) {
-            Stop-TeamClawTunnelForFreshStart
+            Stop-WecliTunnelForFreshStart
             Write-Host "Starting Cloudflare Tunnel for mobile remote access..."
             $python = Ensure-VenvPython -ProjectRoot $projectRoot
             $tunnelStdoutLog = Join-Path $projectRoot "logs\tunnel.out.log"
@@ -658,12 +658,12 @@ switch ($Command) {
         }
 
         if ($startOpts.NoTunnel) {
-            $env:TEAMCLAW_NO_TUNNEL = "1"
+            $env:WECLI_NO_TUNNEL = "1"
         } else {
-            Remove-Item Env:\TEAMCLAW_NO_TUNNEL -ErrorAction SilentlyContinue
+            Remove-Item Env:\WECLI_NO_TUNNEL -ErrorAction SilentlyContinue
         }
         Write-MagicLinks
-        Remove-Item Env:\TEAMCLAW_NO_TUNNEL -ErrorAction SilentlyContinue
+        Remove-Item Env:\WECLI_NO_TUNNEL -ErrorAction SilentlyContinue
 
         Write-Host ""
         Write-Host "Docs (read before creating/managing Teams):"
@@ -678,28 +678,28 @@ switch ($Command) {
     }
 
     "start-foreground" {
-        $startOpts = Get-TeamClawStartOptions -FlagArgs $Rest
-        Invoke-TeamClawSetupIfNeeded
+        $startOpts = Get-WecliStartOptions -FlagArgs $Rest
+        Invoke-WecliSetupIfNeeded
         # Auto-create .env if missing
         if (-not (Test-Path $envPath)) {
             Write-Host "config/.env is missing, auto-initializing from template..."
-            Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
+            Invoke-WecliPython -Arguments @("selfskill\scripts\configure.py", "--init") | Out-Null
         }
 
         if ($startOpts.NoOpenclaw) {
             Write-Host ""
             Write-Host "⏭️  --no-openclaw: skipping LLM import from OpenClaw; launcher will not warm OpenClaw gateway."
-            $env:TEAMCLAW_NO_OPENCLAW = "1"
+            $env:WECLI_NO_OPENCLAW = "1"
         } else {
-            Remove-Item Env:\TEAMCLAW_NO_OPENCLAW -ErrorAction SilentlyContinue
-            $envValues = Read-TeamClawEnvFile -Path $envPath
+            Remove-Item Env:\WECLI_NO_OPENCLAW -ErrorAction SilentlyContinue
+            $envValues = Read-WecliEnvFile -Path $envPath
             $llmKey = ""
             if ($envValues.ContainsKey("LLM_API_KEY")) { $llmKey = $envValues["LLM_API_KEY"] }
             if ([string]::IsNullOrWhiteSpace($llmKey) -or $llmKey -eq "your_api_key_here") {
                 Write-Host ""
-                Write-Host "🔄 LLM_API_KEY still empty/placeholder: trying OpenClaw -> TeamClaw .env (optional)..."
+                Write-Host "🔄 LLM_API_KEY still empty/placeholder: trying OpenClaw -> Wecli .env (optional)..."
                 try {
-                    Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-teamclaw-llm-from-openclaw") | Out-Null
+                    Invoke-WecliPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--import-wecli-llm-from-openclaw") | Out-Null
                 } catch {
                     Write-Host "⚠️ OpenClaw import skipped or failed; continuing startup."
                 }
@@ -711,22 +711,22 @@ switch ($Command) {
             Write-Host "ℹ️  start-foreground does not start Tunnel; --no-tunnel is ignored for this mode."
         }
 
-        Stop-TeamClawServiceProcesses | Out-Null
+        Stop-WecliServiceProcesses | Out-Null
         Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
 
-        $ports = Prepare-TeamClawPorts
+        $ports = Prepare-WecliPorts
         if (-not $ports) {
             exit 1
         }
 
         $python = Ensure-VenvPython -ProjectRoot $projectRoot
-        $env:TEAMBOT_HEADLESS = "1"
+        $env:WEBOT_HEADLESS = "1"
         if ($startOpts.NoOpenclaw) {
-            $env:TEAMCLAW_NO_OPENCLAW = "1"
+            $env:WECLI_NO_OPENCLAW = "1"
         } else {
-            Remove-Item Env:\TEAMCLAW_NO_OPENCLAW -ErrorAction SilentlyContinue
+            Remove-Item Env:\WECLI_NO_OPENCLAW -ErrorAction SilentlyContinue
         }
-        Write-Host "Starting TeamClaw in the foreground (headless) ..."
+        Write-Host "Starting Wecli in the foreground (headless) ..."
         Write-Host "This session stays attached. Press Ctrl+C to stop all services."
 
         Push-Location $projectRoot
@@ -740,7 +740,7 @@ switch ($Command) {
 
     "stop" {
         $stoppedTracked = Stop-TrackedProcess -PidFile $pidFile
-        $stoppedChildren = Stop-TeamClawServiceProcesses
+        $stoppedChildren = Stop-WecliServiceProcesses
         if ($stoppedTracked -or $stoppedChildren) {
             Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
             Write-Host "Service stopped."
@@ -751,9 +751,9 @@ switch ($Command) {
     }
 
     "status" {
-        $ports = Get-TeamClawPortMap -EnvPath $envPath
+        $ports = Get-WecliPortMap -EnvPath $envPath
         $trackedRunning = Test-TrackedProcessRunning -PidFile $pidFile
-        $serviceProcesses = @(Get-TeamClawServiceProcesses)
+        $serviceProcesses = @(Get-WecliServiceProcesses)
 
         if (-not $trackedRunning -and $serviceProcesses.Count -eq 0) {
             Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
@@ -761,7 +761,7 @@ switch ($Command) {
             if (Test-Path $envPath) {
                 $checks = @{}
                 foreach ($entry in $ports.GetEnumerator()) {
-                    $checks[$entry.Key] = Test-TeamClawPortAvailability -Port $entry.Value
+                    $checks[$entry.Key] = Test-WecliPortAvailability -Port $entry.Value
                 }
                 Show-PortChecks -Checks $checks -Ports $ports
             }
@@ -785,7 +785,7 @@ switch ($Command) {
             if ($listener) {
                 Write-Host "  $($entry.Key)=$($entry.Value) is listening (PID $($listener.OwningProcess))"
             } else {
-                $check = Test-TeamClawPortAvailability -Port $entry.Value
+                $check = Test-WecliPortAvailability -Port $entry.Value
                 if ($check.Available) {
                     Write-Host "  $($entry.Key)=$($entry.Value) is not listening yet"
                 } else {
@@ -815,7 +815,7 @@ switch ($Command) {
             exit 1
         }
 
-        $code = Invoke-TeamClawPython -Arguments @("selfskill\scripts\adduser.py", $Rest[0], $Rest[1])
+        $code = Invoke-WecliPython -Arguments @("selfskill\scripts\adduser.py", $Rest[0], $Rest[1])
         exit $code
     }
 
@@ -825,17 +825,17 @@ switch ($Command) {
             exit 1
         }
 
-        $code = Invoke-TeamClawPython -Arguments (@("selfskill\scripts\configure.py") + $Rest)
+        $code = Invoke-WecliPython -Arguments (@("selfskill\scripts\configure.py") + $Rest)
         exit $code
     }
 
     "auto-model" {
-        $code = Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure.py", "--auto-model")
+        $code = Invoke-WecliPython -Arguments @("selfskill\scripts\configure.py", "--auto-model")
         exit $code
     }
 
     "sync-openclaw-llm" {
-        $code = Invoke-TeamClawPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--sync-teamclaw-llm")
+        $code = Invoke-WecliPython -Arguments @("selfskill\scripts\configure_openclaw.py", "--sync-wecli-llm")
         exit $code
     }
 
@@ -845,7 +845,7 @@ switch ($Command) {
             exit 1
         }
 
-        $code = Invoke-TeamClawPython -Arguments (@("scripts\cli.py") + $Rest)
+        $code = Invoke-WecliPython -Arguments (@("scripts\cli.py") + $Rest)
         exit $code
     }
 
@@ -861,10 +861,10 @@ switch ($Command) {
             } finally {
                 Pop-Location
             }
-            if ($code -eq 0 -and ((Test-TrackedProcessRunning -PidFile $pidFile) -or @(Get-TeamClawServiceProcesses).Count -gt 0)) {
+            if ($code -eq 0 -and ((Test-TrackedProcessRunning -PidFile $pidFile) -or @(Get-WecliServiceProcesses).Count -gt 0)) {
                 Write-Host ""
-                Write-Host "If TeamClaw was already running before OpenClaw was installed or reconfigured,"
-                Write-Host "restart TeamClaw so OASIS reloads the openclaw CLI and gateway settings:"
+                Write-Host "If Wecli was already running before OpenClaw was installed or reconfigured,"
+                Write-Host "restart Wecli so OASIS reloads the openclaw CLI and gateway settings:"
                 Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 stop"
                 Write-Host "  powershell -ExecutionPolicy Bypass -File .\selfskill\scripts\run.ps1 start"
             }
@@ -1014,7 +1014,7 @@ switch ($Command) {
         Write-Host "Current bindings for '$agentName':"
         $bindings = @(Get-OpenClawAgentBindings -AgentName $agentName)
         if ($bindings.Count -eq 0) {
-            Write-Host "  (No bindings detected yet. Refresh OpenClaw / TeamClaw and try again.)"
+            Write-Host "  (No bindings detected yet. Refresh OpenClaw / Wecli and try again.)"
         } else {
             foreach ($binding in $bindings) {
                 Write-Host "  $binding"
@@ -1022,13 +1022,13 @@ switch ($Command) {
         }
 
         Write-Host ""
-        Write-Host "Refresh TeamClaw's OpenClaw Channels tab or run:"
+        Write-Host "Refresh Wecli's OpenClaw Channels tab or run:"
         Write-Host "  uv run scripts/cli.py openclaw bindings --agent $agentName"
         exit 0
     }
 
     "start-tunnel" {
-        Stop-TeamClawTunnelForFreshStart
+        Stop-WecliTunnelForFreshStart
 
         $python = Ensure-VenvPython -ProjectRoot $projectRoot
         $stdoutLog = Join-Path $projectRoot "logs\tunnel.out.log"
@@ -1049,7 +1049,7 @@ switch ($Command) {
         $ready = $false
         for ($i = 0; $i -lt 20; $i++) {
             Start-Sleep -Seconds 2
-            $envValues = Read-TeamClawEnvFile -Path $envPath
+            $envValues = Read-WecliEnvFile -Path $envPath
             $pd = if ($envValues.ContainsKey("PUBLIC_DOMAIN")) { $envValues["PUBLIC_DOMAIN"] } else { "" }
             if ($pd -and $pd -ne "wait to set" -and $pd -match "trycloudflare\.com") {
                 Write-Host "Public URL: $pd"
@@ -1082,7 +1082,7 @@ switch ($Command) {
         $pidValue = Get-TrackedProcessId -PidFile $tunnelPidFile
         Write-Host "Tunnel is running. PID: $pidValue"
 
-        $envValues = Read-TeamClawEnvFile -Path $envPath
+        $envValues = Read-WecliEnvFile -Path $envPath
         if ($envValues.ContainsKey("PUBLIC_DOMAIN") -and -not [string]::IsNullOrWhiteSpace($envValues["PUBLIC_DOMAIN"])) {
             Write-Host "Public URL: $($envValues["PUBLIC_DOMAIN"])"
         }

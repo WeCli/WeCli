@@ -1,0 +1,13 @@
+{
+  "preset_id": "nuwa-strategists",
+  "roles": {
+    "maoxuan": {
+      "name": "毛泽东",
+      "source_repo": "awesome-human-distillation/maoxuan-skill"
+    },
+    "karlmarx": {
+      "name": "马克思方法论",
+      "source_repo": "awesome-human-distillation/karlmarx-skill"
+    }
+  }
+}

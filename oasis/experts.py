@@ -4,7 +4,7 @@ OASIS Forum - Expert Agent definitions
 Three expert backends:
   1. ExpertAgent  — direct LLM call (stateless, single-shot)
      name = "display_name#temp#N" (display_name from preset by tag)
-  2. SessionExpert — calls TeamBot's /v1/chat/completions endpoint
+  2. SessionExpert — calls WeBot's /v1/chat/completions endpoint
      using an existing or auto-created session_id.
      - session_id format "tag#oasis#id" → oasis-managed session, first-round
        identity injection (tag → name/persona from preset configs)
@@ -19,7 +19,7 @@ Three expert backends:
     the tag is an ACP-capable tool (openclaw, codex, etc), prefers ACP persistent
     connection; falls back to HTTP API if ACP is unavailable and api_url is set.
     The tag determines which CLI binary is used for the ACP subprocess.
-    Session suffix defaults to ``teamclawchat`` (aligned with group chat ACP) if omitted in the model string.
+    Session suffix defaults to ``weclichat`` (aligned with group chat ACP) if omitted in the model string.
 
 Expert pool is built from schedule_yaml or schedule_file (YAML-only mode).
 schedule_file takes priority if both provided.
@@ -60,8 +60,8 @@ from llm_factory import create_chat_model, extract_text
 from oasis.forum import DiscussionForum
 
 # OASIS ACP 调试：logger [ACP_TRACE] + logs/acp_oasis_trace.jsonl（与群聊 acp_group_trace 同风格）
-_TEAMCLAW_ROOT = os.path.dirname(os.path.dirname(__file__))
-_OASIS_ACP_TRACE_PATH = os.path.join(_TEAMCLAW_ROOT, "logs", "acp_oasis_trace.jsonl")
+_WECLI_ROOT = os.path.dirname(os.path.dirname(__file__))
+_OASIS_ACP_TRACE_PATH = os.path.join(_WECLI_ROOT, "logs", "acp_oasis_trace.jsonl")
 _oasis_acp_trace_file_lock = threading.Lock()
 _oasis_acp_trace_log = logging.getLogger("oasis.acp_trace")
 
@@ -388,6 +388,7 @@ _BEHAVIOR_RULES = (
     '1. **禁止自动开启子工作流**：除非明确收到点名要求开启子工作流，否则不得自行开启任何子讨论或子工作流\n'
     '2. **单级讨论原则**：保持当前讨论层级，不创建多级嵌套讨论\n'
     '3. **任务专注**：专注于当前论坛主题，不偏离到其他无关话题\n'
+    '4. **禁止随意发到群聊**：与当前 OASIS 论坛/工作流相关的产出，只能按系统规定的格式与渠道回传（如论坛 JSON、callback 等）；**禁止**擅自使用 send_to_group 或等价能力把过程稿、内部推演、专家间讨论随意推到用户群聊，除非用户或当前任务**明文**要求发群。\n'
 )
 
 
@@ -455,7 +456,8 @@ def _build_discuss_prompt(
         "0. **子 Agent 身份**：你是被上级调度系统（OASIS 工作流引擎）调用的子 Agent，你的职责是按照指令在当前讨论中发表你自己角色的观点并返回结果，不要试图接管整个讨论流程或代替其他专家发言\n"
         "1. **禁止自动开启子工作流**：除非明确收到点名要求开启子工作流，否则不得自行开启任何子讨论或子工作流\n"
         "2. **单级讨论原则**：保持当前讨论层级，不创建多级嵌套讨论\n"
-        "3. **任务专注**：专注于当前论坛主题，不偏离到其他无关话题",
+        "3. **任务专注**：专注于当前论坛主题，不偏离到其他无关话题\n"
+        "4. **禁止随意发到群聊**：与当前 OASIS 论坛/工作流相关的产出，只能按系统规定的格式与渠道回传（如论坛 JSON、callback 等）；**禁止**擅自使用 send_to_group 或等价能力把过程稿、内部推演、专家间讨论随意推到用户群聊，除非用户或当前任务**明文**要求发群。",
     ] if p]
     system_prompt = "\n".join(sys_parts)
 
@@ -464,10 +466,10 @@ def _build_discuss_prompt(
         f"讨论主题: {question}\n\n"
         f"当前论坛内容:\n{posts_text}\n\n"
         "请在回复中包含一个 JSON 对象（不要包含 markdown 代码块标记，不要包含注释）：\n"
-        '{"teamclaw_type": "oasis reply", "reply_to": 2, "content": "你的观点（200字以内，观点鲜明）", '
+        '{"wecli_type": "oasis reply", "reply_to": 2, "content": "你的观点（200字以内，观点鲜明）", '
         '"votes": [{"post_id": 1, "direction": "up"}]}\n\n'
         "说明:\n"
-        "- teamclaw_type: 必须为 \"oasis reply\"\n"
+        "- wecli_type: 必须为 \"oasis reply\"\n"
         "- reply_to: 如果论坛中已有其他人的帖子，你**必须**选择一个帖子ID进行回复；只有在论坛为空时才填 null\n"
         "- content: 你的发言内容，要有独到见解，可以赞同、反驳或补充你所回复的帖子\n"
         '- votes: 对其他帖子的投票列表，direction 只能是 "up" 或 "down"。如果没有要投票的帖子，填空列表 []\n'
@@ -519,8 +521,8 @@ def _build_discuss_callback_prompt(
         "\n如果你要公开发言、投票或做分支选择，你必须主动执行以下命令回传：",
         callback_hint,
         "\n回传 JSON 格式示例：",
-        '{"teamclaw_type": "oasis reply", "reply_to": 2, "content": "你的观点（200字以内，观点鲜明）", "votes": [{"post_id": 1, "direction": "up"}]}',
-        '{"teamclaw_type": "oasis choose", "choose": {"option": "A", "reason": "理由"}, "content": "补充说明"}',
+        '{"wecli_type": "oasis reply", "reply_to": 2, "content": "你的观点（200字以内，观点鲜明）", "votes": [{"post_id": 1, "direction": "up"}]}',
+        '{"wecli_type": "oasis choose", "choose": {"option": "A", "reason": "理由"}, "content": "补充说明"}',
         "\n注意：不要把最终 JSON 直接放在 ACP 回复正文里；正式内容必须以工具/callback 的返回为准。",
         "⚠️ 只有 callback 命令/工具提交到 OASIS 的内容才算正式回复；纯文本正文不算。无实质内容时也要走工具回传上述最小 JSON。",
     ]
@@ -562,7 +564,7 @@ def _build_execute_callback_prompt(
     parts.append("每一轮都必须主动执行以下命令至少一次，把合规单行 JSON 回传到 OASIS（系统以工具返回为准）：")
     parts.append(callback_hint)
     parts.append("\n回传 JSON 示例：")
-    parts.append('{"teamclaw_type": "oasis reply", "reply_to": null, "content": "你的执行结果", "votes": []}')
+    parts.append('{"wecli_type": "oasis reply", "reply_to": null, "content": "你的执行结果", "votes": []}')
     parts.append("⚠️ 只有 callback 命令/工具回传的结果才会进入 OASIS；你在 ACP 正文里直接写结果不会被采纳。")
     parts.append(
         "\n即使本轮没有新的执行产出，也必须仍通过上述命令/工具回传一次合规 JSON"
@@ -695,11 +697,11 @@ async def _apply_response(
 ):
     """Apply the parsed JSON response: publish post + cast votes.
 
-    Supports two teamclaw_type values:
+    Supports two wecli_type values:
       - "oasis reply": publish post + cast votes
       - "oasis choose": publish choice as a post
     """
-    resp_type = result.get("teamclaw_type", "oasis reply")
+    resp_type = result.get("wecli_type", "oasis reply")
 
     if resp_type == "oasis choose":
         # Choice mode: publish the choice info as a post.
@@ -802,11 +804,11 @@ class ExpertAgent:
         )
 
         if not discussion:
-            # ── Execute mode (requires teamclaw_type JSON protocol, retry=1 for internal agent) ──
+            # ── Execute mode (requires wecli_type JSON protocol, retry=1 for internal agent) ──
             _EXEC_JSON_HINT = (
                 '\n\n请将你的执行结果用以下 JSON 格式返回'
                 '（不要包含 markdown 代码块标记，不要包含注释）：\n'
-                '{"teamclaw_type": "oasis reply", "reply_to": null, '
+                '{"wecli_type": "oasis reply", "reply_to": null, '
                 '"content": "你的执行结果", "votes": []}\n'
                 'JSON 前后可以有其他文字，系统会自动提取 JSON 部分。\n'
                 '⚠️ JSON 必须写在一行内，content 字段中不能有实际换行符（需要换行请用 \\n 转义）。\n'
@@ -858,13 +860,13 @@ class ExpertAgent:
 
 
 # ======================================================================
-# Backend 2: SessionExpert — calls TeamBot /v1/chat/completions
+# Backend 2: SessionExpert — calls WeBot /v1/chat/completions
 #   using an existing session_id.  name = "title#session_id"
 # ======================================================================
 
 class SessionExpert:
     """
-    Expert backed by a TeamBot session.
+    Expert backed by a WeBot session.
 
     Two sub-types determined by session_id format:
       - "#oasis#" in session_id → oasis-managed session.
@@ -961,14 +963,14 @@ class SessionExpert:
         )
 
         if not discussion:
-            # ── Execute mode (requires teamclaw_type JSON protocol, retry=1 for internal agent) ──
+            # ── Execute mode (requires wecli_type JSON protocol, retry=1 for internal agent) ──
             new_posts = [p for p in others if p.id not in self._seen_post_ids]
             self._seen_post_ids.update(p.id for p in others)
 
             _EXEC_JSON_HINT = (
                 '\n\n请将你的执行结果用以下 JSON 格式返回'
                 '（不要包含 markdown 代码块标记，不要包含注释）：\n'
-                '{"teamclaw_type": "oasis reply", "reply_to": null, '
+                '{"wecli_type": "oasis reply", "reply_to": null, '
                 '"content": "你的执行结果", "votes": []}\n'
                 'JSON 前后可以有其他文字，系统会自动提取 JSON 部分。\n'
                 '⚠️ JSON 必须写在一行内，content 字段中不能有实际换行符（需要换行请用 \\n 转义）。\n'
@@ -1003,7 +1005,7 @@ class SessionExpert:
                 messages.append({"role": "user", "content": "\n".join(ctx_parts)})
 
             body: dict = {
-                "model": "teambot",
+                "model": "webot",
                 "messages": messages,
                 "stream": False,
                 "session_id": self.session_id,
@@ -1062,10 +1064,10 @@ class SessionExpert:
                     f"讨论主题: {forum.question}\n\n"
                     f"当前论坛内容:\n{posts_text}\n\n"
                     "请以你自身的专业视角参与讨论。在回复中包含一个 JSON 对象（不要包含 markdown 代码块标记，不要包含注释）:\n"
-                    '{"teamclaw_type": "oasis reply", "reply_to": 2, "content": "你的观点（200字以内，观点鲜明）", '
+                    '{"wecli_type": "oasis reply", "reply_to": 2, "content": "你的观点（200字以内，观点鲜明）", '
                     '"votes": [{"post_id": 1, "direction": "up"}]}\n\n'
                     "说明:\n"
-                    "- teamclaw_type: 必须为 \"oasis reply\"\n"
+                    "- wecli_type: 必须为 \"oasis reply\"\n"
                     "- reply_to: 如果论坛中已有其他人的帖子，你**必须**选择一个帖子ID进行回复；只有在论坛为空时才填 null\n"
                     "- content: 你的发言内容，要有独到见解\n"
                     '- votes: 对其他帖子的投票列表，direction 只能是 "up" 或 "down"。如果没有要投票的帖子，填空列表 []\n'
@@ -1086,7 +1088,7 @@ class SessionExpert:
                     f"{new_text}\n\n"
                     "请基于这些新观点以及你之前看到的讨论内容，在回复中包含一个 JSON 对象"
                     "（不要包含 markdown 代码块标记，不要包含注释）：\n"
-                    '{"teamclaw_type": "oasis reply", "reply_to": <某个帖子ID>, '
+                    '{"wecli_type": "oasis reply", "reply_to": <某个帖子ID>, '
                     '"content": "你的观点（200字以内，观点鲜明）", '
                     '"votes": [{"post_id": <ID>, "direction": "up或down"}]}\n\n'
                     "JSON 前后可以有其他文字，系统会自动提取 JSON 部分。"
@@ -1097,13 +1099,13 @@ class SessionExpert:
                     f"【第 {forum.current_round} 轮讨论更新】\n"
                     "本轮没有新的帖子。如果你有新的想法或补充，可以继续发言；"
                     "如果没有，回复一个空 content 即可。\n"
-                    '{"teamclaw_type": "oasis reply", "reply_to": null, "content": "", "votes": []}\n\n'
+                    '{"wecli_type": "oasis reply", "reply_to": null, "content": "", "votes": []}\n\n'
                     "JSON 前后可以有其他文字，系统会自动提取 JSON 部分。"
                 )
             messages.append({"role": "user", "content": prompt})
 
         body: dict = {
-            "model": "teambot",
+            "model": "webot",
             "messages": messages,
             "stream": False,
             "session_id": self.session_id,
@@ -1143,7 +1145,7 @@ class SessionExpert:
 # ======================================================================
 # Backend 3: ExternalExpert — direct call to external OpenAI-compatible API
 #   name = "title#ext#id"
-#   Does NOT go through local TeamBot agent.
+#   Does NOT go through local WeBot agent.
 #   Calls external api_url directly using httpx + OpenAI chat format.
 #   ACP agent support: tag (codex/claude/gemini/aider) determines ACP binary.
 # ======================================================================
@@ -1166,9 +1168,9 @@ class ExternalExpert:
     """
     Expert backed by an external OpenAI-compatible API or ACP long-lived connection.
 
-    Unlike SessionExpert (which calls the local TeamBot agent),
+    Unlike SessionExpert (which calls the local WeBot agent),
     ExternalExpert directly calls any OpenAI-compatible endpoint (DeepSeek,
-    GPT-4, Moonshot, Ollama, another TeamBot instance, etc).
+    GPT-4, Moonshot, Ollama, another WeBot instance, etc).
 
     **ACP Agent Support**: When the ``model`` field matches
     ``agent:<agent_name>`` or ``agent:<agent_name>:<session>``, ACP
@@ -1176,7 +1178,7 @@ class ExternalExpert:
     (binary not found or start failed), falls back to HTTP API when
     ``api_url`` is configured. The ``tag`` field (e.g. "codex", "claude")
     determines which CLI binary is used for the ACP subprocess. Session
-    suffix defaults to ``teamclawchat`` if not specified in the model string (same as group/ops ACP).
+    suffix defaults to ``weclichat`` if not specified in the model string (same as group/ops ACP).
 
     ACP subprocesses are stored in a **process-global pool** (same cache key as
     group chat: ``tool`` + ``agent:<global_name>:<suffix>``). ``acp_start()`` only
@@ -1194,12 +1196,12 @@ class ExternalExpert:
     No local message history is accumulated.
 
     Features:
-      - ACP agents: global pooled connection (shared with TeamClaw group ACP)
+      - ACP agents: global pooled connection (shared with Wecli group ACP)
       - HTTP fallback: when ACP unavailable but api_url is configured
       - Non-agent externals: direct HTTP API call
       - Incremental context (first call = full, subsequent = delta only)
       - Identity injection via system prompt on first call (persona from presets)
-    - Works in both discussion mode and execute mode (both require teamclaw_type JSON)
+    - Works in both discussion mode and execute mode (both require wecli_type JSON)
       - Supports custom headers via YAML for service-specific needs
 
     The external service does NOT need to support session_id or any
@@ -1211,35 +1213,35 @@ class ExternalExpert:
     # Group 2 (optional) = session suffix (defaults to _DEFAULT_ACP_SESSION_SUFFIX if omitted)
     _AGENT_MODEL_RE = re.compile(r"^agent:([^:]+)(?::(.+))?$")
 
-    # Oasis reply protocol: require agent to reply with JSON containing "teamclaw_type" field
+    # Oasis reply protocol: require agent to reply with JSON containing "wecli_type" field
     # Supported types: "oasis reply" (discussion), "oasis choose" (choice/vote)
     # Works in both discussion mode (JSON reply/vote) and execute mode
     _OASIS_REPLY_INSTRUCTION = (
         "\n\n⚠️ IMPORTANT — OASIS JSON reply protocol:\n"
         "当你需要发布给其他 agent 或公开的信息时，必须通过 callback/工具提交一个 JSON 对象到 OASIS。\n"
         "仅仅在当前回复正文里写 JSON 或自然语言答案，不算正式回传，系统不会自动代你发布。\n"
-        "JSON 的 \"teamclaw_type\" 字段决定回复类型：\n\n"
-        "1. 讨论发言（teamclaw_type=\"oasis reply\"）：\n"
+        "JSON 的 \"wecli_type\" 字段决定回复类型：\n\n"
+        "1. 讨论发言（wecli_type=\"oasis reply\"）：\n"
         '{\n'
-        '  "teamclaw_type": "oasis reply",\n'
+        '  "wecli_type": "oasis reply",\n'
         '  "reply_to": 2,\n'
         '  "content": "你的观点（200字以内，观点鲜明）",\n'
         '  "votes": [{"post_id": 1, "direction": "up"}]\n'
         '}\n\n'
-        "2. 选择/投票（teamclaw_type=\"oasis choose\"）：\n"
+        "2. 选择/投票（wecli_type=\"oasis choose\"）：\n"
         '{\n'
-        '  "teamclaw_type": "oasis choose",\n'
+        '  "wecli_type": "oasis choose",\n'
         '  "choose": {"option": "A", "reason": "理由"},\n'
         '  "content": "补充说明（可选）"\n'
         '}\n\n'
         "注意：\n"
-        "- 一轮只能回复一次 JSON，teamclaw_type 字段区分于其他协议的 type 字段\n"
+        "- 一轮只能回复一次 JSON，wecli_type 字段区分于其他协议的 type 字段\n"
         "- JSON 前后可以有其他文字，系统会自动提取 JSON 部分\n"
         "- ⚠️ JSON 必须是合法的单行 JSON：content 等字符串字段内不能有实际换行，请把所有内容写在同一行内（需要换行请用 \\n 转义）\n"
         "- 没有通过 callback/工具提交的合规 JSON，回复不会被发布\n"
         "- 【ACP / 外部 agent 强制】每一轮都必须至少调用一次工具（或等价 callback）把合规 JSON 交给 OASIS；"
         "系统以工具返回为准。即使本轮没有新观点、无可投票项、或执行上「无事可做」，也必须仍走工具回传单行 JSON"
-        "（例如 teamclaw_type=\"oasis reply\"，content 写明「本轮无补充」或「无新增结果」，votes 用 []），"
+        "（例如 wecli_type=\"oasis reply\"，content 写明「本轮无补充」或「无新增结果」，votes 用 []），"
         "禁止仅用自然语言或 ACP 纯文本结束本轮而不触发工具回传。\n"
         "- 回复最后必须添加三行 end padding 防止传输截断：\n"
         "[end padding]\n"
@@ -1253,7 +1255,7 @@ class ExternalExpert:
 
     # Default CLI --session suffix when model has no agent:name:<suffix> third segment.
     # Matches group/ops ACP usage so the same external agent shares one session across teams.
-    _DEFAULT_ACP_SESSION_SUFFIX = "teamclawchat"
+    _DEFAULT_ACP_SESSION_SUFFIX = "weclichat"
 
     def __init__(
         self,
@@ -1298,7 +1300,7 @@ class ExternalExpert:
                 )
             self._oc_agent_name = oc_agent_name
 
-            # Session suffix: explicit from model's third segment if present, else teamclawchat.
+            # Session suffix: explicit from model's third segment if present, else weclichat.
             self._acp_session_suffix = self._session_suffix
 
             # Determine ACP tool binary from tag (same rules as src/group_service)
@@ -1635,10 +1637,10 @@ class ExternalExpert:
 
         Tolerant parsing: the JSON can appear anywhere in the text surrounded
         by arbitrary prose.  We look for the first '{' ... '}' that contains
-        a recognised "teamclaw_type" field ("oasis reply" or "oasis choose").
+        a recognised "wecli_type" field ("oasis reply" or "oasis choose").
 
         Returns (status, parsed_dict):
-          - ("found", dict)   — valid JSON with recognised teamclaw_type extracted
+          - ("found", dict)   — valid JSON with recognised wecli_type extracted
           - ("missing", None) — no valid JSON found
         """
         # Strip [end padding] lines first (they are anti-truncation padding)
@@ -1671,7 +1673,7 @@ class ExternalExpert:
             for text in (candidate, _fix_json_control_chars(candidate)):
                 try:
                     obj = json.loads(text)
-                    if isinstance(obj, dict) and obj.get("teamclaw_type") in ("oasis reply", "oasis choose"):
+                    if isinstance(obj, dict) and obj.get("wecli_type") in ("oasis reply", "oasis choose"):
                         return ("found", obj)
                 except (json.JSONDecodeError, ValueError):
                     continue
@@ -1682,13 +1684,13 @@ class ExternalExpert:
         """Call API up to _OASIS_REPLY_MAX_RETRIES times within one participate turn.
 
         For ACP agents, inject the OASIS JSON protocol instruction, then:
-          1. Strict extraction: look for JSON with recognised "teamclaw_type" → return dict
+          1. Strict extraction: look for JSON with recognised "wecli_type" → return dict
           2. Tolerant extraction: try _parse_expert_response (any valid JSON) → return dict
           3. Both failed → ask agent to retry with correct format
           4. After all retries exhausted → return raw text of the LAST reply
 
         This "tolerant-first" strategy avoids wasting retries when the agent
-        returns valid JSON that simply lacks the teamclaw_type field.
+        returns valid JSON that simply lacks the wecli_type field.
 
         No cross-reply buffering: each retry is independent.
         Each participate() call is independent; no state carries across rounds.
@@ -1703,11 +1705,11 @@ class ExternalExpert:
             raw_reply = await self._call_api(messages, **kwargs)
             last_raw = raw_reply
 
-            # Step 1: strict extraction — look for teamclaw_type JSON
+            # Step 1: strict extraction — look for wecli_type JSON
             status, parsed = self._extract_oasis_json(raw_reply)
             if status == "found":
                 print(f"  [OASIS] ✅ {self.name} valid OASIS JSON extracted "
-                      f"(teamclaw_type={parsed.get('teamclaw_type')}, attempt {attempt}/{self._OASIS_REPLY_MAX_RETRIES})")
+                      f"(wecli_type={parsed.get('wecli_type')}, attempt {attempt}/{self._OASIS_REPLY_MAX_RETRIES})")
                 return parsed
 
             # Step 2: tolerant extraction — accept any valid JSON
@@ -1715,7 +1717,7 @@ class ExternalExpert:
                 tolerant_result = _parse_expert_response(raw_reply)
                 if isinstance(tolerant_result, dict):
                     print(f"  [OASIS] ✅ {self.name} tolerant JSON extracted "
-                          f"(no teamclaw_type, attempt {attempt}/{self._OASIS_REPLY_MAX_RETRIES})")
+                          f"(no wecli_type, attempt {attempt}/{self._OASIS_REPLY_MAX_RETRIES})")
                     return tolerant_result
             except json.JSONDecodeError:
                 pass
@@ -1728,10 +1730,10 @@ class ExternalExpert:
             messages.append({"role": "assistant", "content": raw_reply})
             messages.append({"role": "user", "content": (
                 "你的回复中没有检测到合规的 OASIS JSON。请严格按照以下格式重新回复：\n\n"
-                "在你的回复中包含一个 JSON 对象，其中 \"teamclaw_type\" 字段为 \"oasis reply\" 或 \"oasis choose\"。\n"
+                "在你的回复中包含一个 JSON 对象，其中 \"wecli_type\" 字段为 \"oasis reply\" 或 \"oasis choose\"。\n"
                 "⚠️ JSON 必须写在一行内，content 字段中不能有实际换行符（需要换行请用 \\n 转义），否则系统无法解析。\n"
                 "例如：\n"
-                '{"teamclaw_type": "oasis reply", "reply_to": 2, "content": "你的观点", "votes": []}\n\n'
+                '{"wecli_type": "oasis reply", "reply_to": 2, "content": "你的观点", "votes": []}\n\n'
                 "JSON 前后可以有其他文字。回复最后必须添加：\n"
                 "[end padding]\n"
                 "[end padding]\n"
@@ -1759,7 +1761,7 @@ class ExternalExpert:
         )
 
         if not discussion:
-            # ── Execute mode (also requires teamclaw_type JSON protocol) ──
+            # ── Execute mode (also requires wecli_type JSON protocol) ──
             new_posts = [p for p in others if p.id not in self._seen_post_ids]
             self._seen_post_ids.update(p.id for p in others)
 
@@ -1803,7 +1805,7 @@ class ExternalExpert:
                 '\n\n请将你的执行结果用以下 JSON 格式返回'
                 '（不要包含 markdown 代码块标记，不要包含注释）：\n'
                 '⚠️ JSON 必须写在一行内，content 字段中不能有实际换行符（需要换行请用 \\n 转义）。\n'
-                '{"teamclaw_type": "oasis reply", "reply_to": null, '
+                '{"wecli_type": "oasis reply", "reply_to": null, '
                 '"content": "你的执行结果", "votes": []}\n'
                 'JSON 前后可以有其他文字。回复最后请添加：\n'
                 '[end padding]\n'
@@ -1921,7 +1923,7 @@ class ExternalExpert:
                     f"{new_text}\n\n"
                     "请基于这些新观点以及你之前看到的讨论内容，在回复中包含一个 JSON 对象"
                     "（不要包含 markdown 代码块标记，不要包含注释）：\n"
-                    '{"teamclaw_type": "oasis reply", "reply_to": <某个帖子ID>, '                    '"content": "你的观点（200字以内，观点鲜明）", '
+                    '{"wecli_type": "oasis reply", "reply_to": <某个帖子ID>, '                    '"content": "你的观点（200字以内，观点鲜明）", '
                     '"votes": [{"post_id": <ID>, "direction": "up或down"}]}\n\n'                    "JSON 前后可以有其他文字。回复最后请添加：\n"
                     "[end padding]\n"
                     "[end padding]\n"
@@ -1932,7 +1934,7 @@ class ExternalExpert:
                     f"【第 {forum.current_round} 轮讨论更新】\n"
                     "本轮没有新的帖子。如果你有新的想法或补充，可以继续发言；"
                     "如果没有，回复一个空 content 即可。\n"
-                    '{"teamclaw_type": "oasis reply", "reply_to": null, "content": "", "votes": []}\n\n'
+                    '{"wecli_type": "oasis reply", "reply_to": null, "content": "", "votes": []}\n\n'
                     "回复最后请添加：\n"                    "[end padding]\n"
                     "[end padding]\n"
                     "[end padding]\n"

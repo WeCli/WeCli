@@ -1,5 +1,5 @@
 """
-TeamBot Agent Python 测试客户端
+WeBot Agent Python 测试客户端
 用法：python tools/manual/chat.py
 与运行中的 Agent 进行交互式对话测试。
 """
@@ -27,10 +27,10 @@ def send_message(user_id: str, text: str):
 
 
 if __name__ == "__main__":
-    print("=== TeamBot Agent Python 测试客户端 ===")
+    print("=== WeBot Agent Python 测试客户端 ===")
     print("(输入 'exit' 退出对话)")
 
-    user_id = "TeamBot_01"
+    user_id = "WeBot_01"
 
     while True:
         user_input = input("\n[你]: ")

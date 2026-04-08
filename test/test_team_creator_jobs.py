@@ -12,7 +12,7 @@ if str(SRC_DIR) not in sys.path:
 import team_creator_service as svc
 
 
-class TeamCreatorJobStoreTests(unittest.TestCase):
+class WecliCreatorJobStoreTests(unittest.TestCase):
     def test_create_job_persists_pending_record(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "team_creator_jobs.db"
