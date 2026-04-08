@@ -10,8 +10,8 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-import webot_runtime_store as runtime_store
-from webot_bridge import WeBotBridgeHub, get_bridge_runtime_payload, issue_bridge_session
+import webot.runtime_store as runtime_store
+from webot.bridge import WeBotBridgeHub, get_bridge_runtime_payload, issue_bridge_session
 
 
 class _FakeWebSocket:

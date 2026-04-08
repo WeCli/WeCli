@@ -102,7 +102,7 @@ Two backend helpers already cover the Phase 3 collection step without relying on
 
 WeCli Creator has two layers of localization:
 
-- static UI strings are embedded in `src/static/js/creator.js`
+- static UI strings are embedded in `frontend/js/creator.js`
 - dynamic content can be translated on demand through `POST /api/team-creator/translate`
 
 Dynamic translation is used for things like:
@@ -131,7 +131,7 @@ If needed, set `TEAM_CREATOR_JOBS_DB_PATH` to move the jobs database.
 
 ## Workflow -> Generate Team
 
-The Studio workflow canvas also supports a direct Team-generation flow through `orchGenerateTeam()` in `src/static/js/orchestration.js`.
+The Studio workflow canvas also supports a direct Team-generation flow through `orchGenerateTeam()` in `frontend/js/orchestration.js`.
 
 That flow:
 
@@ -169,11 +169,11 @@ Use this when the workflow graph already exists and you want to materialize the 
 | Path | Role |
 |---|---|
 | `src/front.py` | WeCli Creator routes and workflow-to-team endpoint |
-| `src/team_creator_service.py` | discovery, extraction, build, ZIP, jobs, translation |
-| `src/templates/creator.html` | WeCli Creator page shell |
-| `src/static/js/creator.js` | WeCli Creator UI, i18n, persistence, preview rendering |
-| `src/static/css/creator.css` | WeCli Creator layout and DAG styling |
-| `src/static/js/orchestration.js` | `Generate Team` modal on the workflow canvas |
+| `src/services/team_creator_service.py` | discovery, extraction, build, ZIP, jobs, translation |
+| `frontend/templates/creator.html` | WeCli Creator page shell |
+| `frontend/js/creator.js` | WeCli Creator UI, i18n, persistence, preview rendering |
+| `frontend/css/creator.css` | WeCli Creator layout and DAG styling |
+| `frontend/js/orchestration.js` | `Generate Team` modal on the workflow canvas |
 | `test/test_team_creator_jobs.py` | jobs persistence coverage |
 | `test/test_team_creator_workflow.py` | workflow build coverage |
 | `test/test_team_creator_zip.py` | ZIP export coverage |

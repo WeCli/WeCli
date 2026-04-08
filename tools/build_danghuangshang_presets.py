@@ -3,7 +3,7 @@
 Generate repo-owned Wecli team presets from danghuangshang source material.
 
 The generated assets live under:
-  data/team_presets/danghuangshang/<preset_id>/
+  data/team_presets/<preset_id>/
 
 Runtime code must depend only on the generated assets, not the external repo.
 """
@@ -19,7 +19,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = Path("/tmp/wecli-repo-compare/danghuangshang")
-OUTPUT_ROOT = REPO_ROOT / "data" / "team_presets" / "danghuangshang"
+OUTPUT_ROOT = REPO_ROOT / "data" / "team_presets"
 
 TANG_ROLE_MAP = {
     "zhongshu": {"name": "中书省", "file": "zhongshusheng.md"},

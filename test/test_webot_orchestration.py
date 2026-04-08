@@ -58,9 +58,9 @@ if "dotenv" not in sys.modules:
     dotenv_module.load_dotenv = load_dotenv
     sys.modules["dotenv"] = dotenv_module
 
-import webot_subagents as store
-import webot_runtime_store as runtime_store
-import mcp_webot
+import webot.subagents as store
+import webot.runtime_store as runtime_store
+import mcp_servers.webot as mcp_webot
 
 
 class _FakeResponse:
@@ -131,8 +131,8 @@ class WeBotOrchestrationFlowTests(unittest.IsolatedAsyncioTestCase):
         self.tmpdir = tempfile.TemporaryDirectory()
         self.original_db_path = store.DEFAULT_DB_PATH
         self.original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
-        store.DEFAULT_DB_PATH = Path(self.tmpdir.name) / "webot_subagents.db"
-        runtime_store.DEFAULT_DB_PATH = Path(self.tmpdir.name) / "webot_runtime.db"
+        store.DEFAULT_DB_PATH = Path(self.tmpdir.name) / "webot.subagents.db"
+        runtime_store.DEFAULT_DB_PATH = Path(self.tmpdir.name) / "webot.runtime.db"
         mcp_webot._BACKGROUND_TASKS.clear()
         self.addAsyncCleanup(self._cleanup)
 
@@ -153,7 +153,7 @@ class WeBotOrchestrationFlowTests(unittest.IsolatedAsyncioTestCase):
             return _FakeAsyncClient(state, delay=0.0)
 
         with patch.object(mcp_webot, "_INTERNAL_TOKEN", "internal-token"), patch(
-            "mcp_webot.httpx.AsyncClient",
+            "mcp_servers.webot.httpx.AsyncClient",
             new=_client_factory,
         ):
             result = await mcp_webot.spawn_subagent(
@@ -190,7 +190,7 @@ class WeBotOrchestrationFlowTests(unittest.IsolatedAsyncioTestCase):
             return _FakeAsyncClient(state, delay=0.2)
 
         with patch.object(mcp_webot, "_INTERNAL_TOKEN", "internal-token"), patch(
-            "mcp_webot.httpx.AsyncClient",
+            "mcp_servers.webot.httpx.AsyncClient",
             new=_client_factory,
         ):
             await mcp_webot.spawn_subagent(
@@ -249,7 +249,7 @@ class WeBotOrchestrationFlowTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch.object(mcp_webot, "_INTERNAL_TOKEN", "internal-token"), patch(
-            "mcp_webot.httpx.AsyncClient",
+            "mcp_servers.webot.httpx.AsyncClient",
             new=_client_factory,
         ):
             await mcp_webot._recover_background_runs("alice")

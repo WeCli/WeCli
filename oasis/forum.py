@@ -18,6 +18,33 @@ _project_root = os.path.dirname(_this_dir)
 DISCUSSIONS_DIR = os.path.join(_project_root, "data", "oasis_discussions")
 
 
+def coerce_optional_post_id(value) -> int | None:
+    """Normalize post id / reply_to from JSON: int or numeric string only.
+
+    Non-numeric strings (e.g. mistaken UUIDs) become None so API models stay valid.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        if value != value:  # NaN
+            return None
+        iv = int(value)
+        return iv if iv == value else None
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return None
+        try:
+            return int(s, 10)
+        except ValueError:
+            return None
+    return None
+
+
 @dataclass
 class TimelineEvent:
     """讨论生命周期中的带时间戳事件"""
@@ -33,7 +60,28 @@ class TimelineEvent:
 
     @classmethod
     def from_dict(cls, d: dict) -> "TimelineEvent":
-        return cls(**d)
+        if not isinstance(d, dict):
+            d = {}
+        allowed = ("elapsed", "event", "agent", "detail", "seq")
+        clean = {k: d[k] for k in allowed if k in d}
+        clean.setdefault("elapsed", 0.0)
+        clean.setdefault("event", "unknown")
+        clean.setdefault("agent", "")
+        clean.setdefault("detail", "")
+        clean.setdefault("seq", 0)
+        if clean.get("agent") is None:
+            clean["agent"] = ""
+        if clean.get("detail") is None:
+            clean["detail"] = ""
+        if clean.get("event") is None:
+            clean["event"] = "unknown"
+        return cls(
+            elapsed=float(clean["elapsed"]),
+            event=str(clean["event"]),
+            agent=str(clean["agent"]),
+            detail=str(clean["detail"]),
+            seq=int(clean["seq"]),
+        )
 
 
 @dataclass
@@ -64,10 +112,27 @@ class Post:
 
     @classmethod
     def from_dict(cls, d: dict) -> "Post":
-        d2 = dict(d)
+        if not isinstance(d, dict):
+            d = {}
+        allowed = (
+            "id", "author", "content", "reply_to", "upvotes", "downvotes",
+            "timestamp", "elapsed", "voters", "round_num", "source_node_id",
+        )
+        d2 = {k: d[k] for k in allowed if k in d}
+        d2.setdefault("reply_to", None)
+        d2.setdefault("upvotes", 0)
+        d2.setdefault("downvotes", 0)
+        d2.setdefault("timestamp", time.time())
         d2.setdefault("elapsed", 0.0)
+        d2.setdefault("voters", {})
         d2.setdefault("round_num", 0)
         d2.setdefault("source_node_id", None)
+        d2["author"] = "" if d2.get("author") is None else str(d2["author"])
+        d2["content"] = "" if d2.get("content") is None else str(d2["content"])
+        d2["id"] = int(d2.get("id", 0))
+        d2["reply_to"] = coerce_optional_post_id(d2.get("reply_to"))
+        if not isinstance(d2.get("voters"), dict):
+            d2["voters"] = {}
         return cls(**d2)
 
 
@@ -98,8 +163,8 @@ class PendingHumanReply:
             prompt=str(d.get("prompt", "")),
             author=str(d.get("author", "")),
             round_num=int(d.get("round_num", 0)),
-            reply_to=d.get("reply_to"),
-            submitted_post_id=d.get("submitted_post_id"),
+            reply_to=coerce_optional_post_id(d.get("reply_to")),
+            submitted_post_id=coerce_optional_post_id(d.get("submitted_post_id")),
         )
 
 

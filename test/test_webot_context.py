@@ -13,8 +13,8 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-import webot_context
-from webot_context import budget_tool_messages, compact_history_messages
+import webot.context as webot_context
+from webot.context import budget_tool_messages, compact_history_messages
 
 
 class WeBotContextTests(unittest.TestCase):

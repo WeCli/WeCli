@@ -541,7 +541,7 @@ openclaw gateway restart
 ```bash
 uv run python -c "
 from dotenv import load_dotenv; load_dotenv('config/.env')
-from src.llm_factory import create_chat_model, extract_text
+from src.services.llm_factory import create_chat_model, extract_text
 resp = create_chat_model(max_tokens=8).invoke('Reply with OK only.')
 print(extract_text(resp.content))
 "

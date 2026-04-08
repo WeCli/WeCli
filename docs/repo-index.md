@@ -38,7 +38,7 @@ Read these first for setup or environment changes:
 | `selfskill/scripts/configure.py` | `.env` initialization and configuration logic |
 | `selfskill/scripts/configure_openclaw.py` | OpenClaw detection plus Wecli/OpenClaw LLM sync logic |
 | `config/.env.example` | config template and inline guidance |
-| `config/tinyfish_targets.example.json` | example TinyFish competitor target schema |
+| `config/tinyfish_targets.example.json` | example TinyFish search target schema |
 | `scripts/setup_apikey.sh` | legacy API key helper |
 | `scripts/setup_apikey.ps1` | legacy Windows API key helper |
 | `manual_run.sh` | manual startup helper with guardrails |
@@ -46,8 +46,8 @@ Read these first for setup or environment changes:
 
 If the issue is model detection or provider-specific behavior, inspect:
 
-- `src/llm_factory.py`
-- `src/ops_service.py`
+- `src/services/llm_factory.py`
+- `src/api/ops_service.py`
 
 ## Runtime Entry Points
 
@@ -57,9 +57,9 @@ These are the main services Wecli runs:
 |---|---|
 | `src/mainagent.py` | Agent API bootstrap and router composition |
 | `src/front.py` | Flask frontend and proxy gateway |
-| `src/time.py` | scheduler service |
-| `src/team_creator_service.py` | WeCli Creator discovery, extraction, build, jobs, and translation pipeline |
-| `src/tinyfish_monitor_service.py` | shared TinyFish monitor runtime used by frontend, scheduler, and CLI |
+| `src/utils/scheduler_service.py` | scheduler service |
+| `src/services/team_creator_service.py` | WeCli Creator discovery, extraction, build, jobs, and translation pipeline |
+| `src/services/tinyfish_monitor_service.py` | shared TinyFish monitor runtime used by frontend, scheduler, and CLI |
 | `oasis/server.py` | OASIS service |
 | `scripts/launcher.py` | multi-service startup order |
 
@@ -69,58 +69,58 @@ When the bug is "service does not start" or "route behaves unexpectedly", start 
 
 ### OpenAI-compatible chat API
 
-- `src/openai_routes.py`
-- `src/openai_service.py`
-- `src/openai_models.py`
-- `src/openai_protocol.py`
-- `src/message_builder.py`
+- `src/api/openai_routes.py`
+- `src/api/openai_service.py`
+- `src/api/openai_models.py`
+- `src/api/openai_protocol.py`
+- `src/services/message_builder.py`
 
 ### Sessions
 
-- `src/session_routes.py`
-- `src/session_service.py`
-- `src/session_models.py`
-- `src/session_summary.py`
-- `src/checkpoint_repository.py`
+- `src/api/session_routes.py`
+- `src/api/session_service.py`
+- `src/api/session_models.py`
+- `src/utils/session_summary.py`
+- `src/utils/checkpoint_repository.py`
 
 ### Groups
 
-- `src/group_routes.py`
-- `src/group_service.py`
-- `src/group_models.py`
-- `src/group_repository.py`
+- `src/api/group_routes.py`
+- `src/api/group_service.py`
+- `src/api/group_models.py`
+- `src/api/group_repository.py`
 
 ### Settings / ops / auth / system
 
-- `src/settings_routes.py`
-- `src/settings_service.py`
-- `src/settings_models.py`
-- `src/ops_routes.py`
-- `src/ops_service.py`
-- `src/ops_models.py`
-- `src/system_routes.py`
-- `src/system_service.py`
-- `src/system_models.py`
-- `src/env_settings.py`
-- `src/user_auth.py`
-- `src/auth_utils.py`
+- `src/api/settings_routes.py`
+- `src/api/settings_service.py`
+- `src/api/settings_models.py`
+- `src/api/ops_routes.py`
+- `src/api/ops_service.py`
+- `src/api/ops_models.py`
+- `src/api/system_routes.py`
+- `src/api/system_service.py`
+- `src/api/system_models.py`
+- `src/utils/env_settings.py`
+- `src/utils/user_auth.py`
+- `src/utils/auth_utils.py`
 
 ### Runtime plumbing
 
-- `src/agent.py`
-- `src/agent_runtime_state.py`
-- `src/acpx_adapter.py`
-- `src/webot_context.py`
-- `src/webot_permission_context.py`
-- `src/webot_policy.py`
-- `src/webot_profiles.py`
-- `src/webot_routes.py`
-- `src/webot_runtime.py`
-- `src/webot_runtime_store.py`
-- `src/webot_service.py`
-- `src/webot_subagents.py`
-- `src/webot_workspace.py`
-- `src/logging_utils.py`
+- `src/core/agent.py`
+- `src/core/agent_runtime_state.py`
+- `src/integrations/acpx_adapter.py`
+- `src/webot/context.py`
+- `src/webot/permission_context.py`
+- `src/webot/policy.py`
+- `src/webot/profiles.py`
+- `src/webot/routes.py`
+- `src/webot/runtime.py`
+- `src/webot/runtime_store.py`
+- `src/webot/service.py`
+- `src/webot/subagents.py`
+- `src/webot/workspace.py`
+- `src/utils/logging_utils.py`
 
 ## Frontend Map
 
@@ -128,19 +128,19 @@ If the task touches the UI, start here:
 
 | Path | Purpose |
 |---|---|
-| `src/static/js/main.js` | main desktop frontend logic |
-| `src/static/css/style.css` | main desktop styling, including OASIS Town / swarm / ReportAgent panels |
-| `src/front_webot_routes.py` | Flask proxy routes for WeBot runtime panel and tool policy |
-| `src/static/js/creator.js` | WeCli Creator page logic, i18n, persistence, DAG preview |
-| `src/static/css/creator.css` | WeCli Creator styles and DAG layout |
-| `src/static/js/orchestration.js` | Studio canvas logic, including `Generate Team` |
-| `src/templates/creator.html` | WeCli Creator HTML shell |
-| `src/templates/group_chat_mobile.html` | mobile group chat page and mobile settings UI |
-| `src/templates/` | other HTML templates |
-| `src/static/` | CSS, JS, images |
-| `src/front_group_routes.py` | frontend proxy routes for groups |
-| `src/front_oasis_routes.py` | frontend proxy routes for OASIS |
-| `src/front_session_routes.py` | frontend proxy routes for sessions |
+| `frontend/js/main.js` | main desktop frontend logic |
+| `frontend/css/style.css` | main desktop styling, including OASIS Town / swarm / ReportAgent panels |
+| `src/routes/front_webot_routes.py` | Flask proxy routes for WeBot runtime panel and tool policy |
+| `frontend/js/creator.js` | WeCli Creator page logic, i18n, persistence, DAG preview |
+| `frontend/css/creator.css` | WeCli Creator styles and DAG layout |
+| `frontend/js/orchestration.js` | Studio canvas logic, including `Generate Team` |
+| `frontend/templates/creator.html` | WeCli Creator HTML shell |
+| `frontend/templates/group_chat_mobile.html` | mobile group chat page and mobile settings UI |
+| `frontend/templates/` | other HTML templates |
+| `frontend/` | CSS, JS, images |
+| `src/routes/front_group_routes.py` | frontend proxy routes for groups |
+| `src/routes/front_oasis_routes.py` | frontend proxy routes for OASIS |
+| `src/routes/front_session_routes.py` | frontend proxy routes for sessions |
 
 ## OASIS and Workflow Engine
 
@@ -169,15 +169,15 @@ Pair these with:
 
 For tool execution or tool exposure:
 
-- `src/mcp_commander.py`
-- `src/mcp_filemanager.py`
-- `src/mcp_oasis.py`
-- `src/mcp_scheduler.py`
-- `src/mcp_search.py`
-- `src/mcp_session.py`
-- `src/mcp_webot.py`
-- `src/mcp_telegram.py`
-- `src/mcp_llmapi.py`
+- `src/mcp_servers/commander.py`
+- `src/mcp_servers/filemanager.py`
+- `src/mcp_servers/oasis.py`
+- `src/mcp_servers/scheduler.py`
+- `src/mcp_servers/search.py`
+- `src/mcp_servers/session.py`
+- `src/mcp_servers/webot.py`
+- `src/mcp_servers/telegram.py`
+- `src/mcp_servers/llmapi.py`
 
 ## ACP Exchange (acpx)
 
@@ -185,8 +185,8 @@ For external AI agent communication via the Agent Client Protocol:
 
 | Path | Purpose |
 |---|---|
-| `src/acpx_adapter.py` | Singleton `AcpxAdapter` wrapping the `acpx` CLI; manages sessions and prompt execution |
-| `src/group_service.py` | Primary acpx consumer; `_send_to_acp_agent()` broadcasts group chat messages to ACP agents |
+| `src/integrations/acpx_adapter.py` | Singleton `AcpxAdapter` wrapping the `acpx` CLI; manages sessions and prompt execution |
+| `src/api/group_service.py` | Primary acpx consumer; `_send_to_acp_agent()` broadcasts group chat messages to ACP agents |
 | `oasis/experts.py` | `ExternalExpert` class uses ACP for pooled prompt communication with external agents |
 
 Known ACP tools (external AI agents): `openclaw`, `codex`, `claude`, `gemini`, `aider`.
@@ -268,8 +268,8 @@ When changing code, check the nearest validation surface:
 | `python test/tinyfish_live_smoke.py --site <site_key>` | opt-in real TinyFish smoke test |
 | `uv run scripts/cli.py status` | smoke test services |
 | `python -m py_compile <file>` | quick syntax check for touched Python files |
-| `node --check src/static/js/creator.js` | quick WeCli Creator syntax check |
-| `node --check src/static/js/main.js` | quick JS syntax check |
+| `node --check frontend/js/creator.js` | quick WeCli Creator syntax check |
+| `node --check frontend/js/main.js` | quick JS syntax check |
 
 ## Task-to-File Lookup
 
@@ -277,19 +277,19 @@ When changing code, check the nearest validation surface:
 
 Read:
 
-- `src/static/js/main.js`
-- `src/templates/group_chat_mobile.html`
-- `src/settings_routes.py`
-- `src/settings_service.py`
-- `src/env_settings.py`
+- `frontend/js/main.js`
+- `frontend/templates/group_chat_mobile.html`
+- `src/api/settings_routes.py`
+- `src/api/settings_service.py`
+- `src/utils/env_settings.py`
 - `config/.env.example`
 
 ### "Model selection / provider / audio defaults are wrong"
 
 Read:
 
-- `src/llm_factory.py`
-- `src/ops_service.py`
+- `src/services/llm_factory.py`
+- `src/api/ops_service.py`
 - `scripts/setup_apikey.sh`
 - `scripts/setup_apikey.ps1`
 - `selfskill/scripts/configure.py`
@@ -310,10 +310,10 @@ Read:
 
 Read:
 
-- `src/templates/index.html`
-- `src/static/js/main.js`
-- `src/static/css/style.css`
-- `src/front_oasis_routes.py`
+- `frontend/templates/index.html`
+- `frontend/js/main.js`
+- `frontend/css/style.css`
+- `src/routes/front_oasis_routes.py`
 - `oasis/server.py`
 - `oasis/swarm_engine.py`
 - `oasis/graph_memory.py`
@@ -324,11 +324,11 @@ Read:
 
 - `docs/team-creator.md`
 - `src/front.py`
-- `src/team_creator_service.py`
-- `src/static/js/creator.js`
-- `src/static/css/creator.css`
-- `src/templates/creator.html`
-- `src/static/js/orchestration.js`
+- `src/services/team_creator_service.py`
+- `frontend/js/creator.js`
+- `frontend/css/creator.css`
+- `frontend/templates/creator.html`
+- `frontend/js/orchestration.js`
 - `test/test_team_creator_jobs.py`
 - `test/test_team_creator_workflow.py`
 - `test/test_team_creator_zip.py`
@@ -351,14 +351,14 @@ Read:
 - `selfskill/scripts/configure.py`
 - `config/.env.example`
 
-### "TinyFish monitor or pricing change detection is wrong"
+### "TinyFish search agent or data extraction is wrong"
 
 Read:
 
 - `docs/tinyfish-monitor.md`
-- `src/tinyfish_monitor_service.py`
+- `src/services/tinyfish_monitor_service.py`
 - `src/front.py`
-- `src/time.py`
+- `src/utils/scheduler_service.py`
 - `config/tinyfish_targets.example.json`
 - `test/test_tinyfish_monitor.py`
 
@@ -367,9 +367,9 @@ Read:
 Read:
 
 - `src/front.py`
-- `src/front_group_routes.py`
-- `src/front_oasis_routes.py`
-- `src/front_session_routes.py`
+- `src/routes/front_group_routes.py`
+- `src/routes/front_oasis_routes.py`
+- `src/routes/front_session_routes.py`
 - `docs/ports.md`
 
 ## Documentation Cross-Links

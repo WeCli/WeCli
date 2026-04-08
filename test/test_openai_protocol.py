@@ -11,8 +11,8 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from openai_models import ChatMessage
-from openai_protocol import OpenAIProtocolHelper
+from api.openai_models import ChatMessage
+from api.openai_protocol import OpenAIProtocolHelper
 
 
 class OpenAIProtocolHelperTests(unittest.TestCase):

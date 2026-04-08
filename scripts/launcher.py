@@ -295,7 +295,7 @@ ensure_openclaw_gateway_running()
 
 # 服务配置列表：(显示信息, 脚本路径, 启动后等待秒数)
 services = [
-    (f"⏰ [1/5] 启动定时调度中心 (port {PORT_SCHEDULER})...", "src/time.py", 2),
+    (f"⏰ [1/5] 启动定时调度中心 (port {PORT_SCHEDULER})...", "src/utils/scheduler_service.py", 2),
     (f"🏛️ [2/5] 启动 OASIS 论坛服务 (port {PORT_OASIS})...", "oasis/server.py", 2),
     (f"🤖 [3/5] 启动 AI Agent (port {PORT_AGENT})...", "src/mainagent.py", 3),
 ]

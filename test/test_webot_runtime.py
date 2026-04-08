@@ -1,6 +1,6 @@
 import unittest
 
-from src.webot_runtime import (
+from src.webot.runtime import (
     build_turn_limit_message,
     resolve_max_turns,
     should_stop_for_turn_limit,

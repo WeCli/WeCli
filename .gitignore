@@ -72,6 +72,18 @@ data/checkpoint_export_*.json
 data/user_files/
 data/oasis_discussions/
 
+# src 下运行时 SQLite / 用户数据（与 data/ 规则对齐）
+src/data/*.db
+src/data/*.db-wal
+src/data/*.db-shm
+src/data/*.db-journal
+src/data/user_files/
+
+# 大体积演示素材（本地保留即可，不进仓库）
+docs/wecli.pptx
+docs/media/wecli-demo.mp4
+docs/media/teamclaw-demo.mp4
+
 # 临时 LLM 请求调试导出（WECLI_DEBUG_LLM_PAYLOAD=1）
 data/debug_llm_payload_last.json
 .claude/settings.local.json

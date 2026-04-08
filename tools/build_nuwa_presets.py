@@ -3,7 +3,7 @@
 
 Reads SKILL.md files from cloned repos under /tmp/nuwa-skills/,
 extracts key persona sections, and generates team preset directories
-under data/team_presets/danghuangshang/.
+under data/team_presets/.
 
 Usage:
     python tools/build_nuwa_presets.py [--source /tmp/nuwa-skills]
@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PRESET_ROOT = PROJECT_ROOT / "data" / "team_presets" / "danghuangshang"
+PRESET_ROOT = PROJECT_ROOT / "data" / "team_presets"
 DEFAULT_SOURCE = Path("/tmp/nuwa-skills")
 
 # ── Persona registry ──────────────────────────────────────────

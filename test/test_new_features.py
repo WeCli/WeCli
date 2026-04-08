@@ -14,6 +14,7 @@ import asyncio
 import os
 import sys
 import time
+import utils.scheduler_service
 import pytest
 
 # Add src to path
@@ -28,7 +29,7 @@ class TestStreamingToolExecutor:
     """Test streaming tool execution with concurrency control."""
 
     def test_tool_access_classification(self):
-        from streaming_tool_executor import classify_tool_access, ToolAccessMode
+        from core.streaming_tool_executor import classify_tool_access, ToolAccessMode
         assert classify_tool_access("read_file") == ToolAccessMode.READ_ONLY
         assert classify_tool_access("write_file") == ToolAccessMode.WRITE
         assert classify_tool_access("run_command") == ToolAccessMode.WRITE
@@ -36,19 +37,19 @@ class TestStreamingToolExecutor:
         assert classify_tool_access("unknown_tool") == ToolAccessMode.UNKNOWN
 
     def test_register_custom_tool_mode(self):
-        from streaming_tool_executor import register_tool_access_mode, classify_tool_access, ToolAccessMode
+        from core.streaming_tool_executor import register_tool_access_mode, classify_tool_access, ToolAccessMode
         register_tool_access_mode("my_custom_tool", ToolAccessMode.READ_ONLY)
         assert classify_tool_access("my_custom_tool") == ToolAccessMode.READ_ONLY
 
     def test_executor_creation(self):
-        from streaming_tool_executor import StreamingToolExecutor
+        from core.streaming_tool_executor import StreamingToolExecutor
         executor = StreamingToolExecutor(max_concurrent_reads=4)
         assert executor.max_concurrent_reads == 4
         assert executor.result_char_budget == 6000
 
     @pytest.mark.asyncio
     async def test_execute_tool_calls(self):
-        from streaming_tool_executor import StreamingToolExecutor, ToolExecutionResult
+        from core.streaming_tool_executor import StreamingToolExecutor, ToolExecutionResult
 
         async def mock_executor(tc):
             await asyncio.sleep(0.01)
@@ -70,7 +71,7 @@ class TestStreamingToolExecutor:
 
     @pytest.mark.asyncio
     async def test_execute_with_truncation(self):
-        from streaming_tool_executor import StreamingToolExecutor
+        from core.streaming_tool_executor import StreamingToolExecutor
 
         async def large_result_executor(tc):
             return "x" * 20000  # Exceeds default budget
@@ -89,7 +90,7 @@ class TestStreamingToolExecutor:
 
     @pytest.mark.asyncio
     async def test_execute_with_error(self):
-        from streaming_tool_executor import StreamingToolExecutor
+        from core.streaming_tool_executor import StreamingToolExecutor
 
         async def failing_executor(tc):
             raise ValueError("test error")
@@ -106,7 +107,7 @@ class TestStreamingToolExecutor:
         assert "test error" in results[0].content
 
     def test_to_tool_messages(self):
-        from streaming_tool_executor import StreamingToolExecutor, ToolExecutionResult
+        from core.streaming_tool_executor import StreamingToolExecutor, ToolExecutionResult
         executor = StreamingToolExecutor()
         results = [
             ToolExecutionResult(tool_call_id="tc1", tool_name="read_file", content="hello"),
@@ -126,13 +127,13 @@ class TestTokenBudget:
     """Test token budget tracking and marginal utility."""
 
     def test_session_budget_creation(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget(max_context_tokens=100000)
         assert budget.total_tokens == 0
         assert budget.context_pressure == 0.0
 
     def test_record_turn(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget()
         turn = budget.record_turn(input_tokens=1000, output_tokens=500)
         assert turn.total_tokens == 1500
@@ -140,7 +141,7 @@ class TestTokenBudget:
         assert budget.total_output_tokens == 500
 
     def test_context_pressure(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget(max_context_tokens=1000)
         budget.record_turn(input_tokens=800, output_tokens=100)
         # (800 + 100) / 1000 = 0.9 (now includes output per openclaw)
@@ -148,13 +149,13 @@ class TestTokenBudget:
         assert budget.is_warning
 
     def test_critical_threshold(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget(max_context_tokens=1000)
         budget.record_turn(input_tokens=960, output_tokens=100)
         assert budget.is_critical
 
     def test_marginal_utility(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget()
         budget.record_turn(input_tokens=1000, output_tokens=500)
         budget.record_turn(input_tokens=2000, output_tokens=400)
@@ -162,31 +163,31 @@ class TestTokenBudget:
         assert 0.0 <= utility <= 1.0
 
     def test_marginal_utility_single_turn(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget()
         budget.record_turn(input_tokens=1000, output_tokens=500)
         assert budget.marginal_utility() == 1.0  # Not enough data
 
     def test_should_auto_continue(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget(max_context_tokens=100000)
         budget.record_turn(input_tokens=1000, output_tokens=500)
         assert budget.should_auto_continue()
 
     def test_format_budget_notice_empty(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget()
         assert budget.format_budget_notice() == ""
 
     def test_format_budget_notice_warning(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget(max_context_tokens=1000)
         budget.record_turn(input_tokens=850, output_tokens=0)
         notice = budget.format_budget_notice()
         assert "⚡" in notice
 
     def test_get_session_budget(self):
-        from token_budget import get_session_budget, reset_session_budget
+        from utils.token_budget import get_session_budget, reset_session_budget
         budget = get_session_budget("test_user", "test_session")
         assert budget is not None
         budget.record_turn(input_tokens=100, output_tokens=50)
@@ -195,7 +196,7 @@ class TestTokenBudget:
         reset_session_budget("test_user", "test_session")
 
     def test_get_status(self):
-        from token_budget import SessionTokenBudget
+        from utils.token_budget import SessionTokenBudget
         budget = SessionTokenBudget()
         budget.record_turn(input_tokens=1000, output_tokens=500)
         status = budget.get_status()
@@ -222,21 +223,21 @@ class TestContextCompressor:
         return msgs
 
     def test_no_compression_needed(self):
-        from context_compressor import compress_context
+        from utils.context_compressor import compress_context
         msgs = self._make_messages(4, 10)
         result, stats = compress_context(msgs, token_budget=100000)
         assert stats.level_applied == "none"
         assert len(result) == 4
 
     def test_snip_level(self):
-        from context_compressor import level_snip
+        from utils.context_compressor import level_snip
         from langchain_core.messages import HumanMessage
         msgs = [HumanMessage(content="x" * 10000)]
         result = level_snip(msgs, token_budget=500, char_limit=500, preserve_recent=0)
         assert len(result[0].content) < 10000
 
     def test_micro_level(self):
-        from context_compressor import level_micro
+        from utils.context_compressor import level_micro
         from langchain_core.messages import ToolMessage
         msgs = [
             ToolMessage(content="x" * 5000, tool_call_id="tc1", name="read_file"),
@@ -247,26 +248,26 @@ class TestContextCompressor:
         assert result[1].content == "short"
 
     def test_collapse_level(self):
-        from context_compressor import level_collapse
+        from utils.context_compressor import level_collapse
         msgs = self._make_messages(20, 200)
         result = level_collapse(msgs, token_budget=500, preserve_recent=4)
         assert len(result) < 20
 
     def test_evict_level(self):
-        from context_compressor import level_evict
+        from utils.context_compressor import level_evict
         msgs = self._make_messages(20, 200)
         result = level_evict(msgs, token_budget=200, preserve_recent=2)
         assert len(result) <= 4
 
     def test_full_pipeline(self):
-        from context_compressor import compress_context
+        from utils.context_compressor import compress_context
         msgs = self._make_messages(50, 500)
         result, stats = compress_context(msgs, token_budget=1000, preserve_recent=4)
         assert stats.level_applied != "none"
         assert len(result) < 50
 
     def test_compression_stats(self):
-        from context_compressor import compress_context
+        from utils.context_compressor import compress_context
         msgs = self._make_messages(30, 300)
         _, stats = compress_context(msgs, token_budget=500)
         assert stats.original_messages == 30
@@ -282,7 +283,7 @@ class TestCacheBoundary:
     """Test system prompt cache boundary management."""
 
     def test_set_sections(self):
-        from cache_boundary import SystemPromptCacheManager
+        from utils.cache_boundary import SystemPromptCacheManager
         mgr = SystemPromptCacheManager()
         mgr.set_section("identity", "I am WeBot")
         mgr.set_section("tools", "Available tools: read_file, write_file")
@@ -292,7 +293,7 @@ class TestCacheBoundary:
         assert boundary.static_chars > 0
 
     def test_cache_breakpoint(self):
-        from cache_boundary import SystemPromptCacheManager
+        from utils.cache_boundary import SystemPromptCacheManager
         mgr = SystemPromptCacheManager()
         mgr.set_section("identity", "I am WeBot")
         mgr.set_section("tools", "Tools list")
@@ -303,7 +304,7 @@ class TestCacheBoundary:
         assert boundary.cache_breakpoint_index == 2
 
     def test_build_single_prompt(self):
-        from cache_boundary import SystemPromptCacheManager
+        from utils.cache_boundary import SystemPromptCacheManager
         mgr = SystemPromptCacheManager()
         mgr.set_section("identity", "Part 1")
         mgr.set_section("runtime_context", "Part 2")
@@ -312,7 +313,7 @@ class TestCacheBoundary:
         assert "Part 2" in prompt
 
     def test_cache_stats(self):
-        from cache_boundary import SystemPromptCacheManager
+        from utils.cache_boundary import SystemPromptCacheManager
         mgr = SystemPromptCacheManager()
         mgr.set_section("identity", "x" * 1000)
         mgr.set_section("runtime_context", "y" * 200)
@@ -329,14 +330,14 @@ class TestBashSafety:
     """Test bash command safety analysis."""
 
     def test_safe_commands(self):
-        from bash_safety import analyze_command, RiskLevel
+        from utils.bash_safety import analyze_command, RiskLevel
         assert analyze_command("ls -la").risk_level == RiskLevel.SAFE
         assert analyze_command("pwd").risk_level == RiskLevel.SAFE
         assert analyze_command("echo hello").risk_level == RiskLevel.SAFE
         assert analyze_command("git status").risk_level == RiskLevel.SAFE
 
     def test_deny_invariants(self):
-        from bash_safety import analyze_command, is_command_blocked
+        from utils.bash_safety import analyze_command, is_command_blocked
         result = analyze_command("rm -rf /")
         assert result.risk_level.value == "critical"
         assert result.blocked
@@ -345,7 +346,7 @@ class TestBashSafety:
         assert is_command_blocked("dd if=/dev/zero of=/dev/sda")
 
     def test_high_risk(self):
-        from bash_safety import analyze_command, RiskLevel
+        from utils.bash_safety import analyze_command, RiskLevel
         result = analyze_command("sudo rm -rf /tmp/test")
         assert result.risk_level == RiskLevel.HIGH
         assert not result.blocked
@@ -354,7 +355,7 @@ class TestBashSafety:
         assert result.risk_level == RiskLevel.HIGH
 
     def test_medium_risk(self):
-        from bash_safety import analyze_command, RiskLevel
+        from utils.bash_safety import analyze_command, RiskLevel
         result = analyze_command("rm -r some_dir")
         assert result.risk_level == RiskLevel.MEDIUM
 
@@ -362,26 +363,26 @@ class TestBashSafety:
         assert result.risk_level == RiskLevel.MEDIUM
 
     def test_low_risk(self):
-        from bash_safety import analyze_command, RiskLevel
+        from utils.bash_safety import analyze_command, RiskLevel
         result = analyze_command("python3 script.py")
         assert result.risk_level in (RiskLevel.LOW, RiskLevel.SAFE)
 
     def test_fork_bomb_detection(self):
-        from bash_safety import is_command_blocked
+        from utils.bash_safety import is_command_blocked
         assert is_command_blocked(":(){ :|:& };:")
 
     def test_credential_theft(self):
-        from bash_safety import is_command_blocked
+        from utils.bash_safety import is_command_blocked
         assert is_command_blocked("cat ~/.ssh/id_rsa")
         assert is_command_blocked("cat /etc/shadow")
 
     def test_empty_command(self):
-        from bash_safety import analyze_command, RiskLevel
+        from utils.bash_safety import analyze_command, RiskLevel
         result = analyze_command("")
         assert result.risk_level == RiskLevel.SAFE
 
     def test_batch_analyze(self):
-        from bash_safety import batch_analyze
+        from utils.bash_safety import batch_analyze
         results = batch_analyze(["ls", "rm -rf /", "echo hi"])
         assert len(results) == 3
         assert results[1].blocked
@@ -404,17 +405,17 @@ class TestLazyToolDiscovery:
             MockTool("write_file", "Write content to a file"),
             MockTool("run_command", "Execute a shell command"),
             MockTool("search_files", "Search files by pattern"),
-            MockTool("post_to_oasis", "Post a discussion to OASIS forum"),
+            MockTool("start_new_oasis", "Post a discussion to OASIS forum"),
         ]
 
     def test_register_tools(self):
-        from lazy_tool_discovery import LazyToolRegistry
+        from core.lazy_tool_discovery import LazyToolRegistry
         registry = LazyToolRegistry()
         registry.register_tools(self._mock_tools())
         assert registry.tool_count == 5
 
     def test_compact_listing(self):
-        from lazy_tool_discovery import LazyToolRegistry
+        from core.lazy_tool_discovery import LazyToolRegistry
         registry = LazyToolRegistry()
         registry.register_tools(self._mock_tools())
         listing = registry.compact_tool_list()
@@ -422,7 +423,7 @@ class TestLazyToolDiscovery:
         assert "write_file" in listing
 
     def test_search_tools(self):
-        from lazy_tool_discovery import LazyToolRegistry
+        from core.lazy_tool_discovery import LazyToolRegistry
         registry = LazyToolRegistry()
         registry.register_tools(self._mock_tools())
         results = registry.search_tools("file")
@@ -430,7 +431,7 @@ class TestLazyToolDiscovery:
         assert any(r["name"] == "read_file" for r in results)
 
     def test_get_full_schema(self):
-        from lazy_tool_discovery import LazyToolRegistry
+        from core.lazy_tool_discovery import LazyToolRegistry
         registry = LazyToolRegistry()
         registry.register_tools(self._mock_tools())
         schema = registry.get_full_schema("read_file")
@@ -438,7 +439,7 @@ class TestLazyToolDiscovery:
         assert schema["name"] == "read_file"
 
     def test_always_loaded(self):
-        from lazy_tool_discovery import LazyToolRegistry
+        from core.lazy_tool_discovery import LazyToolRegistry
         registry = LazyToolRegistry()
         registry.register_tools(self._mock_tools())
         registry.set_always_loaded({"read_file", "write_file"})
@@ -446,14 +447,14 @@ class TestLazyToolDiscovery:
         assert len(always) == 2
 
     def test_category_inference(self):
-        from lazy_tool_discovery import LazyToolRegistry
+        from core.lazy_tool_discovery import LazyToolRegistry
         registry = LazyToolRegistry()
         registry.register_tools(self._mock_tools())
         stats = registry.get_stats()
         assert "filesystem" in stats["categories"]
 
     def test_search_empty_query(self):
-        from lazy_tool_discovery import LazyToolRegistry
+        from core.lazy_tool_discovery import LazyToolRegistry
         registry = LazyToolRegistry()
         registry.register_tools(self._mock_tools())
         results = registry.search_tools("")
@@ -468,7 +469,7 @@ class TestAgentOrchestrator:
     """Test fork, coordinator, council, and consensus."""
 
     def test_create_fork(self):
-        from agent_orchestrator import create_fork, get_fork, ForkMode
+        from core.agent_orchestrator import create_fork, get_fork, ForkMode
         fork = create_fork(
             parent_session="main_session",
             task="Implement feature X",
@@ -479,21 +480,21 @@ class TestAgentOrchestrator:
         assert get_fork(fork.fork_id) is not None
 
     def test_complete_fork(self):
-        from agent_orchestrator import create_fork, complete_fork
+        from core.agent_orchestrator import create_fork, complete_fork
         fork = create_fork(parent_session="test", task="Test task")
         completed = complete_fork(fork.fork_id, "Done!")
         assert completed.status == "completed"
         assert completed.result == "Done!"
 
     def test_list_forks(self):
-        from agent_orchestrator import create_fork, list_forks
+        from core.agent_orchestrator import create_fork, list_forks
         create_fork(parent_session="parent_a", task="Task 1")
         create_fork(parent_session="parent_a", task="Task 2")
         forks = list_forks("parent_a")
         assert len(forks) >= 2
 
     def test_coordinator_run(self):
-        from agent_orchestrator import (
+        from core.agent_orchestrator import (
             start_coordinator_run, advance_coordinator_phase,
             get_coordinator_prompt, CoordinatorPhase,
         )
@@ -516,7 +517,7 @@ class TestAgentOrchestrator:
         assert run.status == "completed"
 
     def test_council_session(self):
-        from agent_orchestrator import (
+        from core.agent_orchestrator import (
             create_council_session, submit_council_vote,
             evaluate_council_consensus,
         )
@@ -545,7 +546,7 @@ class TestAgentOrchestrator:
 
     @pytest.mark.asyncio
     async def test_build_consensus(self):
-        from agent_orchestrator import build_consensus
+        from core.agent_orchestrator import build_consensus
 
         async def approve_voter(question):
             return ("approve", "Looks good", 0.8)
@@ -569,13 +570,13 @@ class TestCostTracker:
     """Test cost tracking and pricing."""
 
     def test_record_cost(self):
-        from cost_tracker import SessionCostTracker
+        from utils.cost_tracker import SessionCostTracker
         tracker = SessionCostTracker(user_id="u1", session_id="s1")
         entry = tracker.record("gpt-4o", input_tokens=1000, output_tokens=500)
         assert entry.cost_usd > 0
 
     def test_cost_breakdown(self):
-        from cost_tracker import SessionCostTracker
+        from utils.cost_tracker import SessionCostTracker
         tracker = SessionCostTracker(user_id="u1", session_id="s1")
         tracker.record("gpt-4o", input_tokens=1000, output_tokens=500)
         tracker.record("gpt-4o-mini", input_tokens=2000, output_tokens=1000)
@@ -585,20 +586,20 @@ class TestCostTracker:
         assert "gpt-4o-mini" in breakdown["by_model"]
 
     def test_cost_limit(self):
-        from cost_tracker import SessionCostTracker
+        from utils.cost_tracker import SessionCostTracker
         tracker = SessionCostTracker(user_id="u1", session_id="s1", cost_limit_usd=0.001)
         tracker.record("gpt-4o", input_tokens=100000, output_tokens=50000)
         assert tracker.is_over_limit
 
     def test_format_notice(self):
-        from cost_tracker import SessionCostTracker
+        from utils.cost_tracker import SessionCostTracker
         tracker = SessionCostTracker(user_id="u1", session_id="s1", cost_limit_usd=0.01)
         tracker.record("gpt-4o", input_tokens=100000, output_tokens=50000)
         notice = tracker.format_cost_notice()
         assert len(notice) > 0
 
     def test_get_cost_tracker(self):
-        from cost_tracker import get_cost_tracker, get_user_total_cost
+        from utils.cost_tracker import get_cost_tracker, get_user_total_cost
         tracker = get_cost_tracker("test_cost_user", "session_a")
         tracker.record("gpt-4o", input_tokens=1000, output_tokens=500)
         total = get_user_total_cost("test_cost_user")
@@ -613,35 +614,35 @@ class TestEffortController:
     """Test effort level estimation and configuration."""
 
     def test_estimate_minimal(self):
-        from effort_controller import estimate_effort, EffortLevel
+        from utils.effort_controller import estimate_effort, EffortLevel
         assert estimate_effort("what is the version?") == EffortLevel.MINIMAL
         assert estimate_effort("show me the file") == EffortLevel.MINIMAL
 
     def test_estimate_high(self):
-        from effort_controller import estimate_effort, EffortLevel
+        from utils.effort_controller import estimate_effort, EffortLevel
         level = estimate_effort("implement a new authentication system with JWT")
         assert level in (EffortLevel.HIGH, EffortLevel.EXPERT)
 
     def test_estimate_expert(self):
-        from effort_controller import estimate_effort, EffortLevel
+        from utils.effort_controller import estimate_effort, EffortLevel
         level = estimate_effort("architect and refactor the entire codebase with a comprehensive migration plan")
         assert level == EffortLevel.EXPERT
 
     def test_get_config(self):
-        from effort_controller import get_effort_config, EffortLevel
+        from utils.effort_controller import get_effort_config, EffortLevel
         config = get_effort_config(EffortLevel.HIGH)
         assert config.max_turns == 30
         assert config.enable_planning
 
     def test_session_override(self):
-        from effort_controller import set_session_effort, get_session_effort, clear_session_effort, EffortLevel
+        from utils.effort_controller import set_session_effort, get_session_effort, clear_session_effort, EffortLevel
         set_session_effort("u1", "s1", EffortLevel.EXPERT)
         assert get_session_effort("u1", "s1") == EffortLevel.EXPERT
         clear_session_effort("u1", "s1")
         assert get_session_effort("u1", "s1") is None
 
     def test_resolve_effort(self):
-        from effort_controller import resolve_effort, EffortLevel
+        from utils.effort_controller import resolve_effort, EffortLevel
         config = resolve_effort("u1", "s1", "implement a feature")
         assert config.level in EffortLevel
         assert config.max_turns > 0
@@ -655,7 +656,7 @@ class TestWorkflowEngines:
     """Test Ralph loop, deep interview, autopilot, context gate, HUD."""
 
     def test_ralph_loop(self):
-        from workflow_engines import create_ralph_loop, get_ralph_prompt
+        from core.workflow_engines import create_ralph_loop, get_ralph_prompt
         loop = create_ralph_loop(
             user_id="u1", session_id="s1",
             task="Fix the bug", verification_criteria="All tests pass",
@@ -665,7 +666,7 @@ class TestWorkflowEngines:
         assert "首次执行" in prompt
 
     def test_ralph_iterations(self):
-        from workflow_engines import create_ralph_loop
+        from core.workflow_engines import create_ralph_loop
         loop = create_ralph_loop(
             user_id="u1", session_id="s1",
             task="Fix bug", verification_criteria="Tests pass",
@@ -679,7 +680,7 @@ class TestWorkflowEngines:
         assert loop.status.value == "complete"
 
     def test_ralph_max_retries(self):
-        from workflow_engines import create_ralph_loop
+        from core.workflow_engines import create_ralph_loop
         loop = create_ralph_loop(
             user_id="u1", session_id="s1",
             task="Fix bug", verification_criteria="Tests pass",
@@ -691,7 +692,7 @@ class TestWorkflowEngines:
         assert not loop.can_retry
 
     def test_deep_interview(self):
-        from workflow_engines import (
+        from core.workflow_engines import (
             create_deep_interview, add_interview_question,
             answer_interview_question, complete_interview,
         )
@@ -706,7 +707,7 @@ class TestWorkflowEngines:
         assert interview.status == "complete"
 
     def test_autopilot(self):
-        from workflow_engines import set_autopilot, get_autopilot, disable_autopilot, AutopilotConfig
+        from core.workflow_engines import set_autopilot, get_autopilot, disable_autopilot, AutopilotConfig
         config = AutopilotConfig(enabled=True, max_turns=20, allow_network=False)
         set_autopilot("u1", "s1", config)
         retrieved = get_autopilot("u1", "s1")
@@ -716,7 +717,7 @@ class TestWorkflowEngines:
         assert get_autopilot("u1", "s1") is None
 
     def test_context_gate(self):
-        from workflow_engines import check_context_gate
+        from core.workflow_engines import check_context_gate
         result = check_context_gate(
             task="implement feature",
             available_context={"task": "implement feature", "workspace": "/tmp"},
@@ -732,14 +733,14 @@ class TestWorkflowEngines:
         assert "workspace" in result.missing_context
 
     def test_session_fork(self):
-        from workflow_engines import fork_session, list_session_forks
+        from core.workflow_engines import fork_session, list_session_forks
         fork = fork_session(user_id="u1", source_session="main", reason="Try alternative")
         assert fork.fork_id.startswith("sfork_")
         forks = list_session_forks("u1", "main")
         assert len(forks) >= 1
 
     def test_hud(self):
-        from workflow_engines import get_hud, update_hud
+        from core.workflow_engines import get_hud, update_hud
         hud = get_hud("u1", "s1")
         assert not hud.active
 
@@ -761,7 +762,7 @@ class TestNotificationSystem:
     """Test notifications, TTL, broadcast, session resume."""
 
     def test_send_notification(self):
-        from notification_system import send_notification, get_notifications
+        from services.notification_system import send_notification, get_notifications
         notif = send_notification(
             user_id="u1", session_id="s1",
             level="info", title="Test", body="Hello",
@@ -772,7 +773,7 @@ class TestNotificationSystem:
         assert len(notifs) >= 1
 
     def test_unread_notifications(self):
-        from notification_system import send_notification, get_notifications, mark_notification_read
+        from services.notification_system import send_notification, get_notifications, mark_notification_read
         send_notification(user_id="u_notif_test", title="A", body="1")
         send_notification(user_id="u_notif_test", title="B", body="2")
 
@@ -784,13 +785,13 @@ class TestNotificationSystem:
         assert len(unread) == 1
 
     def test_ttl_registration(self):
-        from notification_system import register_ttl, get_ttl_stats
+        from services.notification_system import register_ttl, get_ttl_stats
         register_ttl("test_key_1", "test_category", ttl_seconds=3600)
         stats = get_ttl_stats()
         assert stats["total_entries"] >= 1
 
     def test_ttl_cleanup(self):
-        from notification_system import register_ttl, run_ttl_cleanup
+        from services.notification_system import register_ttl, run_ttl_cleanup
         # Register an already-expired entry
         register_ttl("expired_key", "test", ttl_seconds=0)
         time.sleep(0.01)
@@ -798,7 +799,7 @@ class TestNotificationSystem:
         assert counts.get("test", 0) >= 1
 
     def test_broadcast(self):
-        from notification_system import create_broadcast, mark_broadcast_delivered, get_broadcast
+        from services.notification_system import create_broadcast, mark_broadcast_delivered, get_broadcast
         msg = create_broadcast(
             sender_user_id="u1", sender_session_id="s1",
             target_sessions=["s2", "s3"],
@@ -810,7 +811,7 @@ class TestNotificationSystem:
         assert "s2" in retrieved.delivered_to
 
     def test_session_checkpoint(self):
-        from notification_system import save_session_checkpoint, get_session_checkpoint, build_resume_prompt
+        from services.notification_system import save_session_checkpoint, get_session_checkpoint, build_resume_prompt
         checkpoint = save_session_checkpoint(
             user_id="u1", session_id="s1",
             state_summary="Working on feature X",
@@ -827,7 +828,7 @@ class TestNotificationSystem:
         assert "Finish implementation" in prompt
 
     def test_model_hot_swap(self):
-        from notification_system import request_model_swap, get_pending_model_swap, consume_model_swap
+        from services.notification_system import request_model_swap, get_pending_model_swap, consume_model_swap
         request_model_swap("u1", "s1", "gpt-4o", reason="Need better reasoning")
         pending = get_pending_model_swap("u1", "s1")
         assert pending is not None
@@ -847,8 +848,8 @@ class TestIntegration:
 
     def test_effort_with_budget(self):
         """Effort controller should influence token budget."""
-        from effort_controller import resolve_effort
-        from token_budget import SessionTokenBudget
+        from utils.effort_controller import resolve_effort
+        from utils.token_budget import SessionTokenBudget
 
         config = resolve_effort("u1", "s1", "architect a complete system redesign")
         budget = SessionTokenBudget(max_context_tokens=config.max_context_tokens)
@@ -856,7 +857,7 @@ class TestIntegration:
 
     def test_ralph_with_hud(self):
         """Ralph loop updates should reflect in HUD."""
-        from workflow_engines import create_ralph_loop, get_hud, update_hud
+        from core.workflow_engines import create_ralph_loop, get_hud, update_hud
 
         loop = create_ralph_loop(
             user_id="u1", session_id="s1",
@@ -872,8 +873,8 @@ class TestIntegration:
 
     def test_council_with_notification(self):
         """Council conclusion should trigger notification."""
-        from agent_orchestrator import create_council_session, submit_council_vote, evaluate_council_consensus
-        from notification_system import send_notification
+        from core.agent_orchestrator import create_council_session, submit_council_vote, evaluate_council_consensus
+        from services.notification_system import send_notification
 
         council = create_council_session(question="Deploy to prod?")
         submit_council_vote(council.council_id, voter_id="v1", model="a", decision="approve", reasoning="ok", confidence=0.9)
@@ -889,8 +890,8 @@ class TestIntegration:
 
     def test_fork_with_cost_tracking(self):
         """Forked sessions should have independent cost tracking."""
-        from agent_orchestrator import create_fork
-        from cost_tracker import get_cost_tracker
+        from core.agent_orchestrator import create_fork
+        from utils.cost_tracker import get_cost_tracker
 
         fork = create_fork(parent_session="main", task="Explore alternative")
         parent_tracker = get_cost_tracker("u1", "main")
@@ -903,8 +904,8 @@ class TestIntegration:
 
     def test_bash_safety_with_policy(self):
         """Bash safety should work alongside existing policy system."""
-        from bash_safety import analyze_command, is_command_blocked
-        from webot_policy import evaluate_tool_policy, WeBotToolPolicy
+        from utils.bash_safety import analyze_command, is_command_blocked
+        from webot.policy import evaluate_tool_policy, WeBotToolPolicy
 
         # Bash safety blocks critical commands
         assert is_command_blocked("rm -rf /")

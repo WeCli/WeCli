@@ -250,9 +250,9 @@ Important rules:
 
 External experts with tags like `openclaw`, `codex`, `claude`, `gemini`, or `aider` can communicate through the **Agent Client Protocol** via the `acpx` CLI adapter:
 
-- `src/acpx_adapter.py` provides a singleton `AcpxAdapter` class wrapping the `acpx` CLI binary
+- `src/integrations/acpx_adapter.py` provides a singleton `AcpxAdapter` class wrapping the `acpx` CLI binary
 - `oasis/experts.py` (`ExternalExpert`) uses ACP for pooled prompt communication with external agents
-- `src/group_service.py` uses ACP for broadcasting group chat messages to external AI agents
+- `src/api/group_service.py` uses ACP for broadcasting group chat messages to external AI agents
 - `acpx` is automatically installed during `bash selfskill/scripts/run.sh setup`
 - If `acpx` is not in PATH, the system falls back to HTTP-only communication for external experts
 

@@ -38,8 +38,8 @@ if "aiosqlite" not in sys.modules:
     aiosqlite_stub.connect = connect
     sys.modules["aiosqlite"] = aiosqlite_stub
 
-from session_models import DeleteSessionRequest, SessionListRequest
-from session_service import SessionService
+from api.session_models import DeleteSessionRequest, SessionListRequest
+from api.session_service import SessionService
 
 
 class HumanMessage:
@@ -92,7 +92,7 @@ class SessionServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch(
-            "session_service.list_thread_ids_by_prefix",
+            "api.session_service.list_thread_ids_by_prefix",
             new=AsyncMock(return_value=["alice#default", "alice#subagent__research__worker1"]),
         ):
             result = await service.list_sessions(SessionListRequest(user_id="alice"), None)
@@ -130,8 +130,8 @@ class SessionServiceTests(unittest.IsolatedAsyncioTestCase):
             extract_text=lambda content: content if isinstance(content, str) else str(content),
         )
 
-        with patch("session_service.delete_thread_records", new=AsyncMock()) as delete_thread_records:
-            with patch("session_service.delete_subagent_by_session", new=Mock()) as delete_subagent_by_session:
+        with patch("api.session_service.delete_thread_records", new=AsyncMock()) as delete_thread_records:
+            with patch("api.session_service.delete_subagent_by_session", new=Mock()) as delete_subagent_by_session:
                 result = await service.delete_session(
                     DeleteSessionRequest(
                         user_id="alice",

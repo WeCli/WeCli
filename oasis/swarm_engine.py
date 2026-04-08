@@ -33,7 +33,7 @@ _SRC_DIR = os.path.join(_PROJECT_ROOT, "src")
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
 
-from llm_factory import create_chat_model, extract_text  # noqa: E402
+from services.llm_factory import create_chat_model, extract_text  # noqa: E402
 
 
 _ALLOWED_NODE_TYPES = {"objective", "agent", "entity", "memory", "signal", "scenario"}

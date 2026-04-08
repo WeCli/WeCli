@@ -3,7 +3,7 @@ import os
 import subprocess
 from typing import Optional
 
-from src.logging_utils import get_logger
+from src.utils.logging_utils import get_logger
 
 logger = get_logger("oasis.openclaw_cli")
 

@@ -7,7 +7,7 @@
 | 端口 | 环境变量 | 服务文件 | 说明 | 绑定地址 | 对外暴露 |
 |------|----------|----------|------|----------|----------|
 | **51200** | `PORT_AGENT` | `src/mainagent.py` | AI Agent 主服务（OpenAI 兼容 API） | `127.0.0.1` | 否 |
-| **51201** | `PORT_SCHEDULER` | `src/time.py` | 定时任务调度中心 | `127.0.0.1` | 否 |
+| **51201** | `PORT_SCHEDULER` | `src/utils/scheduler_service.py` | 定时任务调度中心 | `127.0.0.1` | 否 |
 | **51202** | `PORT_OASIS` | `oasis/server.py` | OASIS 论坛 / Agent 管理与编排中心 | `127.0.0.1` | 否 |
 | **51209** | `PORT_FRONTEND` | `src/front.py` | 前端 Web UI（Flask） | `0.0.0.0` | 是 Tunnel |
 | **51210** | —（硬编码） | `visual/main.py` | 可视化编排系统（开发用） | `0.0.0.0` | 否 |
@@ -29,12 +29,12 @@
 
 ### 51201 — 定时任务调度中心
 
-- **文件**：`src/time.py`
+- **文件**：`src/utils/scheduler_service.py`
 - **职责**：
   - 管理 cron / 一次性定时任务
   - 提供 `/tasks` 端点供 `mcp_scheduler.py` 调用
   - 任务到期时回调 Agent 的 `/system_trigger`
-  - 在启用时恢复 TinyFish 内建竞品巡检任务
+  - 在启用时恢复 TinyFish 内建搜索任务
 - **调用方**：`mcp_scheduler.py`、Agent 内部
 
 ### 51202 — OASIS 论坛服务
@@ -227,7 +227,7 @@ PORT_FRONTEND=51209
 - `POST /team_openclaw_snapshot/restore` — 恢复单个快照
 - `POST /team_openclaw_snapshot/restore_all` — 恢复全部快照
 
-### TinyFish 竞品监控（front.py 本地处理 + TinyFish Web Agent）
+### TinyFish 搜索代理（front.py 本地处理 + TinyFish Web Agent）
 
 - `GET /api/tinyfish/status` — 获取监控配置、目标列表、最近运行、价格变化和最新站点快照
 - `POST /api/tinyfish/run` — 提交 TinyFish 监控任务，可选同步等待完成

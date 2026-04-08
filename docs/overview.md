@@ -14,7 +14,7 @@ Wecli is an OpenAI-compatible AI agent system with:
 - an AI-assisted WeCli Creator that can turn task descriptions or SOP pages into Teams
 - lightweight built-in agents for files, commands, and messaging
 - ACP exchange (acpx) for communicating with external AI agents (OpenClaw, Codex, Claude, Gemini, Aider) via the Agent Client Protocol
-- optional integrations such as OpenClaw, TinyFish competitor monitoring, Telegram, QQ, and Cloudflare Tunnel
+- optional integrations such as OpenClaw, TinyFish internet search agent, Telegram, QQ, and Cloudflare Tunnel
 
 ## Core Concepts
 
@@ -51,7 +51,7 @@ OASIS is the workflow engine behind coordinated persona-driven discussions and e
 - ACP exchange (acpx) for external agent communication in group chat and OASIS workflows
 - Web UI on the local machine
 - scheduled tasks
-- competitor-site monitoring through TinyFish
+- internet search via TinyFish
 - optional bot integration
 - optional public exposure through Cloudflare Tunnel
 
