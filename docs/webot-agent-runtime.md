@@ -34,21 +34,21 @@ This document records the current, running WeBot delegated runtime that is now c
 
 | File | Role |
 |---|---|
-| `src/mcp_webot.py` | Core orchestrator: queues, leases, ultrareview/ultraplan, dream gating, bridge/voice/buddy tools, runtime artifact logging |
-| `src/webot_runtime_store.py` | Durable tables for runs, attempts, inbox, artifacts, session state |
-| `src/webot_service.py` | Runtime API that serializes DTO for the frontend and proxies, tracks workspace descriptions, counts inbox/gate details |
-| `src/webot_runtime.py` | Utility functions (`normalize_session_mode`, mode messages, stop conditions, max_turn resolution) |
-| `src/webot_context.py` | Context budgeting, artifact logging for oversized inputs/results, compaction guardrails |
-| `src/webot_policy.py` | Policy normalization, hook/approval parsing, event enumeration |
-| `src/agent.py` | Permits MCP tools, enforces tool filtering, injects runtime prompts, loads `webot_runtime` helpers |
-| `src/webot_bridge.py` | Browser-native bridge session issuance, websocket connection registry, publish helpers |
-| `src/webot_memory.py` | Per-project memory directories, Kairos state, daily logs, dream summaries |
-| `src/webot_buddy.py` | Deterministic companion generation plus durable reaction state |
-| `src/webot_voice.py` | Session voice defaults/state adapter layered on top of existing audio providers |
-| `src/front_webot_routes.py` | Flask proxies for runtime APIs, bridging the JS UI with FastAPI backends |
-| `src/webot_profiles.py` | Profile definitions plus helper to build/parse `subagent__...` session ids |
-| `src/webot_workspace.py` | Worktree/remote/shared workspace resolution describing `workspace_mode` for the runtime card |
-| `src/ops_service.py` | Text-to-speech (voice) backend that feeds audio metadata into runtime payloads |
+| `src/mcp_servers/webot.py` | Core orchestrator: queues, leases, ultrareview/ultraplan, dream gating, bridge/voice/buddy tools, runtime artifact logging |
+| `src/webot/runtime_store.py` | Durable tables for runs, attempts, inbox, artifacts, session state |
+| `src/webot/service.py` | Runtime API that serializes DTO for the frontend and proxies, tracks workspace descriptions, counts inbox/gate details |
+| `src/webot/runtime.py` | Utility functions (`normalize_session_mode`, mode messages, stop conditions, max_turn resolution) |
+| `src/webot/context.py` | Context budgeting, artifact logging for oversized inputs/results, compaction guardrails |
+| `src/webot/policy.py` | Policy normalization, hook/approval parsing, event enumeration |
+| `src/core/agent.py` | Permits MCP tools, enforces tool filtering, injects runtime prompts, loads `webot_runtime` helpers |
+| `src/webot/bridge.py` | Browser-native bridge session issuance, websocket connection registry, publish helpers |
+| `src/webot/memory.py` | Per-project memory directories, Kairos state, daily logs, dream summaries |
+| `src/webot/buddy.py` | Deterministic companion generation plus durable reaction state |
+| `src/webot/voice.py` | Session voice defaults/state adapter layered on top of existing audio providers |
+| `src/routes/front_webot_routes.py` | Flask proxies for runtime APIs, bridging the JS UI with FastAPI backends |
+| `src/webot/profiles.py` | Profile definitions plus helper to build/parse `subagent__...` session ids |
+| `src/webot/workspace.py` | Worktree/remote/shared workspace resolution describing `workspace_mode` for the runtime card |
+| `src/api/ops_service.py` | Text-to-speech (voice) backend that feeds audio metadata into runtime payloads |
 
 ## Runtime Best Practices
 

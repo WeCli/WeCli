@@ -10,10 +10,10 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-import webot_subagents as store
-import webot_workspace
-from webot_subagents import create_subagent_record, upsert_subagent
-from webot_workspace import resolve_session_workspace
+import webot.subagents as store
+import webot.workspace as webot_workspace
+from webot.subagents import create_subagent_record, upsert_subagent
+from webot.workspace import resolve_session_workspace
 
 
 class WeBotWorkspaceTests(unittest.TestCase):

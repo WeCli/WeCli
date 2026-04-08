@@ -2,7 +2,9 @@
 
 **[中文版 README](./README_CN.md)**
 
-![Wecli Poster](docs/poster.jpg)
+<p align="center">
+  <img src="docs/poster.jpg" alt="Wecli Poster" width="360" />
+</p>
 
 > **An OpenAI-compatible local AI workspace with Teams, visual multi-agent orchestration, OASIS Town, living GraphRAG memory, multimodal I/O, bots, scheduled tasks, and one-click public access.**
 
@@ -10,7 +12,7 @@
 
 <p align="center">
   <a href="https://youtube.com/shorts/OKuZNwz-CP0">
-    <img src="./docs/media/wecli-demo-poster.jpg" alt="Wecli demo video" width="100%" />
+    <img src="./docs/media/wecli-demo-poster.jpg" alt="Wecli demo video" width="360" />
   </a>
 </p>
 

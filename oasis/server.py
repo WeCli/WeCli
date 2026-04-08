@@ -17,7 +17,6 @@ import subprocess
 import sys
 import asyncio
 import uuid
-import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -110,7 +109,7 @@ _src_path = os.path.join(_project_root, "src")
 if _src_path not in sys.path:
     sys.path.insert(0, _src_path)
 try:
-    from mcp_oasis import _yaml_to_layout_data
+    from mcp_servers.oasis import _yaml_to_layout_data
 except Exception:
     _yaml_to_layout_data = None
 

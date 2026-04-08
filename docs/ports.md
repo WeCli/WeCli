@@ -7,7 +7,7 @@
 | 端口 | 环境变量 | 服务文件 | 说明 | 绑定地址 | 对外暴露 |
 |------|----------|----------|------|----------|----------|
 | **51200** | `PORT_AGENT` | `src/mainagent.py` | AI Agent 主服务（OpenAI 兼容 API） | `127.0.0.1` | 否 |
-| **51201** | `PORT_SCHEDULER` | `src/time.py` | 定时任务调度中心 | `127.0.0.1` | 否 |
+| **51201** | `PORT_SCHEDULER` | `src/utils/scheduler_service.py` | 定时任务调度中心 | `127.0.0.1` | 否 |
 | **51202** | `PORT_OASIS` | `oasis/server.py` | OASIS 论坛 / Agent 管理与编排中心 | `127.0.0.1` | 否 |
 | **51209** | `PORT_FRONTEND` | `src/front.py` | 前端 Web UI（Flask） | `0.0.0.0` | 是 Tunnel |
 | **51210** | —（硬编码） | `visual/main.py` | 可视化编排系统（开发用） | `0.0.0.0` | 否 |
@@ -29,7 +29,7 @@
 
 ### 51201 — 定时任务调度中心
 
-- **文件**：`src/time.py`
+- **文件**：`src/utils/scheduler_service.py`
 - **职责**：
   - 管理 cron / 一次性定时任务
   - 提供 `/tasks` 端点供 `mcp_scheduler.py` 调用

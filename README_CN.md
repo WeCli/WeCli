@@ -2,7 +2,9 @@
 
 **[English README](./README.md)**
 
-![Wecli Poster](docs/poster.jpg)
+<p align="center">
+  <img src="docs/poster.jpg" alt="Wecli Poster" width="360" />
+</p>
 
 > **一个 OpenAI 兼容的本地 AI 工作台：带 Team、多专家可视化编排、OASIS Town、长期 GraphRAG 记忆、多模态输入输出、Bot、定时任务，以及一键公网访问。**
 
@@ -10,7 +12,7 @@
 
 <p align="center">
   <a href="https://youtube.com/shorts/OKuZNwz-CP0">
-    <img src="./docs/media/wecli-demo-poster.jpg" alt="Wecli 演示视频" width="100%" />
+    <img src="./docs/media/wecli-demo-poster.jpg" alt="Wecli 演示视频" width="360" />
   </a>
 </p>
 

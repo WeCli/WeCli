@@ -10,7 +10,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-import team_preset_assets
+import services.team_preset_assets as team_preset_assets
 
 
 class TeamPresetAssetsTests(unittest.TestCase):

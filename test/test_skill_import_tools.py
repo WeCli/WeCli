@@ -8,7 +8,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-import skill_import_tools as tools
+import services.skill_import_tools as tools
 
 
 class SkillImportToolsTests(unittest.TestCase):

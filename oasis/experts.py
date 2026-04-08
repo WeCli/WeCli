@@ -54,8 +54,8 @@ _ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # 确保 src/ 在 import 路径中，以便导入 llm_factory
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
-from acpx_adapter import AcpxError, get_acpx_adapter
-from llm_factory import create_chat_model, extract_text
+from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+from services.llm_factory import create_chat_model, extract_text
 
 from oasis.forum import DiscussionForum
 

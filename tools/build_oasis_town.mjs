@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, '..');
 
 const entry = path.join(root, 'frontend/oasis-town/src/index.ts');
-const out = path.join(root, 'src/static/js/oasis-town.bundle.js');
+const out = path.join(root, 'frontend/js/oasis-town.bundle.js');
 
 await esbuild.build({
   entryPoints: [entry],

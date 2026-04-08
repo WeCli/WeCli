@@ -8,7 +8,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from acpx_adapter import AcpxAdapter  # noqa: E402
+from integrations.acpx_adapter import AcpxAdapter  # noqa: E402
 
 
 def test_extract_text_jsonrpc_agent_message_chunks():

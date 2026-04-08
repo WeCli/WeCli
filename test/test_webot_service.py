@@ -22,8 +22,8 @@ if "fastapi" not in sys.modules:
     fastapi_stub.HTTPException = HTTPException
     sys.modules["fastapi"] = fastapi_stub
 
-from webot_models import WeBotSubagentHistoryRequest, WeBotSubagentRefRequest
-from webot_models import (
+from webot.models import WeBotSubagentHistoryRequest, WeBotSubagentRefRequest
+from webot.models import (
     WeBotApprovalResolutionRequest,
     WeBotBridgeAttachRequest,
     WeBotBridgeDetachRequest,
@@ -39,10 +39,11 @@ from webot_models import (
     WeBotVoiceStateUpdateRequest,
     WeBotWorkflowPresetApplyRequest,
 )
-import webot_policy
-import webot_runtime_store as runtime_store
-from webot_service import WeBotService
-from webot_subagents import create_subagent_record, upsert_subagent
+import webot.memory as webot_memory
+import webot.policy as policy
+import webot.runtime_store as runtime_store
+from webot.service import WeBotService
+from webot.subagents import create_subagent_record, upsert_subagent
 
 
 class HumanMessage:
@@ -103,7 +104,7 @@ class _FakeAgent:
 class WeBotServiceTests(unittest.IsolatedAsyncioTestCase):
     async def test_list_history_and_cancel_subagent(self):
         with TemporaryDirectory() as tmpdir:
-            import webot_subagents as store
+            import webot.subagents as store
             original_db_path = store.DEFAULT_DB_PATH
             original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
             store.DEFAULT_DB_PATH = Path(tmpdir) / "subagents.db"
@@ -164,13 +165,13 @@ class WeBotServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_session_runtime_and_approval_resolution(self):
         with TemporaryDirectory() as tmpdir:
-            import webot_subagents as store
+            import webot.subagents as store
             original_db_path = store.DEFAULT_DB_PATH
             original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
-            original_policy_root = webot_policy.PROJECT_ROOT
+            original_policy_root = policy.PROJECT_ROOT
             store.DEFAULT_DB_PATH = Path(tmpdir) / "subagents.db"
             runtime_store.DEFAULT_DB_PATH = Path(tmpdir) / "runtime.db"
-            webot_policy.PROJECT_ROOT = Path(tmpdir)
+            policy.PROJECT_ROOT = Path(tmpdir)
             try:
                 service = WeBotService(
                     agent=_FakeAgent({}, active_keys=set(), statuses={}),
@@ -205,7 +206,7 @@ class WeBotServiceTests(unittest.IsolatedAsyncioTestCase):
                     ),
                     None,
                 )
-                webot_policy.save_tool_policy_config(
+                policy.save_tool_policy_config(
                     "alice",
                     {"tools": {"run_command": {"approval": "manual"}}},
                     project_root=tmpdir,
@@ -236,11 +237,11 @@ class WeBotServiceTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 store.DEFAULT_DB_PATH = original_db_path
                 runtime_store.DEFAULT_DB_PATH = original_runtime_db_path
-                webot_policy.PROJECT_ROOT = original_policy_root
+                policy.PROJECT_ROOT = original_policy_root
 
     async def test_workflow_preset_application_and_run_recovery_are_exposed(self):
         with TemporaryDirectory() as tmpdir:
-            import webot_subagents as store
+            import webot.subagents as store
             original_db_path = store.DEFAULT_DB_PATH
             original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
             store.DEFAULT_DB_PATH = Path(tmpdir) / "subagents.db"
@@ -310,8 +311,8 @@ class WeBotServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_session_control_plane_features(self):
         with TemporaryDirectory() as tmpdir:
-            import webot_subagents as store
-            import webot_memory
+            import webot.subagents as store
+            import webot.memory
             original_db_path = store.DEFAULT_DB_PATH
             original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
             original_memory_root = webot_memory.PROJECT_ROOT
@@ -396,7 +397,7 @@ class WeBotServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_session_inbox_send_and_deliver(self):
         with TemporaryDirectory() as tmpdir:
-            import webot_subagents as store
+            import webot.subagents as store
             original_db_path = store.DEFAULT_DB_PATH
             original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
             store.DEFAULT_DB_PATH = Path(tmpdir) / "subagents.db"
