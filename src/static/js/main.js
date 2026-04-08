@@ -2221,7 +2221,7 @@ const SESSION_RUNTIME_PANEL_MIN_HEIGHT = 140;
 const SESSION_RUNTIME_LIST_MIN_HEIGHT = 120;
 let _sessionPanelResizeState = null;
 
-function _teamBotBridgeWsUrl(path) {
+function _weBotBridgeWsUrl(path) {
     if (!path) return '';
     if (/^wss?:\/\//i.test(path)) return path;
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -2229,7 +2229,7 @@ function _teamBotBridgeWsUrl(path) {
     return `${protocol}//${window.location.host}${normalized}`;
 }
 
-function _teamBotBridgeSocketLabel(sessionId) {
+function _weBotBridgeSocketLabel(sessionId) {
     const socket = _webotBridgeSockets[sessionId];
     if (!socket) return 'idle';
     switch (socket.readyState) {
@@ -2324,7 +2324,7 @@ function _connectWeBotBridgeSocket(sessionId, bridgeRecord, force = false) {
         return;
     }
     _closeWeBotBridgeSocket(sessionId);
-    const socketUrl = _teamBotBridgeWsUrl(bridgeRecord.websocket_path);
+    const socketUrl = _weBotBridgeWsUrl(bridgeRecord.websocket_path);
     if (!socketUrl) return;
     const socket = new WebSocket(socketUrl);
     _webotBridgeSockets[sessionId] = socket;
@@ -2636,7 +2636,7 @@ function _buildExtendedSections(runtime, item) {
         const bridge = runtime.bridge || {};
         const primary = bridge.primary || (Array.isArray(bridge.sessions) ? bridge.sessions[0] : {}) || {};
         const canDetach = !!(primary && primary.bridge_id);
-        const socketState = _teamBotBridgeSocketLabel(sessionId);
+        const socketState = _weBotBridgeSocketLabel(sessionId);
         sections.push(`
             <div class="webot-runtime-section">
                 <div class="webot-runtime-title">Bridge</div>

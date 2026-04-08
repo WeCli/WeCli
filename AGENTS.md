@@ -16,7 +16,7 @@ argument-hint: "[RECOMMENDED] LLM_API_KEY, LLM_BASE_URL (auto-detected from Open
 
 metadata:
   version: "1.1.0"
-  github: "https://github.com/BorisGuo6/Wecli"
+  github: "https://github.com/WeCli/WeCli"
   ports:
     agent: 51200
     scheduler: 51201

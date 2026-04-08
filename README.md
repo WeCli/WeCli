@@ -2,20 +2,20 @@
 
 **[中文版 README](./README_CN.md)**
 
-![Wecli Poster](docs/poster.png)
+![Wecli Poster](docs/poster.jpg)
 
 > **An OpenAI-compatible local AI workspace with Teams, visual multi-agent orchestration, OASIS Town, living GraphRAG memory, multimodal I/O, bots, scheduled tasks, and one-click public access.**
 
 ## Product Video
 
 <p align="center">
-  <a href="https://youtu.be/amg87hiLRW0">
+  <a href="https://youtube.com/shorts/OKuZNwz-CP0">
     <img src="./docs/media/wecli-demo-poster.jpg" alt="Wecli demo video" width="100%" />
   </a>
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/amg87hiLRW0">Watch the Wecli demo video on YouTube</a>
+  <a href="https://youtube.com/shorts/OKuZNwz-CP0">Watch the Wecli demo video on YouTube</a>
 </p>
 
 ## Quick Start
@@ -25,7 +25,7 @@
 Open any AI coding assistant such as **Codex**, **Cursor**, **Claude Code**, **CodeBuddy**, or **Trae**, and say:
 
 ```text
-Clone https://github.com/BorisGuo6/Wecli.git, read AGENTS.md, and install Wecli.
+Clone https://github.com/WeCli/WeCli.git, read AGENTS.md, and install Wecli.
 ```
 
 ### Manual Setup

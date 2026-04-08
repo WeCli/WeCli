@@ -2,20 +2,20 @@
 
 **[English README](./README.md)**
 
-![Wecli Poster](docs/poster.png)
+![Wecli Poster](docs/poster.jpg)
 
 > **一个 OpenAI 兼容的本地 AI 工作台：带 Team、多专家可视化编排、OASIS Town、长期 GraphRAG 记忆、多模态输入输出、Bot、定时任务，以及一键公网访问。**
 
 ## 产品视频
 
 <p align="center">
-  <a href="https://youtu.be/amg87hiLRW0">
+  <a href="https://youtube.com/shorts/OKuZNwz-CP0">
     <img src="./docs/media/wecli-demo-poster.jpg" alt="Wecli 演示视频" width="100%" />
   </a>
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/amg87hiLRW0">点击在 YouTube 观看 Wecli 演示视频</a>
+  <a href="https://youtube.com/shorts/OKuZNwz-CP0">点击在 YouTube 观看 Wecli 演示视频</a>
 </p>
 
 ## 快速开始
@@ -25,7 +25,7 @@
 在 **Codex**、**Cursor**、**Claude Code**、**CodeBuddy**、**Trae** 之类的 AI 编码助手里输入：
 
 ```text
-Clone https://github.com/BorisGuo6/Wecli.git，读取 AGENTS.md，然后安装 Wecli。
+Clone https://github.com/WeCli/WeCli.git，读取 AGENTS.md，然后安装 Wecli。
 ```
 
 ### 手动安装
