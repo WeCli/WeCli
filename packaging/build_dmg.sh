@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================
-#  TeamBot macOS 打包脚本
+#  WeBot macOS 打包脚本
 #  生成 .app 应用包 + DMG/tar.gz
 #  用法: bash packaging/build_dmg.sh
 # ==============================================
@@ -8,9 +8,9 @@
 set -e
 
 # ---- 配置 ----
-APP_NAME="TeamBot"
+APP_NAME="WeBot"
 VERSION="1.0.0"
-BUNDLE_ID="com.teambot.app"
+BUNDLE_ID="com.webot.app"
 DMG_NAME="${APP_NAME}_${VERSION}.dmg"
 
 # 项目根目录
@@ -66,7 +66,7 @@ cat > "${CONTENTS}/Info.plist" << PLIST
     <key>CFBundleName</key>
     <string>${APP_NAME}</string>
     <key>CFBundleDisplayName</key>
-    <string>TeamBot</string>
+    <string>WeBot</string>
     <key>CFBundleIdentifier</key>
     <string>${BUNDLE_ID}</string>
     <key>CFBundleVersion</key>
@@ -88,7 +88,7 @@ cat > "${CONTENTS}/Info.plist" << PLIST
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>TeamBot 需要控制终端来启动服务</string>
+    <string>WeBot 需要控制终端来启动服务</string>
 </dict>
 </plist>
 PLIST
@@ -98,7 +98,7 @@ echo "  ✅ Info.plist"
 # ---- 3b. 创建启动器脚本（Contents/MacOS/launch）----
 cat > "${MACOS_DIR}/launch" << 'LAUNCHER'
 #!/bin/bash
-# TeamBot .app 启动器
+# WeBot .app 启动器
 # 双击 .app 时 macOS 会执行此脚本
 
 # 获取 Resources 目录（项目文件所在位置）
@@ -226,22 +226,22 @@ fi
 # ---- 3e. 生成使用说明 ----
 cat > "${BUILD_DIR}/使用说明.txt" << 'GUIDE'
 ==========================================
-  TeamBot macOS 使用说明
+  WeBot macOS 使用说明
 ==========================================
 
 【安装】
-  将 TeamBot.app 拖到「应用程序」文件夹
+  将 WeBot.app 拖到「应用程序」文件夹
   （或任意你喜欢的位置）
 
 【首次启动】
-  1. 双击 TeamBot.app
+  1. 双击 WeBot.app
   2. 如果弹出"无法验证开发者"提示：
      → 右键点击 app → 选择「打开」→ 点击「打开」
-     → 或在终端执行: xattr -cr /path/to/TeamBot.app
+     → 或在终端执行: xattr -cr /path/to/WeBot.app
   3. 首次运行会自动在终端中打开，按提示配置
 
 【日常启动】
-  双击 TeamBot.app 即可
+  双击 WeBot.app 即可
 
 【访问地址】
   启动后浏览器打开: http://127.0.0.1:51209

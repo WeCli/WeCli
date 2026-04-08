@@ -1,6 +1,6 @@
 # Create OASIS Workflow YAML
 
-> This document describes the OASIS workflow YAML format (Version 2 — Graph Mode) and how to create workflow schedules for TeamClaw teams. The format rules are extracted from the visual orchestrator prompt system.
+> This document describes the OASIS workflow YAML format (Version 2 — Graph Mode) and how to create workflow schedules for Wecli teams. The format rules are extracted from the visual orchestrator prompt system.
 
 ---
 
@@ -75,9 +75,9 @@ plan:
 selector_edges:
   - source: router
     choices:
-      1: branch_a                  # {"teamclaw_type": "oasis choose", "choose": 1} → branch_a
-      2: branch_b                  # {"teamclaw_type": "oasis choose", "choose": 2} → branch_b
-      3: __end__                   # {"teamclaw_type": "oasis choose", "choose": 3} → end
+      1: branch_a                  # {"wecli_type": "oasis choose", "choose": 1} → branch_a
+      2: branch_b                  # {"wecli_type": "oasis choose", "choose": 2} → branch_b
+      3: __end__                   # {"wecli_type": "oasis choose", "choose": 3} → end
 ```
 
 ### 2.4 Parallel Groups (within plan)
@@ -221,7 +221,7 @@ Rules:
 - Use `unix_command` / `windows_command` when the command differs by platform
 - Or use a shared `command` field when one command works everywhere
 - `timeout` is optional; when omitted, the runtime falls back to the workflow timeout defaults
-- `cwd` is optional and is constrained to the TeamClaw project root or current team directory
+- `cwd` is optional and is constrained to the Wecli project root or current team directory
 
 ### 5.3 Human Nodes
 

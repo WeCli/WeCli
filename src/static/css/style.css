@@ -2845,7 +2845,7 @@ header {
 }
 .session-busy-badge.user { background: #dbeafe; color: #2563eb; }
 .session-busy-badge.system { background: #fef3c7; color: #b45309; }
-.teambot-subagent-panel {
+.webot-subagent-panel {
     flex-shrink: 0;
     background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
     padding: 10px 10px 12px;
@@ -2855,25 +2855,25 @@ header {
     flex-direction: column;
     gap: 8px;
 }
-.teambot-subagent-header {
+.webot-subagent-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
 }
-.teambot-subagent-kicker {
+.webot-subagent-kicker {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: #64748b;
 }
-.teambot-subagent-title {
+.webot-subagent-title {
     font-size: 13px;
     font-weight: 700;
     color: #1e293b;
 }
-.teambot-subagent-refresh {
+.webot-subagent-refresh {
     border: 1px solid #cbd5e1;
     background: rgba(255,255,255,0.8);
     color: #334155;
@@ -2883,18 +2883,18 @@ header {
     font-weight: 600;
     cursor: pointer;
 }
-.teambot-subagent-refresh:hover {
+.webot-subagent-refresh:hover {
     background: #ffffff;
     border-color: #94a3b8;
 }
-.teambot-subagent-list {
+.webot-subagent-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
     overflow-y: auto;
     min-height: 72px;
 }
-.teambot-subagent-item {
+.webot-subagent-item {
     border: 1px solid rgba(148, 163, 184, 0.35);
     background: rgba(255,255,255,0.88);
     border-radius: 12px;
@@ -2902,22 +2902,22 @@ header {
     cursor: pointer;
     transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.teambot-subagent-item:hover {
+.webot-subagent-item:hover {
     transform: translateY(-1px);
     border-color: rgba(79, 70, 229, 0.45);
     box-shadow: 0 8px 18px rgba(79, 70, 229, 0.08);
 }
-.teambot-subagent-item.active {
+.webot-subagent-item.active {
     border-color: rgba(79, 70, 229, 0.55);
     background: #eef2ff;
 }
-.teambot-subagent-item-row {
+.webot-subagent-item-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
 }
-.teambot-subagent-name {
+.webot-subagent-name {
     min-width: 0;
     font-size: 12px;
     font-weight: 700;
@@ -2926,12 +2926,12 @@ header {
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.teambot-subagent-meta {
+.webot-subagent-meta {
     font-size: 11px;
     color: #64748b;
     margin-top: 4px;
 }
-.teambot-subagent-status {
+.webot-subagent-status {
     flex-shrink: 0;
     font-size: 10px;
     font-weight: 700;
@@ -2942,55 +2942,55 @@ header {
     background: #e2e8f0;
     color: #475569;
 }
-.teambot-subagent-status.running,
-.teambot-subagent-status.queued {
+.webot-subagent-status.running,
+.webot-subagent-status.queued {
     background: #dbeafe;
     color: #1d4ed8;
 }
-.teambot-subagent-status.completed {
+.webot-subagent-status.completed {
     background: #dcfce7;
     color: #166534;
 }
-.teambot-subagent-status.failed {
+.webot-subagent-status.failed {
     background: #fee2e2;
     color: #b91c1c;
 }
-.teambot-subagent-status.cancelled {
+.webot-subagent-status.cancelled {
     background: #fef3c7;
     color: #b45309;
 }
-.teambot-subagent-status.stale {
+.webot-subagent-status.stale {
     background: #ede9fe;
     color: #6d28d9;
 }
-.teambot-subagent-empty {
+.webot-subagent-empty {
     font-size: 12px;
     color: #64748b;
     text-align: center;
     padding: 16px 10px;
 }
-.teambot-subagent-detail {
+.webot-subagent-detail {
     border-top: 1px solid rgba(148, 163, 184, 0.32);
     padding-top: 8px;
 }
-.teambot-subagent-detail-card {
+.webot-subagent-detail-card {
     border: 1px solid rgba(148, 163, 184, 0.3);
     border-radius: 12px;
     background: rgba(255,255,255,0.82);
     padding: 10px;
 }
-.teambot-subagent-detail-header {
+.webot-subagent-detail-header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 8px;
 }
-.teambot-subagent-detail-actions {
+.webot-subagent-detail-actions {
     display: flex;
     align-items: center;
     gap: 6px;
 }
-.teambot-subagent-btn {
+.webot-subagent-btn {
     border: 1px solid #cbd5e1;
     background: white;
     color: #334155;
@@ -3000,16 +3000,16 @@ header {
     font-weight: 600;
     cursor: pointer;
 }
-.teambot-subagent-btn:hover {
+.webot-subagent-btn:hover {
     border-color: #94a3b8;
     background: #f8fafc;
 }
-.teambot-subagent-btn.danger {
+.webot-subagent-btn.danger {
     border-color: #fecaca;
     color: #b91c1c;
     background: #fef2f2;
 }
-.teambot-subagent-detail-copy {
+.webot-subagent-detail-copy {
     margin-top: 8px;
     font-size: 11px;
     color: #475569;
@@ -3019,42 +3019,42 @@ header {
     max-height: 160px;
     overflow-y: auto;
 }
-.teambot-runtime-shell {
+.webot-runtime-shell {
     margin-top: 8px;
 }
-.teambot-runtime-grid {
+.webot-runtime-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
 }
-.teambot-current-session-card {
+.webot-current-session-card {
     padding: 12px;
     border-radius: 10px;
     background: linear-gradient(180deg, rgba(37,99,235,0.08), rgba(255,255,255,0.95));
     border: 1px solid rgba(37,99,235,0.35);
     margin-bottom: 10px;
 }
-.teambot-current-card-header {
+.webot-current-card-header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     gap: 10px;
 }
-.teambot-current-card-title {
+.webot-current-card-title {
     font-weight: 600;
 }
-.teambot-mode-row {
+.webot-mode-row {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
     margin-bottom: 8px;
 }
-.teambot-mode-actions {
+.webot-mode-actions {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;
 }
-.teambot-mode-btn {
+.webot-mode-btn {
     padding: 4px 10px;
     border-radius: 4px;
     border: 1px solid rgba(37,99,235,0.5);
@@ -3063,11 +3063,11 @@ header {
     font-size: 11px;
     cursor: pointer;
 }
-.teambot-mode-btn.is-active {
+.webot-mode-btn.is-active {
     background: #2563eb;
     color: #fff;
 }
-.teambot-runtime-section {
+.webot-runtime-section {
     border: 1px solid rgba(148, 163, 184, 0.24);
     border-radius: 10px;
     background: #f8fafc;
@@ -3076,26 +3076,26 @@ header {
     flex-direction: column;
     gap: 6px;
 }
-.teambot-runtime-section-full {
+.webot-runtime-section-full {
     grid-column: 1 / -1;
 }
-.teambot-runtime-title {
+.webot-runtime-title {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: #6366f1;
 }
-.teambot-runtime-caption {
+.webot-runtime-caption {
     font-size: 10px;
     color: #64748b;
 }
-.teambot-runtime-row {
+.webot-runtime-row {
     display: flex;
     align-items: flex-start;
     gap: 6px;
 }
-.teambot-runtime-badge {
+.webot-runtime-badge {
     flex-shrink: 0;
     border-radius: 999px;
     padding: 2px 7px;
@@ -3105,35 +3105,35 @@ header {
     font-weight: 700;
     text-transform: uppercase;
 }
-.teambot-runtime-text {
+.webot-runtime-text {
     min-width: 0;
     font-size: 11px;
     color: #334155;
     line-height: 1.45;
     word-break: break-word;
 }
-.teambot-runtime-detail {
+.webot-runtime-detail {
     font-size: 11px;
     color: #475569;
     line-height: 1.5;
     white-space: pre-wrap;
     word-break: break-word;
 }
-.teambot-runtime-empty {
+.webot-runtime-empty {
     font-size: 11px;
     color: #64748b;
 }
-.teambot-runtime-block {
+.webot-runtime-block {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
-.teambot-runtime-actions {
+.webot-runtime-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
 }
-.teambot-subagent-history {
+.webot-subagent-history {
     margin-top: 8px;
     max-height: 180px;
     overflow-y: auto;
@@ -3141,48 +3141,48 @@ header {
     flex-direction: column;
     gap: 6px;
 }
-.teambot-subagent-history-item {
+.webot-subagent-history-item {
     border-radius: 8px;
     padding: 7px 8px;
     background: #f8fafc;
     border: 1px solid rgba(226, 232, 240, 0.9);
 }
-.teambot-subagent-history-role {
+.webot-subagent-history-role {
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     color: #6366f1;
     letter-spacing: 0.04em;
 }
-.teambot-subagent-history-content {
+.webot-subagent-history-content {
     margin-top: 4px;
     font-size: 11px;
     color: #334155;
     white-space: pre-wrap;
     word-break: break-word;
 }
-.teambot-policy-panel {
+.webot-policy-panel {
     border-top: 1px solid rgba(148, 163, 184, 0.28);
     padding-top: 8px;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
-.teambot-policy-header,
-.teambot-policy-row {
+.webot-policy-header,
+.webot-policy-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
 }
-.teambot-policy-actions {
+.webot-policy-actions {
     display: flex;
     align-items: center;
     gap: 6px;
 }
-.teambot-policy-summary,
-.teambot-policy-meta,
-.teambot-policy-status {
+.webot-policy-summary,
+.webot-policy-meta,
+.webot-policy-status {
     border: 1px solid rgba(148, 163, 184, 0.24);
     background: rgba(255,255,255,0.78);
     border-radius: 12px;
@@ -3193,17 +3193,17 @@ header {
     white-space: pre-wrap;
     word-break: break-word;
 }
-.teambot-policy-editor-wrap {
+.webot-policy-editor-wrap {
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
-.teambot-policy-label {
+.webot-policy-label {
     font-size: 11px;
     font-weight: 700;
     color: #334155;
 }
-.teambot-policy-select {
+.webot-policy-select {
     border: 1px solid #cbd5e1;
     border-radius: 10px;
     background: white;
@@ -3212,7 +3212,7 @@ header {
     font-weight: 600;
     padding: 6px 9px;
 }
-.teambot-policy-editor {
+.webot-policy-editor {
     width: 100%;
     min-height: 190px;
     resize: vertical;
@@ -3226,26 +3226,26 @@ header {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
 }
-.teambot-policy-editor:focus {
+.webot-policy-editor:focus {
     outline: none;
     border-color: rgba(79, 70, 229, 0.56);
     box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
 }
-.teambot-policy-actions-footer {
+.webot-policy-actions-footer {
     justify-content: flex-end;
 }
-.teambot-policy-status {
+.webot-policy-status {
     display: none;
 }
-.teambot-policy-status.is-visible {
+.webot-policy-status.is-visible {
     display: block;
 }
-.teambot-policy-status.is-error {
+.webot-policy-status.is-error {
     border-color: rgba(248, 113, 113, 0.34);
     background: #fff1f2;
     color: #be123c;
 }
-.teambot-policy-status.is-success {
+.webot-policy-status.is-success {
     border-color: rgba(74, 222, 128, 0.34);
     background: #f0fdf4;
     color: #166534;
@@ -3262,13 +3262,13 @@ body.session-panel-resizing * {
         position: fixed; left: 0; top: 0; z-index: 200; width: 75vw; max-width: 300px;
         box-shadow: 4px 0 20px rgba(0,0,0,0.15);
     }
-    .teambot-subagent-panel {
+    .webot-subagent-panel {
         min-height: 140px;
     }
-    .teambot-runtime-grid {
+    .webot-runtime-grid {
         grid-template-columns: 1fr;
     }
-    .teambot-policy-editor {
+    .webot-policy-editor {
         min-height: 160px;
     }
     .session-overlay {

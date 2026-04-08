@@ -1,4 +1,4 @@
-# TeamClaw Repository Index
+# Wecli Repository Index
 
 Use this file when an agent needs to **index the repo before reading code**. It is a task-oriented map of the main files and directories.
 
@@ -36,7 +36,7 @@ Read these first for setup or environment changes:
 | `selfskill/scripts/run.sh` | primary Linux / macOS install, configure, start flow |
 | `selfskill/scripts/run.ps1` | primary Windows install, configure, start flow |
 | `selfskill/scripts/configure.py` | `.env` initialization and configuration logic |
-| `selfskill/scripts/configure_openclaw.py` | OpenClaw detection plus TeamClaw/OpenClaw LLM sync logic |
+| `selfskill/scripts/configure_openclaw.py` | OpenClaw detection plus Wecli/OpenClaw LLM sync logic |
 | `config/.env.example` | config template and inline guidance |
 | `config/tinyfish_targets.example.json` | example TinyFish competitor target schema |
 | `scripts/setup_apikey.sh` | legacy API key helper |
@@ -51,14 +51,14 @@ If the issue is model detection or provider-specific behavior, inspect:
 
 ## Runtime Entry Points
 
-These are the main services TeamClaw runs:
+These are the main services Wecli runs:
 
 | Path | Service |
 |---|---|
 | `src/mainagent.py` | Agent API bootstrap and router composition |
 | `src/front.py` | Flask frontend and proxy gateway |
 | `src/time.py` | scheduler service |
-| `src/team_creator_service.py` | Team Creator discovery, extraction, build, jobs, and translation pipeline |
+| `src/team_creator_service.py` | WeCli Creator discovery, extraction, build, jobs, and translation pipeline |
 | `src/tinyfish_monitor_service.py` | shared TinyFish monitor runtime used by frontend, scheduler, and CLI |
 | `oasis/server.py` | OASIS service |
 | `scripts/launcher.py` | multi-service startup order |
@@ -110,16 +110,16 @@ When the bug is "service does not start" or "route behaves unexpectedly", start 
 - `src/agent.py`
 - `src/agent_runtime_state.py`
 - `src/acpx_adapter.py`
-- `src/teambot_context.py`
-- `src/teambot_permission_context.py`
-- `src/teambot_policy.py`
-- `src/teambot_profiles.py`
-- `src/teambot_routes.py`
-- `src/teambot_runtime.py`
-- `src/teambot_runtime_store.py`
-- `src/teambot_service.py`
-- `src/teambot_subagents.py`
-- `src/teambot_workspace.py`
+- `src/webot_context.py`
+- `src/webot_permission_context.py`
+- `src/webot_policy.py`
+- `src/webot_profiles.py`
+- `src/webot_routes.py`
+- `src/webot_runtime.py`
+- `src/webot_runtime_store.py`
+- `src/webot_service.py`
+- `src/webot_subagents.py`
+- `src/webot_workspace.py`
 - `src/logging_utils.py`
 
 ## Frontend Map
@@ -130,11 +130,11 @@ If the task touches the UI, start here:
 |---|---|
 | `src/static/js/main.js` | main desktop frontend logic |
 | `src/static/css/style.css` | main desktop styling, including OASIS Town / swarm / ReportAgent panels |
-| `src/front_teambot_routes.py` | Flask proxy routes for TeamBot runtime panel and tool policy |
-| `src/static/js/creator.js` | Team Creator page logic, i18n, persistence, DAG preview |
-| `src/static/css/creator.css` | Team Creator styles and DAG layout |
+| `src/front_webot_routes.py` | Flask proxy routes for WeBot runtime panel and tool policy |
+| `src/static/js/creator.js` | WeCli Creator page logic, i18n, persistence, DAG preview |
+| `src/static/css/creator.css` | WeCli Creator styles and DAG layout |
 | `src/static/js/orchestration.js` | Studio canvas logic, including `Generate Team` |
-| `src/templates/creator.html` | Team Creator HTML shell |
+| `src/templates/creator.html` | WeCli Creator HTML shell |
 | `src/templates/group_chat_mobile.html` | mobile group chat page and mobile settings UI |
 | `src/templates/` | other HTML templates |
 | `src/static/` | CSS, JS, images |
@@ -175,7 +175,7 @@ For tool execution or tool exposure:
 - `src/mcp_scheduler.py`
 - `src/mcp_search.py`
 - `src/mcp_session.py`
-- `src/mcp_teambot.py`
+- `src/mcp_webot.py`
 - `src/mcp_telegram.py`
 - `src/mcp_llmapi.py`
 
@@ -210,14 +210,14 @@ data/
 ├── agent_memory.db
 ├── group_chat.db
 ├── oasis_graph_memory.db
-├── teambot_subagents.db
+├── webot_subagents.db
 ├── team_creator_jobs.db
 ├── prompts/
 ├── schedules/
 └── user_files/{user_id}/
     ├── user_profile.txt
     ├── skills_manifest.json
-    ├── teambot_agent_profiles.json
+    ├── webot_agent_profiles.json
     ├── oasis/yaml/
     └── teams/{team_name}/
         ├── internal_agents.json
@@ -240,26 +240,26 @@ When changing code, check the nearest validation surface:
 |---|---|
 | `test/test_agent_runtime_state.py` | runtime state unit tests |
 | `test/test_session_service.py` | session API filtering / deletion tests |
-| `test/test_teambot_profiles.py` | TeamBot agent profile unit tests |
-| `test/test_teambot_policy.py` | TeamBot tool policy and hook unit tests |
-| `test/test_teambot_runtime.py` | TeamBot delegated runtime helper tests |
-| `test/test_teambot_service.py` | TeamBot runtime API service tests |
-| `test/test_teambot_subagents.py` | TeamBot subagent metadata store unit tests |
-| `test/test_teambot_orchestration.py` | delegated subagent flow integration tests |
+| `test/test_webot_profiles.py` | WeBot agent profile unit tests |
+| `test/test_webot_policy.py` | WeBot tool policy and hook unit tests |
+| `test/test_webot_runtime.py` | WeBot delegated runtime helper tests |
+| `test/test_webot_service.py` | WeBot runtime API service tests |
+| `test/test_webot_subagents.py` | WeBot subagent metadata store unit tests |
+| `test/test_webot_orchestration.py` | delegated subagent flow integration tests |
 | `test/test_openai_protocol.py` | OpenAI protocol unit tests |
 | `test/test_integration.py` | cross-service integration tests |
-| `test/test_team_creator_jobs.py` | Team Creator job persistence tests |
-| `test/test_team_creator_imports.py` | Team Creator colleague/mentor import and quick-create route tests |
+| `test/test_team_creator_jobs.py` | WeCli Creator job persistence tests |
+| `test/test_team_creator_imports.py` | WeCli Creator colleague/mentor import and quick-create route tests |
 | `test/test_skill_import_tools.py` | ArXiv / Feishu helper conversion tests |
-| `test/test_team_creator_workflow.py` | Team Creator workflow/build tests |
-| `test/test_team_creator_zip.py` | Team Creator ZIP export tests |
+| `test/test_team_creator_workflow.py` | WeCli Creator workflow/build tests |
+| `test/test_team_creator_zip.py` | WeCli Creator ZIP export tests |
 | `test/test_proxy_login_i18n.py` | frontend i18n and login proxy coverage |
 | `test/test_tinyfish_monitor.py` | TinyFish target loading, persistence, and polling tests |
-| `test/test_configure_openclaw_sync.py` | TeamClaw/OpenClaw LLM sync tests |
+| `test/test_configure_openclaw_sync.py` | Wecli/OpenClaw LLM sync tests |
 | `test/test_oasis_swarm_engine.py` | swarm scaffold / blueprint normalization tests |
 | `test/test_oasis_graph_memory.py` | GraphRAG persistence, retrieval, and ReportAgent fallback tests |
 | `test/browser/creator-smoke.spec.js` | Playwright smoke for `/creator` direct mentor/colleague generation flows |
-| `test/browser/studio-smoke.spec.js` | Playwright smoke for `/studio` tabs, settings actions, and TeamBot runtime sidebar |
+| `test/browser/studio-smoke.spec.js` | Playwright smoke for `/studio` tabs, settings actions, and WeBot runtime sidebar |
 | `test/llm_live_smoke.py` | opt-in real provider LLM smoke test |
 | `test/openclaw_live_smoke.py` | opt-in isolated OpenClaw gateway smoke test |
 | `test/cloudflare_live_smoke.py` | opt-in Cloudflare quick tunnel smoke test |
@@ -268,7 +268,7 @@ When changing code, check the nearest validation surface:
 | `python test/tinyfish_live_smoke.py --site <site_key>` | opt-in real TinyFish smoke test |
 | `uv run scripts/cli.py status` | smoke test services |
 | `python -m py_compile <file>` | quick syntax check for touched Python files |
-| `node --check src/static/js/creator.js` | quick Team Creator syntax check |
+| `node --check src/static/js/creator.js` | quick WeCli Creator syntax check |
 | `node --check src/static/js/main.js` | quick JS syntax check |
 
 ## Task-to-File Lookup
@@ -318,7 +318,7 @@ Read:
 - `oasis/swarm_engine.py`
 - `oasis/graph_memory.py`
 
-### "Team Creator or workflow-to-team is wrong"
+### "WeCli Creator or workflow-to-team is wrong"
 
 Read:
 
@@ -342,7 +342,7 @@ Read:
 - `oasis/openclaw_cli.py`
 - `docs/build_team.md`
 
-### "TeamClaw and OpenClaw model settings drift"
+### "Wecli and OpenClaw model settings drift"
 
 Read:
 

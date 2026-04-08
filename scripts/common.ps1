@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 
-function Set-TeamClawUtf8 {
+function Set-WecliUtf8 {
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [Console]::InputEncoding = $utf8NoBom
     [Console]::OutputEncoding = $utf8NoBom
@@ -80,7 +80,7 @@ function Ensure-VenvPython {
     return $pythonPath
 }
 
-function Read-TeamClawEnvFile {
+function Read-WecliEnvFile {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path
@@ -104,7 +104,7 @@ function Read-TeamClawEnvFile {
     return $values
 }
 
-function Set-TeamClawEnvValues {
+function Set-WecliEnvValues {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path,
@@ -355,7 +355,7 @@ function Test-TcpPortExcluded {
     return $false
 }
 
-function Test-TeamClawPortAvailability {
+function Test-WecliPortAvailability {
     param(
         [Parameter(Mandatory = $true)]
         [int]$Port
@@ -379,13 +379,13 @@ function Test-TeamClawPortAvailability {
     }
 }
 
-function Get-TeamClawPortMap {
+function Get-WecliPortMap {
     param(
         [Parameter(Mandatory = $true)]
         [string]$EnvPath
     )
 
-    $envValues = Read-TeamClawEnvFile -Path $EnvPath
+    $envValues = Read-WecliEnvFile -Path $EnvPath
     $agentPort = "51200"
     $schedulerPort = "51201"
     $oasisPort = "51202"
@@ -411,7 +411,7 @@ function Get-TeamClawPortMap {
     }
 }
 
-function Find-TeamClawAvailablePortSet {
+function Find-WecliAvailablePortSet {
     param(
         [int]$StartPort = 53000,
         [int]$EndPort = 64000
@@ -427,7 +427,7 @@ function Find-TeamClawAvailablePortSet {
 
         $allAvailable = $true
         foreach ($port in $candidate.Values) {
-            if (-not (Test-TeamClawPortAvailability -Port $port).Available) {
+            if (-not (Test-WecliPortAvailability -Port $port).Available) {
                 $allAvailable = $false
                 break
             }
@@ -438,19 +438,19 @@ function Find-TeamClawAvailablePortSet {
         }
     }
 
-    throw "Could not find an available local port set for TeamClaw."
+    throw "Could not find an available local port set for Wecli."
 }
 
-function Resolve-TeamClawPortConfiguration {
+function Resolve-WecliPortConfiguration {
     param(
         [Parameter(Mandatory = $true)]
         [string]$EnvPath
     )
 
-    $currentPorts = Get-TeamClawPortMap -EnvPath $EnvPath
+    $currentPorts = Get-WecliPortMap -EnvPath $EnvPath
     $checks = @{}
     foreach ($entry in $currentPorts.GetEnumerator()) {
-        $checks[$entry.Key] = Test-TeamClawPortAvailability -Port $entry.Value
+        $checks[$entry.Key] = Test-WecliPortAvailability -Port $entry.Value
     }
 
     $blocked = @($checks.GetEnumerator() | Where-Object { -not $_.Value.Available })
@@ -487,7 +487,7 @@ function Resolve-TeamClawPortConfiguration {
         }
     }
 
-    $newPorts = Find-TeamClawAvailablePortSet
+    $newPorts = Find-WecliAvailablePortSet
     $updates = @{
         PORT_AGENT = $newPorts["PORT_AGENT"]
         PORT_SCHEDULER = $newPorts["PORT_SCHEDULER"]
@@ -495,7 +495,7 @@ function Resolve-TeamClawPortConfiguration {
         PORT_FRONTEND = $newPorts["PORT_FRONTEND"]
     }
 
-    $envValues = Read-TeamClawEnvFile -Path $EnvPath
+    $envValues = Read-WecliEnvFile -Path $EnvPath
     $currentAgentUrl = "http://127.0.0.1:$($currentPorts["PORT_AGENT"])/v1/chat/completions"
     $currentOasisUrl = "http://127.0.0.1:$($currentPorts["PORT_OASIS"])"
 
@@ -507,7 +507,7 @@ function Resolve-TeamClawPortConfiguration {
         $updates["OASIS_BASE_URL"] = "http://127.0.0.1:$($newPorts["PORT_OASIS"])"
     }
 
-    Set-TeamClawEnvValues -Path $EnvPath -Updates $updates
+    Set-WecliEnvValues -Path $EnvPath -Updates $updates
 
     return [pscustomobject]@{
         AutoUpdated = $true
@@ -519,7 +519,7 @@ function Resolve-TeamClawPortConfiguration {
     }
 }
 
-function Get-TeamClawLogTail {
+function Get-WecliLogTail {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path,

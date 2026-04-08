@@ -284,7 +284,7 @@ class TestCacheBoundary:
     def test_set_sections(self):
         from cache_boundary import SystemPromptCacheManager
         mgr = SystemPromptCacheManager()
-        mgr.set_section("identity", "I am TeamBot")
+        mgr.set_section("identity", "I am WeBot")
         mgr.set_section("tools", "Available tools: read_file, write_file")
         mgr.set_section("runtime_context", "Current plan: none")
         boundary = mgr.compute_boundary()
@@ -294,7 +294,7 @@ class TestCacheBoundary:
     def test_cache_breakpoint(self):
         from cache_boundary import SystemPromptCacheManager
         mgr = SystemPromptCacheManager()
-        mgr.set_section("identity", "I am TeamBot")
+        mgr.set_section("identity", "I am WeBot")
         mgr.set_section("tools", "Tools list")
         mgr.set_section("session_mode", "execute mode")  # This is dynamic
         mgr.set_section("runtime_context", "Runtime data")
@@ -904,13 +904,13 @@ class TestIntegration:
     def test_bash_safety_with_policy(self):
         """Bash safety should work alongside existing policy system."""
         from bash_safety import analyze_command, is_command_blocked
-        from teambot_policy import evaluate_tool_policy, TeamBotToolPolicy
+        from webot_policy import evaluate_tool_policy, WeBotToolPolicy
 
         # Bash safety blocks critical commands
         assert is_command_blocked("rm -rf /")
 
         # Policy can also block commands
-        policy = TeamBotToolPolicy(
+        policy = WeBotToolPolicy(
             tools={"run_command": type(evaluate_tool_policy).__class__}
         )
         # Policy evaluation is independent of bash safety

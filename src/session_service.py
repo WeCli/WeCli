@@ -15,8 +15,8 @@ from session_models import (
     SessionStatusRequest,
 )
 from session_summary import build_session_summary
-from teambot_profiles import is_subagent_session
-from teambot_subagents import delete_subagent_by_session, delete_subagents_for_user
+from webot_profiles import is_subagent_session
+from webot_subagents import delete_subagent_by_session, delete_subagents_for_user
 
 logger = get_logger("session_service")
 

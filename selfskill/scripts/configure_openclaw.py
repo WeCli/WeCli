@@ -3,11 +3,11 @@
 OpenClaw 自动探测与配置工具。
 
 检测本地 OpenClaw 安装状态，自动探测 gateway 端口、sessions 文件路径、
-API token 等配置，并写入 TeamClaw 的 config/.env。
+API token 等配置，并写入 Wecli 的 config/.env。
 
 用法:
     python selfskill/scripts/configure_openclaw.py --auto-detect       # 自动探测并配置（含 workspace 初始化）
-    python selfskill/scripts/configure_openclaw.py --sync-teamclaw-llm # 将 TeamClaw 当前 LLM 配置回写到 OpenClaw
+    python selfskill/scripts/configure_openclaw.py --sync-wecli-llm # 将 Wecli 当前 LLM 配置回写到 OpenClaw
     python selfskill/scripts/configure_openclaw.py --status            # 仅显示检测状态
     python selfskill/scripts/configure_openclaw.py --install-guide     # 输出 OpenClaw 安装/初始化流程
     python selfskill/scripts/configure_openclaw.py --repair-health     # 检查并修复轻量健康问题
@@ -155,8 +155,8 @@ def mask_secret(value):
     return value[:4] + "****" + value[-4:]
 
 
-def _read_teamclaw_env_kvs():
-    """Read TeamClaw config/.env using this module's ENV_PATH (tests patch ENV_PATH).
+def _read_wecli_env_kvs():
+    """Read Wecli config/.env using this module's ENV_PATH (tests patch ENV_PATH).
 
     When configure.read_env is imported, it reads configure.ENV_PATH instead; path
     resolution for OpenClaw must follow configure_openclaw.ENV_PATH.
@@ -202,7 +202,7 @@ def _resolve_openclaw_paths():
     config_path = OPENCLAW_CONFIG_PATH
     models_path = OPENCLAW_AGENT_MODELS_PATH
     try:
-        kvs = _read_teamclaw_env_kvs()
+        kvs = _read_wecli_env_kvs()
         inferred_home = _infer_openclaw_home_from_sessions_file(
             (kvs.get("OPENCLAW_SESSIONS_FILE") or "").strip()
         )
@@ -310,7 +310,7 @@ def print_install_guide():
         print("     curl -fsSL 'https://mirrors.tencent.com/repository/generic/tencent_openclaw/openclaw/install_openclaw.sh' | bash -s -- --token <TOKEN> --bot-id <BOT_ID> --bot-secret <BOT_SECRET>")
         print("  3. 安装完成后执行:")
         print(f"     {sync_cmd}")
-        print("  注: 内网版默认 gateway 端口为 23001，TeamClaw 会自动探测适配。")
+        print("  注: 内网版默认 gateway 端口为 23001，Wecli 会自动探测适配。")
         print("")
         print("=" * 50)
         print("")
@@ -321,7 +321,7 @@ def print_install_guide():
     if is_windows:
         print("  3. Windows / 自动化场景优先使用非交互 onboarding:")
         print("     openclaw onboard --non-interactive --accept-risk --install-daemon")
-        print("     如需复用 TeamClaw 的 OpenAI key，可追加:")
+        print("     如需复用 Wecli 的 OpenAI key，可追加:")
         print("     openclaw onboard --non-interactive --accept-risk --install-daemon --openai-api-key <LLM_API_KEY>")
     else:
         print("  3. 本地交互模式: openclaw onboard --install-daemon")
@@ -330,8 +330,8 @@ def print_install_guide():
     print("  5. 启用 HTTP Chat Completions: openclaw config set gateway.http.endpoints.chatCompletions.enabled true")
     print("  6. 重启 Gateway: openclaw gateway restart")
     print(f"  7. 完成后执行: {sync_cmd}")
-    print("     这一步会自动同步 TeamClaw .env，并清理缺失 transcript 的 session 坏索引")
-    print("  8. 如果 TeamClaw 已在运行，再执行一次 stop -> start，让 OASIS 重新加载 openclaw CLI")
+    print("     这一步会自动同步 Wecli .env，并清理缺失 transcript 的 session 坏索引")
+    print("  8. 如果 Wecli 已在运行，再执行一次 stop -> start，让 OASIS 重新加载 openclaw CLI")
     if is_windows:
         print("")
         print("Windows 本地控制台若提示 'gateway token missing'，有两种做法：")
@@ -691,11 +691,11 @@ def wait_for_gateway_runtime(target="running", timeout=20, interval=1.0):
     return last_runtime
 
 
-def sync_openclaw_runtime_for_teamclaw_startup():
-    """为 TeamClaw 启动准备 OpenClaw runtime。
+def sync_openclaw_runtime_for_wecli_startup():
+    """为 Wecli 启动准备 OpenClaw runtime。
 
     该流程只同步 OpenClaw runtime 相关配置，不会把 OpenClaw 的 LLM 配置
-    自动导入 TeamClaw，避免覆盖用户在 TeamClaw 中维护的 provider/model。
+    自动导入 Wecli，避免覆盖用户在 Wecli 中维护的 provider/model。
     """
     result = {
         "installed": False,
@@ -822,7 +822,7 @@ def detect_llm_config_from_openclaw():
     result: dict[str, str] = {}
 
     def _strip_openclaw_base_url_suffix(base_url: str) -> str:
-        """OpenClaw baseUrl 常带 /v1；TeamClaw LLM_BASE_URL 不带末尾 /v1。"""
+        """OpenClaw baseUrl 常带 /v1；Wecli LLM_BASE_URL 不带末尾 /v1。"""
         u = (base_url or "").strip()
         if not u:
             return u
@@ -980,7 +980,7 @@ def _is_bootstrap_llm_base_url(url: str) -> bool:
 
 
 def _llm_base_url_conflicts_with_openclaw(kvs: dict, detected: dict) -> bool:
-    """TeamClaw 里 BASE_URL 与 OpenClaw 探测结果明显不一致（如 DeepSeek 模板 + MiniMax 模型）。"""
+    """Wecli 里 BASE_URL 与 OpenClaw 探测结果明显不一致（如 DeepSeek 模板 + MiniMax 模型）。"""
     ex_url = (kvs.get("LLM_BASE_URL") or "").strip().lower()
     det_url = (detected.get("LLM_BASE_URL") or "").strip().lower()
     if not det_url or not ex_url:
@@ -998,7 +998,7 @@ def _llm_base_url_conflicts_with_openclaw(kvs: dict, detected: dict) -> bool:
 
 
 def sync_llm_config_from_openclaw():
-    """从 OpenClaw 同步 LLM 配置到 TeamClaw .env。
+    """从 OpenClaw 同步 LLM 配置到 Wecli .env。
 
     仅同步未设置或仍为占位符的字段，不覆盖用户已显式设置的值。
     模板默认的 LLM_BASE_URL（如 api.deepseek.com）视为可覆盖，以便导入 OpenClaw 真实 baseUrl。
@@ -1041,8 +1041,8 @@ def sync_llm_config_from_openclaw():
     return synced
 
 
-def _infer_teamclaw_provider(provider, base_url="", model=""):
-    """根据 TeamClaw 当前配置推断 OpenClaw provider id。"""
+def _infer_wecli_provider(provider, base_url="", model=""):
+    """根据 Wecli 当前配置推断 OpenClaw provider id。"""
     if isinstance(provider, str) and provider.strip():
         return provider.strip().lower()
 
@@ -1088,7 +1088,7 @@ def _provider_is_local_keyless(provider_id, base_url=""):
 
 
 def _openclaw_provider_api(provider_id):
-    """将 TeamClaw provider 映射到 OpenClaw provider API 类型。"""
+    """将 Wecli provider 映射到 OpenClaw provider API 类型。"""
     provider = (provider_id or "").strip().lower()
     if provider == "anthropic":
         return "anthropic-messages"
@@ -1119,7 +1119,7 @@ def _strip_base_url_suffixes(base_url):
 
 
 def _normalize_openclaw_base_url(provider_id, base_url):
-    """将 TeamClaw 的 base URL 规范为 OpenClaw provider 所需格式。"""
+    """将 Wecli 的 base URL 规范为 OpenClaw provider 所需格式。"""
     value = _strip_base_url_suffixes(base_url)
     if not value:
         return ""
@@ -1191,11 +1191,11 @@ def _write_openclaw_config(config):
 
 
 def export_llm_config_to_openclaw(api_key, base_url, model, provider=""):
-    """将 TeamClaw 当前 LLM 设置写回 OpenClaw 默认模型配置。"""
+    """将 Wecli 当前 LLM 设置写回 OpenClaw 默认模型配置。"""
     api_key = (api_key or "").strip()
     base_url = (base_url or "").strip()
     model = (model or "").strip()
-    provider_id = _infer_teamclaw_provider(provider, base_url, model)
+    provider_id = _infer_wecli_provider(provider, base_url, model)
     is_local_keyless = _provider_is_local_keyless(provider_id, base_url)
 
     if not api_key and not is_local_keyless:
@@ -1294,8 +1294,8 @@ def export_llm_config_to_openclaw(api_key, base_url, model, provider=""):
     }
 
 
-def read_teamclaw_llm_config():
-    """读取 TeamClaw 当前 LLM 配置。"""
+def read_wecli_llm_config():
+    """读取 Wecli 当前 LLM 配置。"""
     _, kvs = read_env()
     return {
         "LLM_API_KEY": (kvs.get("LLM_API_KEY") or "").strip(),
@@ -1305,10 +1305,10 @@ def read_teamclaw_llm_config():
     }
 
 
-def sync_teamclaw_llm_to_openclaw():
-    """将 TeamClaw 当前 LLM 配置回写到 OpenClaw。"""
-    config = read_teamclaw_llm_config()
-    provider_id = _infer_teamclaw_provider(
+def sync_wecli_llm_to_openclaw():
+    """将 Wecli 当前 LLM 配置回写到 OpenClaw。"""
+    config = read_wecli_llm_config()
+    provider_id = _infer_wecli_provider(
         config.get("LLM_PROVIDER", ""),
         config.get("LLM_BASE_URL", ""),
         config.get("LLM_MODEL", ""),
@@ -1325,7 +1325,7 @@ def sync_teamclaw_llm_to_openclaw():
         missing.append("LLM_API_KEY")
     if missing:
         raise ValueError(
-            "TeamClaw 当前 LLM 配置不完整，缺少: " + ", ".join(missing)
+            "Wecli 当前 LLM 配置不完整，缺少: " + ", ".join(missing)
         )
 
     return export_llm_config_to_openclaw(
@@ -1367,7 +1367,7 @@ def auto_detect_and_configure():
     if enabled:
         if changed:
             print("   ✅ 已启用 gateway.http.endpoints.chatCompletions.enabled=true")
-            print("   ℹ️ TeamClaw 的 HTTP 回退链路现在可使用 /v1/chat/completions")
+            print("   ℹ️ Wecli 的 HTTP 回退链路现在可使用 /v1/chat/completions")
         else:
             print("   ✅ /v1/chat/completions 兼容端点已开启")
     else:
@@ -1556,8 +1556,8 @@ When multiple solutions exist:
 
 ## Collaboration
 
-This agent may be orchestrated by TeamClaw (multi-agent workflow system).
-When receiving tasks from TeamClaw:
+This agent may be orchestrated by Wecli (multi-agent workflow system).
+When receiving tasks from Wecli:
 
 - Follow the task instructions precisely.
 - Return structured results when possible.
@@ -1593,13 +1593,13 @@ This workspace supports multi-agent collaboration.
 - Role: General-purpose assistant
 - Handles: coding, research, automation, Q&A
 
-## TeamClaw Integration
+## Wecli Integration
 
-This agent can be orchestrated by TeamClaw for multi-agent workflows.
-TeamClaw communicates via CLI (`openclaw agent --agent main --message ...`)
+This agent can be orchestrated by Wecli for multi-agent workflows.
+Wecli communicates via CLI (`openclaw agent --agent main --message ...`)
 or HTTP gateway as fallback.
 
-When working within a TeamClaw workflow:
+When working within a Wecli workflow:
 
 - You may receive tasks from an orchestrator agent.
 - Follow instructions precisely and return structured output.
@@ -1613,7 +1613,7 @@ Use the OpenClaw CLI to add specialized agents:
 openclaw agents add <name> --workspace <path> --non-interactive
 ```
 
-Or use TeamClaw's frontend to create and manage agents visually.
+Or use Wecli's frontend to create and manage agents visually.
 """,
     "TOOLS.md": """\
 # TOOLS
@@ -1716,7 +1716,7 @@ Long-term memory for this workspace.
 
 ## Current Notes
 
-- Initial setup via TeamClaw auto-configuration.
+- Initial setup via Wecli auto-configuration.
 - Workspace initialized with default templates.
 
 ---
@@ -1725,43 +1725,43 @@ Long-term memory for this workspace.
 """,
 }
 
-TEAMCLAW_WORKSPACE_SKILL = "TeamClaw"
-TEAMCLAW_BLOCK_START = "<!-- TEAMCLAW AUTO START -->"
-TEAMCLAW_BLOCK_END = "<!-- TEAMCLAW AUTO END -->"
+WECLI_WORKSPACE_SKILL = "Wecli"
+WECLI_BLOCK_START = "<!-- WECLI AUTO START -->"
+WECLI_BLOCK_END = "<!-- WECLI AUTO END -->"
 
 
-def _teamclaw_run_prefix():
-    """返回当前平台的 TeamClaw 运维脚本前缀。"""
+def _wecli_run_prefix():
+    """返回当前平台的 Wecli 运维脚本前缀。"""
     if os.name == "nt":
         return "powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1"
     return "bash selfskill/scripts/run.sh"
 
 
-def _teamclaw_openclaw_cmd():
+def _wecli_openclaw_cmd():
     """返回当前平台更稳妥的 OpenClaw 命令。"""
     if os.name == "nt":
         return "openclaw.cmd"
     return "openclaw"
 
 
-def _teamclaw_skill_templates():
-    """生成 TeamClaw workspace skill 文件。"""
-    run_prefix = _teamclaw_run_prefix()
-    openclaw_cmd = _teamclaw_openclaw_cmd()
-    skill_root = os.path.join("skills", TEAMCLAW_WORKSPACE_SKILL)
+def _wecli_skill_templates():
+    """生成 Wecli workspace skill 文件。"""
+    run_prefix = _wecli_run_prefix()
+    openclaw_cmd = _wecli_openclaw_cmd()
+    skill_root = os.path.join("skills", WECLI_WORKSPACE_SKILL)
 
     return {
         os.path.join(skill_root, "SKILL.md"): f"""\
 ---
-name: TeamClaw
-description: Operate the local TeamClaw repository and services from this OpenClaw workspace. Use when the user asks to install, configure, start, stop, debug, or modify TeamClaw, or to manage TeamClaw's OpenClaw integration, teams, workflows, channels, or CLI.
+name: Wecli
+description: Operate the local Wecli repository and services from this OpenClaw workspace. Use when the user asks to install, configure, start, stop, debug, or modify Wecli, or to manage Wecli's OpenClaw integration, teams, workflows, channels, or CLI.
 metadata:
-  short-description: Control the local TeamClaw repo
+  short-description: Control the local Wecli repo
 ---
 
-# TeamClaw
+# Wecli
 
-Use this skill when the user wants you to control TeamClaw in `{PROJECT_ROOT}`.
+Use this skill when the user wants you to control Wecli in `{PROJECT_ROOT}`.
 
 ## First Read
 
@@ -1773,25 +1773,25 @@ Use this skill when the user wants you to control TeamClaw in `{PROJECT_ROOT}`.
 
 ## Working Rules
 
-- Run TeamClaw commands from `{PROJECT_ROOT}`.
+- Run Wecli commands from `{PROJECT_ROOT}`.
 - Prefer `run.sh` / `run.ps1` and `uv run scripts/cli.py` over ad-hoc edits.
 - If OpenClaw was installed or reconfigured, run `{run_prefix} check-openclaw`.
 - Do not enable optional integrations, public exposure, or password users unless the user explicitly asks.
 - Before touching code, inspect only the files routed by `{os.path.join(PROJECT_ROOT, "docs", "repo-index.md")}` instead of scanning the whole repo.
-- When the user asks to operate TeamClaw, assume they want action, not just documentation.
+- When the user asks to operate Wecli, assume they want action, not just documentation.
 
 ## Quick Entry Points
 
 - Service lifecycle and environment: [CLI Cheat Sheet](./references/cli.md)
-- Full TeamClaw command reference: `{os.path.join(PROJECT_ROOT, "docs", "cli.md")}`
+- Full Wecli command reference: `{os.path.join(PROJECT_ROOT, "docs", "cli.md")}`
 - OpenClaw install / binding / repair notes: `{os.path.join(PROJECT_ROOT, "docs", "openclaw-commands.md")}`
 """,
         os.path.join(skill_root, "references", "cli.md"): f"""\
-# TeamClaw CLI Cheat Sheet
+# Wecli CLI Cheat Sheet
 
 Repository root: `{PROJECT_ROOT}`
 
-Run these commands from the TeamClaw repo root.
+Run these commands from the Wecli repo root.
 
 ## Service lifecycle
 
@@ -1816,7 +1816,7 @@ Run these commands from the TeamClaw repo root.
 - `{openclaw_cmd} channels list --json`
 - `{openclaw_cmd} skills list --json`
 
-## TeamClaw repo-local CLI
+## Wecli repo-local CLI
 
 - `uv run scripts/cli.py status`
 - `uv run scripts/cli.py openclaw`
@@ -1836,33 +1836,33 @@ Run these commands from the TeamClaw repo root.
     }
 
 
-def _teamclaw_workspace_blocks():
-    """生成注入到 OpenClaw 核心 workspace 文件中的 TeamClaw 引导块。"""
-    run_prefix = _teamclaw_run_prefix()
-    skill_path = os.path.join("skills", TEAMCLAW_WORKSPACE_SKILL, "SKILL.md")
+def _wecli_workspace_blocks():
+    """生成注入到 OpenClaw 核心 workspace 文件中的 Wecli 引导块。"""
+    run_prefix = _wecli_run_prefix()
+    skill_path = os.path.join("skills", WECLI_WORKSPACE_SKILL, "SKILL.md")
     repo_skill = os.path.join(PROJECT_ROOT, "SKILL.md")
     repo_index = os.path.join(PROJECT_ROOT, "docs", "repo-index.md")
     repo_cli = os.path.join(PROJECT_ROOT, "docs", "cli.md")
 
     return {
         "BOOTSTRAP.md": f"""\
-## TeamClaw Bootstrap
+## Wecli Bootstrap
 
-This workspace is paired with TeamClaw at `{PROJECT_ROOT}`.
+This workspace is paired with Wecli at `{PROJECT_ROOT}`.
 
-If the user wants you to operate TeamClaw, read `{skill_path}` and `{repo_skill}` after the basic identity bootstrap. Use them to learn the TeamClaw command surface before taking action.
+If the user wants you to operate Wecli, read `{skill_path}` and `{repo_skill}` after the basic identity bootstrap. Use them to learn the Wecli command surface before taking action.
 """,
         "AGENTS.md": f"""\
-## TeamClaw Control
+## Wecli Control
 
-This OpenClaw workspace is connected to TeamClaw at `{PROJECT_ROOT}`.
+This OpenClaw workspace is connected to Wecli at `{PROJECT_ROOT}`.
 
-When the user asks about TeamClaw, load the workspace skill `{TEAMCLAW_WORKSPACE_SKILL}` first. Then use `{repo_skill}` as the repo's own task router and `{repo_index}` before code changes.
+When the user asks about Wecli, load the workspace skill `{WECLI_WORKSPACE_SKILL}` first. Then use `{repo_skill}` as the repo's own task router and `{repo_index}` before code changes.
 """,
         "TOOLS.md": f"""\
-## TeamClaw CLI
+## Wecli CLI
 
-For TeamClaw tasks, run commands from `{PROJECT_ROOT}` and prefer the project wrappers over ad-hoc operations.
+For Wecli tasks, run commands from `{PROJECT_ROOT}` and prefer the project wrappers over ad-hoc operations.
 
 - `{run_prefix} status`
 - `{run_prefix} start`
@@ -1878,9 +1878,9 @@ For TeamClaw tasks, run commands from `{PROJECT_ROOT}` and prefer the project wr
 def _upsert_managed_block(filepath: str, block: str):
     """向 Markdown 文件中写入可重复更新的自动管理块。"""
     managed = (
-        f"{TEAMCLAW_BLOCK_START}\n"
+        f"{WECLI_BLOCK_START}\n"
         f"{block.strip()}\n"
-        f"{TEAMCLAW_BLOCK_END}"
+        f"{WECLI_BLOCK_END}"
     )
 
     if os.path.exists(filepath):
@@ -1889,14 +1889,14 @@ def _upsert_managed_block(filepath: str, block: str):
     else:
         current = ""
 
-    if TEAMCLAW_BLOCK_START in current and TEAMCLAW_BLOCK_END in current:
-        start = current.find(TEAMCLAW_BLOCK_START)
-        end = current.find(TEAMCLAW_BLOCK_END, start)
+    if WECLI_BLOCK_START in current and WECLI_BLOCK_END in current:
+        start = current.find(WECLI_BLOCK_START)
+        end = current.find(WECLI_BLOCK_END, start)
         if end < 0:
             updated = current.rstrip()
             updated = f"{updated}\n\n{managed}\n" if updated else f"{managed}\n"
         else:
-            end += len(TEAMCLAW_BLOCK_END)
+            end += len(WECLI_BLOCK_END)
             prefix = current[:start].rstrip()
             suffix = current[end:].lstrip("\n")
             parts = []
@@ -1921,8 +1921,8 @@ def _upsert_managed_block(filepath: str, block: str):
 def init_workspace_templates(workspace_path: str | None = None):
     """初始化 OpenClaw workspace 默认模板文件。
 
-    默认模板和 TeamClaw skill 只在文件不存在时创建；
-    TeamClaw 引导块会以可重复更新的方式注入到核心 workspace 文件。
+    默认模板和 Wecli skill 只在文件不存在时创建；
+    Wecli 引导块会以可重复更新的方式注入到核心 workspace 文件。
     """
     if workspace_path is None:
         workspace_path = detect_workspace_path()
@@ -1946,7 +1946,7 @@ def init_workspace_templates(workspace_path: str | None = None):
                 f.write(content)
             created.append(filename)
 
-    for relpath, content in _teamclaw_skill_templates().items():
+    for relpath, content in _wecli_skill_templates().items():
         filepath = os.path.join(workspace_path, relpath)
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         if os.path.exists(filepath):
@@ -1956,9 +1956,9 @@ def init_workspace_templates(workspace_path: str | None = None):
                 f.write(content)
             created.append(relpath)
 
-    # 暂时禁用 TeamClaw 管理块注入（BOOTSTRAP.md / AGENTS.md / TOOLS.md）
+    # 暂时禁用 Wecli 管理块注入（BOOTSTRAP.md / AGENTS.md / TOOLS.md）
     # 如需恢复，取消注释以下逻辑。
-    # for filename, block in _teamclaw_workspace_blocks().items():
+    # for filename, block in _wecli_workspace_blocks().items():
     #     filepath = os.path.join(workspace_path, filename)
     #     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     #     if _upsert_managed_block(filepath, block):
@@ -2065,7 +2065,7 @@ def show_status():
     # 检查 .env 中的配置
     _, kvs = read_env()
     print()
-    print("--- TeamClaw .env 中的 OpenClaw 配置 ---")
+    print("--- Wecli .env 中的 OpenClaw 配置 ---")
     for key in ["OPENCLAW_API_URL", "OPENCLAW_GATEWAY_TOKEN", "OPENCLAW_SESSIONS_FILE"]:
         val = kvs.get(key, "（未配置）")
         if key == "OPENCLAW_GATEWAY_TOKEN" and val and val != "（未配置）":
@@ -2082,10 +2082,10 @@ def main():
 
     if cmd == "--auto-detect":
         auto_detect_and_configure()
-    elif cmd == "--sync-teamclaw-llm":
+    elif cmd == "--sync-wecli-llm":
         try:
-            print("🔄 将 TeamClaw 当前 LLM 配置同步到 OpenClaw...")
-            result = sync_teamclaw_llm_to_openclaw()
+            print("🔄 将 Wecli 当前 LLM 配置同步到 OpenClaw...")
+            result = sync_wecli_llm_to_openclaw()
             print(f"   Provider: {result.get('provider')}")
             print(f"   Model: {result.get('model_ref')}")
             print(f"   Config: {result.get('config_path')}")
@@ -2094,14 +2094,14 @@ def main():
                     print("   ✅ OpenClaw gateway 已自动重载")
                 elif result.get("restart_error"):
                     print(f"   ⚠️ 已写入配置，但 gateway 重载失败: {result['restart_error']}")
-            print("✅ TeamClaw → OpenClaw LLM 同步完成")
+            print("✅ Wecli → OpenClaw LLM 同步完成")
         except Exception as e:
             print(f"❌ 同步失败: {e}", file=sys.stderr)
             sys.exit(1)
-    elif cmd == "--import-teamclaw-llm-from-openclaw":
-        # UI / operator automation: read OpenClaw LLM config and write into TeamClaw config/.env
+    elif cmd == "--import-wecli-llm-from-openclaw":
+        # UI / operator automation: read OpenClaw LLM config and write into Wecli config/.env
         try:
-            print("🔄 从 OpenClaw 导入 LLM 配置到 TeamClaw（写入 config/.env）...")
+            print("🔄 从 OpenClaw 导入 LLM 配置到 Wecli（写入 config/.env）...")
             synced = sync_llm_config_from_openclaw()
             print(f"✅ 导入完成：已同步 {synced} 项配置")
         except Exception as e:

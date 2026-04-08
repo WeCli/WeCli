@@ -1,9 +1,9 @@
 #!/bin/bash
-# TeamBot 一键运行（环境配置 + API Key + 注册用户 + 启动服务）
+# WeBot 一键运行（环境配置 + API Key + 注册用户 + 启动服务）
 
 # 锁定绝对路径：确保无论在哪启动，都能找到项目根目录
 export PROJECT_ROOT="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
-export TEAMBOT_HEADLESS=0
+export WEBOT_HEADLESS=0
 cd "$PROJECT_ROOT"
 echo "========== 1/4 环境检查与配置 =========="
 bash scripts/setup_env.sh
@@ -62,7 +62,7 @@ fi
 echo ""
 echo "========== 4/4 启动服务 =========="
 
-# 清理旧的 Teamclaw 进程（按进程名匹配，pgrep/pkill 在 Linux 和 macOS 上均可用）
+# 清理旧的 Wecli 进程（按进程名匹配，pgrep/pkill 在 Linux 和 macOS 上均可用）
 _TC_SCRIPTS="scripts/launcher.py src/time.py oasis/server.py src/mainagent.py src/front.py"
 _TC_KILLED=0
 for _script in $_TC_SCRIPTS; do

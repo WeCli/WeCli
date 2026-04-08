@@ -13,8 +13,8 @@ const context = {
 vm.createContext(context);
 vm.runInContext(code, context);
 
-const helper = context.window.TeamClawTinyFish;
-assert.ok(helper, 'TeamClawTinyFish helper should be exposed');
+const helper = context.window.WecliTinyFish;
+assert.ok(helper, 'WecliTinyFish helper should be exposed');
 
 const mismatch = helper.normalizeTinyFishEvent({
   type: 'PROGRESS',

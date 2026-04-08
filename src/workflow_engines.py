@@ -973,10 +973,10 @@ class HUDState:
 
         elements = self._render_elements()
         if not elements:
-            return "[TeamBot] No active modes."
+            return "[WeBot] No active modes."
 
         ver = f"#{self.version}" if self.version else ""
-        label = f"[TeamBot{ver}]"
+        label = f"[WeBot{ver}]"
         return f"{label} " + " | ".join(elements)
 
 

@@ -7,12 +7,12 @@ $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 . (Join-Path $PSScriptRoot "common.ps1")
 
-Set-TeamClawUtf8
+Set-WecliUtf8
 Push-Location $projectRoot
 
 try {
     Write-Host "=========================================="
-    Write-Host "  TeamClaw Windows environment setup"
+    Write-Host "  Wecli Windows environment setup"
     Write-Host "=========================================="
     Write-Host ""
 

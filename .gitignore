@@ -43,7 +43,7 @@ node_modules/
 playwright-report/
 test-results/
 *.spec
-TeamClaw.exe
+Wecli.exe
 *.dmg
 
 
@@ -55,7 +55,7 @@ logs/
 !logs/.gitkeep
 
 # PID 文件
-.teamclaw.pid
+.wecli.pid
 
 # 重启信号文件
 .restart_flag
@@ -72,6 +72,6 @@ data/checkpoint_export_*.json
 data/user_files/
 data/oasis_discussions/
 
-# 临时 LLM 请求调试导出（TEAMCLAW_DEBUG_LLM_PAYLOAD=1）
+# 临时 LLM 请求调试导出（WECLI_DEBUG_LLM_PAYLOAD=1）
 data/debug_llm_payload_last.json
 .claude/settings.local.json

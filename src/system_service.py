@@ -163,7 +163,7 @@ class SystemService:
                 self.agent.set_thread_busy_source(thread_id, "system")
                 logger.info("Acquired lock on %s, invoking graph ...", thread_id)
                 try:
-                    async for _ in self.agent.agent_app.astream_events(system_input, config, version="v2"):
+                    async for _ in self.agent.agent_app.astream_events(system_input, config, version="v2", durability="exit"):
                         pass
                     self.agent.add_pending_system_message(thread_id)
                     logger.info("Done for %s", thread_id)

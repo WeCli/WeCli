@@ -1,0 +1,40 @@
+# nuwa-awesome-figures — auto-generated workflow
+# 毛泽东 × 马克思 × 户晨风 × 童锦程 × 峰哥 × 陈震——awesome-human-distillation 公众人物思维框架全集。
+version: 2
+repeat: false
+plan:
+- id: m0
+  manual:
+    author: begin
+    content: "请提出你的问题或议题，各位专家将依次给出分析。"
+- id: m1
+  expert: maoxuan#oasis#毛泽东
+- id: m2
+  expert: tong_jincheng#oasis#童锦程
+- id: m3
+  expert: karlmarx#oasis#马克思方法论
+- id: m4
+  expert: hu_chenfeng#oasis#户晨风
+- id: m5
+  expert: fengge#oasis#峰哥
+- id: m6
+  expert: zhen_ge#oasis#陈震
+- id: m7
+  manual:
+    author: bend
+    content: "所有专家已发言完毕。"
+edges:
+- - m0
+  - m1
+- - m1
+  - m2
+- - m2
+  - m3
+- - m3
+  - m4
+- - m4
+  - m5
+- - m5
+  - m6
+- - m6
+  - m7

@@ -56,7 +56,7 @@ const i18n = {
         close: '关闭',
 
         // 登录页
-        login_title: 'Teamclaw',
+        login_title: 'Wecli',
         login_subtitle: '请登录以开始对话',
         username: '用户名',
         password: '密码',
@@ -105,8 +105,8 @@ const i18n = {
         public_stopping: '停止中...',
 
         // 聊天区域
-        welcome_message: '你好！我是 TeamBot 智能助手。我已经准备好为你服务，请输入你的指令。',
-        new_session_message: '🆕 已开启新对话。我是 TeamBot 智能助手，请输入你的指令。',
+        welcome_message: '你好！我是 WeBot 智能助手。我已经准备好为你服务，请输入你的指令。',
+        new_session_message: '🆕 已开启新对话。我是 WeBot 智能助手，请输入你的指令。',
         input_placeholder: '输入指令...（可粘贴图片/上传文件/录音）',
         send_btn: '发送',
         cancel_btn: '终止',
@@ -209,7 +209,7 @@ const i18n = {
         policy_panel_edit: '编辑',
         policy_panel_close: '收起',
         policy_panel_loading: '加载策略中...',
-        policy_panel_empty: '当前未配置用户级 TeamBot policy，将使用内置默认 allow。',
+        policy_panel_empty: '当前未配置用户级 WeBot policy，将使用内置默认 allow。',
         policy_default_approval: '默认审批',
         policy_panel_format: '格式化',
         policy_panel_save: '保存',
@@ -650,7 +650,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         // 其他
         persona_search_placeholder: '🔍 搜索专家名称 / 标签...',
         persona_no_match: '没有匹配的专家',
-        splash_subtitle: 'TeamBot AI Agent',
+        splash_subtitle: 'WeBot AI Agent',
         secure_footer: 'Secured by Nginx Reverse Proxy & SSH Tunnel',
         refresh: '刷新',
         collapse: '收起',
@@ -665,7 +665,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_restart_hint: '修改配置后请先「保存」，再点击「重启服务」使配置生效',
         settings_restart_btn: '🔄 重启服务',
         settings_restarting: '⏳ 正在重启...',
-        settings_restart_ok: '✅ 重启信号已发送，页面将在 20 秒后自动刷新',
+        settings_restart_ok: '✅ 重启信号已发送（约 20 秒后自动刷新，也可随时手动刷新）',
         settings_restart_fail: '❌ 重启失败',
         settings_restart_confirm: '确定要重启所有服务吗？未保存的配置修改将丢失。',
         menu_settings: '⚙️ 设置',
@@ -703,7 +703,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_openclaw_import_hint_ready: '自动读取已配置的 API Key、模型和 Provider',
         settings_openclaw_import_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
         settings_openclaw_export: '🦞 导出到 OpenClaw',
-        settings_openclaw_export_hint_ready: '把当前 TeamClaw 的 LLM 设置写回 OpenClaw 默认模型',
+        settings_openclaw_export_hint_ready: '把当前 Wecli 的 LLM 设置写回 OpenClaw 默认模型',
         settings_openclaw_export_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
         settings_openclaw_importing: '正在从 OpenClaw 读取配置...',
         settings_openclaw_imported: '✅ 已从 OpenClaw 导入配置',
@@ -774,7 +774,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         tunnel_url_hint: '点击复制公网地址',
 
         // OpenClaw 对话切换
-        oc_tab_internal: '🤖 TeamBot',
+        oc_tab_internal: '🤖 WeBot',
         oc_tab_openclaw: '🦞 OpenClaw',
         oc_tab_codex: 'Codex',
         oc_tab_claude: 'Claude',
@@ -794,10 +794,10 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         oc_acp_session_refresh_title: '执行 acpx（工具）sessions list 更新列表',
         oc_acp_session_or_new: '或新建',
         oc_acp_session_label: '名称',
-        oc_acp_session_placeholder: '可选；留空则按左侧 TeamClaw 会话区分',
+        oc_acp_session_placeholder: '可选；留空则按左侧 Wecli 会话区分',
         oc_acp_session_ensure: '预热',
         oc_acp_session_ensure_title: '仅创建/预热 ACP 会话，不发送消息',
-        oc_internal_session_refresh_title: '从服务器刷新 TeamBot 会话列表',
+        oc_internal_session_refresh_title: '从服务器刷新 WeBot 会话列表',
     },
     'en': {
         // General
@@ -809,7 +809,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         close: 'Close',
 
         // Login
-        login_title: 'Teamclaw',
+        login_title: 'Wecli',
         login_subtitle: 'Please login to start',
         username: 'Username',
         password: 'Password',
@@ -858,8 +858,8 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         public_stopping: 'Stopping...',
 
         // Chat area
-        welcome_message: 'Hello! I am TeamBot AI Assistant. Ready to serve you. Please enter your instructions.',
-        new_session_message: '🆕 New conversation started. I am TeamBot AI Assistant. Please enter your instructions.',
+        welcome_message: 'Hello! I am WeBot AI Assistant. Ready to serve you. Please enter your instructions.',
+        new_session_message: '🆕 New conversation started. I am WeBot AI Assistant. Please enter your instructions.',
         input_placeholder: 'Enter command... (paste images/upload files/record audio)',
         send_btn: 'Send',
         cancel_btn: 'Stop',
@@ -962,7 +962,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         policy_panel_edit: 'Edit',
         policy_panel_close: 'Hide',
         policy_panel_loading: 'Loading policy...',
-        policy_panel_empty: 'No user TeamBot policy is configured yet. Built-in default allow is active.',
+        policy_panel_empty: 'No user WeBot policy is configured yet. Built-in default allow is active.',
         policy_default_approval: 'Default approval',
         policy_panel_format: 'Format',
         policy_panel_save: 'Save',
@@ -1411,7 +1411,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         // Others
         persona_search_placeholder: '🔍 Search expert name / tag...',
         persona_no_match: 'No matching experts',
-        splash_subtitle: 'TeamBot AI Agent',
+        splash_subtitle: 'WeBot AI Agent',
         secure_footer: 'Secured by Nginx Reverse Proxy & SSH Tunnel',
         refresh: 'Refresh',
         collapse: 'Collapse',
@@ -1426,7 +1426,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_restart_hint: 'After editing, click "Save" first, then "Restart" to apply changes',
         settings_restart_btn: '🔄 Restart',
         settings_restarting: '⏳ Restarting...',
-        settings_restart_ok: '✅ Restart signal sent, page will auto-refresh in 20 seconds',
+        settings_restart_ok: '✅ Restart signal sent (auto-refresh in ~20s, or refresh manually anytime)',
         settings_restart_fail: '❌ Restart failed',
         settings_restart_confirm: 'Restart all services? Unsaved changes will be lost.',
         menu_settings: '⚙️ Settings',
@@ -1464,7 +1464,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_openclaw_import_hint_ready: 'Read the configured API key, model, and provider from OpenClaw',
         settings_openclaw_import_hint_missing: '⚠️ OpenClaw was not detected',
         settings_openclaw_export: '🦞 Export to OpenClaw',
-        settings_openclaw_export_hint_ready: 'Write the current TeamClaw LLM settings back to OpenClaw defaults',
+        settings_openclaw_export_hint_ready: 'Write the current Wecli LLM settings back to OpenClaw defaults',
         settings_openclaw_export_hint_missing: '⚠️ OpenClaw was not detected',
         settings_openclaw_importing: 'Reading configuration from OpenClaw...',
         settings_openclaw_imported: '✅ Imported configuration from OpenClaw',
@@ -1487,7 +1487,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_help_tinyfish_targets_path: 'JSON file listing competitor targets. Defaults to config/tinyfish_targets.json.',
         settings_help_tinyfish_enabled: 'Set true to enable the built-in daily monitor job; set false to disable it.',
         settings_help_tinyfish_cron: 'Five-field cron expression, for example 0 9 * * * for every day at 9:00.',
-        settings_tinyfish_quick_setup: 'Enter the API key and save. TeamClaw will validate TinyFish and fill the remaining default settings automatically.',
+        settings_tinyfish_quick_setup: 'Enter the API key and save. Wecli will validate TinyFish and fill the remaining default settings automatically.',
         settings_tinyfish_run_now: 'Run Now',
         settings_tinyfish_refresh: 'Refresh',
         settings_tinyfish_loading: 'Loading TinyFish monitor status...',
@@ -1535,7 +1535,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         tunnel_url_hint: 'Click to copy public URL',
 
         // OpenClaw Chat Switcher
-        oc_tab_internal: '🤖 TeamBot',
+        oc_tab_internal: '🤖 WeBot',
         oc_tab_openclaw: '🦞 OpenClaw',
         oc_tab_codex: 'Codex',
         oc_tab_claude: 'Claude',
@@ -1555,10 +1555,10 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         oc_acp_session_refresh_title: 'Run acpx (tool) sessions list',
         oc_acp_session_or_new: 'or new',
         oc_acp_session_label: 'Name',
-        oc_acp_session_placeholder: 'Optional; empty = scope by TeamClaw session',
+        oc_acp_session_placeholder: 'Optional; empty = scope by Wecli session',
         oc_acp_session_ensure: 'Warm up',
         oc_acp_session_ensure_title: 'Create/warm ACP session only (no message sent)',
-        oc_internal_session_refresh_title: 'Refresh TeamBot session list from server',
+        oc_internal_session_refresh_title: 'Refresh WeBot session list from server',
     }
 };
 
@@ -1617,7 +1617,7 @@ function applyTranslations() {
     });
 
     // 更新 title
-    document.title = 'Teamclaw | AI Agent';
+    document.title = 'Wecli | AI Agent';
 
     // 刷新编排面板的专家列表（专家名称和分类标签跟随语言切换）
     if (typeof orchRenderExpertSidebar === 'function') {
@@ -1638,13 +1638,13 @@ function applyTranslations() {
     if (typeof renderSubagentPanel === 'function' && Array.isArray(_subagentPanelItems) && _subagentPanelItems.length > 0) {
         renderSubagentPanel(_subagentPanelItems);
     }
-    if (typeof _syncTeamBotPolicyEditor === 'function') {
-        _syncTeamBotPolicyEditor();
+    if (typeof _syncWeBotPolicyEditor === 'function') {
+        _syncWeBotPolicyEditor();
     }
 }
 
 function renderMarkdown(content) {
-    if (window.TeamClawMarkdown) return window.TeamClawMarkdown.render(content);
+    if (window.WecliMarkdown) return window.WecliMarkdown.render(content);
     let raw = content == null ? '' : String(content);
     if (raw.indexOf('\\') !== -1) {
         raw = raw.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n').replace(/\\t/g, '\t');
@@ -1653,8 +1653,8 @@ function renderMarkdown(content) {
 }
 
 function highlightMarkdownIn(root) {
-    if (window.TeamClawMarkdown) {
-        window.TeamClawMarkdown.highlight(root);
+    if (window.WecliMarkdown) {
+        window.WecliMarkdown.highlight(root);
         return;
     }
     if (!root || typeof hljs === 'undefined') return;
@@ -1662,8 +1662,8 @@ function highlightMarkdownIn(root) {
 }
 
 function renderMarkdownInto(element, content) {
-    if (window.TeamClawMarkdown) {
-        window.TeamClawMarkdown.renderInto(element, content);
+    if (window.WecliMarkdown) {
+        window.WecliMarkdown.renderInto(element, content);
         return;
     }
     if (!element) return;
@@ -2208,15 +2208,15 @@ let _subagentHistoryVisible = false;
 let _subagentHistoryCache = {};
 let _subagentRuntimeCache = {};
 let _subagentRuntimeLoading = {};
-let _teambotPolicyData = null;
-let _teambotPolicyDirty = false;
-let _teambotPolicyEditorOpen = false;
-let _teambotPolicyLoaded = false;
+let _webotPolicyData = null;
+let _webotPolicyDirty = false;
+let _webotPolicyEditorOpen = false;
+let _webotPolicyLoaded = false;
 let _currentSessionRuntime = null;
-let _teambotBridgeSockets = {};
-let _teambotBridgeReconnectTimers = {};
-let _teambotBridgeDesired = {};
-const SESSION_RUNTIME_PANEL_HEIGHT_KEY = 'teamclawSessionRuntimePanelHeightV1';
+let _webotBridgeSockets = {};
+let _webotBridgeReconnectTimers = {};
+let _webotBridgeDesired = {};
+const SESSION_RUNTIME_PANEL_HEIGHT_KEY = 'wecliSessionRuntimePanelHeightV1';
 const SESSION_RUNTIME_PANEL_MIN_HEIGHT = 140;
 const SESSION_RUNTIME_LIST_MIN_HEIGHT = 120;
 let _sessionPanelResizeState = null;
@@ -2230,7 +2230,7 @@ function _teamBotBridgeWsUrl(path) {
 }
 
 function _teamBotBridgeSocketLabel(sessionId) {
-    const socket = _teambotBridgeSockets[sessionId];
+    const socket = _webotBridgeSockets[sessionId];
     if (!socket) return 'idle';
     switch (socket.readyState) {
         case WebSocket.CONNECTING:
@@ -2245,16 +2245,16 @@ function _teamBotBridgeSocketLabel(sessionId) {
     }
 }
 
-function _clearTeamBotBridgeReconnect(sessionId) {
-    if (_teambotBridgeReconnectTimers[sessionId]) {
-        clearTimeout(_teambotBridgeReconnectTimers[sessionId]);
-        delete _teambotBridgeReconnectTimers[sessionId];
+function _clearWeBotBridgeReconnect(sessionId) {
+    if (_webotBridgeReconnectTimers[sessionId]) {
+        clearTimeout(_webotBridgeReconnectTimers[sessionId]);
+        delete _webotBridgeReconnectTimers[sessionId];
     }
 }
 
-function _closeTeamBotBridgeSocket(sessionId, clearDesired = false) {
-    _clearTeamBotBridgeReconnect(sessionId);
-    const socket = _teambotBridgeSockets[sessionId];
+function _closeWeBotBridgeSocket(sessionId, clearDesired = false) {
+    _clearWeBotBridgeReconnect(sessionId);
+    const socket = _webotBridgeSockets[sessionId];
     if (socket) {
         socket.onopen = null;
         socket.onmessage = null;
@@ -2263,22 +2263,22 @@ function _closeTeamBotBridgeSocket(sessionId, clearDesired = false) {
         try {
             socket.close();
         } catch (e) {
-            console.debug('Failed to close TeamBot bridge socket', e);
+            console.debug('Failed to close WeBot bridge socket', e);
         }
-        delete _teambotBridgeSockets[sessionId];
+        delete _webotBridgeSockets[sessionId];
     }
     if (clearDesired) {
-        delete _teambotBridgeDesired[sessionId];
+        delete _webotBridgeDesired[sessionId];
     }
 }
 
-function _closeAllTeamBotBridgeSockets() {
-    Object.keys(_teambotBridgeSockets).forEach(sessionId => {
-        _closeTeamBotBridgeSocket(sessionId);
+function _closeAllWeBotBridgeSockets() {
+    Object.keys(_webotBridgeSockets).forEach(sessionId => {
+        _closeWeBotBridgeSocket(sessionId);
     });
 }
 
-function _storeTeamBotRuntimeSnapshot(runtime) {
+function _storeWeBotRuntimeSnapshot(runtime) {
     if (!runtime || !runtime.session_id) return;
     if (runtime.session_id === currentSessionId) {
         _currentSessionRuntime = runtime;
@@ -2289,25 +2289,25 @@ function _storeTeamBotRuntimeSnapshot(runtime) {
     }
 }
 
-function _scheduleTeamBotBridgeReconnect(sessionId, bridgeRecord) {
-    if (!sessionId || !_teambotBridgeDesired[sessionId] || !sessionSidebarOpen || !bridgeRecord?.websocket_path) {
+function _scheduleWeBotBridgeReconnect(sessionId, bridgeRecord) {
+    if (!sessionId || !_webotBridgeDesired[sessionId] || !sessionSidebarOpen || !bridgeRecord?.websocket_path) {
         return;
     }
-    if (_teambotBridgeReconnectTimers[sessionId]) return;
-    _teambotBridgeReconnectTimers[sessionId] = setTimeout(() => {
-        delete _teambotBridgeReconnectTimers[sessionId];
-        _connectTeamBotBridgeSocket(sessionId, bridgeRecord, true);
+    if (_webotBridgeReconnectTimers[sessionId]) return;
+    _webotBridgeReconnectTimers[sessionId] = setTimeout(() => {
+        delete _webotBridgeReconnectTimers[sessionId];
+        _connectWeBotBridgeSocket(sessionId, bridgeRecord, true);
     }, 1500);
 }
 
-function _handleTeamBotBridgeMessage(sessionId, payload) {
+function _handleWeBotBridgeMessage(sessionId, payload) {
     if (!payload || typeof payload !== 'object') return;
     const messageType = String(payload.type || '').toLowerCase();
     if (messageType === 'runtime_snapshot' || messageType === 'runtime_update') {
         if (payload.runtime && payload.runtime.session_id) {
-            _storeTeamBotRuntimeSnapshot(payload.runtime);
+            _storeWeBotRuntimeSnapshot(payload.runtime);
             if (payload.runtime.session_id === currentSessionId) {
-                _syncTeamBotBridgeSocket(currentSessionId, payload.runtime);
+                _syncWeBotBridgeSocket(currentSessionId, payload.runtime);
             }
         }
         const changedSessionId = payload.changed_session_id || '';
@@ -2317,55 +2317,55 @@ function _handleTeamBotBridgeMessage(sessionId, payload) {
     }
 }
 
-function _connectTeamBotBridgeSocket(sessionId, bridgeRecord, force = false) {
+function _connectWeBotBridgeSocket(sessionId, bridgeRecord, force = false) {
     if (!sessionId || !bridgeRecord?.websocket_path) return;
-    const existing = _teambotBridgeSockets[sessionId];
+    const existing = _webotBridgeSockets[sessionId];
     if (!force && existing && (existing.readyState === WebSocket.CONNECTING || existing.readyState === WebSocket.OPEN)) {
         return;
     }
-    _closeTeamBotBridgeSocket(sessionId);
+    _closeWeBotBridgeSocket(sessionId);
     const socketUrl = _teamBotBridgeWsUrl(bridgeRecord.websocket_path);
     if (!socketUrl) return;
     const socket = new WebSocket(socketUrl);
-    _teambotBridgeSockets[sessionId] = socket;
+    _webotBridgeSockets[sessionId] = socket;
     socket.onopen = () => {
-        _clearTeamBotBridgeReconnect(sessionId);
+        _clearWeBotBridgeReconnect(sessionId);
         try {
             socket.send(JSON.stringify({ type: 'refresh' }));
         } catch (e) {
-            console.debug('Failed to request TeamBot bridge refresh', e);
+            console.debug('Failed to request WeBot bridge refresh', e);
         }
     };
     socket.onmessage = event => {
         try {
             const payload = JSON.parse(event.data || '{}');
-            _handleTeamBotBridgeMessage(sessionId, payload);
+            _handleWeBotBridgeMessage(sessionId, payload);
         } catch (e) {
-            console.debug('Invalid TeamBot bridge payload', e);
+            console.debug('Invalid WeBot bridge payload', e);
         }
     };
     socket.onerror = () => {
-        if (!_teambotBridgeDesired[sessionId]) return;
-        _setTeamBotPolicyStatus('TeamBot bridge socket error', 'error');
+        if (!_webotBridgeDesired[sessionId]) return;
+        _setWeBotPolicyStatus('WeBot bridge socket error', 'error');
     };
     socket.onclose = () => {
-        if (_teambotBridgeSockets[sessionId] === socket) {
-            delete _teambotBridgeSockets[sessionId];
+        if (_webotBridgeSockets[sessionId] === socket) {
+            delete _webotBridgeSockets[sessionId];
         }
-        _scheduleTeamBotBridgeReconnect(sessionId, bridgeRecord);
+        _scheduleWeBotBridgeReconnect(sessionId, bridgeRecord);
     };
 }
 
-function _syncTeamBotBridgeSocket(sessionId, runtime) {
+function _syncWeBotBridgeSocket(sessionId, runtime) {
     if (!sessionId) return;
     const bridge = runtime?.bridge || {};
     const primary = bridge.primary || (Array.isArray(bridge.sessions) ? bridge.sessions[0] : null);
-    const shouldConnect = !!_teambotBridgeDesired[sessionId] || !!bridge.attached || Number(bridge.connection_count || 0) > 0;
+    const shouldConnect = !!_webotBridgeDesired[sessionId] || !!bridge.attached || Number(bridge.connection_count || 0) > 0;
     if (!primary?.bridge_id || !primary?.websocket_path || !shouldConnect) {
-        _closeTeamBotBridgeSocket(sessionId);
+        _closeWeBotBridgeSocket(sessionId);
         return;
     }
-    _connectTeamBotBridgeSocket(sessionId, primary);
+    _connectWeBotBridgeSocket(sessionId, primary);
 }
 
 function _readSessionRuntimePanelHeightPreference() {
@@ -2412,7 +2412,7 @@ function _getSessionRuntimePanelBounds() {
 }
 
 function applySessionRuntimePanelHeight(height = null, persist = false) {
-    const panel = document.getElementById('teambot-subagent-panel');
+    const panel = document.getElementById('webot-subagent-panel');
     const bounds = _getSessionRuntimePanelBounds();
     if (!panel || !bounds) return;
 
@@ -2446,7 +2446,7 @@ function initSessionRuntimePanelResize() {
 
     divider.addEventListener('pointerdown', (event) => {
         if (event.button !== undefined && event.button !== 0) return;
-        const panel = document.getElementById('teambot-subagent-panel');
+        const panel = document.getElementById('webot-subagent-panel');
         if (!panel) return;
         const bounds = _getSessionRuntimePanelBounds();
         if (!bounds) return;
@@ -2503,33 +2503,33 @@ function _countPolicyHooks(policy) {
     return count;
 }
 
-function _setTeamBotPolicyStatus(message, kind = '') {
-    const el = document.getElementById('teambot-policy-status');
+function _setWeBotPolicyStatus(message, kind = '') {
+    const el = document.getElementById('webot-policy-status');
     if (!el) return;
     if (!message) {
         el.textContent = '';
-        el.className = 'teambot-policy-status';
+        el.className = 'webot-policy-status';
         return;
     }
     el.textContent = message;
-    el.className = `teambot-policy-status is-visible${kind ? ` is-${kind}` : ''}`;
+    el.className = `webot-policy-status is-visible${kind ? ` is-${kind}` : ''}`;
 }
 
-function _renderTeamBotPolicySummary() {
-    const summaryEl = document.getElementById('teambot-policy-summary');
-    const metaEl = document.getElementById('teambot-policy-meta');
-    const toggleBtn = document.getElementById('teambot-policy-toggle');
+function _renderWeBotPolicySummary() {
+    const summaryEl = document.getElementById('webot-policy-summary');
+    const metaEl = document.getElementById('webot-policy-meta');
+    const toggleBtn = document.getElementById('webot-policy-toggle');
     if (!summaryEl || !metaEl || !toggleBtn) return;
 
-    toggleBtn.textContent = t(_teambotPolicyEditorOpen ? 'policy_panel_close' : 'policy_panel_edit');
+    toggleBtn.textContent = t(_webotPolicyEditorOpen ? 'policy_panel_close' : 'policy_panel_edit');
 
-    if (!_teambotPolicyData || !_teambotPolicyData.policy) {
+    if (!_webotPolicyData || !_webotPolicyData.policy) {
         summaryEl.textContent = t('policy_panel_loading');
         metaEl.textContent = '';
         return;
     }
 
-    const policy = _teambotPolicyData.policy;
+    const policy = _webotPolicyData.policy;
     const toolCount = Object.keys(policy.tools || {}).length;
     const hookCount = _countPolicyHooks(policy);
     const defaultApproval = policy.default_approval || 'allow';
@@ -2538,7 +2538,7 @@ function _renderTeamBotPolicySummary() {
         toolCount,
         hookCount,
     });
-    if (_teambotPolicyDirty) {
+    if (_webotPolicyDirty) {
         summary += `\n${t('policy_panel_dirty')}`;
     }
     summaryEl.textContent = summary || t('policy_panel_empty');
@@ -2549,32 +2549,32 @@ function _renderTeamBotPolicySummary() {
     metaEl.textContent = metaLines.join('\n');
 }
 
-function _syncTeamBotPolicyEditor(force = false) {
-    const selectEl = document.getElementById('teambot-policy-default-approval');
-    const editorEl = document.getElementById('teambot-policy-editor');
-    const wrapEl = document.getElementById('teambot-policy-editor-wrap');
+function _syncWeBotPolicyEditor(force = false) {
+    const selectEl = document.getElementById('webot-policy-default-approval');
+    const editorEl = document.getElementById('webot-policy-editor');
+    const wrapEl = document.getElementById('webot-policy-editor-wrap');
     if (!selectEl || !editorEl || !wrapEl) return;
-    wrapEl.style.display = _teambotPolicyEditorOpen ? 'flex' : 'none';
-    if (!_teambotPolicyData || !_teambotPolicyData.policy) return;
-    if (_teambotPolicyDirty && !force) {
-        _renderTeamBotPolicySummary();
+    wrapEl.style.display = _webotPolicyEditorOpen ? 'flex' : 'none';
+    if (!_webotPolicyData || !_webotPolicyData.policy) return;
+    if (_webotPolicyDirty && !force) {
+        _renderWeBotPolicySummary();
         return;
     }
-    const editablePolicy = _stripPolicyMeta(_teambotPolicyData.policy);
+    const editablePolicy = _stripPolicyMeta(_webotPolicyData.policy);
     selectEl.value = editablePolicy.default_approval || 'allow';
     editorEl.value = JSON.stringify(editablePolicy, null, 2);
-    _renderTeamBotPolicySummary();
+    _renderWeBotPolicySummary();
 }
 
-function markTeamBotPolicyDirty() {
-    _teambotPolicyDirty = true;
-    _setTeamBotPolicyStatus('');
-    _renderTeamBotPolicySummary();
+function markWeBotPolicyDirty() {
+    _webotPolicyDirty = true;
+    _setWeBotPolicyStatus('');
+    _renderWeBotPolicySummary();
 }
 
-function _parseTeamBotPolicyEditor() {
-    const editorEl = document.getElementById('teambot-policy-editor');
-    const selectEl = document.getElementById('teambot-policy-default-approval');
+function _parseWeBotPolicyEditor() {
+    const editorEl = document.getElementById('webot-policy-editor');
+    const selectEl = document.getElementById('webot-policy-default-approval');
     if (!editorEl || !selectEl) return { default_approval: 'allow', tools: {} };
     let parsed = {};
     const raw = String(editorEl.value || '').trim();
@@ -2594,10 +2594,10 @@ function _escapeAndFormatText(value) {
 
 function _modeActionButtons(sessionId, currentMode) {
     const modes = ['plan', 'review', 'execute'];
-    return `<div class="teambot-mode-actions">${modes
+    return `<div class="webot-mode-actions">${modes
         .map(mode => {
             const active = currentMode === mode;
-            return `<button class="teambot-mode-btn${active ? ' is-active' : ''}" type="button" onclick="updateTeamBotSessionMode('${sessionId}', '${mode}')">${t(`subagent_runtime_mode_${mode}`)}</button>`;
+            return `<button class="webot-mode-btn${active ? ' is-active' : ''}" type="button" onclick="updateWeBotSessionMode('${sessionId}', '${mode}')">${t(`subagent_runtime_mode_${mode}`)}</button>`;
         })
         .join('')}</div>`;
 }
@@ -2609,21 +2609,21 @@ function _buildWorkflowPresetSection(runtime, item) {
     const activeMeta = active && typeof active === 'object' ? active : null;
     const activeHtml = activeMeta
         ? `
-            <div class="teambot-runtime-caption">${_escapeAndFormatText(`${activeMeta.name || activeMeta.preset_id || 'workflow'} · ${activeMeta.mode || ''}`)}</div>
-            <div class="teambot-runtime-detail">${_escapeAndFormatText(activeMeta.description || '')}</div>
+            <div class="webot-runtime-caption">${_escapeAndFormatText(`${activeMeta.name || activeMeta.preset_id || 'workflow'} · ${activeMeta.mode || ''}`)}</div>
+            <div class="webot-runtime-detail">${_escapeAndFormatText(activeMeta.description || '')}</div>
         `
-        : `<div class="teambot-runtime-empty">No active workflow preset</div>`;
+        : `<div class="webot-runtime-empty">No active workflow preset</div>`;
     const buttonHtml = presets.slice(0, 4).map((preset) => `
-        <button class="teambot-subagent-btn${activeMeta && activeMeta.preset_id === preset.preset_id ? ' is-active' : ''}"
+        <button class="webot-subagent-btn${activeMeta && activeMeta.preset_id === preset.preset_id ? ' is-active' : ''}"
                 type="button"
                 title="${escapeHtml(preset.description || '')}"
-                onclick="applyTeamBotWorkflowPreset('${encodeURIComponent(sessionId)}', '${encodeURIComponent(preset.preset_id || '')}')">${escapeHtml(preset.name || preset.preset_id || 'preset')}</button>
+                onclick="applyWeBotWorkflowPreset('${encodeURIComponent(sessionId)}', '${encodeURIComponent(preset.preset_id || '')}')">${escapeHtml(preset.name || preset.preset_id || 'preset')}</button>
     `).join('');
     return `
-        <div class="teambot-runtime-section">
-            <div class="teambot-runtime-title">Workflow</div>
+        <div class="webot-runtime-section">
+            <div class="webot-runtime-title">Workflow</div>
             ${activeHtml}
-            ${buttonHtml ? `<div class="teambot-runtime-actions">${buttonHtml}</div>` : ''}
+            ${buttonHtml ? `<div class="webot-runtime-actions">${buttonHtml}</div>` : ''}
         </div>
     `;
 }
@@ -2638,13 +2638,13 @@ function _buildExtendedSections(runtime, item) {
         const canDetach = !!(primary && primary.bridge_id);
         const socketState = _teamBotBridgeSocketLabel(sessionId);
         sections.push(`
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">Bridge</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(bridge.status || 'detached')} · socket=${_escapeAndFormatText(socketState)} · clients=${_escapeAndFormatText(String(bridge.connection_count || 0))}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(primary.attach_code ? `attach=${primary.attach_code}` : '')} ${_escapeAndFormatText(primary.role ? `· role=${primary.role}` : '')}</div>
-                <div class="teambot-runtime-actions">
-                    <button class="teambot-subagent-btn" type="button" onclick="attachTeamBotBridge('${encodeURIComponent(sessionId)}')">Attach</button>
-                    ${canDetach ? `<button class="teambot-subagent-btn danger" type="button" onclick="detachTeamBotBridge('${encodeURIComponent(sessionId)}', '${encodeURIComponent(primary.bridge_id || '')}')">Detach</button>` : ''}
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">Bridge</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(bridge.status || 'detached')} · socket=${_escapeAndFormatText(socketState)} · clients=${_escapeAndFormatText(String(bridge.connection_count || 0))}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(primary.attach_code ? `attach=${primary.attach_code}` : '')} ${_escapeAndFormatText(primary.role ? `· role=${primary.role}` : '')}</div>
+                <div class="webot-runtime-actions">
+                    <button class="webot-subagent-btn" type="button" onclick="attachWeBotBridge('${encodeURIComponent(sessionId)}')">Attach</button>
+                    ${canDetach ? `<button class="webot-subagent-btn danger" type="button" onclick="detachWeBotBridge('${encodeURIComponent(sessionId)}', '${encodeURIComponent(primary.bridge_id || '')}')">Detach</button>` : ''}
                 </div>
             </div>
         `);
@@ -2652,13 +2652,13 @@ function _buildExtendedSections(runtime, item) {
     if (runtime?.voice) {
         const voice = runtime.voice || {};
         sections.push(`
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('voice_mode')}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(voice.status || (voice.enabled ? 'enabled' : 'disabled'))}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(`${voice.stt_model || ''} · ${voice.tts_model || ''} · ${voice.tts_voice || ''}`)}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(voice.last_transcript || '')}</div>
-                <div class="teambot-runtime-actions">
-                    <button class="teambot-subagent-btn" type="button" onclick="toggleTeamBotVoice('${encodeURIComponent(sessionId)}', ${voice.enabled ? 'false' : 'true'})">${voice.enabled ? 'Disable' : 'Enable'}</button>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('voice_mode')}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(voice.status || (voice.enabled ? 'enabled' : 'disabled'))}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(`${voice.stt_model || ''} · ${voice.tts_model || ''} · ${voice.tts_voice || ''}`)}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(voice.last_transcript || '')}</div>
+                <div class="webot-runtime-actions">
+                    <button class="webot-subagent-btn" type="button" onclick="toggleWeBotVoice('${encodeURIComponent(sessionId)}', ${voice.enabled ? 'false' : 'true'})">${voice.enabled ? 'Disable' : 'Enable'}</button>
                 </div>
             </div>
         `);
@@ -2666,13 +2666,13 @@ function _buildExtendedSections(runtime, item) {
     if (runtime?.buddy) {
         const buddy = runtime.buddy || {};
         sections.push(`
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_buddy')}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(`${buddy.compact_face || ''} ${buddy.name || buddy.soul?.name || ''}`)} · ${_escapeAndFormatText(buddy.species || '')} · ${_escapeAndFormatText(buddy.rarity || '')}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(buddy.personality || buddy.soul?.personality || '')}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(buddy.reaction || buddy.last_bubble || '')}</div>
-                <div class="teambot-runtime-actions">
-                    <button class="teambot-subagent-btn" type="button" onclick="petTeamBotBuddy('${encodeURIComponent(sessionId)}')">Pet</button>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_buddy')}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(`${buddy.compact_face || ''} ${buddy.name || buddy.soul?.name || ''}`)} · ${_escapeAndFormatText(buddy.species || '')} · ${_escapeAndFormatText(buddy.rarity || '')}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(buddy.personality || buddy.soul?.personality || '')}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(buddy.reaction || buddy.last_bubble || '')}</div>
+                <div class="webot-runtime-actions">
+                    <button class="webot-subagent-btn" type="button" onclick="petWeBotBuddy('${encodeURIComponent(sessionId)}')">Pet</button>
                 </div>
             </div>
         `);
@@ -2681,14 +2681,14 @@ function _buildExtendedSections(runtime, item) {
         const memory = runtime.memory || {};
         const relevant = Array.isArray(memory.relevant_entries) ? memory.relevant_entries.slice(0, 2).map(entry => entry.name || entry.path || '').filter(Boolean).join(' · ') : '';
         sections.push(`
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">Memory</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(memory.summary || '')}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(`${memory.project_slug || ''} · entries=${memory.entry_count || 0} · can_dream=${memory.can_dream ? 'yes' : 'no'}`)}</div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(relevant)}</div>
-                <div class="teambot-runtime-actions">
-                    <button class="teambot-subagent-btn" type="button" onclick="toggleTeamBotKairos('${encodeURIComponent(sessionId)}', ${memory.kairos_enabled ? 'false' : 'true'})">${memory.kairos_enabled ? 'Kairos Off' : 'Kairos On'}</button>
-                    <button class="teambot-subagent-btn" type="button" onclick="runTeamBotDream('${encodeURIComponent(sessionId)}')">Dream</button>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">Memory</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(memory.summary || '')}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(`${memory.project_slug || ''} · entries=${memory.entry_count || 0} · can_dream=${memory.can_dream ? 'yes' : 'no'}`)}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(relevant)}</div>
+                <div class="webot-runtime-actions">
+                    <button class="webot-subagent-btn" type="button" onclick="toggleWeBotKairos('${encodeURIComponent(sessionId)}', ${memory.kairos_enabled ? 'false' : 'true'})">${memory.kairos_enabled ? 'Kairos Off' : 'Kairos On'}</button>
+                    <button class="webot-subagent-btn" type="button" onclick="runWeBotDream('${encodeURIComponent(sessionId)}')">Dream</button>
                 </div>
             </div>
         `);
@@ -2696,9 +2696,9 @@ function _buildExtendedSections(runtime, item) {
     return sections.join('');
 }
 
-function updateTeamBotSessionMode(sessionId, mode, reason = '') {
+function updateWeBotSessionMode(sessionId, mode, reason = '') {
     if (!sessionId) return;
-    fetch('/proxy_teambot_session_mode', {
+    fetch('/proxy_webot_session_mode', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({session_id: sessionId, mode, reason}),
@@ -2706,18 +2706,18 @@ function updateTeamBotSessionMode(sessionId, mode, reason = '') {
         .then(resp => resp.json())
         .then(async data => {
             if (!data || data.status !== 'success') return;
-            _setTeamBotPolicyStatus(t('subagent_runtime_mode_updated'), 'success');
+            _setWeBotPolicyStatus(t('subagent_runtime_mode_updated'), 'success');
             await refreshSubagentPanel();
         })
         .catch(() => {
-            _setTeamBotPolicyStatus(t('subagent_runtime_mode_update_failed'), 'error');
+            _setWeBotPolicyStatus(t('subagent_runtime_mode_update_failed'), 'error');
         });
 }
 
-async function interruptTeamBotRun(sessionId, runId, agentRef = '') {
+async function interruptWeBotRun(sessionId, runId, agentRef = '') {
     if (!sessionId || !runId) return;
     try {
-        const resp = await fetch('/proxy_teambot_run_interrupt', {
+        const resp = await fetch('/proxy_webot_run_interrupt', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({session_id: sessionId, run_id: runId, agent_ref: agentRef}),
@@ -2728,14 +2728,14 @@ async function interruptTeamBotRun(sessionId, runId, agentRef = '') {
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Interrupt failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Interrupt failed'), 'error');
     }
 }
 
-async function deliverTeamBotInbox(sessionId, targetRef = '', force = false) {
+async function deliverWeBotInbox(sessionId, targetRef = '', force = false) {
     if (!sessionId) return;
     try {
-        const resp = await fetch('/proxy_teambot_session_inbox_deliver', {
+        const resp = await fetch('/proxy_webot_session_inbox_deliver', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({session_id: sessionId, target_ref: targetRef, force}),
@@ -2746,16 +2746,16 @@ async function deliverTeamBotInbox(sessionId, targetRef = '', force = false) {
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Inbox delivery failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Inbox delivery failed'), 'error');
     }
 }
 
-async function toggleTeamBotVoice(sessionId, enabled) {
+async function toggleWeBotVoice(sessionId, enabled) {
     if (!sessionId) return;
     try {
         const runtime = sessionId === currentSessionId ? (_currentSessionRuntime || {}) : (_subagentRuntimeCache[sessionId] || {});
         const voice = runtime.voice || {};
-        const resp = await fetch('/proxy_teambot_voice', {
+        const resp = await fetch('/proxy_webot_voice', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -2774,14 +2774,14 @@ async function toggleTeamBotVoice(sessionId, enabled) {
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Voice update failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Voice update failed'), 'error');
     }
 }
 
-async function applyTeamBotWorkflowPreset(sessionId, presetId) {
+async function applyWeBotWorkflowPreset(sessionId, presetId) {
     if (!sessionId || !presetId) return;
     try {
-        const resp = await fetch('/proxy_teambot_workflow_apply', {
+        const resp = await fetch('/proxy_webot_workflow_apply', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({session_id: sessionId, preset_id: presetId}),
@@ -2792,14 +2792,14 @@ async function applyTeamBotWorkflowPreset(sessionId, presetId) {
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Workflow preset apply failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Workflow preset apply failed'), 'error');
     }
 }
 
-async function attachTeamBotBridge(sessionId, role = 'viewer') {
+async function attachWeBotBridge(sessionId, role = 'viewer') {
     if (!sessionId) return;
     try {
-        const resp = await fetch('/proxy_teambot_bridge_attach', {
+        const resp = await fetch('/proxy_webot_bridge_attach', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({session_id: sessionId, role}),
@@ -2808,22 +2808,22 @@ async function attachTeamBotBridge(sessionId, role = 'viewer') {
         if (!resp.ok || data.status !== 'success') {
             throw new Error(data.detail || data.error || 'Bridge attach failed');
         }
-        _teambotBridgeDesired[sessionId] = true;
+        _webotBridgeDesired[sessionId] = true;
         if (data.bridge) {
-            _connectTeamBotBridgeSocket(sessionId, data.bridge, true);
+            _connectWeBotBridgeSocket(sessionId, data.bridge, true);
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Bridge attach failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Bridge attach failed'), 'error');
     }
 }
 
-async function detachTeamBotBridge(sessionId, bridgeId) {
+async function detachWeBotBridge(sessionId, bridgeId) {
     if (!sessionId || !bridgeId) return;
     try {
-        delete _teambotBridgeDesired[sessionId];
-        _closeTeamBotBridgeSocket(sessionId);
-        const resp = await fetch('/proxy_teambot_bridge_detach', {
+        delete _webotBridgeDesired[sessionId];
+        _closeWeBotBridgeSocket(sessionId);
+        const resp = await fetch('/proxy_webot_bridge_detach', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({bridge_id: bridgeId}),
@@ -2834,14 +2834,14 @@ async function detachTeamBotBridge(sessionId, bridgeId) {
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Bridge detach failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Bridge detach failed'), 'error');
     }
 }
 
-async function toggleTeamBotKairos(sessionId, enabled) {
+async function toggleWeBotKairos(sessionId, enabled) {
     if (!sessionId) return;
     try {
-        const resp = await fetch('/proxy_teambot_kairos', {
+        const resp = await fetch('/proxy_webot_kairos', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({session_id: sessionId, enabled: !!enabled, reason: 'ui-toggle'}),
@@ -2852,14 +2852,14 @@ async function toggleTeamBotKairos(sessionId, enabled) {
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Kairos update failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Kairos update failed'), 'error');
     }
 }
 
-async function runTeamBotDream(sessionId) {
+async function runWeBotDream(sessionId) {
     if (!sessionId) return;
     try {
-        const resp = await fetch('/proxy_teambot_dream', {
+        const resp = await fetch('/proxy_webot_dream', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({session_id: sessionId, reason: 'ui-dream'}),
@@ -2870,13 +2870,13 @@ async function runTeamBotDream(sessionId) {
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Dream failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Dream failed'), 'error');
     }
 }
 
-async function petTeamBotBuddy(sessionId) {
+async function petWeBotBuddy(sessionId) {
     try {
-        const resp = await fetch('/proxy_teambot_buddy', {
+        const resp = await fetch('/proxy_webot_buddy', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({session_id: sessionId || currentSessionId || '', action: 'pet'}),
@@ -2887,7 +2887,7 @@ async function petTeamBotBuddy(sessionId) {
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(String(e.message || 'Buddy action failed'), 'error');
+        _setWeBotPolicyStatus(String(e.message || 'Buddy action failed'), 'error');
     }
 }
 
@@ -2896,14 +2896,14 @@ async function refreshCurrentSessionRuntime() {
         return;
     }
     try {
-        const resp = await fetch(`/proxy_teambot_session_runtime?user_id=${encodeURIComponent(currentUserId)}&session_id=${encodeURIComponent(currentSessionId)}`);
+        const resp = await fetch(`/proxy_webot_session_runtime?user_id=${encodeURIComponent(currentUserId)}&session_id=${encodeURIComponent(currentSessionId)}`);
         if (!resp.ok) return;
         const data = await resp.json();
         _currentSessionRuntime = data;
-        _syncTeamBotBridgeSocket(data.session_id || currentSessionId, data);
+        _syncWeBotBridgeSocket(data.session_id || currentSessionId, data);
         _renderCurrentSessionCard();
     } catch (e) {
-        console.error('Failed to load TeamBot session runtime', e);
+        console.error('Failed to load WeBot session runtime', e);
     }
 }
 
@@ -2922,39 +2922,39 @@ function _summarizeSubagentItem(item) {
 
 function _buildSubagentHistoryHtml(messages) {
     if (!messages || messages.length === 0) {
-        return `<div class="teambot-subagent-empty">${t('subagent_history_empty')}</div>`;
+        return `<div class="webot-subagent-empty">${t('subagent_history_empty')}</div>`;
     }
     return messages.map(msg => `
-        <div class="teambot-subagent-history-item">
-            <div class="teambot-subagent-history-role">${escapeHtml(msg.role || 'assistant')}</div>
-            <div class="teambot-subagent-history-content">${_escapeAndFormatText(msg.content || '')}</div>
+        <div class="webot-subagent-history-item">
+            <div class="webot-subagent-history-role">${escapeHtml(msg.role || 'assistant')}</div>
+            <div class="webot-subagent-history-content">${_escapeAndFormatText(msg.content || '')}</div>
         </div>
     `).join('');
 }
 
 function _buildRuntimeItemList(items, emptyKey) {
     if (!items || items.length === 0) {
-        return `<div class="teambot-runtime-empty">${t(emptyKey)}</div>`;
+        return `<div class="webot-runtime-empty">${t(emptyKey)}</div>`;
     }
     return items.map(item => `
-        <div class="teambot-runtime-row">
-            <span class="teambot-runtime-badge">${escapeHtml(item.status || 'pending')}</span>
-            <span class="teambot-runtime-text">${escapeHtml(item.step || item.title || item.tool_name || '')}</span>
+        <div class="webot-runtime-row">
+            <span class="webot-runtime-badge">${escapeHtml(item.status || 'pending')}</span>
+            <span class="webot-runtime-text">${escapeHtml(item.step || item.title || item.tool_name || '')}</span>
         </div>
     `).join('');
 }
 
 function _buildRuntimeVerificationList(items) {
     if (!items || items.length === 0) {
-        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_verifications')}</div>`;
+        return `<div class="webot-runtime-empty">${t('subagent_runtime_no_verifications')}</div>`;
     }
     return items.map(item => `
-        <div class="teambot-runtime-block">
-            <div class="teambot-runtime-row">
-                <span class="teambot-runtime-badge">${escapeHtml(item.status || '')}</span>
-                <span class="teambot-runtime-text">${escapeHtml(item.title || '')}</span>
+        <div class="webot-runtime-block">
+            <div class="webot-runtime-row">
+                <span class="webot-runtime-badge">${escapeHtml(item.status || '')}</span>
+                <span class="webot-runtime-text">${escapeHtml(item.title || '')}</span>
             </div>
-            <div class="teambot-runtime-detail">${_escapeAndFormatText(item.details || '')}</div>
+            <div class="webot-runtime-detail">${_escapeAndFormatText(item.details || '')}</div>
         </div>
     `).join('');
 }
@@ -2963,24 +2963,24 @@ function _buildRuntimeApprovalList(item, runtimeOverride = null) {
     const runtime = runtimeOverride || _subagentRuntimeCache[item.session_id];
     const approvals = runtime && Array.isArray(runtime.approvals) ? runtime.approvals : [];
     if (!approvals.length) {
-        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_approvals')}</div>`;
+        return `<div class="webot-runtime-empty">${t('subagent_runtime_no_approvals')}</div>`;
     }
     return approvals.map(approval => {
         const approvalId = encodeURIComponent(approval.approval_id || '');
         const sessionId = encodeURIComponent(item.session_id || '');
         const canResolve = approval.status === 'pending';
         return `
-            <div class="teambot-runtime-block">
-                <div class="teambot-runtime-row">
-                    <span class="teambot-runtime-badge">${escapeHtml(approval.status || '')}</span>
-                    <span class="teambot-runtime-text">${escapeHtml(approval.tool_name || '')}</span>
+            <div class="webot-runtime-block">
+                <div class="webot-runtime-row">
+                    <span class="webot-runtime-badge">${escapeHtml(approval.status || '')}</span>
+                    <span class="webot-runtime-text">${escapeHtml(approval.tool_name || '')}</span>
                 </div>
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(approval.request_reason || '')}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(approval.request_reason || '')}</div>
                 ${canResolve ? `
-                    <div class="teambot-runtime-actions">
-                        <button class="teambot-subagent-btn" type="button" onclick="resolveTeamBotApproval(decodeURIComponent('${approvalId}'), 'approve', false, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_approve')}</button>
-                        <button class="teambot-subagent-btn" type="button" onclick="resolveTeamBotApproval(decodeURIComponent('${approvalId}'), 'approve', true, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_approve_remember')}</button>
-                        <button class="teambot-subagent-btn danger" type="button" onclick="resolveTeamBotApproval(decodeURIComponent('${approvalId}'), 'deny', false, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_deny')}</button>
+                    <div class="webot-runtime-actions">
+                        <button class="webot-subagent-btn" type="button" onclick="resolveWeBotApproval(decodeURIComponent('${approvalId}'), 'approve', false, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_approve')}</button>
+                        <button class="webot-subagent-btn" type="button" onclick="resolveWeBotApproval(decodeURIComponent('${approvalId}'), 'approve', true, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_approve_remember')}</button>
+                        <button class="webot-subagent-btn danger" type="button" onclick="resolveWeBotApproval(decodeURIComponent('${approvalId}'), 'deny', false, decodeURIComponent('${sessionId}'))">${t('subagent_runtime_deny')}</button>
                     </div>
                 ` : ''}
             </div>
@@ -2990,12 +2990,12 @@ function _buildRuntimeApprovalList(item, runtimeOverride = null) {
 
 function _buildRuntimeRunList(items, sessionId = '', agentRef = '') {
     if (!items || items.length === 0) {
-        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_runs')}</div>`;
+        return `<div class="webot-runtime-empty">${t('subagent_runtime_no_runs')}</div>`;
     }
     return items.map(run => {
         const events = Array.isArray(run.events) ? run.events : [];
         const eventHtml = events.slice(0, 4).map(event => `
-            <div class="teambot-runtime-detail">${escapeHtml(event.event_type || '')} · ${escapeHtml(event.status || '')} · ${escapeHtml(event.message || '')}</div>
+            <div class="webot-runtime-detail">${escapeHtml(event.event_type || '')} · ${escapeHtml(event.status || '')} · ${escapeHtml(event.message || '')}</div>
         `).join('');
         const metaParts = [
             run.run_kind || 'run',
@@ -3005,17 +3005,17 @@ function _buildRuntimeRunList(items, sessionId = '', agentRef = '') {
         const canInterrupt = !!sessionId && ['queued', 'running', 'cancelling'].includes(String(run.status || '').toLowerCase());
         const recovery = run.recovery || {};
         return `
-            <div class="teambot-runtime-block">
-                <div class="teambot-runtime-row">
-                    <span class="teambot-runtime-badge">${escapeHtml(run.status || '')}</span>
-                    <span class="teambot-runtime-text">${escapeHtml(run.title || run.run_id || '')}</span>
+            <div class="webot-runtime-block">
+                <div class="webot-runtime-row">
+                    <span class="webot-runtime-badge">${escapeHtml(run.status || '')}</span>
+                    <span class="webot-runtime-text">${escapeHtml(run.title || run.run_id || '')}</span>
                 </div>
-                <div class="teambot-runtime-caption">${escapeHtml(metaParts.join(' · '))}</div>
-                ${run.last_error ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(run.last_error)}</div>` : ''}
-                ${run.last_result ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(run.last_result)}</div>` : ''}
-                ${recovery.summary ? `<div class="teambot-runtime-caption">Recovery · ${_escapeAndFormatText(recovery.summary)}</div>` : ''}
-                ${recovery.suggestion ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(recovery.suggestion)}</div>` : ''}
-                ${canInterrupt ? `<div class="teambot-runtime-actions"><button class="teambot-subagent-btn danger" type="button" onclick="interruptTeamBotRun('${encodeURIComponent(sessionId)}', '${encodeURIComponent(run.run_id || '')}', '${encodeURIComponent(agentRef || '')}')">Interrupt</button></div>` : ''}
+                <div class="webot-runtime-caption">${escapeHtml(metaParts.join(' · '))}</div>
+                ${run.last_error ? `<div class="webot-runtime-detail">${_escapeAndFormatText(run.last_error)}</div>` : ''}
+                ${run.last_result ? `<div class="webot-runtime-detail">${_escapeAndFormatText(run.last_result)}</div>` : ''}
+                ${recovery.summary ? `<div class="webot-runtime-caption">Recovery · ${_escapeAndFormatText(recovery.summary)}</div>` : ''}
+                ${recovery.suggestion ? `<div class="webot-runtime-detail">${_escapeAndFormatText(recovery.suggestion)}</div>` : ''}
+                ${canInterrupt ? `<div class="webot-runtime-actions"><button class="webot-subagent-btn danger" type="button" onclick="interruptWeBotRun('${encodeURIComponent(sessionId)}', '${encodeURIComponent(run.run_id || '')}', '${encodeURIComponent(agentRef || '')}')">Interrupt</button></div>` : ''}
                 ${eventHtml}
             </div>
         `;
@@ -3024,35 +3024,35 @@ function _buildRuntimeRunList(items, sessionId = '', agentRef = '') {
 
 function _buildRuntimeInboxList(items, sessionId = '') {
     if (!items || items.length === 0) {
-        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_inbox')}</div>`;
+        return `<div class="webot-runtime-empty">${t('subagent_runtime_no_inbox')}</div>`;
     }
     const hasQueued = items.some(item => String(item.status || '').toLowerCase() === 'queued');
     const actionHtml = sessionId && hasQueued
-        ? `<div class="teambot-runtime-actions"><button class="teambot-subagent-btn" type="button" onclick="deliverTeamBotInbox('${encodeURIComponent(sessionId)}')">Deliver queued</button></div>`
+        ? `<div class="webot-runtime-actions"><button class="webot-subagent-btn" type="button" onclick="deliverWeBotInbox('${encodeURIComponent(sessionId)}')">Deliver queued</button></div>`
         : '';
     return `${actionHtml}${items.map(item => `
-        <div class="teambot-runtime-block">
-            <div class="teambot-runtime-row">
-                <span class="teambot-runtime-badge">${escapeHtml(item.status || '')}</span>
-                <span class="teambot-runtime-text">${escapeHtml(item.source_label || item.source_session || 'unknown')}</span>
+        <div class="webot-runtime-block">
+            <div class="webot-runtime-row">
+                <span class="webot-runtime-badge">${escapeHtml(item.status || '')}</span>
+                <span class="webot-runtime-text">${escapeHtml(item.source_label || item.source_session || 'unknown')}</span>
             </div>
-            <div class="teambot-runtime-detail">${_escapeAndFormatText(item.body || '')}</div>
+            <div class="webot-runtime-detail">${_escapeAndFormatText(item.body || '')}</div>
         </div>
     `).join('')}`;
 }
 
 function _buildRuntimeArtifactList(items) {
     if (!items || items.length === 0) {
-        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_artifacts')}</div>`;
+        return `<div class="webot-runtime-empty">${t('subagent_runtime_no_artifacts')}</div>`;
     }
     return items.map(item => `
-        <div class="teambot-runtime-block">
-            <div class="teambot-runtime-row">
-                <span class="teambot-runtime-badge">${escapeHtml(item.artifact_kind || '')}</span>
-                <span class="teambot-runtime-text">${escapeHtml(item.title || item.path || '')}</span>
+        <div class="webot-runtime-block">
+            <div class="webot-runtime-row">
+                <span class="webot-runtime-badge">${escapeHtml(item.artifact_kind || '')}</span>
+                <span class="webot-runtime-text">${escapeHtml(item.title || item.path || '')}</span>
             </div>
-            ${item.path ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(item.path)}</div>` : ''}
-            ${item.preview ? `<div class="teambot-runtime-detail">${_escapeAndFormatText(item.preview)}</div>` : ''}
+            ${item.path ? `<div class="webot-runtime-detail">${_escapeAndFormatText(item.path)}</div>` : ''}
+            ${item.preview ? `<div class="webot-runtime-detail">${_escapeAndFormatText(item.preview)}</div>` : ''}
         </div>
     `).join('');
 }
@@ -3062,35 +3062,35 @@ function _buildRuntimeRelationshipList(runtime, item) {
     const children = Array.isArray(relationships.children) ? relationships.children : [];
     const hasParent = !!(relationships.parent_session || item.parent_session);
     if (!hasParent && children.length === 0) {
-        return `<div class="teambot-runtime-empty">${t('subagent_runtime_no_relationships')}</div>`;
+        return `<div class="webot-runtime-empty">${t('subagent_runtime_no_relationships')}</div>`;
     }
     return `
-        <div class="teambot-runtime-block">
-            <div class="teambot-runtime-row">
-                <span class="teambot-runtime-badge">${t('subagent_runtime_parent')}</span>
-                <span class="teambot-runtime-text">${escapeHtml(relationships.parent_session || item.parent_session || '(none)')}</span>
+        <div class="webot-runtime-block">
+            <div class="webot-runtime-row">
+                <span class="webot-runtime-badge">${t('subagent_runtime_parent')}</span>
+                <span class="webot-runtime-text">${escapeHtml(relationships.parent_session || item.parent_session || '(none)')}</span>
             </div>
         </div>
-        <div class="teambot-runtime-block">
-            <div class="teambot-runtime-row">
-                <span class="teambot-runtime-badge">${t('subagent_runtime_children')}</span>
-                <span class="teambot-runtime-text">${escapeHtml(String(children.length))}</span>
+        <div class="webot-runtime-block">
+            <div class="webot-runtime-row">
+                <span class="webot-runtime-badge">${t('subagent_runtime_children')}</span>
+                <span class="webot-runtime-text">${escapeHtml(String(children.length))}</span>
             </div>
             ${children.map(child => `
-                <div class="teambot-runtime-detail">${escapeHtml(child.name || child.agent_id || child.session_id || 'subagent')} · ${escapeHtml(child.status || '')}</div>
+                <div class="webot-runtime-detail">${escapeHtml(child.name || child.agent_id || child.session_id || 'subagent')} · ${escapeHtml(child.status || '')}</div>
             `).join('')}
         </div>
     `;
 }
 
 function _renderCurrentSessionCard() {
-    const containerId = 'teambot-current-session';
+    const containerId = 'webot-current-session';
     let container = document.getElementById(containerId);
     if (!container) {
         container = document.createElement('div');
         container.id = containerId;
-        container.className = 'teambot-current-session-card';
-        const listEl = document.getElementById('teambot-subagent-list');
+        container.className = 'webot-current-session-card';
+        const listEl = document.getElementById('webot-subagent-list');
         if (listEl && listEl.parentNode) {
             listEl.parentNode.insertBefore(container, listEl);
         }
@@ -3107,49 +3107,49 @@ function _renderCurrentSessionCard() {
     const hasBridge = Boolean(runtime.bridge);
     container.style.display = 'block';
     container.innerHTML = `
-        <div class="teambot-current-card-header">
-            <div class="teambot-current-card-title">${t('subagent_runtime_current')}</div>
-            <div class="teambot-current-card-caption">${_escapeAndFormatText(runtime.session_id || currentSessionId || 'current')} · ${_escapeAndFormatText(mode)}</div>
+        <div class="webot-current-card-header">
+            <div class="webot-current-card-title">${t('subagent_runtime_current')}</div>
+            <div class="webot-current-card-caption">${_escapeAndFormatText(runtime.session_id || currentSessionId || 'current')} · ${_escapeAndFormatText(mode)}</div>
         </div>
-        <div class="teambot-mode-row">${_modeActionButtons(runtime.session_id || currentSessionId || '', mode)}</div>
-        <div class="teambot-runtime-shell">
-            <div class="teambot-runtime-grid">
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_plan')}</div>
-                    ${planCaption ? `<div class="teambot-runtime-caption">${_escapeAndFormatText(planCaption)}</div>` : ''}
+        <div class="webot-mode-row">${_modeActionButtons(runtime.session_id || currentSessionId || '', mode)}</div>
+        <div class="webot-runtime-shell">
+            <div class="webot-runtime-grid">
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_plan')}</div>
+                    ${planCaption ? `<div class="webot-runtime-caption">${_escapeAndFormatText(planCaption)}</div>` : ''}
                     ${_buildRuntimeItemList(planItems, 'subagent_runtime_no_plan')}
                 </div>
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_todos')}</div>
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_todos')}</div>
                     ${_buildRuntimeItemList(todoItems, 'subagent_runtime_no_todos')}
                 </div>
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_verifications')}</div>
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_verifications')}</div>
                     ${_buildRuntimeVerificationList(runtime.verifications || [])}
                 </div>
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_approvals')}</div>
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_approvals')}</div>
                     ${_buildRuntimeApprovalList({session_id: runtime.session_id || currentSessionId}, runtime)}
                 </div>
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_runs')}</div>
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_runs')}</div>
                     ${_buildRuntimeRunList(runtime.runs || [], runtime.session_id || currentSessionId, '')}
                 </div>
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_inbox')}</div>
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_inbox')}</div>
                     ${_buildRuntimeInboxList(runtime.inbox || [], runtime.session_id || currentSessionId)}
                 </div>
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_workspace')}</div>
-                    <div class="teambot-runtime-detail">${_escapeAndFormatText(runtime.workspace || '')}</div>
-                    ${runtime.mode?.reason ? `<div class="teambot-runtime-caption">${_escapeAndFormatText(runtime.mode.reason)}</div>` : ''}
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_workspace')}</div>
+                    <div class="webot-runtime-detail">${_escapeAndFormatText(runtime.workspace || '')}</div>
+                    ${runtime.mode?.reason ? `<div class="webot-runtime-caption">${_escapeAndFormatText(runtime.mode.reason)}</div>` : ''}
                 </div>
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_artifacts')}</div>
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_artifacts')}</div>
                     ${_buildRuntimeArtifactList(runtime.artifacts || [])}
                 </div>
-                <div class="teambot-runtime-section">
-                    <div class="teambot-runtime-title">${t('subagent_runtime_relationships')}</div>
+                <div class="webot-runtime-section">
+                    <div class="webot-runtime-title">${t('subagent_runtime_relationships')}</div>
                     ${_buildRuntimeRelationshipList(runtime, runtime)}
                 </div>
                 ${_buildExtendedSections(runtime, runtime)}
@@ -3162,61 +3162,61 @@ function _buildSubagentRuntimeHtml(item) {
     const loading = !!_subagentRuntimeLoading[item.session_id];
     const runtime = _subagentRuntimeCache[item.session_id];
     if (loading && !runtime) {
-        return `<div class="teambot-runtime-empty">${t('subagent_runtime_loading')}</div>`;
+        return `<div class="webot-runtime-empty">${t('subagent_runtime_loading')}</div>`;
     }
     if (!runtime || runtime.status !== 'success') {
-        return `<div class="teambot-runtime-empty">${t('subagent_runtime_unavailable')}</div>`;
+        return `<div class="webot-runtime-empty">${t('subagent_runtime_unavailable')}</div>`;
     }
     const workspace = runtime.workspace || item.workspace || '';
     const planItems = runtime.plan && Array.isArray(runtime.plan.items) ? runtime.plan.items : [];
     const todoItems = runtime.todos && Array.isArray(runtime.todos.items) ? runtime.todos.items : [];
     const runtimeMode = runtime.mode || item.session_mode || {};
     const modeLabel = runtimeMode.mode || item.session_mode?.mode || 'execute';
-    const modeReason = runtimeMode.reason ? `<div class="teambot-runtime-caption">${_escapeAndFormatText(runtimeMode.reason)}</div>` : '';
+    const modeReason = runtimeMode.reason ? `<div class="webot-runtime-caption">${_escapeAndFormatText(runtimeMode.reason)}</div>` : '';
     const remoteText = runtime.subagent && runtime.subagent.remote ? runtime.subagent.remote : (item.remote || '');
     const modeActions = _modeActionButtons(item.session_id, modeLabel);
     const extendedSections = _buildExtendedSections(runtime.subagent || {}, item);
     return `
-        <div class="teambot-runtime-grid">
-            <div class="teambot-runtime-section teambot-runtime-section-full">
-                <div class="teambot-runtime-title">${t('subagent_runtime_workspace')}</div>
-                <div class="teambot-runtime-caption">${t('subagent_runtime_mode')}: ${escapeHtml(modeLabel)}</div>
+        <div class="webot-runtime-grid">
+            <div class="webot-runtime-section webot-runtime-section-full">
+                <div class="webot-runtime-title">${t('subagent_runtime_workspace')}</div>
+                <div class="webot-runtime-caption">${t('subagent_runtime_mode')}: ${escapeHtml(modeLabel)}</div>
                 ${modeActions}
                 ${modeReason}
-                <div class="teambot-runtime-detail">${_escapeAndFormatText(workspace || t('subagent_runtime_unavailable'))}</div>
-                ${remoteText ? `<div class="teambot-runtime-detail">${t('subagent_runtime_remote')}: ${_escapeAndFormatText(remoteText)}</div>` : ''}
+                <div class="webot-runtime-detail">${_escapeAndFormatText(workspace || t('subagent_runtime_unavailable'))}</div>
+                ${remoteText ? `<div class="webot-runtime-detail">${t('subagent_runtime_remote')}: ${_escapeAndFormatText(remoteText)}</div>` : ''}
             </div>
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_plan')}</div>
-                ${runtime.plan && runtime.plan.title ? `<div class="teambot-runtime-caption">${escapeHtml(runtime.plan.title)} · ${escapeHtml(runtime.plan.status || 'active')}</div>` : ''}
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_plan')}</div>
+                ${runtime.plan && runtime.plan.title ? `<div class="webot-runtime-caption">${escapeHtml(runtime.plan.title)} · ${escapeHtml(runtime.plan.status || 'active')}</div>` : ''}
                 ${_buildRuntimeItemList(planItems, 'subagent_runtime_no_plan')}
             </div>
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_todos')}</div>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_todos')}</div>
                 ${_buildRuntimeItemList(todoItems, 'subagent_runtime_no_todos')}
             </div>
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_verifications')}</div>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_verifications')}</div>
                 ${_buildRuntimeVerificationList(runtime.verifications || [])}
             </div>
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_approvals')}</div>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_approvals')}</div>
                 ${_buildRuntimeApprovalList(item, runtime)}
             </div>
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_runs')}</div>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_runs')}</div>
                 ${_buildRuntimeRunList(runtime.runs || [], item.session_id, item.agent_id || item.session_id)}
             </div>
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_inbox')}</div>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_inbox')}</div>
                 ${_buildRuntimeInboxList(runtime.inbox || [], item.session_id)}
             </div>
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_artifacts')}</div>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_artifacts')}</div>
                 ${_buildRuntimeArtifactList(runtime.artifacts || [])}
             </div>
-            <div class="teambot-runtime-section">
-                <div class="teambot-runtime-title">${t('subagent_runtime_relationships')}</div>
+            <div class="webot-runtime-section">
+                <div class="webot-runtime-title">${t('subagent_runtime_relationships')}</div>
                 ${_buildRuntimeRelationshipList(runtime, item)}
             </div>
             ${extendedSections}
@@ -3225,7 +3225,7 @@ function _buildSubagentRuntimeHtml(item) {
 }
 
 function _renderSubagentDetail() {
-    const detailEl = document.getElementById('teambot-subagent-detail');
+    const detailEl = document.getElementById('webot-subagent-detail');
     if (!detailEl) return;
     const item = _subagentPanelItems.find(entry =>
         entry.agent_id === _selectedSubagentRef || entry.session_id === _selectedSubagentRef
@@ -3238,7 +3238,7 @@ function _renderSubagentDetail() {
 
     const cacheKey = item.agent_id || item.session_id;
     const historyHtml = _subagentHistoryVisible
-        ? `<div class="teambot-subagent-history">${_buildSubagentHistoryHtml(_subagentHistoryCache[cacheKey] || [])}</div>`
+        ? `<div class="webot-subagent-history">${_buildSubagentHistoryHtml(_subagentHistoryCache[cacheKey] || [])}</div>`
         : '';
     const runtimeHtml = _buildSubagentRuntimeHtml(item);
     const stopDisabled = ['completed', 'failed', 'cancelled'].includes(item.status);
@@ -3247,32 +3247,32 @@ function _renderSubagentDetail() {
     const encodedRef = encodeURIComponent(cacheKey);
     const encodedParent = encodeURIComponent(item.parent_session || '');
     detailEl.innerHTML = `
-        <div class="teambot-subagent-detail-card">
-            <div class="teambot-subagent-detail-header">
+        <div class="webot-subagent-detail-card">
+            <div class="webot-subagent-detail-header">
                 <div style="min-width:0;">
-                    <div class="teambot-subagent-name">${escapeHtml(item.name || item.agent_id)}</div>
-                    <div class="teambot-subagent-meta">${t('subagent_runtime_status')}: ${escapeHtml(item.status || 'idle')} · ${escapeHtml(item.session_id || '')}</div>
+                    <div class="webot-subagent-name">${escapeHtml(item.name || item.agent_id)}</div>
+                    <div class="webot-subagent-meta">${t('subagent_runtime_status')}: ${escapeHtml(item.status || 'idle')} · ${escapeHtml(item.session_id || '')}</div>
                 </div>
-                <div class="teambot-subagent-detail-actions">
-                    <button class="teambot-subagent-btn" type="button" onclick="toggleSubagentHistory(decodeURIComponent('${encodedRef}'))">${t(_subagentHistoryVisible ? 'subagent_hide_history' : 'subagent_history')}</button>
-                    <button class="teambot-subagent-btn${stopDisabled ? '' : ' danger'}" type="button" onclick="cancelSubagentFromPanel(decodeURIComponent('${encodedRef}'))" ${stopDisabled ? 'disabled' : ''}>${t('subagent_stop')}</button>
-                    ${item.parent_session ? `<button class="teambot-subagent-btn" type="button" onclick="openSubagentParentSession(decodeURIComponent('${encodedParent}'))">${t('subagent_open_parent')}</button>` : ''}
+                <div class="webot-subagent-detail-actions">
+                    <button class="webot-subagent-btn" type="button" onclick="toggleSubagentHistory(decodeURIComponent('${encodedRef}'))">${t(_subagentHistoryVisible ? 'subagent_hide_history' : 'subagent_history')}</button>
+                    <button class="webot-subagent-btn${stopDisabled ? '' : ' danger'}" type="button" onclick="cancelSubagentFromPanel(decodeURIComponent('${encodedRef}'))" ${stopDisabled ? 'disabled' : ''}>${t('subagent_stop')}</button>
+                    ${item.parent_session ? `<button class="webot-subagent-btn" type="button" onclick="openSubagentParentSession(decodeURIComponent('${encodedParent}'))">${t('subagent_open_parent')}</button>` : ''}
                 </div>
             </div>
-            <div class="teambot-subagent-detail-copy"><strong>${t('subagent_last_result')}:</strong>\n${_escapeAndFormatText(item.last_result || '(none)')}</div>
-            <div class="teambot-runtime-shell">${runtimeHtml}</div>
+            <div class="webot-subagent-detail-copy"><strong>${t('subagent_last_result')}:</strong>\n${_escapeAndFormatText(item.last_result || '(none)')}</div>
+            <div class="webot-runtime-shell">${runtimeHtml}</div>
             ${historyHtml}
         </div>
     `;
 }
 
 function renderSubagentPanel(subagents) {
-    const listEl = document.getElementById('teambot-subagent-list');
+    const listEl = document.getElementById('webot-subagent-list');
     if (!listEl) return;
     _subagentPanelItems = Array.isArray(subagents) ? subagents : [];
 
     if (_subagentPanelItems.length === 0) {
-        listEl.innerHTML = `<div class="teambot-subagent-empty">${t('subagents_empty')}</div>`;
+        listEl.innerHTML = `<div class="webot-subagent-empty">${t('subagents_empty')}</div>`;
         _selectedSubagentRef = '';
         _renderSubagentDetail();
         return;
@@ -3289,12 +3289,12 @@ function renderSubagentPanel(subagents) {
         const active = _selectedSubagentRef === ref || _selectedSubagentRef === item.session_id;
         const encodedRef = encodeURIComponent(ref);
         return `
-            <div class="teambot-subagent-item${active ? ' active' : ''}" onclick="selectSubagentPanelItem(decodeURIComponent('${encodedRef}'))">
-                <div class="teambot-subagent-item-row">
-                    <div class="teambot-subagent-name">${escapeHtml(item.name || item.agent_id || 'subagent')}</div>
-                    <span class="teambot-subagent-status ${escapeHtml(item.status || 'idle')}">${_renderSubagentStatus(item.status)}</span>
+            <div class="webot-subagent-item${active ? ' active' : ''}" onclick="selectSubagentPanelItem(decodeURIComponent('${encodedRef}'))">
+                <div class="webot-subagent-item-row">
+                    <div class="webot-subagent-name">${escapeHtml(item.name || item.agent_id || 'subagent')}</div>
+                    <span class="webot-subagent-status ${escapeHtml(item.status || 'idle')}">${_renderSubagentStatus(item.status)}</span>
                 </div>
-                <div class="teambot-subagent-meta">${escapeHtml(_summarizeSubagentItem(item))}</div>
+                <div class="webot-subagent-meta">${escapeHtml(_summarizeSubagentItem(item))}</div>
             </div>
         `;
     }).join('');
@@ -3310,13 +3310,13 @@ function selectSubagentPanelItem(agentRef) {
 }
 
 async function refreshSubagentPanel() {
-    const listEl = document.getElementById('teambot-subagent-list');
+    const listEl = document.getElementById('webot-subagent-list');
     if (!listEl) return;
     if (_subagentPanelItems.length === 0) {
-        listEl.innerHTML = `<div class="teambot-subagent-empty">${t('subagents_loading')}</div>`;
+        listEl.innerHTML = `<div class="webot-subagent-empty">${t('subagents_loading')}</div>`;
     }
     try {
-        const resp = await fetch('/proxy_teambot_subagents');
+        const resp = await fetch('/proxy_webot_subagents');
         const data = await resp.json();
         renderSubagentPanel(data.subagents || []);
         await refreshCurrentSessionRuntime();
@@ -3327,7 +3327,7 @@ async function refreshSubagentPanel() {
             ensureSubagentRuntimeLoaded(selected.agent_id || selected.session_id, true);
         }
     } catch (e) {
-        listEl.innerHTML = `<div class="teambot-subagent-empty">${escapeHtml(e.message || 'Failed')}</div>`;
+        listEl.innerHTML = `<div class="webot-subagent-empty">${escapeHtml(e.message || 'Failed')}</div>`;
         _selectedSubagentRef = '';
         _renderSubagentDetail();
     }
@@ -3343,13 +3343,13 @@ async function ensureSubagentRuntimeLoaded(agentRef, force = false) {
     _subagentRuntimeLoading[item.session_id] = true;
     _renderSubagentDetail();
     try {
-        const resp = await fetch(`/proxy_teambot_session_runtime?session_id=${encodeURIComponent(item.session_id)}`);
+        const resp = await fetch(`/proxy_webot_session_runtime?session_id=${encodeURIComponent(item.session_id)}`);
         const data = await resp.json();
         if (!resp.ok || data.status !== 'success') {
             throw new Error(data.detail || data.error || t('subagent_runtime_unavailable'));
         }
         _subagentRuntimeCache[item.session_id] = data;
-        _syncTeamBotBridgeSocket(item.session_id, data);
+        _syncWeBotBridgeSocket(item.session_id, data);
     } catch (e) {
         _subagentRuntimeCache[item.session_id] = {
             status: 'error',
@@ -3361,9 +3361,9 @@ async function ensureSubagentRuntimeLoaded(agentRef, force = false) {
     }
 }
 
-async function resolveTeamBotApproval(approvalId, action, remember, sessionId) {
+async function resolveWeBotApproval(approvalId, action, remember, sessionId) {
     try {
-        const resp = await fetch('/proxy_teambot_tool_approval_resolve', {
+        const resp = await fetch('/proxy_webot_tool_approval_resolve', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -3377,68 +3377,68 @@ async function resolveTeamBotApproval(approvalId, action, remember, sessionId) {
         if (!resp.ok || data.status !== 'success') {
             throw new Error(data.detail || data.error || t('subagent_runtime_approval_failed'));
         }
-        _setTeamBotPolicyStatus(t('subagent_runtime_approval_ok'), 'success');
+        _setWeBotPolicyStatus(t('subagent_runtime_approval_ok'), 'success');
         if (sessionId) {
             delete _subagentRuntimeCache[sessionId];
         }
         await refreshSubagentPanel();
     } catch (e) {
-        _setTeamBotPolicyStatus(`${t('subagent_runtime_approval_failed')}: ${e.message}`, 'error');
+        _setWeBotPolicyStatus(`${t('subagent_runtime_approval_failed')}: ${e.message}`, 'error');
     }
 }
 
-async function reloadTeamBotPolicy(force = false) {
-    if (_teambotPolicyDirty && !force) {
-        _renderTeamBotPolicySummary();
+async function reloadWeBotPolicy(force = false) {
+    if (_webotPolicyDirty && !force) {
+        _renderWeBotPolicySummary();
         return;
     }
-    _setTeamBotPolicyStatus('');
-    const summaryEl = document.getElementById('teambot-policy-summary');
-    if (summaryEl && !_teambotPolicyLoaded) {
+    _setWeBotPolicyStatus('');
+    const summaryEl = document.getElementById('webot-policy-summary');
+    if (summaryEl && !_webotPolicyLoaded) {
         summaryEl.textContent = t('policy_panel_loading');
     }
     try {
-        const resp = await fetch('/proxy_teambot_tool_policy');
+        const resp = await fetch('/proxy_webot_tool_policy');
         const data = await resp.json();
         if (!resp.ok || data.status !== 'success') {
             throw new Error(data.detail || data.error || t('policy_panel_load_failed'));
         }
-        _teambotPolicyData = data;
-        _teambotPolicyDirty = false;
-        _teambotPolicyLoaded = true;
-        _syncTeamBotPolicyEditor(true);
+        _webotPolicyData = data;
+        _webotPolicyDirty = false;
+        _webotPolicyLoaded = true;
+        _syncWeBotPolicyEditor(true);
     } catch (e) {
-        _setTeamBotPolicyStatus(`${t('policy_panel_load_failed')}: ${e.message}`, 'error');
+        _setWeBotPolicyStatus(`${t('policy_panel_load_failed')}: ${e.message}`, 'error');
         if (summaryEl) summaryEl.textContent = t('policy_panel_load_failed');
     }
 }
 
-function toggleTeamBotPolicyEditor() {
-    _teambotPolicyEditorOpen = !_teambotPolicyEditorOpen;
-    _syncTeamBotPolicyEditor();
-    if (_teambotPolicyEditorOpen && !_teambotPolicyLoaded) {
-        reloadTeamBotPolicy();
+function toggleWeBotPolicyEditor() {
+    _webotPolicyEditorOpen = !_webotPolicyEditorOpen;
+    _syncWeBotPolicyEditor();
+    if (_webotPolicyEditorOpen && !_webotPolicyLoaded) {
+        reloadWeBotPolicy();
     }
 }
 
-function formatTeamBotPolicyEditor() {
+function formatWeBotPolicyEditor() {
     try {
-        const parsed = _parseTeamBotPolicyEditor();
-        const editorEl = document.getElementById('teambot-policy-editor');
+        const parsed = _parseWeBotPolicyEditor();
+        const editorEl = document.getElementById('webot-policy-editor');
         if (!editorEl) return;
         editorEl.value = JSON.stringify(parsed, null, 2);
-        _teambotPolicyDirty = true;
-        _setTeamBotPolicyStatus('');
-        _renderTeamBotPolicySummary();
+        _webotPolicyDirty = true;
+        _setWeBotPolicyStatus('');
+        _renderWeBotPolicySummary();
     } catch (e) {
-        _setTeamBotPolicyStatus(`${t('policy_panel_invalid_json')}: ${e.message}`, 'error');
+        _setWeBotPolicyStatus(`${t('policy_panel_invalid_json')}: ${e.message}`, 'error');
     }
 }
 
-async function saveTeamBotPolicyEditor() {
+async function saveWeBotPolicyEditor() {
     try {
-        const parsed = _parseTeamBotPolicyEditor();
-        const resp = await fetch('/proxy_teambot_tool_policy', {
+        const parsed = _parseWeBotPolicyEditor();
+        const resp = await fetch('/proxy_webot_tool_policy', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ policy: parsed })
@@ -3447,13 +3447,13 @@ async function saveTeamBotPolicyEditor() {
         if (!resp.ok || data.status !== 'success') {
             throw new Error(data.detail || data.error || t('policy_panel_save_failed'));
         }
-        _teambotPolicyData = data;
-        _teambotPolicyDirty = false;
-        _teambotPolicyLoaded = true;
-        _syncTeamBotPolicyEditor(true);
-        _setTeamBotPolicyStatus(t('policy_panel_saved'), 'success');
+        _webotPolicyData = data;
+        _webotPolicyDirty = false;
+        _webotPolicyLoaded = true;
+        _syncWeBotPolicyEditor(true);
+        _setWeBotPolicyStatus(t('policy_panel_saved'), 'success');
     } catch (e) {
-        _setTeamBotPolicyStatus(`${t('policy_panel_save_failed')}: ${e.message}`, 'error');
+        _setWeBotPolicyStatus(`${t('policy_panel_save_failed')}: ${e.message}`, 'error');
     }
 }
 
@@ -3464,7 +3464,7 @@ async function toggleSubagentHistory(agentRef) {
         const cacheKey = agentRef;
         if (!_subagentHistoryCache[cacheKey]) {
             try {
-                const resp = await fetch('/proxy_teambot_subagent_history', {
+                const resp = await fetch('/proxy_webot_subagent_history', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ agent_ref: agentRef, limit: 12 })
@@ -3497,7 +3497,7 @@ async function cancelSubagentFromPanel(agentRef) {
     if (['completed', 'failed', 'cancelled'].includes(item.status)) return;
     if (!confirm(t('subagent_stop_confirm'))) return;
     try {
-        const resp = await fetch('/proxy_teambot_subagent_cancel', {
+        const resp = await fetch('/proxy_webot_subagent_cancel', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ agent_ref: agentRef })
@@ -3545,10 +3545,10 @@ async function openSessionSidebar() {
     initSessionRuntimePanelResize();
     requestAnimationFrame(() => applySessionRuntimePanelHeight());
     refreshSubagentPanel();
-    if (!_teambotPolicyLoaded) {
-        reloadTeamBotPolicy();
+    if (!_webotPolicyLoaded) {
+        reloadWeBotPolicy();
     } else {
-        _syncTeamBotPolicyEditor();
+        _syncWeBotPolicyEditor();
     }
     // 移动端加遮罩
     if (window.innerWidth <= 768) {
@@ -3574,7 +3574,7 @@ async function openSessionSidebar() {
 }
 
 function closeSessionSidebar() {
-    _closeAllTeamBotBridgeSockets();
+    _closeAllWeBotBridgeSockets();
     document.getElementById('session-sidebar').style.display = 'none';
     const overlay = document.getElementById('session-overlay');
     if (overlay) overlay.style.display = 'none';
@@ -3930,7 +3930,7 @@ async function switchToSession(sessionId, force = false, options = {}) {
     updateSessionDisplay();
     closeSessionSidebar();
 
-    // ACP 模式：左侧会话只影响未命名时的 acpx 会话键与本地转写，不加载 TeamBot 历史
+    // ACP 模式：左侧会话只影响未命名时的 acpx 会话键与本地转写，不加载 WeBot 历史
     if (_ocChatMode === 'acp' && _acpTool) {
         const chatBoxAcp = document.getElementById('chat-box');
         if (chatBoxAcp) {
@@ -4191,7 +4191,7 @@ function showLoginError(errorDiv, message) {
 }
 
 function _localLoginBannerDismissKey(userId = currentUserId) {
-    return userId ? `teamclaw-local-login-banner-dismissed:${userId}` : '';
+    return userId ? `wecli-local-login-banner-dismissed:${userId}` : '';
 }
 
 function _syncLocalLoginBannerDismissedState() {
@@ -6571,7 +6571,7 @@ async function handleSend() {
         }
         messages.push({ role: 'user', content: msgContent });
 
-        // ── OpenClaw: /proxy_openclaw_chat · ACP (Codex/Claude/Gemini): /proxy_acpx_chat · else TeamBot ──
+        // ── OpenClaw: /proxy_openclaw_chat · ACP (Codex/Claude/Gemini): /proxy_acpx_chat · else WeBot ──
         const isOpenClawChat = (_ocChatMode === 'openclaw' && _ocSelectedAgent);
         const isAcpChat = (_ocChatMode === 'acp' && _acpTool);
         let openaiPayload;
@@ -6599,7 +6599,7 @@ async function handleSend() {
             chatEndpoint = '/proxy_acpx_chat';
         } else {
             openaiPayload = {
-                model: 'teambot',
+                model: 'webot',
                 messages: messages,
                 stream: true,
                 session_id: currentSessionId,
@@ -6945,7 +6945,7 @@ var _acpToolsCache = [];
 var _acpTool = null;                // selected acpx tool when _ocChatMode === 'acp'
 var _acpTranscriptByKey = Object.create(null);
 var _acpLastTranscriptKey = '';
-/** Per–OpenClaw-agent chat HTML while switching away from OpenClaw tab (TeamBot uses server history). */
+/** Per–OpenClaw-agent chat HTML while switching away from OpenClaw tab (WeBot uses server history). */
 var _ocTranscriptByAgent = Object.create(null);
 
 function _acpDisplayLabel(tool) {
@@ -7170,11 +7170,11 @@ let oasisSwarmEdgeLabelsVisible = localStorage.getItem('oasisSwarmEdgeLabelsVisi
 let oasisSwarmViewport = { scale: 1, x: 0, y: 0 };
 let oasisReportLoading = false;
 const oasisReportCache = new Map();
-const TEAMCLAW_STUDIO_FIRST_VISIT_KEY = 'teamclawStudioFirstVisitV2';
+const WECLI_STUDIO_FIRST_VISIT_KEY = 'wecliStudioFirstVisitV2';
 
 function applyStudioFirstVisitDefaults() {
     try {
-        if (localStorage.getItem(TEAMCLAW_STUDIO_FIRST_VISIT_KEY) === '1') {
+        if (localStorage.getItem(WECLI_STUDIO_FIRST_VISIT_KEY) === '1') {
             return;
         }
         currentPage = 'chat';
@@ -7185,7 +7185,7 @@ function applyStudioFirstVisitDefaults() {
         localStorage.setItem('oasisTownModeEnabled', '0');
         localStorage.setItem('oasisTownAudioEnabled', '0');
         localStorage.setItem('oasisTownWorkspaceView', 'town');
-        localStorage.setItem(TEAMCLAW_STUDIO_FIRST_VISIT_KEY, '1');
+        localStorage.setItem(WECLI_STUDIO_FIRST_VISIT_KEY, '1');
     } catch (err) {
         console.warn('[Studio] Failed to apply first-visit defaults:', err);
     }
@@ -8021,9 +8021,9 @@ function clampOasisSwarmNumber(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function getTeamClawTextLayout() {
+function getWecliTextLayout() {
     if (typeof window === 'undefined') return null;
-    return window.TeamClawTextLayout || null;
+    return window.WecliTextLayout || null;
 }
 
 function oasisSwarmStableHash(value) {
@@ -8071,7 +8071,7 @@ function buildOasisSwarmNodeMetrics(node) {
             : node.type === 'agent'
                 ? { radius: 13.4, maxUnits: 11.3, labelFontSize: 10.2, minLabelWidth: 50, maxLabelWidth: 120, labelGap: 13 }
                 : { radius: 12.4, maxUnits: 10.4, labelFontSize: 9.8, minLabelWidth: 46, maxLabelWidth: 112, labelGap: 12 };
-    const textLayout = getTeamClawTextLayout();
+    const textLayout = getWecliTextLayout();
     const labelLineHeight = Math.round(typeConfig.labelFontSize + 4);
     let labelLines = [truncateOasisSwarmLabelText(node.label, typeConfig.maxUnits)];
     let labelText = labelLines[0];
@@ -8416,7 +8416,7 @@ function buildOasisSwarmNodeSvg(node, selected, muted) {
     const labelY = node.y - (((node.labelHeight || labelLineHeight) - labelLineHeight) / 2) + ((node.labelFontSize || 10) * 0.34);
     const labelFill = selected ? '#fff6bf' : '#fff1e8';
     const labelStroke = selected ? 'rgba(92,68,10,0.92)' : 'rgba(8,12,26,0.9)';
-    const textLayout = getTeamClawTextLayout();
+    const textLayout = getWecliTextLayout();
     const labelMarkup = textLayout && typeof textLayout.renderSvgTspans === 'function'
         ? textLayout.renderSvgTspans(node.labelLines || [node.labelText || node.label || ''], labelX, labelY, labelLineHeight, escapeHtml)
         : escapeHtml(node.labelText || node.label || '');
@@ -8453,7 +8453,7 @@ function buildOasisSwarmEdgeSvg(edge, graphState, muted, selected) {
     const labelY = ctrlY - 8;
     const stroke = selected ? '#f9c74f' : '#c2c3c7';
     const strokeWidth = selected ? (2.6 + (edge.weight || 0.5) * 2.4) : (1.2 + (edge.weight || 0.5) * 1.9);
-    const textLayout = getTeamClawTextLayout();
+    const textLayout = getWecliTextLayout();
     const edgeLabel = textLayout && typeof textLayout.fitSingleLine === 'function'
         ? textLayout.fitSingleLine(edge.label || '', 118, { font: '600 8px Arial', lineHeight: 10, suffix: '…' }).text
         : (edge.label || '').slice(0, 18);
@@ -8947,7 +8947,7 @@ function showDiscussionOverview() {
     const barColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16'];
     const evIcons = {start:'🚀',round:'📢',agent_call:'⏳',agent_done:'✅',conclude:'🏁',manual_post:'📝',if_branch:'🔀',post:'💬'};
 
-    const textLayout = getTeamClawTextLayout();
+    const textLayout = getWecliTextLayout();
     const overviewNames = rowKeys.map((key) => key === '__system__' ? (currentLang === 'zh-CN' ? '系统' : 'System') : key);
     const labelW = textLayout && typeof textLayout.measureLabelGutter === 'function'
         ? textLayout.measureLabelGutter(overviewNames, {
@@ -10691,7 +10691,7 @@ async function uploadTeam(input) {
 }
 
 // ── Import team dropdown & Hub import ──
-const TEAM_HUB_URL = 'https://teamclawhub.com';
+const TEAM_HUB_URL = 'https://wecli.net';
 
 function toggleImportDropdown() {
     const dd = document.getElementById('import-dropdown');
@@ -10724,7 +10724,7 @@ function showHubImportModal() {
     if (modal) modal.style.display = 'flex';
 }
 
-function openTeamHub() {
+function openWecliHub() {
     window.open(TEAM_HUB_URL, '_blank');
 }
 
@@ -10764,7 +10764,7 @@ function _renderBuiltinPresetCards() {
                         <div style="margin-top:4px;font-size:12px;line-height:1.55;color:#6b7280;">${escapeHtml(preset.description || '')}</div>
                         ${meta ? `<div style="margin-top:6px;font-size:11px;color:#9ca3af;">${escapeHtml(meta)}</div>` : ''}
                     </div>
-                    <button class="teambot-subagent-btn" type="button" onclick="installBuiltinTeamPreset(decodeURIComponent('${presetId}'), '${escapeHtml(defaultTeam)}')">安装</button>
+                    <button class="webot-subagent-btn" type="button" onclick="installBuiltinTeamPreset(decodeURIComponent('${presetId}'), '${escapeHtml(defaultTeam)}')">安装</button>
                 </div>
             </div>
         `;
@@ -12658,7 +12658,7 @@ function acpGetSessionPickValue() {
     return sel && String(sel.value || '').trim();
 }
 
-/** Transcript + backend session: tool + list pick, custom slug, or TeamClaw session id. */
+/** Transcript + backend session: tool + list pick, custom slug, or Wecli session id. */
 function acpComputeTranscriptKey() {
     const tool = _acpTool || '';
     const pick = acpGetSessionPickValue();
@@ -12678,7 +12678,7 @@ function _acpTranscriptKey() {
 function acpSyncSessionInputFromStorage() {
     const inp = document.getElementById('oc-acp-session-name');
     if (!inp || !_acpTool) return;
-    inp.value = localStorage.getItem('teamclaw_acp_session_name_' + _acpTool) || '';
+    inp.value = localStorage.getItem('wecli_acp_session_name_' + _acpTool) || '';
 }
 
 function acpUpdateSessionInputsDisabledState() {
@@ -12702,15 +12702,15 @@ function acpNotifySessionContextChanged() {
 function acpOnSessionNameBlur() {
     if (_ocChatMode !== 'acp' || !_acpTool) return;
     const inp = document.getElementById('oc-acp-session-name');
-    if (inp) localStorage.setItem('teamclaw_acp_session_name_' + _acpTool, String(inp.value || '').trim());
+    if (inp) localStorage.setItem('wecli_acp_session_name_' + _acpTool, String(inp.value || '').trim());
     acpNotifySessionContextChanged();
 }
 
 function acpOnSessionPickChange() {
     if (!_acpTool) return;
     const v = acpGetSessionPickValue();
-    if (v) localStorage.setItem('teamclaw_acp_session_pick_' + _acpTool, v);
-    else localStorage.removeItem('teamclaw_acp_session_pick_' + _acpTool);
+    if (v) localStorage.setItem('wecli_acp_session_pick_' + _acpTool, v);
+    else localStorage.removeItem('wecli_acp_session_pick_' + _acpTool);
     acpUpdateSessionInputsDisabledState();
     acpNotifySessionContextChanged();
 }
@@ -12741,7 +12741,7 @@ async function acpLoadSessionsList() {
             opt.textContent = name + (ts ? ' · ' + ts : '') + closed;
             sel.appendChild(opt);
         }
-        const stored = localStorage.getItem('teamclaw_acp_session_pick_' + _acpTool);
+        const stored = localStorage.getItem('wecli_acp_session_pick_' + _acpTool);
         if (stored && Array.from(sel.options).some((o) => o.value === stored)) sel.value = stored;
         else if (prev && Array.from(sel.options).some((o) => o.value === prev)) sel.value = prev;
         else sel.value = '';
@@ -12861,7 +12861,7 @@ function ocPaintOpenClawChatFromCache() {
 }
 
 /**
- * Switch between TeamBot (internal), OpenClaw (HTTP gateway), and ACP local CLIs (codex / claude / gemini via acpx).
+ * Switch between WeBot (internal), OpenClaw (HTTP gateway), and ACP local CLIs (codex / claude / gemini via acpx).
  */
 async function ocSwitchTo(mode, acpTool) {
     const nextAcp = (mode === 'acp' && acpTool) ? String(acpTool).toLowerCase() : null;
@@ -12957,7 +12957,7 @@ function ocOnAgentChange() {
 }
 
 /**
- * Initialize the chat backend switcher (TeamBot / OpenClaw / ACP CLIs).
+ * Initialize the chat backend switcher (WeBot / OpenClaw / ACP CLIs).
  * Shows the bar when OpenClaw agents exist or acpx is available on the server.
  */
 async function ocInitSwitcher() {

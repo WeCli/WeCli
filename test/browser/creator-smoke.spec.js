@@ -118,7 +118,7 @@ test('team creator can generate a mentor directly from ArXiv', async ({ page }) 
     window.alert = () => {};
     window.confirm = () => true;
     localStorage.setItem('lang', 'zh-CN');
-    localStorage.setItem('teamclaw_lang', 'zh');
+    localStorage.setItem('wecli_lang', 'zh');
   });
 
   await page.goto('/creator');
@@ -152,7 +152,7 @@ test('team creator can collect Feishu data and auto-import a colleague', async (
     window.alert = () => {};
     window.confirm = () => true;
     localStorage.setItem('lang', 'zh-CN');
-    localStorage.setItem('teamclaw_lang', 'zh');
+    localStorage.setItem('wecli_lang', 'zh');
   });
 
   await page.goto('/creator');
@@ -161,7 +161,7 @@ test('team creator can collect Feishu data and auto-import a colleague', async (
   await page.locator('#feishu-app-secret').fill('secret-test');
   await page.locator('#feishu-target-name').fill('张三');
   await page.locator('#feishu-role').fill('后端工程师');
-  await page.locator('#feishu-company').fill('TeamClaw');
+  await page.locator('#feishu-company').fill('Wecli');
   await page.locator('#feishu-level').fill('L4');
   await page.locator('#feishu-personality-tags').fill('直接, 数据驱动');
   await page.locator('#feishu-msg-limit').fill('800');
@@ -173,7 +173,7 @@ test('team creator can collect Feishu data and auto-import a colleague', async (
     app_secret: 'secret-test',
     target_name: '张三',
     role: '后端工程师',
-    company: 'TeamClaw',
+    company: 'Wecli',
     level: 'L4',
     auto_distill: true,
     auto_import: true,
@@ -217,7 +217,7 @@ test('team creator dag uses pretext-driven sizing for long mentor names', async 
     window.alert = () => {};
     window.confirm = () => true;
     localStorage.setItem('lang', 'zh-CN');
-    localStorage.setItem('teamclaw_lang', 'zh');
+    localStorage.setItem('wecli_lang', 'zh');
   });
 
   await page.goto('/creator');
@@ -228,14 +228,14 @@ test('team creator dag uses pretext-driven sizing for long mentor names', async 
   await expect.poll(() => calls.arxiv).toBe(1);
 
   const result = await page.evaluate(() => {
-    const metrics = window.__TeamCreatorBuilder && typeof window.__TeamCreatorBuilder.getDagNodeMetrics === 'function'
-      ? window.__TeamCreatorBuilder.getDagNodeMetrics({
+    const metrics = window.__WecliCreatorBuilder && typeof window.__WecliCreatorBuilder.getDagNodeMetrics === 'function'
+      ? window.__WecliCreatorBuilder.getDagNodeMetrics({
           name: 'Professor Geoffrey Everest Hinton AlphaBetaGamma',
           tag: 'hinton-long',
         })
       : null;
     return {
-      ready: Boolean(window.TeamClawTextLayout && typeof window.TeamClawTextLayout.measureDisplay === 'function'),
+      ready: Boolean(window.WecliTextLayout && typeof window.WecliTextLayout.measureDisplay === 'function'),
       width: metrics ? metrics.w : 0,
       nameText: metrics ? metrics.displayNameText : '',
     };

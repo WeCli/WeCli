@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TinyFish competitor monitor service for TeamClaw.
+"""TinyFish competitor monitor service for Wecli.
 
 Shared by:
 - CLI script
@@ -182,7 +182,7 @@ class Target:
             "url": self.url,
             "goal": self.goal,
             "browser_profile": self.browser_profile,
-            "api_integration": "teamclaw-competitor-monitor",
+            "api_integration": "wecli-competitor-monitor",
         }
         payload.update(self.extra_payload)
         return payload
@@ -281,7 +281,7 @@ class TinyFishClient:
         return list(body.get("data") or [])
 
     def probe(self) -> dict[str, Any]:
-        probe_id = f"teamclaw-probe-{int(time.time())}"
+        probe_id = f"wecli-probe-{int(time.time())}"
         return self._post("/v1/runs/batch", {"run_ids": [probe_id]})
 
     def run_sse(self, target: Target) -> Iterator[dict[str, Any]]:
@@ -1275,7 +1275,7 @@ def stream_live_run(
                     "result": event.get("result"),
                 }
                 summary = db.persist_run_result(target, run_record)
-                event = {**event, "teamclaw_summary": summary}
+                event = {**event, "wecli_summary": summary}
 
             yield event
     except Exception as exc:
@@ -1388,7 +1388,7 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="TinyFish competitor monitor for TeamClaw")
+    parser = argparse.ArgumentParser(description="TinyFish competitor monitor for Wecli")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser("run", help="Submit targets to TinyFish, wait, and store results")

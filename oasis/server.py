@@ -55,7 +55,7 @@ load_dotenv(dotenv_path=env_path)
 
 def _server_host() -> str:
     """Expose services to the Windows host when running inside WSL."""
-    explicit_host = os.getenv("TEAMCLAW_SERVER_HOST", "").strip()
+    explicit_host = os.getenv("WECLI_SERVER_HOST", "").strip()
     if explicit_host:
         return explicit_host
     return "0.0.0.0" if os.getenv("WSL_DISTRO_NAME") else "127.0.0.1"
@@ -507,7 +507,7 @@ async def add_agent_callback(topic_id: str, req: AgentCallbackRequest):
     forum.log_event(
         "agent_callback",
         agent=author[:200],
-        detail=f"round={req.round_num}, type={req.result.get('teamclaw_type', 'oasis reply')}",
+        detail=f"round={req.round_num}, type={req.result.get('wecli_type', 'oasis reply')}",
     )
     forum.save()
 
@@ -518,7 +518,7 @@ async def add_agent_callback(topic_id: str, req: AgentCallbackRequest):
         "topic_id": topic_id,
         "author": author[:200],
         "round_num": req.round_num,
-        "teamclaw_type": req.result.get("teamclaw_type", "oasis reply"),
+        "wecli_type": req.result.get("wecli_type", "oasis reply"),
         "post_id": latest.id if latest and latest.author == author[:200] else None,
     }
 

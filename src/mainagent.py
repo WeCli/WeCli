@@ -33,7 +33,7 @@ from ops_routes import create_ops_router
 from session_routes import create_session_router
 from settings_routes import create_settings_router
 from system_routes import create_system_router
-from teambot_routes import create_teambot_router
+from webot_routes import create_webot_router
 from message_builder import build_human_message
 from logging_utils import get_logger, request_id_ctx
 
@@ -197,7 +197,7 @@ app.include_router(
 )
 
 app.include_router(
-    create_teambot_router(
+    create_webot_router(
         agent=agent,
         verify_auth_or_token=verify_auth_or_token,
         extract_text=_extract_text,

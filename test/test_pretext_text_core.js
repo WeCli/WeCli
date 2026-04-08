@@ -1,8 +1,8 @@
 const assert = require('assert');
 const path = require('path');
 
-delete global.TeamClawPretext;
-delete global.TeamClawTextLayout;
+delete global.WecliPretext;
+delete global.WecliTextLayout;
 
 const textLayout = require(path.join(__dirname, '..', 'src', 'static', 'js', 'pretext_text_core.js'));
 

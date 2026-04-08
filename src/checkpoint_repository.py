@@ -11,6 +11,8 @@ import sqlite3
 
 import aiosqlite
 
+_VACUUM_FREE_PAGE_RATIO_THRESHOLD = 0.35
+
 
 def _is_missing_table_error(exc: sqlite3.OperationalError) -> bool:
     """判断异常是否为 'no such table' 错误。"""
@@ -70,6 +72,22 @@ async def delete_thread_records_like(db_path: str, pattern: str) -> None:
         await db.commit()
 
 
+async def _maybe_vacuum_on_free_page_ratio(db: aiosqlite.Connection) -> bool:
+    """Run VACUUM when freelist/page_count ratio is too high."""
+    page_row = await (await db.execute("PRAGMA page_count")).fetchone()
+    free_row = await (await db.execute("PRAGMA freelist_count")).fetchone()
+    page_count = int(page_row[0] if page_row and page_row[0] is not None else 0)
+    freelist_count = int(free_row[0] if free_row and free_row[0] is not None else 0)
+    if page_count <= 0:
+        return False
+    free_ratio = freelist_count / page_count
+    if free_ratio < _VACUUM_FREE_PAGE_RATIO_THRESHOLD:
+        return False
+    await db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    await db.execute("VACUUM")
+    return True
+
+
 async def purge_old_checkpoints(db_path: str, thread_id: str, keep: int = 1) -> int:
     """清理指定 thread 的旧 checkpoint，只保留最近 `keep` 个。
 
@@ -117,6 +135,7 @@ async def purge_old_checkpoints(db_path: str, thread_id: str, keep: int = 1) -> 
                 if not _is_missing_table_error(exc):
                     raise
         await db.commit()
+        await _maybe_vacuum_on_free_page_ratio(db)
         deleted = len(ids_to_delete)
 
     return deleted

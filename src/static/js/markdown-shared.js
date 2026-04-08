@@ -24,7 +24,7 @@
 
     function configureMarked() {
         if (typeof global.marked === 'undefined') return;
-        if (global.marked.__teamclawConfigured) return;
+        if (global.marked.__wecliConfigured) return;
 
         global.marked.setOptions({
             gfm: true,
@@ -40,7 +40,7 @@
             langPrefix: 'hljs language-'
         });
 
-        global.marked.__teamclawConfigured = true;
+        global.marked.__wecliConfigured = true;
     }
 
     function render(content) {
@@ -71,7 +71,7 @@
         highlight(element);
     }
 
-    global.TeamClawMarkdown = {
+    global.WecliMarkdown = {
         configure: configureMarked,
         escapeHtml,
         normalizeEscapedNewlines,

@@ -89,7 +89,7 @@ class TeamPresetAssetsTests(unittest.TestCase):
                 installed_agents = json.loads((team_dir / "internal_agents.json").read_text(encoding="utf-8"))
                 self.assertEqual(len(installed_agents), 2)
                 self.assertTrue(all(item.get("session") for item in installed_agents))
-                self.assertTrue((team_dir / "teamclaw_preset_manifest.json").exists())
+                self.assertTrue((team_dir / "wecli_preset_manifest.json").exists())
                 self.assertTrue((team_dir / "oasis" / "yaml" / "modern.yaml").exists())
             finally:
                 team_preset_assets.PRESET_ROOT = original_preset_root

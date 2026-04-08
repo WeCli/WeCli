@@ -1,5 +1,5 @@
 #!/bin/bash
-# TeamBot 自动环境配置脚本 (Linux / macOS)
+# WeBot 自动环境配置脚本 (Linux / macOS)
 # 参考腾讯内网版 OpenClaw install_prepare.sh 的组件状态跟踪模式
 
 set -e
@@ -372,7 +372,7 @@ main() {
     register_component "openclaw"     "OpenClaw 集成"
 
     echo ""
-    echo -e "${BOLD}TeamBot 环境自动配置${NC}"
+    echo -e "${BOLD}WeBot 环境自动配置${NC}"
     echo -e "${MUTED}正在检查并配置必要的运行组件...${NC}"
 
     # 尝试加载内网版 OpenClaw 运行时（复用其 Node.js/Python/uv）

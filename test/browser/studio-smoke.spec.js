@@ -3,8 +3,8 @@ const { test, expect } = require('@playwright/test');
 async function installMockWebSocket(page) {
   await page.addInitScript(() => {
     const sockets = [];
-    window.__teamclawSocketUrls = [];
-    window.__teamclawSocketSends = [];
+    window.__wecliSocketUrls = [];
+    window.__wecliSocketSends = [];
 
     class MockWebSocket {
       static CONNECTING = 0;
@@ -20,7 +20,7 @@ async function installMockWebSocket(page) {
         this.onerror = null;
         this.onclose = null;
         sockets.push(this);
-        window.__teamclawSocketUrls.push(url);
+        window.__wecliSocketUrls.push(url);
         setTimeout(() => {
           this.readyState = MockWebSocket.OPEN;
           if (typeof this.onopen === 'function') this.onopen({ type: 'open' });
@@ -28,7 +28,7 @@ async function installMockWebSocket(page) {
       }
 
       send(data) {
-        window.__teamclawSocketSends.push({ url: this.url, data: String(data || '') });
+        window.__wecliSocketSends.push({ url: this.url, data: String(data || '') });
       }
 
       close() {
@@ -38,7 +38,7 @@ async function installMockWebSocket(page) {
     }
 
     window.WebSocket = MockWebSocket;
-    window.__emitTeamClawSocket = (payload) => {
+    window.__emitWecliSocket = (payload) => {
       const data = JSON.stringify(payload);
       sockets.forEach((socket) => {
         if (socket.readyState === MockWebSocket.OPEN && typeof socket.onmessage === 'function') {
@@ -50,7 +50,7 @@ async function installMockWebSocket(page) {
 }
 
 async function stubStudioNetwork(page, calls, options = {}) {
-  const teambotState = {
+  const webotState = {
     approvals: [
       {
         approval_id: 'approval-1',
@@ -67,7 +67,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     status: 'success',
     session_id: 'main-session',
     session_role: 'main',
-    workspace: '/tmp/teamclaw/main',
+    workspace: '/tmp/wecli/main',
     mode: { mode: 'execute', reason: 'Runtime panel smoke' },
     plan: {
       title: 'Execution swarm',
@@ -124,7 +124,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     relationships: { parent_session: '', children: [] },
     memory: {
       summary: '3 entries · kairos off',
-      project_slug: 'teamclaw-main',
+      project_slug: 'wecli-main',
       entry_count: 3,
       can_dream: true,
       kairos_enabled: false,
@@ -160,12 +160,12 @@ async function stubStudioNetwork(page, calls, options = {}) {
   const subagentRuntimeState = {
     status: 'success',
     session_id: 'subagent__coder__curie',
-    workspace: '/tmp/teamclaw/worktree/curie',
+    workspace: '/tmp/wecli/worktree/curie',
     plan: {
       title: 'Review gate',
       status: 'active',
       items: [
-        { step: 'Inspect TeamBot runtime surface', status: 'completed' },
+        { step: 'Inspect WeBot runtime surface', status: 'completed' },
         { step: 'Verify approval roundtrip', status: 'in_progress' },
       ],
       metadata: {
@@ -213,7 +213,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
         details: 'Integration proxy verified',
       },
     ],
-    approvals: teambotState.approvals,
+    approvals: webotState.approvals,
     bridge: {
       status: 'detached',
       attached: false,
@@ -242,7 +242,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     },
     memory: {
       summary: '2 entries · kairos off',
-      project_slug: 'teamclaw-curie',
+      project_slug: 'wecli-curie',
       entry_count: 2,
       can_dream: true,
       kairos_enabled: false,
@@ -340,7 +340,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
       contentType: 'application/javascript',
       body: `
         window.marked = {
-          __teamclawConfigured: false,
+          __wecliConfigured: false,
           parse: (value) => value,
           setOptions() {},
         };
@@ -376,7 +376,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
   await page.route('**/teams', (route) => json(route, { teams: ['Smoke Team'] }));
   await page.route('**/proxy_visual/experts*', (route) => json(route, []));
   await page.route('**/proxy_openclaw_sessions', (route) => json(route, { available: true, agents: [] }));
-  await page.route('**/proxy_teambot_subagents', (route) =>
+  await page.route('**/proxy_webot_subagents', (route) =>
     json(route, {
       status: 'success',
       subagents: [
@@ -392,13 +392,13 @@ async function stubStudioNetwork(page, calls, options = {}) {
           updated_at: '2026-03-31T12:00:00',
           created_at: '2026-03-31T11:55:00',
           last_result: 'Collected runtime evidence.',
-          workspace: '/tmp/teamclaw/worktree/curie',
+          workspace: '/tmp/wecli/worktree/curie',
           latest_run: { run_id: 'run-curie-1', status: 'running' },
         },
       ],
     })
   );
-  await page.route('**/proxy_teambot_session_runtime?*', (route) =>
+  await page.route('**/proxy_webot_session_runtime?*', (route) =>
     {
       const url = new URL(route.request().url());
       const sessionId = url.searchParams.get('session_id') || '';
@@ -409,7 +409,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
       return json(route, { ...currentRuntimeState });
     }
   );
-  await page.route('**/proxy_teambot_workflow_apply', async (route) => {
+  await page.route('**/proxy_webot_workflow_apply', async (route) => {
     const payload = await route.request().postDataJSON();
     calls.workflowApply.push(payload);
     const workflow = {
@@ -436,15 +436,15 @@ async function stubStudioNetwork(page, calls, options = {}) {
     target.mode = { mode: workflow.mode, reason: `workflow:${workflow.preset_id}` };
     return json(route, { status: 'success', preset: workflow });
   });
-  await page.route('**/proxy_teambot_tool_approval_resolve', async (route) => {
+  await page.route('**/proxy_webot_tool_approval_resolve', async (route) => {
     calls.approvalActions.push(await route.request().postDataJSON());
-    teambotState.approvals = [
+    webotState.approvals = [
       {
-        ...teambotState.approvals[0],
+        ...webotState.approvals[0],
         status: 'approved',
       },
     ];
-    subagentRuntimeState.approvals = teambotState.approvals;
+    subagentRuntimeState.approvals = webotState.approvals;
     return json(route, {
       status: 'success',
       approval: {
@@ -455,12 +455,12 @@ async function stubStudioNetwork(page, calls, options = {}) {
       },
     });
   });
-  await page.route('**/proxy_teambot_session_inbox_deliver', async (route) => {
+  await page.route('**/proxy_webot_session_inbox_deliver', async (route) => {
     calls.inboxDeliveries = (calls.inboxDeliveries || 0) + 1;
     currentRuntimeState.inbox = currentRuntimeState.inbox.map(item => ({ ...item, status: 'delivered' }));
     return json(route, { status: 'success', delivered: currentRuntimeState.inbox.length });
   });
-  await page.route('**/proxy_teambot_voice', async (route) => {
+  await page.route('**/proxy_webot_voice', async (route) => {
     const payload = await route.request().postDataJSON();
     calls.voiceUpdates = calls.voiceUpdates || [];
     calls.voiceUpdates.push(payload);
@@ -476,7 +476,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     };
     return json(route, { status: 'success', voice: currentRuntimeState.voice });
   });
-  await page.route('**/proxy_teambot_bridge_attach', async (route) => {
+  await page.route('**/proxy_webot_bridge_attach', async (route) => {
     const payload = await route.request().postDataJSON();
     calls.bridgeAttach = (calls.bridgeAttach || 0) + 1;
     const sessionId = payload.session_id || currentRuntimeState.session_id || 'main-session';
@@ -491,7 +491,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
           session_id: sessionId,
           role: payload.role || 'viewer',
           attach_code: 'ATTACH-42',
-          websocket_path: '/teambot/ws/smoke-user/bridge-main-1',
+          websocket_path: '/webot/ws/smoke-user/bridge-main-1',
           status: 'attached',
           connection_count: 0,
         },
@@ -501,7 +501,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
         session_id: sessionId,
         role: payload.role || 'viewer',
         attach_code: 'ATTACH-42',
-        websocket_path: '/teambot/ws/smoke-user/bridge-main-1',
+        websocket_path: '/webot/ws/smoke-user/bridge-main-1',
         status: 'attached',
         connection_count: 0,
       },
@@ -511,7 +511,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
       bridge: currentRuntimeState.bridge.primary,
     });
   });
-  await page.route('**/proxy_teambot_bridge_detach', async (route) => {
+  await page.route('**/proxy_webot_bridge_detach', async (route) => {
     calls.bridgeDetach = (calls.bridgeDetach || 0) + 1;
     currentRuntimeState.bridge = {
       status: 'detached',
@@ -528,7 +528,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
       },
     });
   });
-  await page.route('**/proxy_teambot_kairos', async (route) => {
+  await page.route('**/proxy_webot_kairos', async (route) => {
     const payload = await route.request().postDataJSON();
     calls.kairosUpdates = calls.kairosUpdates || [];
     calls.kairosUpdates.push(payload);
@@ -539,7 +539,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     };
     return json(route, { status: 'success', memory: currentRuntimeState.memory });
   });
-  await page.route('**/proxy_teambot_dream', async (route) => {
+  await page.route('**/proxy_webot_dream', async (route) => {
     calls.dreamRuns = (calls.dreamRuns || 0) + 1;
     currentRuntimeState.memory = {
       ...currentRuntimeState.memory,
@@ -550,7 +550,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     };
     return json(route, { status: 'success', memory: currentRuntimeState.memory });
   });
-  await page.route('**/proxy_teambot_buddy', async (route) => {
+  await page.route('**/proxy_webot_buddy', async (route) => {
     const payload = await route.request().postDataJSON();
     calls.buddyActions = calls.buddyActions || [];
     calls.buddyActions.push(payload);
@@ -560,7 +560,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     };
     return json(route, { status: 'success', buddy: currentRuntimeState.buddy });
   });
-  await page.route('**/proxy_teambot_tool_policy', async (route) => {
+  await page.route('**/proxy_webot_tool_policy', async (route) => {
     if (route.request().method() !== 'GET') {
       return json(route, {
         status: 'success',
@@ -580,7 +580,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
           run_command: { approval: 'manual' },
         },
         source: 'user',
-        definition_path: '/tmp/teamclaw/policy.json',
+        definition_path: '/tmp/wecli/policy.json',
       },
     });
   });
@@ -693,7 +693,7 @@ test('studio workflow tab and settings actions stay responsive', async ({ page }
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('teamclawStudioFirstVisitV2');
+    localStorage.removeItem('wecliStudioFirstVisitV2');
     localStorage.setItem('oasisTownModeEnabled', '1');
     localStorage.setItem('oasisTownWorkspaceView', 'graph');
   });
@@ -776,7 +776,7 @@ test('studio settings export button allows keyless ollama sync', async ({ page }
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('teamclawStudioFirstVisitV2');
+    localStorage.removeItem('wecliStudioFirstVisitV2');
   });
 
   await page.goto('/studio');
@@ -799,7 +799,7 @@ test('studio settings export button allows keyless ollama sync', async ({ page }
   expect(pageErrors).toEqual([]);
 });
 
-test('studio teambot current runtime card stays synced over bridge websocket', async ({ page }) => {
+test('studio webot current runtime card stays synced over bridge websocket', async ({ page }) => {
   const calls = {
     importOpenClaw: 0,
     exportOpenClaw: 0,
@@ -827,38 +827,38 @@ test('studio teambot current runtime card stays synced over bridge websocket', a
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('teamclawSessionRuntimePanelHeightV1');
+    localStorage.removeItem('wecliSessionRuntimePanelHeightV1');
   });
 
   await page.goto('/studio');
   await page.locator('.hamburger-btn').click();
   await page.locator('#hamburger-panel button[onclick*="toggleSessionSidebar(); closeHamburgerMenu();"]').click();
 
-  await expect(page.locator('#teambot-current-session')).toBeVisible();
-  await expect(page.locator('#teambot-current-session')).toContainText('Current Session');
-  await expect(page.locator('#teambot-current-session')).toContainText(/Execution swarm|Execution Swarm/);
-  await expect(page.locator('#teambot-current-session')).toContainText('Memory');
-  await expect(page.locator('#teambot-current-session')).toContainText('Buddy');
-  await expect(page.locator('#teambot-current-session')).toContainText('Waiting by the prompt');
+  await expect(page.locator('#webot-current-session')).toBeVisible();
+  await expect(page.locator('#webot-current-session')).toContainText('Current Session');
+  await expect(page.locator('#webot-current-session')).toContainText(/Execution swarm|Execution Swarm/);
+  await expect(page.locator('#webot-current-session')).toContainText('Memory');
+  await expect(page.locator('#webot-current-session')).toContainText('Buddy');
+  await expect(page.locator('#webot-current-session')).toContainText('Waiting by the prompt');
 
-  await page.locator('#teambot-current-session button').filter({ hasText: 'Attach' }).click();
+  await page.locator('#webot-current-session button').filter({ hasText: 'Attach' }).click();
   await expect.poll(() => calls.bridgeAttach).toBe(1);
-  await expect.poll(() => page.evaluate(() => window.__teamclawSocketUrls.length)).toBe(1);
-  await expect(page.locator('#teambot-current-session')).toContainText('attach=ATTACH-42');
+  await expect.poll(() => page.evaluate(() => window.__wecliSocketUrls.length)).toBe(1);
+  await expect(page.locator('#webot-current-session')).toContainText('attach=ATTACH-42');
 
-  const currentSessionId = await page.locator('#teambot-current-session .teambot-current-card-caption').evaluate((el) => {
+  const currentSessionId = await page.locator('#webot-current-session .webot-current-card-caption').evaluate((el) => {
     return String(el.textContent || '').split(' · ')[0].trim();
   });
 
   await page.evaluate(({ sessionId }) => {
-    window.__emitTeamClawSocket({
+    window.__emitWecliSocket({
       type: 'runtime_update',
       changed_session_id: sessionId,
       runtime: {
         status: 'success',
         session_id: sessionId,
         session_role: 'main',
-        workspace: '/tmp/teamclaw/main',
+        workspace: '/tmp/wecli/main',
         mode: { mode: 'execute', reason: 'Bridge live update' },
         plan: {
           title: 'Main session plan',
@@ -875,7 +875,7 @@ test('studio teambot current runtime card stays synced over bridge websocket', a
         relationships: { parent_session: '', children: [] },
         memory: {
           summary: '4 entries · kairos on · last dream just now',
-          project_slug: 'teamclaw-main',
+          project_slug: 'wecli-main',
           entry_count: 4,
           can_dream: false,
           kairos_enabled: true,
@@ -890,7 +890,7 @@ test('studio teambot current runtime card stays synced over bridge websocket', a
             session_id: sessionId,
             role: 'viewer',
             attach_code: 'ATTACH-42',
-            websocket_path: '/teambot/ws/smoke-user/bridge-main-1',
+            websocket_path: '/webot/ws/smoke-user/bridge-main-1',
             status: 'attached',
             connection_count: 1,
           }],
@@ -899,7 +899,7 @@ test('studio teambot current runtime card stays synced over bridge websocket', a
             session_id: sessionId,
             role: 'viewer',
             attach_code: 'ATTACH-42',
-            websocket_path: '/teambot/ws/smoke-user/bridge-main-1',
+            websocket_path: '/webot/ws/smoke-user/bridge-main-1',
             status: 'attached',
             connection_count: 1,
           },
@@ -927,20 +927,20 @@ test('studio teambot current runtime card stays synced over bridge websocket', a
     });
   }, { sessionId: currentSessionId });
 
-  await expect(page.locator('#teambot-current-session')).toContainText('socket=live');
-  await expect(page.locator('#teambot-current-session')).toContainText('clients=1');
-  await expect(page.locator('#teambot-current-session')).toContainText('Bridge sync received');
-  await expect(page.locator('#teambot-current-session')).toContainText('Bridge runtime synced');
-  await expect(page.locator('#teambot-current-session')).toContainText('kairos on');
+  await expect(page.locator('#webot-current-session')).toContainText('socket=live');
+  await expect(page.locator('#webot-current-session')).toContainText('clients=1');
+  await expect(page.locator('#webot-current-session')).toContainText('Bridge sync received');
+  await expect(page.locator('#webot-current-session')).toContainText('Bridge runtime synced');
+  await expect(page.locator('#webot-current-session')).toContainText('kairos on');
 
-  await page.locator('#teambot-current-session button').filter({ hasText: 'Pet' }).click();
+  await page.locator('#webot-current-session button').filter({ hasText: 'Pet' }).click();
   await expect.poll(() => calls.buddyActions.length).toBe(1);
-  await expect(page.locator('#teambot-current-session')).toContainText('Purring after a bridge sync');
+  await expect(page.locator('#webot-current-session')).toContainText('Purring after a bridge sync');
 
   expect(pageErrors).toEqual([]);
 });
 
-test('studio teambot runtime sidebar shows runtime state and resolves approvals', async ({ page }) => {
+test('studio webot runtime sidebar shows runtime state and resolves approvals', async ({ page }) => {
   const calls = {
     importOpenClaw: 0,
     exportOpenClaw: 0,
@@ -960,7 +960,7 @@ test('studio teambot runtime sidebar shows runtime state and resolves approvals'
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('teamclawSessionRuntimePanelHeightV1');
+    localStorage.removeItem('wecliSessionRuntimePanelHeightV1');
   });
 
   await page.goto('/studio');
@@ -968,7 +968,7 @@ test('studio teambot runtime sidebar shows runtime state and resolves approvals'
   await page.locator('#hamburger-panel button[onclick*="toggleSessionSidebar(); closeHamburgerMenu();"]').click();
 
   await expect(page.locator('#session-sidebar')).toBeVisible();
-  const runtimePanel = page.locator('#teambot-subagent-panel');
+  const runtimePanel = page.locator('#webot-subagent-panel');
   const divider = page.locator('#session-panel-divider');
   const runtimeHeightBefore = await runtimePanel.evaluate((el) => Math.round(el.getBoundingClientRect().height));
   const dividerBox = await divider.boundingBox();
@@ -978,15 +978,15 @@ test('studio teambot runtime sidebar shows runtime state and resolves approvals'
   await page.mouse.up();
   const runtimeHeightAfter = await runtimePanel.evaluate((el) => Math.round(el.getBoundingClientRect().height));
   expect(runtimeHeightAfter).toBeLessThan(runtimeHeightBefore);
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('teamclawSessionRuntimePanelHeightV1'))).not.toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('wecliSessionRuntimePanelHeightV1'))).not.toBeNull();
 
-  await expect(page.locator('#teambot-subagent-list')).toContainText('Curie');
-  await expect(page.locator('#teambot-subagent-detail')).toContainText('Review gate');
-  await expect(page.locator('#teambot-subagent-detail')).toContainText('/tmp/teamclaw/worktree/curie');
-  await expect(page.locator('#teambot-subagent-detail')).toContainText('Flask proxy chain');
+  await expect(page.locator('#webot-subagent-list')).toContainText('Curie');
+  await expect(page.locator('#webot-subagent-detail')).toContainText('Review gate');
+  await expect(page.locator('#webot-subagent-detail')).toContainText('/tmp/wecli/worktree/curie');
+  await expect(page.locator('#webot-subagent-detail')).toContainText('Flask proxy chain');
 
   await page
-    .locator('#teambot-subagent-detail button')
+    .locator('#webot-subagent-detail button')
     .filter({ hasText: /批准并记住|Approve \+ remember/ })
     .click();
 
@@ -998,13 +998,13 @@ test('studio teambot runtime sidebar shows runtime state and resolves approvals'
     session_id: 'subagent__coder__curie',
   });
 
-  await expect(page.locator('#teambot-policy-status')).toContainText(/Approval 已处理|Approval resolved/);
-  await expect(page.locator('#teambot-subagent-detail')).toContainText(/approved|APPROVED/);
+  await expect(page.locator('#webot-policy-status')).toContainText(/Approval 已处理|Approval resolved/);
+  await expect(page.locator('#webot-subagent-detail')).toContainText(/approved|APPROVED/);
 
   expect(pageErrors).toEqual([]);
 });
 
-test('studio teambot runtime surfaces recovery hints and applies workflow presets', async ({ page }) => {
+test('studio webot runtime surfaces recovery hints and applies workflow presets', async ({ page }) => {
   const calls = {
     importOpenClaw: 0,
     exportOpenClaw: 0,
@@ -1025,25 +1025,25 @@ test('studio teambot runtime surfaces recovery hints and applies workflow preset
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('teamclawSessionRuntimePanelHeightV1');
+    localStorage.removeItem('wecliSessionRuntimePanelHeightV1');
   });
 
   await page.goto('/studio');
   await page.locator('.hamburger-btn').click();
   await page.locator('#hamburger-panel button[onclick*="toggleSessionSidebar(); closeHamburgerMenu();"]').click();
 
-  await expect(page.locator('#teambot-subagent-detail')).toContainText('Workflow');
-  await expect(page.locator('#teambot-subagent-detail')).toContainText('Resolve the pending tool approval');
+  await expect(page.locator('#webot-subagent-detail')).toContainText('Workflow');
+  await expect(page.locator('#webot-subagent-detail')).toContainText('Resolve the pending tool approval');
 
   await page
-    .locator('#teambot-current-session button')
+    .locator('#webot-current-session button')
     .filter({ hasText: 'Execution Swarm' })
     .click();
 
   await expect.poll(() => calls.workflowApply.length).toBe(1);
   expect(calls.workflowApply[0]).toMatchObject({ preset_id: 'execution_swarm' });
   expect(String(calls.workflowApply[0].session_id || '')).not.toBe('');
-  await expect(page.locator('#teambot-current-session')).toContainText('Execution Swarm');
+  await expect(page.locator('#webot-current-session')).toContainText('Execution Swarm');
   expect(pageErrors).toEqual([]);
 });
 
@@ -1168,7 +1168,7 @@ test('studio oasis swarm uses pretext-backed multiline labels', async ({ page })
       participants: [{ name: 'Planner', posts: 2, events: 1 }],
     });
     return {
-      ready: Boolean(window.TeamClawTextLayout && typeof window.TeamClawTextLayout.measureDisplay === 'function'),
+      ready: Boolean(window.WecliTextLayout && typeof window.WecliTextLayout.measureDisplay === 'function'),
       labelLineCount: node.labelLineCount,
       labelLines: node.labelLines,
       edgeLabels: Array.from(document.querySelectorAll('#oasis-swarm-canvas text')).map((el) => el.textContent || ''),

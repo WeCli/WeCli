@@ -381,7 +381,7 @@ class TestHUDEnhanced:
         )
         display = hud.format_display()
         assert "ralph:3/10" in display
-        assert "TeamBot" in display
+        assert "WeBot" in display
 
     def test_focused_preset(self):
         from workflow_engines import get_hud, update_hud

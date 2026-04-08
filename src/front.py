@@ -20,7 +20,7 @@ from llm_factory import infer_provider
 from front_group_routes import register_group_routes
 from front_oasis_routes import register_oasis_routes
 from front_session_routes import register_session_routes
-from front_teambot_routes import register_teambot_routes
+from front_webot_routes import register_webot_routes
 from tinyfish_monitor_service import (
     DEFAULT_BASE_URL as TINYFISH_DEFAULT_BASE_URL,
     DEFAULT_DB_PATH as TINYFISH_DEFAULT_DB_PATH,
@@ -72,7 +72,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 # 基于 INTERNAL_TOKEN 生成稳定的 secret_key，避免每次重启时所有 session 失效
 _token = os.getenv("INTERNAL_TOKEN", "")
-app.secret_key = hashlib.sha256(f"teamclaw-session-{_token}".encode()).digest() if _token else os.urandom(24)
+app.secret_key = hashlib.sha256(f"wecli-session-{_token}".encode()).digest() if _token else os.urandom(24)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB for image uploads
 
 # --- 配置区 ---
@@ -120,7 +120,7 @@ from openclaw_restore_naming import (
     restore_display_name,
 )
 
-_logger_oc_restore = get_logger("teamclaw.openclaw_restore")
+_logger_oc_restore = get_logger("wecli.openclaw_restore")
 
 def generate_login_token(user_id: str, valid_hours: int = 24) -> str:
     """Generate HMAC-signed login token.
@@ -197,7 +197,7 @@ register_session_routes(
     local_session_status_url=LOCAL_SESSION_STATUS_URL,
     local_delete_session_url=LOCAL_DELETE_SESSION_URL,
 )
-register_teambot_routes(
+register_webot_routes(
     app,
     port_agent=PORT_AGENT,
     internal_token=INTERNAL_TOKEN,
@@ -331,7 +331,7 @@ def index():
 @app.route("/api/llm_config_status")
 def llm_config_status():
     """检查 LLM API 是否已配置，供前端判断是否显示提示横幅。"""
-    llm_config = _read_saved_teamclaw_llm_config()
+    llm_config = _read_saved_wecli_llm_config()
     configured = _llm_config_complete(llm_config)
     return jsonify({"configured": configured})
 
@@ -340,7 +340,7 @@ def llm_config_status():
 def setup_status():
     """首次登录向导状态检测：返回 LLM、OpenClaw、Antigravity、密码等配置状态。"""
     import shutil
-    llm_config = _read_saved_teamclaw_llm_config()
+    llm_config = _read_saved_wecli_llm_config()
     api_key = llm_config["api_key"]
     base_url = llm_config["base_url"]
     model = llm_config["model"]
@@ -423,7 +423,7 @@ def import_openclaw_config():
     })
 
 
-def _read_saved_teamclaw_llm_config():
+def _read_saved_wecli_llm_config():
     settings = read_env_all(os.path.join(root_dir, "config", ".env"))
     return {
         "api_key": (settings.get("LLM_API_KEY") or "").strip(),
@@ -482,9 +482,9 @@ def _normalize_openclaw_chat_url(api_url: str) -> str:
     return urljoin(u + "/", "v1/chat/completions").rstrip("/")
 
 
-def _resolve_teamclaw_llm_config(data: dict | None):
+def _resolve_wecli_llm_config(data: dict | None):
     payload = data or {}
-    saved = _read_saved_teamclaw_llm_config()
+    saved = _read_saved_wecli_llm_config()
 
     def pick(field: str):
         value = str(payload.get(field) or "").strip()
@@ -515,7 +515,7 @@ def _resolve_teamclaw_llm_config(data: dict | None):
 
 @app.route("/api/export_openclaw_config", methods=["POST"])
 def export_openclaw_config():
-    """将当前 TeamClaw LLM 设置写回 OpenClaw 默认 provider/model。"""
+    """将当前 Wecli LLM 设置写回 OpenClaw 默认 provider/model。"""
     import shutil
     import sys
 
@@ -523,7 +523,7 @@ def export_openclaw_config():
     if not oc_bin:
         return jsonify({"ok": False, "error": "OpenClaw 未安装"}), 404
 
-    resolved = _resolve_teamclaw_llm_config(request.get_json(force=True) or {})
+    resolved = _resolve_wecli_llm_config(request.get_json(force=True) or {})
     api_key = resolved["api_key"]
     base_url = resolved["base_url"]
     model = resolved["model"]
@@ -567,7 +567,7 @@ def discover_models():
     """代理调用 /v1/models 端点，返回可用模型列表。
     前端 setup wizard 用此端点检测模型。
     """
-    resolved = _resolve_teamclaw_llm_config(request.get_json(force=True) or {})
+    resolved = _resolve_wecli_llm_config(request.get_json(force=True) or {})
     api_key = resolved["api_key"]
     base_url = resolved["base_url"]
     provider = resolved["provider"]
@@ -786,12 +786,12 @@ def tinyfish_site_latest(site_key):
 
 @app.route("/creator")
 def creator():
-    """Team Creator page with TinyFish Live Crawl integration."""
+    """WeCli Creator page with TinyFish Live Crawl integration."""
     return render_template("creator.html")
 
 
 # ──────────────────────────────────────────────────────────────
-# Team Creator API — three-stage pipeline
+# WeCli Creator API — three-stage pipeline
 # ──────────────────────────────────────────────────────────────
 
 @app.route("/api/team-creator/discover", methods=["POST"])
@@ -846,7 +846,7 @@ def team_creator_extract():
 
 @app.route("/api/team-creator/build", methods=["POST"])
 def team_creator_build():
-    """Stage 3: Build — convert roles into TeamClaw team config.
+    """Stage 3: Build — convert roles into Wecli team config.
 
     Accepts either:
     - Pre-extracted roles: {"roles": [...], "team_name": "...", "task": "..."}
@@ -984,7 +984,7 @@ def team_creator_smart_select():
 
 @app.route("/api/team-creator/translate", methods=["POST"])
 def team_creator_translate():
-    """Translate Team Creator dynamic UI text into the requested language."""
+    """Translate WeCli Creator dynamic UI text into the requested language."""
     body = request.get_json(silent=True) or {}
     texts = body.get("texts")
     target_lang = str(body.get("target_lang") or "").strip().lower()
@@ -1013,7 +1013,7 @@ def team_creator_presets():
     """Return available preset expert tags for matching UI.
 
     Now returns richer data including category, description, name_zh
-    to support the new expert pool browser in Team Creator.
+    to support the new expert pool browser in WeCli Creator.
     Note: The primary frontend now uses /proxy_visual/experts directly.
     This endpoint remains for backward compatibility and lightweight usage.
     """
@@ -1104,7 +1104,7 @@ def _load_mentor_import_from_paths(
 
 @app.route("/api/team-creator/import-colleague", methods=["POST"])
 def team_creator_import_colleague():
-    """Import a colleague-skill output (meta.json + persona.md + work.md) into Team Creator.
+    """Import a colleague-skill output (meta.json + persona.md + work.md) into WeCli Creator.
 
     Accepts JSON body:
       - meta_json: dict (parsed meta.json content)
@@ -1191,7 +1191,7 @@ def team_creator_import_colleague():
 
 @app.route("/api/team-creator/import-mentor", methods=["POST"])
 def team_creator_import_mentor():
-    """Import a supervisor/mentor skill output ({name}.json + SKILL.md) into Team Creator.
+    """Import a supervisor/mentor skill output ({name}.json + SKILL.md) into WeCli Creator.
 
     Accepts JSON body:
       - mentor_json: dict (parsed {name}.json content)
@@ -1262,7 +1262,7 @@ def team_creator_import_mentor():
 
 @app.route("/api/team-creator/import-personal", methods=["POST"])
 def team_creator_import_personal():
-    """Import a personal/relationship-type skill into Team Creator.
+    """Import a personal/relationship-type skill into WeCli Creator.
 
     Handles ex-skill (前任), crush-skill, yourself-skill, pig-skill (群友), etc.
     All share the same format: meta.json + persona.md + memory.md / self.md
@@ -1493,7 +1493,7 @@ def team_creator_feishu_collect():
             result["team_config"] = team_config
             result["summary"] = team_config.get("summary")
             result["auto_imported"] = True
-            result["hint"] = "Collected, distilled, and imported into Team Creator"
+            result["hint"] = "Collected, distilled, and imported into WeCli Creator"
 
         return jsonify(result)
 
@@ -1521,7 +1521,7 @@ def team_creator_job_status(job_id):
 
 @app.route("/studio")
 def studio():
-    """Team Studio 页面"""
+    """WeCli Studio 页面"""
     return render_template("index.html")
 
 
@@ -1541,9 +1541,9 @@ def group_chat_mobile_alias():
 def manifest():
     """Serve PWA manifest for iOS/Android Add-to-Home-Screen support."""
     manifest_data = {
-        "name": "Teamclaw",
-        "short_name": "Teamclaw",
-        "description": "TeamBot AI Agent - Intelligent Control Assistant",
+        "name": "Wecli",
+        "short_name": "Wecli",
+        "description": "WeBot AI Agent - Intelligent Control Assistant",
         "start_url": "/mobile_group_chat",
         "scope": "/",
         "display": "standalone",
@@ -1577,8 +1577,8 @@ def manifest():
 def service_worker():
     """Serve Service Worker for PWA offline support and caching."""
     sw_code = """
-// Teamclaw Service Worker v4 — network-first for all resources
-const CACHE_NAME = 'teamclaw-v4';
+// Wecli Service Worker v4 — network-first for all resources
+const CACHE_NAME = 'wecli-v4';
 const PRECACHE_URLS = ['/'];
 
 self.addEventListener('install', event => {
@@ -2282,7 +2282,7 @@ def proxy_openclaw_remove():
 
 
 def _openclaw_session_key_from_model(model_val: Any) -> str | None:
-    """Build x-openclaw-session-key: agent:<name>:teamclawchat (aligned with group/OASIS default suffix)."""
+    """Build x-openclaw-session-key: agent:<name>:weclichat (aligned with group/OASIS default suffix)."""
     model_str = str(model_val or "").strip()
     if not model_str.startswith("agent:"):
         return None
@@ -2292,7 +2292,7 @@ def _openclaw_session_key_from_model(model_val: Any) -> str | None:
     agent_name = rest.split(":", 1)[0].strip()
     if not agent_name:
         return None
-    return f"agent:{agent_name}:teamclawchat"
+    return f"agent:{agent_name}:weclichat"
 
 
 @app.route("/proxy_openclaw_chat", methods=["POST", "OPTIONS"])
@@ -2301,7 +2301,7 @@ def proxy_openclaw_chat():
 
     This path does not use acpx; it POSTs the same JSON body to OPENCLAW_API_URL.
     The model field should be 'agent:<agent_name>' (see main.js isOpenClawChat).
-    Sets x-openclaw-session-key to agent:<name>:teamclawchat for gateway session routing.
+    Sets x-openclaw-session-key to agent:<name>:weclichat for gateway session routing.
     """
     if request.method == "OPTIONS":
         resp = Response("", status=204)
@@ -2605,7 +2605,7 @@ def proxy_acpx_chat():
       - tool: any acpx-supported agent command (or model: acp:<tool>)
       - messages: OpenAI-format list
       - stream: bool (default true)
-      - session_id: optional TeamClaw chat session id (used when no custom name)
+      - session_id: optional Wecli chat session id (used when no custom name)
       - acp_session_name: optional stable name for this ACP session (same name = same CLI context)
         Aliases: acp_session, session_name
       - acp_session_pick: optional exact session ``name`` from GET /proxy_acpx_sessions (reuse existing; overrides acp_session_name)
@@ -2724,7 +2724,7 @@ def proxy_acpx_session_ensure():
       - tool: any acpx-supported agent command
       - acp_session_pick: optional exact name from /proxy_acpx_sessions (reuse existing)
       - acp_session_name: optional (aliases acp_session, session_name)
-      - session_id: fallback when name omitted (TeamClaw chat session id)
+      - session_id: fallback when name omitted (Wecli chat session id)
     Response: { ok, tool, session_key }
     """
     if request.method == "OPTIONS":
@@ -3013,7 +3013,7 @@ def team_openclaw_snapshot_restore():
         result = r.json()
         result["client_http_ms"] = client_http_ms
         _logger_oc_restore.info(
-            "[teamclaw-restore] route=single agent=%s status=%s client_http_ms=%s oasis=%s",
+            "[wecli-restore] route=single agent=%s status=%s client_http_ms=%s oasis=%s",
             target_name,
             r.status_code,
             client_http_ms,
@@ -3035,7 +3035,7 @@ def team_openclaw_snapshot_restore():
                 if cron_errors:
                     result["cron_errors"] = cron_errors
                 _logger_oc_restore.info(
-                    "[teamclaw-restore] route=single agent=%s client_cron_ms=%s cron_restored=%s",
+                    "[wecli-restore] route=single agent=%s client_cron_ms=%s cron_restored=%s",
                     target_name,
                     result["client_cron_ms"],
                     cron_restored,
@@ -3190,7 +3190,7 @@ def team_openclaw_snapshot_restore_all():
             row["client_cron_ms"] = cron_ms
             per_agent_restore.append(row)
             _logger_oc_restore.info(
-                "[teamclaw-restore] route=restore_all agent=%s client_http_ms=%s client_cron_ms=%s oasis=%s ok=%s",
+                "[wecli-restore] route=restore_all agent=%s client_http_ms=%s client_cron_ms=%s oasis=%s ok=%s",
                 target_name,
                 client_http_ms,
                 cron_ms,
@@ -3201,7 +3201,7 @@ def team_openclaw_snapshot_restore_all():
             errors.append(f"{target_name}: {e}")
             per_agent_restore.append({"agent": target_name, "ok": False, "exception": str(e)})
             _logger_oc_restore.warning(
-                "[teamclaw-restore] route=restore_all agent=%s failed: %s", target_name, e
+                "[wecli-restore] route=restore_all agent=%s failed: %s", target_name, e
             )
 
     # Persist updated global_names back to external_agents.json
@@ -3376,7 +3376,7 @@ def proxy_visual_agent_generate_yaml():
             "Authorization": f"Bearer {INTERNAL_TOKEN}:{user_id}",
         }
         payload = {
-            "model": "teambot",
+            "model": "webot",
             "messages": [
                 {"role": "system", "content": (
                     "You are a YAML schedule generator for the OASIS expert orchestration engine. "
@@ -5363,7 +5363,7 @@ def upload_team_snapshot():
                             }
                             openclaw_restore_details.append(detail)
                             _logger_oc_restore.info(
-                                "[teamclaw-restore] route=snapshot_upload agent=%s client_http_ms=%s skills_copy_ms=%s oasis=%s ok=%s",
+                                "[wecli-restore] route=snapshot_upload agent=%s client_http_ms=%s skills_copy_ms=%s oasis=%s ok=%s",
                                 target_name,
                                 client_http_ms,
                                 skills_ms,
@@ -5376,7 +5376,7 @@ def upload_team_snapshot():
                                 {"agent": target_name, "ok": False, "exception": str(e)}
                             )
                             _logger_oc_restore.warning(
-                                "[teamclaw-restore] route=snapshot_upload agent=%s failed: %s",
+                                "[wecli-restore] route=snapshot_upload agent=%s failed: %s",
                                 target_name,
                                 e,
                             )

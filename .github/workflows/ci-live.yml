@@ -170,7 +170,7 @@ jobs:
     env:
       CLOUDFLARE_LIVE_PORT: ${{ vars.CLOUDFLARE_LIVE_PORT || '51239' }}
       CLOUDFLARE_LIVE_TIMEOUT: ${{ vars.CLOUDFLARE_LIVE_TIMEOUT || '180' }}
-      CLOUDFLARE_LIVE_SENTINEL: ${{ vars.CLOUDFLARE_LIVE_SENTINEL || 'TEAMCLAW_CLOUDFLARE_SMOKE_OK' }}
+      CLOUDFLARE_LIVE_SENTINEL: ${{ vars.CLOUDFLARE_LIVE_SENTINEL || 'WECLI_CLOUDFLARE_SMOKE_OK' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

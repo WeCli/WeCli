@@ -1,7 +1,7 @@
 import os
 from mcp.server.fastmcp import FastMCP
 
-from teambot_workspace import resolve_session_workspace
+from webot_workspace import resolve_session_workspace
 
 mcp = FastMCP("FileManager")
 

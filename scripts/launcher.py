@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TeamBot 跨平台启动器
+WeBot 跨平台启动器
 
 功能：
 - 支持 Linux/macOS/Windows 多平台
@@ -17,7 +17,7 @@ import sys
 if sys.version_info < (3, 9):
     sys.stderr.write(
         "\n"
-        "ERROR: TeamClaw requires Python 3.11+, but this script is running under Python {}.{}.\n"
+        "ERROR: Wecli requires Python 3.11+, but this script is running under Python {}.{}.\n"
         "\n"
         "Common cause: on macOS, system 'python' may point to Python 2.7.\n"
         "Solutions:\n"
@@ -192,9 +192,9 @@ def resolve_openclaw_cli():
 
 def ensure_openclaw_gateway_running():
     """Best-effort startup for OpenClaw Gateway when the CLI is installed."""
-    _no_oc = (os.getenv("TEAMCLAW_NO_OPENCLAW") or "").strip().lower()
+    _no_oc = (os.getenv("WECLI_NO_OPENCLAW") or "").strip().lower()
     if _no_oc in ("1", "true", "yes", "on"):
-        print("⏭️  已跳过 OpenClaw 联动（TEAMCLAW_NO_OPENCLAW）— 不预热 Gateway、不刷新 OPENCLAW_*")
+        print("⏭️  已跳过 OpenClaw 联动（WECLI_NO_OPENCLAW）— 不预热 Gateway、不刷新 OPENCLAW_*")
         return
     openclaw_cli = resolve_openclaw_cli()
     if not openclaw_cli:
@@ -205,7 +205,7 @@ def ensure_openclaw_gateway_running():
         if script_dir not in sys.path:
             sys.path.insert(0, script_dir)
 
-        from configure_openclaw import sync_openclaw_runtime_for_teamclaw_startup
+        from configure_openclaw import sync_openclaw_runtime_for_wecli_startup
     except Exception as exc:
         print(f"🦞 OpenClaw 已安装，但运行时预检查不可用: {exc}")
         return
@@ -213,7 +213,7 @@ def ensure_openclaw_gateway_running():
     print("🦞 检测 OpenClaw Gateway...")
 
     try:
-        result = sync_openclaw_runtime_for_teamclaw_startup()
+        result = sync_openclaw_runtime_for_wecli_startup()
         load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
 
         runtime_after = result.get("runtime_after")
@@ -272,7 +272,7 @@ if sys.platform == "win32":
         except Exception:
             pass
 
-print("🚀 启动 TeamBot...")
+print("🚀 启动 WeBot...")
 print()
 
 # 确保 INTERNAL_TOKEN 在所有服务启动前已存在
@@ -302,7 +302,7 @@ services = [
 
 # Chatbot 启动（可选组件）
 chatbot_setup = os.path.join(PROJECT_ROOT, "chatbot", "setup.py")
-is_headless = os.getenv("TEAMBOT_HEADLESS", "0") == "1"
+is_headless = os.getenv("WEBOT_HEADLESS", "0") == "1"
 if os.path.exists(chatbot_setup):
     if is_headless or not sys.stdin.isatty():
         print(f"💬 [4/5] 跳过聊天机器人交互式配置（headless / 非交互模式）")
@@ -330,7 +330,7 @@ for msg, script, wait_time in services:
 
 print()
 print("============================================")
-print("  ✅ TeamBot 已全部启动！")
+print("  ✅ WeBot 已全部启动！")
 print(f"  🌐 访问: http://127.0.0.1:{PORT_FRONTEND}")
 print("  按 Ctrl+C 停止所有服务")
 print("============================================")
