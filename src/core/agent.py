@@ -33,7 +33,7 @@ from webot.context import (
     compact_history_messages,
     render_runtime_context_block,
 )
-from webot.memory import ensure_memory_state
+from webot.memory import append_daily_log, ensure_memory_state, get_memory_state
 from webot.skills import build_skills_prompt
 from webot.soul import build_soul_prompt
 from webot.trajectory import save_trajectory
@@ -1051,7 +1051,9 @@ class TeamAgent:
                     },
                 )
         last_input_message = state["messages"][-1] if state.get("messages") else None
+        last_user_query = ""
         if isinstance(last_input_message, HumanMessage):
+            last_user_query = str(last_input_message.content or "")
             with contextlib.suppress(Exception):
                 run_tool_policy_hooks(
                     session_policy,
@@ -1062,9 +1064,17 @@ class TeamAgent:
                     args={
                         "mode": runtime_mode_name,
                         "trigger_source": state.get("trigger_source") or "user",
-                        "content": str(last_input_message.content)[:500],
+                        "content": last_user_query[:500],
                     },
                 )
+            if (not is_subagent) and user_id and session_id:
+                with contextlib.suppress(Exception):
+                    append_daily_log(
+                        user_id,
+                        session_id,
+                        "User Prompt",
+                        last_user_query[:2000],
+                    )
 
         # Dynamic tool binding based on enabled_tools + external_tools
         all_tools = self._mcp_tools
@@ -1245,6 +1255,9 @@ class TeamAgent:
             for approval in list_tool_approvals(user_id, session_id, status="pending", limit=5)
         ]
         memory_state = ensure_memory_state(user_id, session_id)
+        if user_id and session_id:
+            with contextlib.suppress(Exception):
+                memory_state = get_memory_state(user_id, session_id, query=last_user_query[:600])
         bridge_state = get_bridge_runtime_payload(user_id, session_id)
         voice_state = get_webot_voice_state(user_id, session_id or "default")
         buddy_state = serialize_buddy_state(user_id)

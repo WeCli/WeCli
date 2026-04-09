@@ -36,6 +36,78 @@ class _FakeAgent:
 
 
 class WeBotRoutesTests(unittest.TestCase):
+    def test_memory_routes_create_search_and_reindex(self):
+        with TemporaryDirectory() as tmpdir:
+            original_runtime_db_path = runtime_store.DEFAULT_DB_PATH
+            original_user_files_dir = memory.USER_FILES_DIR
+            runtime_store.DEFAULT_DB_PATH = Path(tmpdir) / "runtime.db"
+            memory.USER_FILES_DIR = Path(tmpdir) / "user_files"
+            try:
+                app = FastAPI()
+                app.include_router(
+                    create_webot_router(
+                        agent=_FakeAgent(),
+                        verify_auth_or_token=lambda user_id, password, token: None,
+                        extract_text=lambda content: content if isinstance(content, str) else str(content),
+                    )
+                )
+
+                with TestClient(app) as client:
+                    created = client.post(
+                        "/webot/memory/entry",
+                        json={
+                            "user_id": "alice",
+                            "session_id": "default",
+                            "name": "Auth Decision",
+                            "content": "We decided to keep GitHub OAuth callbacks behind rate limiting.",
+                            "mem_type": "decision",
+                            "description": "Auth rollout note",
+                            "hall": "facts",
+                            "room": "auth",
+                        },
+                    )
+                    self.assertEqual(created.status_code, 200)
+                    created_payload = created.json()
+                    self.assertEqual(created_payload["status"], "success")
+                    self.assertTrue(Path(created_payload["path"]).is_file())
+
+                    searched = client.post(
+                        "/webot/memory/search",
+                        json={
+                            "user_id": "alice",
+                            "session_id": "default",
+                            "query": "oauth callbacks",
+                            "hall": "facts",
+                            "limit": 5,
+                        },
+                    )
+                    self.assertEqual(searched.status_code, 200)
+                    searched_payload = searched.json()
+                    self.assertEqual(searched_payload["status"], "success")
+                    self.assertTrue(searched_payload["results"])
+                    self.assertEqual(searched_payload["results"][0]["hall"], "facts")
+
+                    reindexed = client.post(
+                        "/webot/memory/reindex",
+                        json={"user_id": "alice", "session_id": "default"},
+                    )
+                    self.assertEqual(reindexed.status_code, 200)
+                    reindexed_payload = reindexed.json()
+                    self.assertEqual(reindexed_payload["status"], "success")
+                    self.assertGreaterEqual(reindexed_payload["entries_indexed"], 1)
+
+                    runtime = client.get(
+                        "/webot/session-runtime",
+                        params={"user_id": "alice", "session_id": "default"},
+                    )
+                    self.assertEqual(runtime.status_code, 200)
+                    runtime_payload = runtime.json()
+                    self.assertEqual(runtime_payload["memory"]["entry_count"], 1)
+                    self.assertIn(runtime_payload["memory"]["search_provider"], {"chroma", "keyword"})
+            finally:
+                runtime_store.DEFAULT_DB_PATH = original_runtime_db_path
+                memory.USER_FILES_DIR = original_user_files_dir
+
     def test_workflow_preset_routes_return_presets_and_apply_to_runtime(self):
         with TemporaryDirectory() as tmpdir:
             original_runtime_db_path = runtime_store.DEFAULT_DB_PATH

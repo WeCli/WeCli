@@ -37,6 +37,7 @@ class OasisGraphMemoryTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(payload["graphrag"]["provider"], "local")
         self.assertGreaterEqual(payload["graphrag"]["memory_count"], 1)
+        self.assertIn("local-memory", payload["graphrag"]["collections"])
         self.assertTrue(any(node["type"] == "objective" for node in payload["graph"]["nodes"]))
         self.assertTrue(any(edge["source"] and edge["target"] for edge in payload["graph"]["edges"]))
 
@@ -56,6 +57,7 @@ class OasisGraphMemoryTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(retrieval["evidence"])
         self.assertTrue(any(item["kind"] in {"memory", "node", "edge"} for item in retrieval["evidence"]))
+        self.assertTrue(any(item["provider"] in {"local", "chroma"} for item in retrieval["evidence"]))
         self.assertTrue(any(node_id.startswith("memory:post:") for node_id in node_ids))
 
     @mock.patch("oasis.swarm_engine.create_chat_model", side_effect=RuntimeError("boom"))

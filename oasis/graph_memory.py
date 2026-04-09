@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import re
+import sys
 import time
 from collections import defaultdict
 from contextlib import asynccontextmanager
@@ -28,7 +29,14 @@ from oasis.swarm_engine import build_pending_swarm
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DATA_DIR = os.path.join(_PROJECT_ROOT, "data")
+_SRC_DIR = os.path.join(_PROJECT_ROOT, "src")
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 _DEFAULT_DB_PATH = os.path.join(_DATA_DIR, "oasis_graph_memory.db")
+_DEFAULT_CHROMA_PATH = os.path.join(_DATA_DIR, "oasis_graph_memory_chroma")
+_CHROMA_COLLECTION = "oasis_graph_memory"
+
+from utils.chroma_memory import chroma_status, query_text, upsert_text
 
 _ALLOWED_NODE_TYPES = {"objective", "agent", "entity", "memory", "signal", "scenario"}
 _GENERIC_TOKENS = {
@@ -850,6 +858,7 @@ class GraphMemoryService:
         db_path = os.getenv("OASIS_GRAPHRAG_DB_PATH", _DEFAULT_DB_PATH).strip() or _DEFAULT_DB_PATH
         self.store = LocalGraphStore(db_path)
         self.zep = ZepGraphProvider()
+        self.chroma_path = os.getenv("OASIS_GRAPHRAG_CHROMA_PATH", _DEFAULT_CHROMA_PATH).strip() or _DEFAULT_CHROMA_PATH
         self._sync_tasks: set[asyncio.Task] = set()
 
     async def initialize(self):
@@ -889,6 +898,78 @@ class GraphMemoryService:
         task = asyncio.create_task(_run())
         self._sync_tasks.add(task)
         task.add_done_callback(lambda t: self._sync_tasks.discard(t))
+
+    def _index_chroma_memory(
+        self,
+        *,
+        topic_id: str,
+        source_type: str,
+        source_id: str,
+        author: str = "",
+        content: str,
+        summary: str = "",
+        meta: dict[str, Any] | None = None,
+    ) -> bool:
+        if not chroma_status()["available"]:
+            return False
+        related = list((meta or {}).get("related_node_ids") or [])
+        document = "\n".join(
+            [
+                f"Topic: {topic_id}",
+                f"Source: {source_type}",
+                f"Author: {author}",
+                f"Summary: {summary}",
+                "",
+                content.strip(),
+            ]
+        ).strip()
+        return upsert_text(
+            path=self.chroma_path,
+            collection_name=_CHROMA_COLLECTION,
+            record_id=f"{topic_id}:{source_type}:{source_id}",
+            document=document,
+            metadata={
+                "topic_id": topic_id,
+                "source_type": source_type,
+                "author": _compact_text(author, "", 120),
+                "summary": _compact_text(summary, "", 240),
+                "related_node_ids": related,
+            },
+        )
+
+    def _query_chroma_memory(self, topic_id: str, query: str, *, limit: int = 8) -> list[dict[str, Any]]:
+        if not chroma_status()["available"]:
+            return []
+        items = query_text(
+            path=self.chroma_path,
+            collection_name=_CHROMA_COLLECTION,
+            query=query,
+            limit=limit,
+            where={"topic_id": topic_id},
+        )
+        normalized: list[dict[str, Any]] = []
+        for item in items:
+            metadata = item.get("metadata") or {}
+            raw_related = metadata.get("related_node_ids")
+            if isinstance(raw_related, str):
+                try:
+                    related = json.loads(raw_related)
+                except Exception:
+                    related = []
+            else:
+                related = raw_related or []
+            normalized.append(
+                {
+                    "provider": "chroma",
+                    "kind": "memory",
+                    "id": item.get("id"),
+                    "title": metadata.get("author") or metadata.get("source_type") or "memory",
+                    "snippet": _compact_text(item.get("document"), "", 240),
+                    "score": round(float(item.get("similarity") or 0.0) * 10.0, 4),
+                    "related_node_ids": list(related)[:12],
+                }
+            )
+        return normalized
 
     async def ensure_topic_initialized(self, forum, *, seed_if_missing: bool = True) -> dict[str, Any]:
         await self.initialize()
@@ -988,6 +1069,15 @@ class GraphMemoryService:
             summary=_compact_text(swarm.get("summary"), "", 220),
             round_num=0,
             timestamp=float(swarm.get("generated_at") or time.time()),
+            meta={"related_node_ids": [n.get("id") for n in graph.get("nodes") or []][:10]},
+        )
+        self._index_chroma_memory(
+            topic_id=forum.topic_id,
+            source_type="blueprint",
+            source_id=f"blueprint:{int(float(swarm.get('generated_at') or time.time()) * 1000)}",
+            author="Town Genesis",
+            content=blueprint_episode,
+            summary=_compact_text(swarm.get("summary"), "", 220),
             meta={"related_node_ids": [n.get("id") for n in graph.get("nodes") or []][:10]},
         )
         self._enqueue_external_sync(graph_id=graph_id, text=blueprint_episode)
@@ -1158,6 +1248,15 @@ class GraphMemoryService:
             meta=meta,
         )
         if inserted:
+            self._index_chroma_memory(
+                topic_id=forum.topic_id,
+                source_type="post",
+                source_id=str(post.id),
+                author=post.author,
+                content=post.content,
+                summary=_compact_text(post.content, "", 220),
+                meta=meta,
+            )
             topic_meta = await self.store.get_topic_meta(forum.topic_id)
             graph_id = (topic_meta or {}).get("external_graph_id", "")
             self._enqueue_external_sync(
@@ -1202,6 +1301,15 @@ class GraphMemoryService:
             meta={"related_node_ids": related_ids, "elapsed": event.elapsed, "event": event.event},
         )
         if memory_inserted and event.event in {"condition", "selector", "conclude", "graph_end", "manual_post", "agent_callback"}:
+            self._index_chroma_memory(
+                topic_id=forum.topic_id,
+                source_type="timeline",
+                source_id=str(getattr(event, "seq", 0) or f"{event.elapsed}:{event.event}:{event.agent}:{event.detail}"),
+                author=author,
+                content=f"{event.event} {event.agent or ''} {event.detail or ''}".strip(),
+                summary=_compact_text(summary, "", 220),
+                meta={"related_node_ids": related_ids, "elapsed": event.elapsed, "event": event.event},
+            )
             topic_meta = await self.store.get_topic_meta(forum.topic_id)
             graph_id = (topic_meta or {}).get("external_graph_id", "")
             self._enqueue_external_sync(
@@ -1252,6 +1360,15 @@ class GraphMemoryService:
             meta={"related_node_ids": [objective_node_id, final_node_id]},
         )
         if inserted:
+            self._index_chroma_memory(
+                topic_id=forum.topic_id,
+                source_type="conclusion",
+                source_id="final",
+                author="ReportAgent",
+                content=forum.conclusion,
+                summary=_compact_text(forum.conclusion, "", 220),
+                meta={"related_node_ids": [objective_node_id, final_node_id]},
+            )
             topic_meta = await self.store.get_topic_meta(forum.topic_id)
             graph_id = (topic_meta or {}).get("external_graph_id", "")
             self._enqueue_external_sync(
@@ -1285,13 +1402,17 @@ class GraphMemoryService:
                 break
         memory_count = await self.store.count_memories(forum.topic_id)
         graphrag = dict(base.get("graphrag") or {})
+        collections = list(graphrag.get("collections") or [])
+        collections.append("local-memory")
+        if chroma_status()["available"]:
+            collections.append("chroma-memory")
         graphrag.update(
             {
                 "provider": (meta or {}).get("provider") or self._resolved_provider(),
                 "external_graph_id": (meta or {}).get("external_graph_id") or "",
                 "memory_count": memory_count,
                 "last_ingested_at": (meta or {}).get("last_ingested_at") or 0,
-                "collections": list(dict.fromkeys((graphrag.get("collections") or []) + ["local-memory"])),
+                "collections": list(dict.fromkeys(collections)),
                 "report_agent": True,
             }
         )
@@ -1343,6 +1464,7 @@ class GraphMemoryService:
         await self.ensure_topic_initialized(forum)
         local_items = await self.store.search(forum.topic_id, query, limit=max(limit, 8))
         merged = list(local_items)
+        merged.extend(self._query_chroma_memory(forum.topic_id, query, limit=max(limit, 8)))
 
         meta = await self.store.get_topic_meta(forum.topic_id)
         graph_id = (meta or {}).get("external_graph_id", "")
@@ -1417,6 +1539,15 @@ class GraphMemoryService:
             summary=_compact_text(answer.get("answer"), "", 220),
             round_num=int(getattr(forum, "current_round", 0) or 0),
             timestamp=time.time(),
+            meta={"related_node_ids": [item.get("node_id") for item in evidence if item.get("node_id")]},
+        )
+        self._index_chroma_memory(
+            topic_id=forum.topic_id,
+            source_type="report_query",
+            source_id=f"{_slugify(question, 'query')}-{int(time.time() * 1000)}",
+            author="ReportAgent",
+            content=question,
+            summary=_compact_text(answer.get("answer"), "", 220),
             meta={"related_node_ids": [item.get("node_id") for item in evidence if item.get("node_id")]},
         )
 

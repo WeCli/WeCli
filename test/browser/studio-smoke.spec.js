@@ -123,12 +123,19 @@ async function stubStudioNetwork(page, calls, options = {}) {
     active_run: null,
     relationships: { parent_session: '', children: [] },
     memory: {
-      summary: '3 entries · kairos off',
+      summary: '3 entries · 2 halls · keyword search',
       project_slug: 'wecli-main',
       entry_count: 3,
       can_dream: true,
       kairos_enabled: false,
       relevant_entries: [{ name: 'deploy_notes' }],
+      search_provider: 'keyword',
+      semantic_enabled: false,
+      halls: ['facts', 'events'],
+      rooms: ['auth', 'release'],
+      layers: {
+        summary: '3 entry files · 2 halls · 2 rooms · provider=keyword',
+      },
     },
     bridge: {
       status: 'detached',
@@ -241,12 +248,19 @@ async function stubStudioNetwork(page, calls, options = {}) {
       available_actions: ['pet', 'bridge'],
     },
     memory: {
-      summary: '2 entries · kairos off',
+      summary: '2 entries · 2 halls · keyword search',
       project_slug: 'wecli-curie',
       entry_count: 2,
       can_dream: true,
       kairos_enabled: false,
       relevant_entries: [{ name: 'runtime_gap_matrix' }],
+      search_provider: 'keyword',
+      semantic_enabled: false,
+      halls: ['facts', 'events'],
+      rooms: ['runtime', 'review'],
+      layers: {
+        summary: '2 entry files · 2 halls · 2 rooms · provider=keyword',
+      },
     },
     artifacts: [],
     runs: [
@@ -549,6 +563,75 @@ async function stubStudioNetwork(page, calls, options = {}) {
       can_dream: false,
     };
     return json(route, { status: 'success', memory: currentRuntimeState.memory });
+  });
+  await page.route('**/proxy_webot_memory_search', async (route) => {
+    const payload = await route.request().postDataJSON();
+    calls.memorySearches = calls.memorySearches || [];
+    calls.memorySearches.push(payload);
+    const query = String(payload.query || '').trim().toLowerCase();
+    const hall = String(payload.hall || '').trim();
+    const room = String(payload.room || '').trim();
+    const seed = [
+      {
+        name: 'deploy_notes',
+        description: 'Release and deployment reminders',
+        type: 'reference',
+        hall: 'facts',
+        room: 'release',
+        source_kind: 'entry',
+        path: '/tmp/wecli/main/memory/entries/deploy_notes.md',
+        snippet: 'Ship checklist for the main workspace.',
+        similarity: 0.82,
+      },
+      {
+        name: 'auth decision',
+        description: 'OAuth callback validation is mandatory',
+        type: 'decision',
+        hall: 'facts',
+        room: 'auth',
+        source_kind: 'entry',
+        path: '/tmp/wecli/main/memory/entries/auth-decision.md',
+        snippet: 'Rate limit callback endpoints and validate the redirect origin.',
+        similarity: 0.91,
+      },
+    ];
+    const results = seed.filter((item) => {
+      if (hall && item.hall !== hall) return false;
+      if (room && item.room !== room) return false;
+      if (!query) return true;
+      const haystack = `${item.name} ${item.description} ${item.snippet}`.toLowerCase();
+      return haystack.includes(query);
+    });
+    return json(route, {
+      status: 'success',
+      query: payload.query || '',
+      memory: currentRuntimeState.memory,
+      results,
+    });
+  });
+  await page.route('**/proxy_webot_memory_entry', async (route) => {
+    const payload = await route.request().postDataJSON();
+    calls.memoryEntries = calls.memoryEntries || [];
+    calls.memoryEntries.push(payload);
+    currentRuntimeState.memory = {
+      ...currentRuntimeState.memory,
+      entry_count: Number(currentRuntimeState.memory.entry_count || 0) + 1,
+      relevant_entries: [{ name: payload.name || 'new-memory' }, ...(currentRuntimeState.memory.relevant_entries || [])].slice(0, 3),
+    };
+    return json(route, {
+      status: 'success',
+      path: `/tmp/wecli/main/memory/entries/${String(payload.name || 'memory').toLowerCase().replace(/\s+/g, '-')}.md`,
+      memory: currentRuntimeState.memory,
+    });
+  });
+  await page.route('**/proxy_webot_memory_reindex', async (route) => {
+    calls.memoryReindex = (calls.memoryReindex || 0) + 1;
+    return json(route, {
+      status: 'success',
+      entries_indexed: currentRuntimeState.memory.entry_count || 0,
+      logs_indexed: 2,
+      memory_dir: '/tmp/wecli/main/memory',
+    });
   });
   await page.route('**/proxy_webot_buddy', async (route) => {
     const payload = await route.request().postDataJSON();
@@ -1044,6 +1127,68 @@ test('studio webot runtime surfaces recovery hints and applies workflow presets'
   expect(calls.workflowApply[0]).toMatchObject({ preset_id: 'execution_swarm' });
   expect(String(calls.workflowApply[0].session_id || '')).not.toBe('');
   await expect(page.locator('#webot-current-session')).toContainText('Execution Swarm');
+  expect(pageErrors).toEqual([]);
+});
+
+test('studio unlocks badclaude and exposes memory lab actions', async ({ page }) => {
+  const calls = {
+    approvalActions: [],
+    workflowApply: [],
+  };
+  const pageErrors = [];
+
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('dialog', async (dialog) => {
+    pageErrors.push(`unexpected dialog: ${dialog.message()}`);
+    await dialog.dismiss();
+  });
+
+  await stubStudioNetwork(page, calls);
+  await page.addInitScript(() => {
+    window.alert = () => {};
+    window.confirm = () => true;
+    localStorage.setItem('wecli_lang', 'en');
+    localStorage.removeItem('wecliBadClaudeUnlockedV1');
+  });
+
+  await page.goto('/studio');
+
+  const brand = page.locator('#studio-brand');
+  await brand.click();
+  await brand.click();
+  await brand.click();
+  await brand.click();
+
+  await page.locator('.hamburger-btn').click();
+  await expect(page.locator('#hamburger-badclaude-item')).toBeVisible();
+  await page.locator('#hamburger-badclaude-item').click();
+  await expect(page.locator('#badclaude-overlay')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#badclaude-overlay')).toBeHidden();
+
+  await page.locator('.hamburger-btn').click();
+  await page.locator('#hamburger-panel button[onclick*="toggleSessionSidebar(); closeHamburgerMenu();"]').click();
+  await expect(page.locator('#session-sidebar')).toBeVisible();
+
+  await page.locator('#webot-current-session button').filter({ hasText: /Memory Lab/ }).click();
+  await expect(page.locator('#webot-memory-overlay')).toBeVisible();
+  await expect(page.locator('#webot-memory-summary')).toContainText('provider=keyword');
+
+  await page.locator('#webot-memory-query').fill('auth');
+  await page.locator('#webot-memory-search-btn').click();
+  await expect.poll(() => (calls.memorySearches || []).length).toBeGreaterThan(0);
+  await expect(page.locator('#webot-memory-results')).toContainText('auth decision');
+
+  await page.locator('#webot-memory-name').fill('Release Memory');
+  await page.locator('#webot-memory-description').fill('Captured from smoke');
+  await page.locator('#webot-memory-content').fill('Remember to run browser smoke after release workflow changes.');
+  await page.locator('#webot-memory-save-btn').click();
+  await expect.poll(() => (calls.memoryEntries || []).length).toBe(1);
+
+  await page.locator('#webot-memory-reindex-btn').click();
+  await expect.poll(() => calls.memoryReindex || 0).toBe(1);
+  await expect(page.locator('#webot-policy-status')).toContainText(/Memory index rebuilt|记忆索引已重建/);
+
   expect(pageErrors).toEqual([]);
 });
 

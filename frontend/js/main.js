@@ -98,6 +98,7 @@ const i18n = {
         hmenu_openclaw: 'OpenClaw 配置',
         hmenu_new: '新对话',
         hmenu_oasis: 'TeamsWork',
+        hmenu_badclaude: 'BadClaude 彩蛋',
         hmenu_logout: '退出',
         hmenu_lang: '语言',
         hmenu_public: '公开',
@@ -111,6 +112,26 @@ const i18n = {
         send_btn: '发送',
         cancel_btn: '终止',
         busy_btn: '系统占用中',
+        badclaude_overlay_title: 'BadClaude / Whip Mode',
+        badclaude_overlay_hint: '快速甩动鼠标可以触发 crack。crack 会先中断当前运行，再自动催促发送。',
+        badclaude_crack_now: '立即 crack',
+        badclaude_unlocked_toast: 'BadClaude 已解锁',
+        memory_lab: 'Memory Lab',
+        memory_manage: '记忆管理',
+        memory_search: '搜索记忆',
+        memory_save: '写入记忆',
+        memory_reindex: '重建索引',
+        memory_name: '标题',
+        memory_description: '描述',
+        memory_content: '内容',
+        memory_type: '类型',
+        memory_hall: 'Hall',
+        memory_room: 'Room',
+        memory_query_placeholder: '按关键词检索当前项目记忆',
+        memory_search_empty: '暂无命中',
+        memory_search_loading: '正在检索记忆...',
+        memory_saved: '记忆已写入',
+        memory_reindexed: '记忆索引已重建',
         new_system_msg: '有新的系统消息',
         click_refresh: '点击刷新',
         no_response: '（无响应）',
@@ -851,6 +872,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         hmenu_openclaw: 'OpenClaw Config',
         hmenu_new: 'New Chat',
         hmenu_oasis: 'TeamsWork',
+        hmenu_badclaude: 'BadClaude Easter Egg',
         hmenu_logout: 'Logout',
         hmenu_lang: 'Language',
         hmenu_public: 'Public',
@@ -864,6 +886,26 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         send_btn: 'Send',
         cancel_btn: 'Stop',
         busy_btn: 'System Busy',
+        badclaude_overlay_title: 'BadClaude / Whip Mode',
+        badclaude_overlay_hint: 'Move fast to trigger a crack. Each crack first interrupts the current run, then nudges the chat box and sends it if possible.',
+        badclaude_crack_now: 'Crack now',
+        badclaude_unlocked_toast: 'BadClaude unlocked',
+        memory_lab: 'Memory Lab',
+        memory_manage: 'Memory Manager',
+        memory_search: 'Search memory',
+        memory_save: 'Save memory',
+        memory_reindex: 'Reindex',
+        memory_name: 'Title',
+        memory_description: 'Description',
+        memory_content: 'Content',
+        memory_type: 'Type',
+        memory_hall: 'Hall',
+        memory_room: 'Room',
+        memory_query_placeholder: 'Search the current project memory',
+        memory_search_empty: 'No matching memory yet',
+        memory_search_loading: 'Searching memory...',
+        memory_saved: 'Memory saved',
+        memory_reindexed: 'Memory index rebuilt',
         new_system_msg: 'New system message',
         click_refresh: 'Click to refresh',
         no_response: '(No response)',
@@ -2679,16 +2721,22 @@ function _buildExtendedSections(runtime, item) {
     }
     if (runtime?.memory) {
         const memory = runtime.memory || {};
+        const hallCount = Array.isArray(memory.halls) ? memory.halls.length : 0;
+        const roomCount = Array.isArray(memory.rooms) ? memory.rooms.length : 0;
+        const provider = memory.search_provider || (memory.semantic_enabled ? 'semantic' : 'keyword');
+        const layerSummary = memory.layers?.summary || '';
         const relevant = Array.isArray(memory.relevant_entries) ? memory.relevant_entries.slice(0, 2).map(entry => entry.name || entry.path || '').filter(Boolean).join(' · ') : '';
         sections.push(`
             <div class="webot-runtime-section">
                 <div class="webot-runtime-title">Memory</div>
                 <div class="webot-runtime-detail">${_escapeAndFormatText(memory.summary || '')}</div>
-                <div class="webot-runtime-detail">${_escapeAndFormatText(`${memory.project_slug || ''} · entries=${memory.entry_count || 0} · can_dream=${memory.can_dream ? 'yes' : 'no'}`)}</div>
+                <div class="webot-runtime-detail">${_escapeAndFormatText(`${memory.project_slug || ''} · entries=${memory.entry_count || 0} · halls=${hallCount} · rooms=${roomCount} · can_dream=${memory.can_dream ? 'yes' : 'no'}`)}</div>
+                <div class="webot-runtime-caption">${_escapeAndFormatText(`${provider} · ${layerSummary}`)}</div>
                 <div class="webot-runtime-detail">${_escapeAndFormatText(relevant)}</div>
                 <div class="webot-runtime-actions">
                     <button class="webot-subagent-btn" type="button" onclick="toggleWeBotKairos('${encodeURIComponent(sessionId)}', ${memory.kairos_enabled ? 'false' : 'true'})">${memory.kairos_enabled ? 'Kairos Off' : 'Kairos On'}</button>
                     <button class="webot-subagent-btn" type="button" onclick="runWeBotDream('${encodeURIComponent(sessionId)}')">Dream</button>
+                    <button class="webot-subagent-btn" type="button" onclick="openWeBotMemoryOverlay('${encodeURIComponent(sessionId)}')">${t('memory_lab')}</button>
                 </div>
             </div>
         `);
@@ -2872,6 +2920,246 @@ async function runWeBotDream(sessionId) {
     } catch (e) {
         _setWeBotPolicyStatus(String(e.message || 'Dream failed'), 'error');
     }
+}
+
+function _decodeWeBotSessionId(sessionId) {
+    if (!sessionId) return currentSessionId || '';
+    try {
+        return decodeURIComponent(sessionId);
+    } catch (_) {
+        return sessionId;
+    }
+}
+
+function _resolveWeBotRuntime(sessionId) {
+    const resolved = _decodeWeBotSessionId(sessionId);
+    if (resolved && resolved === currentSessionId) {
+        return _currentSessionRuntime || {};
+    }
+    return _subagentRuntimeCache[resolved] || _currentSessionRuntime || {};
+}
+
+function _buildMemoryDatalist(id, values) {
+    const items = Array.isArray(values) ? values.filter(Boolean) : [];
+    return `<datalist id="${id}">${items.map((value) => `<option value="${escapeHtml(String(value))}"></option>`).join('')}</datalist>`;
+}
+
+function _formatMemoryResultCard(item) {
+    const meta = [
+        item.type || 'memory',
+        item.hall || '',
+        item.room || '',
+        item.source_kind || '',
+    ].filter(Boolean).join(' / ');
+    const score = Number.isFinite(Number(item.similarity)) ? `score=${Number(item.similarity).toFixed(3)}` : '';
+    return `
+        <div class="webot-runtime-block" style="padding:10px;border:1px solid rgba(148,163,184,.22);border-radius:10px;background:#fff;">
+            <div class="webot-runtime-row">
+                <span class="webot-runtime-badge">${escapeHtml(item.type || 'memory')}</span>
+                <span class="webot-runtime-text">${escapeHtml(item.name || item.path || 'memory')}</span>
+            </div>
+            ${meta ? `<div class="webot-runtime-caption">${escapeHtml(meta)}${score ? ` · ${escapeHtml(score)}` : ''}</div>` : ''}
+            ${item.description ? `<div class="webot-runtime-detail">${_escapeAndFormatText(item.description)}</div>` : ''}
+            ${item.snippet ? `<div class="webot-runtime-detail">${_escapeAndFormatText(item.snippet)}</div>` : ''}
+            ${item.path ? `<div class="webot-runtime-caption">${escapeHtml(item.path)}</div>` : ''}
+        </div>
+    `;
+}
+
+function _renderWeBotMemoryOverlayResults(payload = {}) {
+    const resultsEl = document.getElementById('webot-memory-results');
+    const summaryEl = document.getElementById('webot-memory-summary');
+    if (!resultsEl || !summaryEl) return;
+    const memory = payload.memory || {};
+    const results = Array.isArray(payload.results) ? payload.results : [];
+    const provider = memory.search_provider || (memory.semantic_enabled ? 'semantic' : 'keyword');
+    const summaryParts = [
+        memory.project_slug || '',
+        `entries=${memory.entry_count || 0}`,
+        `provider=${provider}`,
+        memory.layers?.summary || memory.summary || '',
+        results.length ? `hits=${results.length}` : '',
+    ].filter(Boolean);
+    summaryEl.textContent = summaryParts.join(' · ');
+    resultsEl.innerHTML = results.length
+        ? results.map((item) => _formatMemoryResultCard(item)).join('')
+        : `<div class="webot-runtime-empty">${escapeHtml(t('memory_search_empty'))}</div>`;
+}
+
+async function searchWeBotMemoryOverlay(sessionId) {
+    const resolved = _decodeWeBotSessionId(sessionId);
+    const queryInput = document.getElementById('webot-memory-query');
+    const hallInput = document.getElementById('webot-memory-hall');
+    const roomInput = document.getElementById('webot-memory-room');
+    const statusEl = document.getElementById('webot-memory-status');
+    if (!resolved || !queryInput || !hallInput || !roomInput || !statusEl) return;
+    statusEl.textContent = t('memory_search_loading');
+    try {
+        const resp = await fetch('/proxy_webot_memory_search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                session_id: resolved,
+                query: queryInput.value || '',
+                hall: hallInput.value || '',
+                room: roomInput.value || '',
+                limit: 8,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Memory search failed');
+        }
+        _renderWeBotMemoryOverlayResults(data);
+        statusEl.textContent = '';
+    } catch (e) {
+        statusEl.textContent = String(e.message || 'Memory search failed');
+        _setWeBotPolicyStatus(String(e.message || 'Memory search failed'), 'error');
+    }
+}
+
+async function saveWeBotMemoryOverlay(sessionId) {
+    const resolved = _decodeWeBotSessionId(sessionId);
+    const nameInput = document.getElementById('webot-memory-name');
+    const contentInput = document.getElementById('webot-memory-content');
+    const descriptionInput = document.getElementById('webot-memory-description');
+    const typeInput = document.getElementById('webot-memory-type');
+    const hallInput = document.getElementById('webot-memory-entry-hall');
+    const roomInput = document.getElementById('webot-memory-entry-room');
+    if (!resolved || !nameInput || !contentInput || !descriptionInput || !typeInput || !hallInput || !roomInput) return;
+    const name = String(nameInput.value || '').trim();
+    const content = String(contentInput.value || '').trim();
+    if (!name || !content) {
+        _setWeBotPolicyStatus(`${t('memory_name')} / ${t('memory_content')} required`, 'error');
+        return;
+    }
+    try {
+        const resp = await fetch('/proxy_webot_memory_entry', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                session_id: resolved,
+                name,
+                content,
+                description: descriptionInput.value || '',
+                mem_type: typeInput.value || 'project',
+                hall: hallInput.value || '',
+                room: roomInput.value || '',
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Memory save failed');
+        }
+        _setWeBotPolicyStatus(t('memory_saved'), 'success');
+        nameInput.value = '';
+        contentInput.value = '';
+        descriptionInput.value = '';
+        await refreshSubagentPanel();
+        await searchWeBotMemoryOverlay(resolved);
+    } catch (e) {
+        _setWeBotPolicyStatus(String(e.message || 'Memory save failed'), 'error');
+    }
+}
+
+async function reindexWeBotMemoryOverlay(sessionId) {
+    const resolved = _decodeWeBotSessionId(sessionId);
+    if (!resolved) return;
+    try {
+        const resp = await fetch('/proxy_webot_memory_reindex', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({session_id: resolved}),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.status !== 'success') {
+            throw new Error(data.detail || data.error || 'Memory reindex failed');
+        }
+        _setWeBotPolicyStatus(`${t('memory_reindexed')} · entries=${data.entries_indexed || 0} · logs=${data.logs_indexed || 0}`, 'success');
+        await refreshSubagentPanel();
+        await searchWeBotMemoryOverlay(resolved);
+    } catch (e) {
+        _setWeBotPolicyStatus(String(e.message || 'Memory reindex failed'), 'error');
+    }
+}
+
+function closeWeBotMemoryOverlay() {
+    const overlay = document.getElementById('webot-memory-overlay');
+    if (overlay) overlay.remove();
+}
+
+async function openWeBotMemoryOverlay(sessionId) {
+    const resolved = _decodeWeBotSessionId(sessionId);
+    if (!resolved) return;
+    closeWeBotMemoryOverlay();
+    const runtime = _resolveWeBotRuntime(resolved);
+    const memory = runtime.memory || {};
+    const halls = Array.isArray(memory.halls) ? memory.halls : [];
+    const rooms = Array.isArray(memory.rooms) ? memory.rooms : [];
+    const overlay = document.createElement('div');
+    overlay.id = 'webot-memory-overlay';
+    overlay.className = 'orch-modal-overlay';
+    overlay.style.zIndex = '10002';
+    overlay.innerHTML = `
+        <div class="orch-modal" style="min-width:420px;max-width:760px;width:min(92vw,760px);max-height:82vh;display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+                <div>
+                    <h3 style="margin:0;">${escapeHtml(t('memory_manage'))}</h3>
+                    <div id="webot-memory-summary" class="webot-runtime-caption">${escapeHtml(memory.layers?.summary || memory.summary || '')}</div>
+                </div>
+                <button type="button" class="webot-subagent-btn" onclick="closeWeBotMemoryOverlay()">${escapeHtml(t('close'))}</button>
+            </div>
+            <div id="webot-memory-status" class="webot-runtime-caption"></div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-height:0;">
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0;">
+                    <div class="webot-runtime-title">${escapeHtml(t('memory_search'))}</div>
+                    <input id="webot-memory-query" type="text" placeholder="${escapeHtml(t('memory_query_placeholder'))}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;">
+                    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">
+                        <input id="webot-memory-hall" list="webot-memory-halls" placeholder="${escapeHtml(t('memory_hall'))}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;">
+                        <input id="webot-memory-room" list="webot-memory-rooms" placeholder="${escapeHtml(t('memory_room'))}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;">
+                    </div>
+                    ${_buildMemoryDatalist('webot-memory-halls', halls)}
+                    ${_buildMemoryDatalist('webot-memory-rooms', rooms)}
+                    <div class="webot-runtime-actions">
+                        <button id="webot-memory-search-btn" type="button" class="webot-subagent-btn" onclick="searchWeBotMemoryOverlay('${encodeURIComponent(resolved)}')">${escapeHtml(t('memory_search'))}</button>
+                        <button id="webot-memory-reindex-btn" type="button" class="webot-subagent-btn" onclick="reindexWeBotMemoryOverlay('${encodeURIComponent(resolved)}')">${escapeHtml(t('memory_reindex'))}</button>
+                    </div>
+                    <div id="webot-memory-results" style="display:flex;flex-direction:column;gap:8px;min-height:180px;max-height:46vh;overflow:auto;padding-right:2px;"></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0;">
+                    <div class="webot-runtime-title">${escapeHtml(t('memory_save'))}</div>
+                    <input id="webot-memory-name" type="text" placeholder="${escapeHtml(t('memory_name'))}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;">
+                    <input id="webot-memory-description" type="text" placeholder="${escapeHtml(t('memory_description'))}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;">
+                    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+                        <select id="webot-memory-type" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;">
+                            <option value="decision">decision</option>
+                            <option value="preference">preference</option>
+                            <option value="problem">problem</option>
+                            <option value="milestone">milestone</option>
+                            <option value="fact">fact</option>
+                            <option value="reference">reference</option>
+                            <option value="feedback">feedback</option>
+                            <option value="project" selected>project</option>
+                            <option value="note">note</option>
+                        </select>
+                        <input id="webot-memory-entry-hall" list="webot-memory-halls" placeholder="${escapeHtml(t('memory_hall'))}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;">
+                        <input id="webot-memory-entry-room" list="webot-memory-rooms" placeholder="${escapeHtml(t('memory_room'))}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;">
+                    </div>
+                    <textarea id="webot-memory-content" rows="11" placeholder="${escapeHtml(t('memory_content'))}" style="width:100%;padding:10px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;resize:vertical;"></textarea>
+                    <div class="webot-runtime-actions">
+                        <button id="webot-memory-save-btn" type="button" class="webot-subagent-btn" onclick="saveWeBotMemoryOverlay('${encodeURIComponent(resolved)}')">${escapeHtml(t('memory_save'))}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeWeBotMemoryOverlay();
+    });
+    document.body.appendChild(overlay);
+    const queryInput = document.getElementById('webot-memory-query');
+    if (queryInput) queryInput.focus();
+    await searchWeBotMemoryOverlay(resolved);
 }
 
 async function petWeBotBuddy(sessionId) {
@@ -6306,6 +6594,564 @@ async function handleCancel() {
     setStreamingUI(false);
     setSystemBusyUI(false);
 }
+
+// ===== BadClaude Easter Egg =====
+const BADCLAUDE_UNLOCK_KEY = 'wecliBadClaudeUnlockedV1';
+const BADCLAUDE_BRAND_WINDOW_MS = 1200;
+const BADCLAUDE_BRAND_CLICK_COUNT = 4;
+const BADCLAUDE_SEND_DELAY_MS = 96;
+const BADCLAUDE_LIMITS = {
+    segments: 28,
+    segmentLength: 24,
+    taper: 0.62,
+    gravity: 1.08,
+    dropGravity: 0.96,
+    damping: 0.965,
+    constraintIters: 18,
+    maxStretchRatio: 1.16,
+    handleAimClamp: 1.8,
+    handleSpring: 0.72,
+    handleAngularDamping: 0.078,
+    basePoseSegments: 2,
+    basePoseStiffStart: 0.92,
+    basePoseStiffEnd: 0.78,
+    handleMaxBendDeg: 18,
+    tipMaxBendDeg: 128,
+    bendRigidityStart: 0.82,
+    bendRigidityEnd: 0.12,
+    crackSpeed: 330,
+    crackCooldownMs: 220,
+    firstCrackGraceMs: 320,
+    lineWidthHandle: 7,
+    lineWidthTip: 4.8,
+    outlineWidth: 3,
+    handleExtraWidth: 4.5,
+    handleThickSegments: 2,
+    arcWidth: 250,
+    arcHeight: 178,
+};
+
+const BADCLAUDE_PROMPTS = {
+    'zh-CN': [
+        '先别磨叽，直接给我当前问题的最短可执行答案。',
+        '把刚才那段收束一下，优先输出能立刻落地的步骤。',
+        '别停，继续把剩下的关键点补完。',
+        '我需要更直接的结论，按优先级重新整理一遍。',
+        '把复杂部分压缩掉，只保留会影响结果的内容。',
+    ],
+    'en': [
+        'Keep going. Give me the shortest actionable answer first.',
+        'Tighten the last pass and lead with what can be done now.',
+        'Do not stop yet. Finish the missing critical pieces.',
+        'Reorder this for speed and clarity, then send it.',
+        'Trim the noise and keep only what changes the outcome.',
+    ],
+};
+
+const badClaudeState = {
+    unlocked: localStorage.getItem(BADCLAUDE_UNLOCK_KEY) === '1',
+    visible: false,
+    canvas: null,
+    ctx: null,
+    rafId: 0,
+    dpr: 1,
+    width: 0,
+    height: 0,
+    whip: null,
+    dropping: false,
+    spawnAt: 0,
+    lastCrackAt: 0,
+    pointerX: 0,
+    pointerY: 0,
+    prevPointerX: 0,
+    prevPointerY: 0,
+    handleAngle: -1.12,
+    handleAngVel: 0,
+    pulseUntil: 0,
+    cracking: false,
+    brandClickTimes: [],
+};
+
+function showBadClaudeToast(message) {
+    if (!message) return;
+    const toast = document.createElement('div');
+    toast.className = 'badclaude-toast show';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(8px)';
+        toast.style.transition = 'opacity 0.18s ease, transform 0.18s ease';
+    }, 1600);
+    setTimeout(() => toast.remove(), 2000);
+}
+
+function applyBadClaudeMenuState() {
+    const item = document.getElementById('hamburger-badclaude-item');
+    if (item) item.style.display = badClaudeState.unlocked ? 'flex' : 'none';
+}
+
+function unlockBadClaude(showToast = true) {
+    if (!badClaudeState.unlocked) {
+        badClaudeState.unlocked = true;
+        localStorage.setItem(BADCLAUDE_UNLOCK_KEY, '1');
+        applyBadClaudeMenuState();
+        if (showToast) showBadClaudeToast(t('badclaude_unlocked_toast'));
+    }
+}
+
+function badClaudePrompt() {
+    const lang = currentLang === 'zh-CN' ? 'zh-CN' : 'en';
+    const pool = BADCLAUDE_PROMPTS[lang] || BADCLAUDE_PROMPTS.en;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function badClaudeResizeCanvas() {
+    if (!badClaudeState.canvas || !badClaudeState.ctx) return;
+    const canvas = badClaudeState.canvas;
+    const ctx = badClaudeState.ctx;
+    const dpr = window.devicePixelRatio || 1;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    badClaudeState.dpr = dpr;
+    badClaudeState.width = width;
+    badClaudeState.height = height;
+    canvas.width = Math.max(1, Math.round(width * dpr));
+    canvas.height = Math.max(1, Math.round(height * dpr));
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function badClaudeSegLen(index) {
+    const t = index / Math.max(1, BADCLAUDE_LIMITS.segments - 1);
+    return BADCLAUDE_LIMITS.segmentLength * (1 - t * (1 - BADCLAUDE_LIMITS.taper));
+}
+
+function badClaudeSpawnWhip(x, y) {
+    const points = [];
+    for (let i = 0; i < BADCLAUDE_LIMITS.segments; i++) {
+        const t = i / Math.max(1, BADCLAUDE_LIMITS.segments - 1);
+        const px = x + t * BADCLAUDE_LIMITS.arcWidth;
+        const py = y - Math.sin(t * Math.PI * 0.75) * BADCLAUDE_LIMITS.arcHeight;
+        points.push({ x: px, y: py, px, py });
+    }
+    badClaudeState.whip = points;
+    badClaudeState.dropping = false;
+    badClaudeState.spawnAt = performance.now();
+    badClaudeState.lastCrackAt = 0;
+    badClaudeState.handleAngle = -1.12;
+    badClaudeState.handleAngVel = 0;
+    badClaudeState.pulseUntil = 0;
+}
+
+function badClaudeClamp(v, lo, hi) {
+    return Math.max(lo, Math.min(hi, v));
+}
+
+function badClaudeWrapPi(a) {
+    while (a > Math.PI) a -= Math.PI * 2;
+    while (a < -Math.PI) a += Math.PI * 2;
+    return a;
+}
+
+function badClaudeWhipBezier(points, i) {
+    const n = points.length;
+    const p0 = i - 1 < 0 ? { x: 2 * points[0].x - points[1].x, y: 2 * points[0].y - points[1].y } : points[i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = i + 2 >= n ? { x: 2 * points[n - 1].x - points[n - 2].x, y: 2 * points[n - 1].y - points[n - 2].y } : points[i + 2];
+    return {
+        cp1x: p1.x + (p2.x - p0.x) / 6,
+        cp1y: p1.y + (p2.y - p0.y) / 6,
+        cp2x: p2.x - (p3.x - p1.x) / 6,
+        cp2y: p2.y - (p3.y - p1.y) / 6,
+        x2: p2.x,
+        y2: p2.y,
+    };
+}
+
+function badClaudeUpdateAim() {
+    if (badClaudeState.dropping || !badClaudeState.whip) return;
+    const mvx = badClaudeState.pointerX - badClaudeState.prevPointerX;
+    const mvy = badClaudeState.pointerY - badClaudeState.prevPointerY;
+    const delta = badClaudeClamp(mvx * 0.36 + mvy * 0.18, -BADCLAUDE_LIMITS.handleAimClamp, BADCLAUDE_LIMITS.handleAimClamp);
+    const target = -1.12 + delta;
+    const err = badClaudeWrapPi(target - badClaudeState.handleAngle);
+    badClaudeState.handleAngVel += err * BADCLAUDE_LIMITS.handleSpring;
+    badClaudeState.handleAngVel *= BADCLAUDE_LIMITS.handleAngularDamping;
+    badClaudeState.handleAngle = badClaudeWrapPi(badClaudeState.handleAngle + badClaudeState.handleAngVel);
+}
+
+function badClaudeApplyBasePose() {
+    if (!badClaudeState.whip || badClaudeState.dropping) return;
+    const whip = badClaudeState.whip;
+    const dx = Math.cos(badClaudeState.handleAngle);
+    const dy = Math.sin(badClaudeState.handleAngle);
+    const guided = Math.min(BADCLAUDE_LIMITS.basePoseSegments, whip.length - 1);
+    for (let i = 1; i <= guided; i++) {
+        const t = (i - 1) / Math.max(1, guided - 1);
+        const stiff = BADCLAUDE_LIMITS.basePoseStiffStart + (BADCLAUDE_LIMITS.basePoseStiffEnd - BADCLAUDE_LIMITS.basePoseStiffStart) * t;
+        const prev = whip[i - 1];
+        const p = whip[i];
+        const targetLen = badClaudeSegLen(i - 1);
+        const tx = prev.x + dx * targetLen;
+        const ty = prev.y + dy * targetLen;
+        p.x = p.x + (tx - p.x) * stiff;
+        p.y = p.y + (ty - p.y) * stiff;
+    }
+}
+
+function badClaudeApplyBendLimits() {
+    const whip = badClaudeState.whip;
+    if (!whip || whip.length < 3) return;
+    for (let i = 1; i < whip.length - 1; i++) {
+        const a = whip[i - 1];
+        const b = whip[i];
+        const c = whip[i + 1];
+        const v1x = a.x - b.x;
+        const v1y = a.y - b.y;
+        const v2x = c.x - b.x;
+        const v2y = c.y - b.y;
+        const l1 = Math.hypot(v1x, v1y) || 0.0001;
+        const l2 = Math.hypot(v2x, v2y) || 0.0001;
+        const n1x = v1x / l1;
+        const n1y = v1y / l1;
+        const n2x = v2x / l2;
+        const n2y = v2y / l2;
+        const dot = badClaudeClamp(n1x * n2x + n1y * n2y, -1, 1);
+        const angle = Math.acos(dot);
+        const t = i / (whip.length - 2);
+        const maxBend = (BADCLAUDE_LIMITS.handleMaxBendDeg + (BADCLAUDE_LIMITS.tipMaxBendDeg - BADCLAUDE_LIMITS.handleMaxBendDeg) * t) * Math.PI / 180;
+        if ((Math.PI - angle) <= maxBend) continue;
+        const cross = n1x * n2y - n1y * n2x;
+        const sign = cross >= 0 ? 1 : -1;
+        const targetA = Math.atan2(n1y, n1x) + sign * (Math.PI - maxBend);
+        const tx = b.x + Math.cos(targetA) * l2;
+        const ty = b.y + Math.sin(targetA) * l2;
+        const rigidity = BADCLAUDE_LIMITS.bendRigidityStart + (BADCLAUDE_LIMITS.bendRigidityEnd - BADCLAUDE_LIMITS.bendRigidityStart) * t;
+        c.x = c.x + (tx - c.x) * rigidity;
+        c.y = c.y + (ty - c.y) * rigidity;
+    }
+}
+
+function badClaudeCapStretch() {
+    const whip = badClaudeState.whip;
+    if (!whip || whip.length < 2) return;
+    for (let i = 0; i < whip.length - 1; i++) {
+        const a = whip[i];
+        const b = whip[i + 1];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy) || 0.0001;
+        const maxLen = badClaudeSegLen(i) * BADCLAUDE_LIMITS.maxStretchRatio;
+        if (dist <= maxLen) continue;
+        const k = maxLen / dist;
+        b.x = a.x + dx * k;
+        b.y = a.y + dy * k;
+    }
+}
+
+function badClaudeArmCrack() {
+    if (badClaudeState.cracking) return;
+    const hadActiveRun = Boolean(currentAbortController || (cancelBtn && cancelBtn.style.display === 'inline-block') || (busyBtn && busyBtn.style.display === 'inline-block'));
+    badClaudeState.cracking = true;
+    const finish = () => { badClaudeState.cracking = false; };
+    const doSend = async () => {
+        const prompt = badClaudePrompt();
+        const field = document.getElementById('user-input');
+        if (field) {
+            field.value = prompt;
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            field.focus();
+        }
+        if (sendBtn) sendBtn.disabled = false;
+        if (inputField) inputField.disabled = false;
+        await new Promise((resolve) => setTimeout(resolve, BADCLAUDE_SEND_DELAY_MS));
+        try {
+            await handleSend();
+        } finally {
+            finish();
+        }
+    };
+    if (hadActiveRun) {
+        Promise.resolve(handleCancel())
+            .catch(() => {})
+            .then(() => new Promise((resolve) => setTimeout(resolve, BADCLAUDE_SEND_DELAY_MS)))
+            .then(doSend)
+            .catch(() => finish());
+    } else {
+        doSend().catch(() => finish());
+    }
+}
+
+async function badClaudeTriggerCrack() {
+    badClaudeArmCrack();
+}
+
+function badClaudeForceCrack() {
+    badClaudeTriggerCrack();
+}
+
+function badClaudeStepPhysics() {
+    const whip = badClaudeState.whip;
+    if (!whip) return;
+    const g = badClaudeState.dropping ? BADCLAUDE_LIMITS.dropGravity : BADCLAUDE_LIMITS.gravity;
+    badClaudeUpdateAim();
+    const start = badClaudeState.dropping ? 0 : 1;
+    for (let i = start; i < whip.length; i++) {
+        const p = whip[i];
+        const vx = (p.x - p.px) * BADCLAUDE_LIMITS.damping;
+        const vy = (p.y - p.py) * BADCLAUDE_LIMITS.damping;
+        p.px = p.x;
+        p.py = p.y;
+        p.x += vx;
+        p.y += vy + g;
+    }
+    if (!badClaudeState.dropping) {
+        whip[0].x = badClaudeState.pointerX;
+        whip[0].y = badClaudeState.pointerY;
+        whip[0].px = badClaudeState.pointerX;
+        whip[0].py = badClaudeState.pointerY;
+    }
+
+    badClaudeCapStretch();
+
+    for (let iter = 0; iter < BADCLAUDE_LIMITS.constraintIters; iter++) {
+        for (let i = 0; i < whip.length - 1; i++) {
+            const a = whip[i];
+            const b = whip[i + 1];
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 0.0001;
+            const target = badClaudeSegLen(i);
+            const diff = (dist - target) / dist * 0.5;
+            const ox = dx * diff;
+            const oy = dy * diff;
+            if (i === 0 && !badClaudeState.dropping) {
+                b.x -= ox * 2;
+                b.y -= oy * 2;
+            } else {
+                a.x += ox;
+                a.y += oy;
+                b.x -= ox;
+                b.y -= oy;
+            }
+        }
+        badClaudeApplyBendLimits();
+        if (!badClaudeState.dropping) badClaudeApplyBasePose();
+        badClaudeCapStretch();
+    }
+
+    const tip = whip[whip.length - 1];
+    const tipVel = Math.hypot(tip.x - tip.px, tip.y - tip.py);
+    const now = performance.now();
+    if (!badClaudeState.dropping && tipVel > BADCLAUDE_LIMITS.crackSpeed && !badClaudeState.cracking) {
+        if (now - badClaudeState.spawnAt >= BADCLAUDE_LIMITS.firstCrackGraceMs && now - badClaudeState.lastCrackAt > BADCLAUDE_LIMITS.crackCooldownMs) {
+            badClaudeState.lastCrackAt = now;
+            badClaudeState.pulseUntil = now + 360;
+            void badClaudeTriggerCrack();
+        }
+    }
+
+    if (badClaudeState.dropping && whip.every((p) => p.y > badClaudeState.height + 60)) {
+        closeBadClaudeOverlay();
+    }
+
+    badClaudeState.prevPointerX = badClaudeState.pointerX;
+    badClaudeState.prevPointerY = badClaudeState.pointerY;
+}
+
+function badClaudeDraw() {
+    if (!badClaudeState.ctx || !badClaudeState.visible) return;
+    const ctx = badClaudeState.ctx;
+    const width = badClaudeState.width;
+    const height = badClaudeState.height;
+    ctx.clearRect(0, 0, width, height);
+    const now = performance.now();
+    const flash = badClaudeState.pulseUntil > now ? (badClaudeState.pulseUntil - now) / 360 : 0;
+    const wash = ctx.createLinearGradient(0, 0, width, height);
+    wash.addColorStop(0, `rgba(255,255,255,${0.02 + flash * 0.05})`);
+    wash.addColorStop(0.4, 'rgba(255,255,255,0)');
+    wash.addColorStop(1, `rgba(239,68,68,${0.04 + flash * 0.09})`);
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, width, height);
+    if (flash > 0.01) {
+        const glow = ctx.createRadialGradient(badClaudeState.pointerX, badClaudeState.pointerY, 0, badClaudeState.pointerX, badClaudeState.pointerY, 140);
+        glow.addColorStop(0, `rgba(255,255,255,${0.16 * flash})`);
+        glow.addColorStop(0.3, `rgba(248,113,113,${0.2 * flash})`);
+        glow.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, width, height);
+    }
+
+    const whip = badClaudeState.whip;
+    if (!whip || whip.length < 2) return;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#fff';
+    ctx.beginPath();
+    ctx.moveTo(whip[0].x, whip[0].y);
+    for (let i = 0; i < whip.length - 1; i++) {
+        const { cp1x, cp1y, cp2x, cp2y, x2, y2 } = badClaudeWhipBezier(whip, i);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+    }
+    ctx.lineWidth = BADCLAUDE_LIMITS.lineWidthTip + BADCLAUDE_LIMITS.outlineWidth * 2;
+    ctx.shadowColor = 'rgba(255,255,255,0.2)';
+    ctx.shadowBlur = 16;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const thickLinks = Math.min(BADCLAUDE_LIMITS.handleThickSegments, whip.length - 1);
+    if (thickLinks > 0 && BADCLAUDE_LIMITS.handleExtraWidth > 0) {
+        ctx.beginPath();
+        ctx.moveTo(whip[0].x, whip[0].y);
+        for (let i = 0; i < thickLinks; i++) {
+            const { cp1x, cp1y, cp2x, cp2y, x2, y2 } = badClaudeWhipBezier(whip, i);
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+        }
+        ctx.lineWidth = BADCLAUDE_LIMITS.lineWidthHandle + BADCLAUDE_LIMITS.handleExtraWidth + BADCLAUDE_LIMITS.outlineWidth * 2;
+        ctx.stroke();
+    }
+
+    ctx.strokeStyle = '#111827';
+    for (let i = 0; i < whip.length - 1; i++) {
+        const t = i / Math.max(1, whip.length - 2);
+        const extra = i < BADCLAUDE_LIMITS.handleThickSegments ? BADCLAUDE_LIMITS.handleExtraWidth : 0;
+        ctx.lineWidth = BADCLAUDE_LIMITS.lineWidthHandle + (BADCLAUDE_LIMITS.lineWidthTip - BADCLAUDE_LIMITS.lineWidthHandle) * t + extra;
+        const { cp1x, cp1y, cp2x, cp2y, x2, y2 } = badClaudeWhipBezier(whip, i);
+        ctx.beginPath();
+        ctx.moveTo(whip[i].x, whip[i].y);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+        ctx.stroke();
+    }
+}
+
+function badClaudeLoop() {
+    if (!badClaudeState.visible) {
+        badClaudeState.rafId = 0;
+        return;
+    }
+    badClaudeStepPhysics();
+    if (!badClaudeState.visible) {
+        badClaudeState.rafId = 0;
+        return;
+    }
+    badClaudeDraw();
+    badClaudeState.rafId = requestAnimationFrame(badClaudeLoop);
+}
+
+function badClaudeTrackPointer(e) {
+    if (!badClaudeState.visible) return;
+    badClaudeState.pointerX = e.clientX;
+    badClaudeState.pointerY = e.clientY;
+}
+
+function badClaudeHandleCanvasDown(e) {
+    if (!badClaudeState.visible) return;
+    if (e.button !== 0) return;
+    if (e.target && typeof e.target.closest === 'function' && e.target.closest('.badclaude-card')) return;
+    badClaudeState.pointerX = e.clientX;
+    badClaudeState.pointerY = e.clientY;
+    badClaudeState.prevPointerX = e.clientX;
+    badClaudeState.prevPointerY = e.clientY;
+    if (badClaudeState.whip && !badClaudeState.dropping) {
+        badClaudeState.dropping = true;
+    } else {
+        badClaudeSpawnWhip(e.clientX, e.clientY);
+    }
+}
+
+function badClaudeBindOverlayEvents() {
+    if (badClaudeState.visible) return;
+    window.addEventListener('pointermove', badClaudeTrackPointer, { passive: true });
+    window.addEventListener('pointerdown', badClaudeHandleCanvasDown, { passive: true });
+    window.addEventListener('resize', badClaudeResizeCanvas, { passive: true });
+    badClaudeState.visible = true;
+}
+
+function badClaudeUnbindOverlayEvents() {
+    window.removeEventListener('pointermove', badClaudeTrackPointer);
+    window.removeEventListener('pointerdown', badClaudeHandleCanvasDown);
+    window.removeEventListener('resize', badClaudeResizeCanvas);
+}
+
+function openBadClaudeOverlay(event) {
+    unlockBadClaude(true);
+    const overlay = document.getElementById('badclaude-overlay');
+    const canvas = document.getElementById('badclaude-canvas');
+    if (!overlay || !canvas) return;
+    badClaudeState.canvas = canvas;
+    badClaudeState.ctx = canvas.getContext('2d');
+    badClaudeResizeCanvas();
+    overlay.style.display = 'flex';
+    document.body.classList.add('badclaude-active');
+    badClaudeBindOverlayEvents();
+    const startX = Number.isFinite(event?.clientX) ? event.clientX : Math.round(window.innerWidth * 0.34);
+    const startY = Number.isFinite(event?.clientY) ? event.clientY : Math.round(window.innerHeight * 0.3);
+    badClaudeState.pointerX = startX;
+    badClaudeState.pointerY = startY;
+    badClaudeState.prevPointerX = startX;
+    badClaudeState.prevPointerY = startY;
+    if (!badClaudeState.whip) badClaudeSpawnWhip(startX, startY);
+    if (!badClaudeState.rafId) badClaudeState.rafId = requestAnimationFrame(badClaudeLoop);
+}
+
+function closeBadClaudeOverlay() {
+    const overlay = document.getElementById('badclaude-overlay');
+    if (overlay) overlay.style.display = 'none';
+    document.body.classList.remove('badclaude-active');
+    badClaudeUnbindOverlayEvents();
+    if (badClaudeState.rafId) {
+        cancelAnimationFrame(badClaudeState.rafId);
+        badClaudeState.rafId = 0;
+    }
+    badClaudeState.visible = false;
+    badClaudeState.whip = null;
+    badClaudeState.dropping = false;
+    badClaudeState.cracking = false;
+}
+
+function initBadClaudeEasterEgg() {
+    applyBadClaudeMenuState();
+    const brand = document.getElementById('studio-brand');
+    if (brand && !brand.dataset.badclaudeBound) {
+        brand.dataset.badclaudeBound = '1';
+        brand.addEventListener('click', () => {
+            const now = Date.now();
+            badClaudeState.brandClickTimes = badClaudeState.brandClickTimes.filter((ts) => now - ts <= BADCLAUDE_BRAND_WINDOW_MS);
+            badClaudeState.brandClickTimes.push(now);
+            if (badClaudeState.brandClickTimes.length >= BADCLAUDE_BRAND_CLICK_COUNT) {
+                badClaudeState.brandClickTimes = [];
+                unlockBadClaude(true);
+            }
+        });
+        brand.addEventListener('keydown', (e) => {
+            const chord = (e.ctrlKey || e.metaKey) && e.altKey && e.shiftKey && String(e.key).toLowerCase() === 'b';
+            if (chord) {
+                e.preventDefault();
+                unlockBadClaude(true);
+            }
+        });
+    }
+
+    if (!window.__badclaudeGlobalBound) {
+        window.__badclaudeGlobalBound = true;
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && badClaudeState.visible) {
+                closeBadClaudeOverlay();
+            }
+            const chord = (e.ctrlKey || e.metaKey) && e.altKey && e.shiftKey && String(e.key).toLowerCase() === 'b';
+            if (chord) {
+                e.preventDefault();
+                unlockBadClaude(true);
+                openBadClaudeOverlay();
+            }
+        });
+    }
+}
+
+initBadClaudeEasterEgg();
 
 // ===== TTS 朗读功能 =====
 let currentTtsAudio = null;

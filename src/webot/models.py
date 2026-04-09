@@ -106,6 +106,26 @@ class WeBotDreamRequest(WeBotSessionRuntimeRequest):
     reason: str = ""
 
 
+class WeBotMemorySearchRequest(WeBotSessionRuntimeRequest):
+    query: str = ""
+    hall: str = ""
+    room: str = ""
+    limit: int = 8
+
+
+class WeBotMemoryEntryCreateRequest(WeBotSessionRuntimeRequest):
+    name: str
+    content: str
+    mem_type: str = "project"
+    description: str = ""
+    hall: str = ""
+    room: str = ""
+
+
+class WeBotMemoryReindexRequest(WeBotSessionRuntimeRequest):
+    pass
+
+
 class WeBotVerificationCreateRequest(WeBotSessionRuntimeRequest):
     title: str
     status: str = "passed"

@@ -10,7 +10,13 @@ from fastapi import HTTPException
 from services.llm_factory import get_provider_audio_defaults, infer_provider
 from webot.bridge import bridge_hub, get_bridge_runtime_payload, issue_bridge_session, serialize_bridge_record
 from webot.buddy import apply_buddy_action, serialize_buddy_state
-from webot.memory import ensure_memory_state, run_auto_dream
+from webot.memory import (
+    append_memory_entry,
+    ensure_memory_state,
+    reindex_memory_store,
+    run_auto_dream,
+    search_memory_entries,
+)
 from webot.models import (
     WeBotApprovalResolutionRequest,
     WeBotBridgeAttachRequest,
@@ -18,6 +24,9 @@ from webot.models import (
     WeBotBuddyActionRequest,
     WeBotDreamRequest,
     WeBotKairosUpdateRequest,
+    WeBotMemoryEntryCreateRequest,
+    WeBotMemoryReindexRequest,
+    WeBotMemorySearchRequest,
     WeBotPlanUpdateRequest,
     WeBotRunInterruptRequest,
     WeBotSessionInboxDeliverRequest,
@@ -1125,6 +1134,7 @@ class WeBotService:
         memory = run_auto_dream(
             req.user_id,
             req.session_id,
+            force=True,
             plan=runtime.get("plan"),
             todos=runtime.get("todos"),
             verifications=runtime.get("verifications"),
@@ -1139,6 +1149,73 @@ class WeBotService:
             reason="dream_run",
         )
         return {"status": "success", "memory": memory}
+
+    async def search_memory(
+        self,
+        req: WeBotMemorySearchRequest,
+        x_internal_token: str | None,
+    ):
+        self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
+        memory = ensure_memory_state(req.user_id, req.session_id)
+        results = search_memory_entries(
+            req.user_id,
+            req.session_id,
+            req.query,
+            hall=req.hall,
+            room=req.room,
+            limit=req.limit,
+        )
+        return {
+            "status": "success",
+            "query": req.query,
+            "results": results,
+            "memory": memory,
+        }
+
+    async def create_memory_entry(
+        self,
+        req: WeBotMemoryEntryCreateRequest,
+        x_internal_token: str | None,
+    ):
+        self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
+        path = append_memory_entry(
+            req.user_id,
+            req.session_id,
+            name=req.name,
+            content=req.content,
+            mem_type=req.mem_type,
+            description=req.description,
+            hall=req.hall,
+            room=req.room,
+        )
+        memory = ensure_memory_state(req.user_id, req.session_id)
+        await self._publish_runtime_snapshot(
+            req.user_id,
+            req.session_id,
+            reason="memory_entry_create",
+        )
+        return {
+            "status": "success",
+            "path": str(path),
+            "memory": memory,
+        }
+
+    async def reindex_memory(
+        self,
+        req: WeBotMemoryReindexRequest,
+        x_internal_token: str | None,
+    ):
+        self.verify_auth_or_token(req.user_id, req.password, x_internal_token)
+        result = reindex_memory_store(req.user_id, req.session_id)
+        await self._publish_runtime_snapshot(
+            req.user_id,
+            req.session_id,
+            reason="memory_reindex",
+        )
+        return {
+            "status": "success",
+            **result,
+        }
 
     async def buddy_action(
         self,

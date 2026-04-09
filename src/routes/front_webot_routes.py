@@ -350,6 +350,70 @@ def register_webot_routes(
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500
 
+    @app.route("/proxy_webot_memory_search", methods=["POST"])
+    def proxy_webot_memory_search():
+        user_id = session.get("user_id", "")
+        body = request.get_json(force=True) if request.is_json else {}
+        try:
+            response = requests.post(
+                f"{base_url}/webot/memory/search",
+                json={
+                    "user_id": user_id,
+                    "session_id": body.get("session_id", ""),
+                    "query": body.get("query", ""),
+                    "hall": body.get("hall", ""),
+                    "room": body.get("room", ""),
+                    "limit": body.get("limit", 8),
+                },
+                headers=_internal_auth_headers(),
+                timeout=30,
+            )
+            return jsonify(response.json()), response.status_code
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    @app.route("/proxy_webot_memory_entry", methods=["POST"])
+    def proxy_webot_memory_entry():
+        user_id = session.get("user_id", "")
+        body = request.get_json(force=True) if request.is_json else {}
+        try:
+            response = requests.post(
+                f"{base_url}/webot/memory/entry",
+                json={
+                    "user_id": user_id,
+                    "session_id": body.get("session_id", ""),
+                    "name": body.get("name", ""),
+                    "content": body.get("content", ""),
+                    "mem_type": body.get("mem_type", "project"),
+                    "description": body.get("description", ""),
+                    "hall": body.get("hall", ""),
+                    "room": body.get("room", ""),
+                },
+                headers=_internal_auth_headers(),
+                timeout=30,
+            )
+            return jsonify(response.json()), response.status_code
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    @app.route("/proxy_webot_memory_reindex", methods=["POST"])
+    def proxy_webot_memory_reindex():
+        user_id = session.get("user_id", "")
+        body = request.get_json(force=True) if request.is_json else {}
+        try:
+            response = requests.post(
+                f"{base_url}/webot/memory/reindex",
+                json={
+                    "user_id": user_id,
+                    "session_id": body.get("session_id", ""),
+                },
+                headers=_internal_auth_headers(),
+                timeout=60,
+            )
+            return jsonify(response.json()), response.status_code
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
     @app.route("/proxy_webot_buddy", methods=["POST"])
     def proxy_webot_buddy():
         user_id = session.get("user_id", "")

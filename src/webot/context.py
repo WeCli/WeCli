@@ -332,6 +332,10 @@ def render_runtime_context_block(
             )
     if memory:
         lines.append(f"memory_entries: {memory.get('entry_count', 0)}")
+        if memory.get("search_provider"):
+            lines.append(f"memory_provider: {memory.get('search_provider')}")
+        if memory.get("layers", {}).get("summary"):
+            lines.append(f"memory_layers: {_trim_text(memory.get('layers', {}).get('summary', ''), 140)}")
         if memory.get("kairos_enabled"):
             lines.append("kairos: enabled")
         if memory.get("last_dream_at"):

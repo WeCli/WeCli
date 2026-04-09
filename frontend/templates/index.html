@@ -210,6 +210,10 @@
                             <span class="hamburger-item-icon">🏛️</span>
                             <span class="hamburger-item-label" data-i18n="hmenu_oasis">TeamsWork</span>
                         </button>
+                        <button id="hamburger-badclaude-item" class="hamburger-panel-item hamburger-secret-item" style="display:none;" onclick="openBadClaudeOverlay(event); closeHamburgerMenu();">
+                            <span class="hamburger-item-icon">🦂</span>
+                            <span class="hamburger-item-label" data-i18n="hmenu_badclaude">BadClaude</span>
+                        </button>
                         <div class="hamburger-panel-divider"></div>
                         <button class="hamburger-panel-item" onclick="toggleLanguage(); closeHamburgerMenu();">
                             <span class="hamburger-item-icon">🌐</span>
@@ -234,12 +238,13 @@
                         </button>
                     </div>
                 </div>
-                <div class="tab-bar-brand">
+                <div class="tab-bar-brand" id="studio-brand" tabindex="0" role="button" aria-label="Studio easter egg trigger">
                     <img class="tab-bar-logo-mark" src="/static/assets/wecli-mark.svg" alt="Wecli logo">
                     <div class="tab-bar-brand-text">
                         <span class="text-xs font-bold text-gray-800 leading-tight">Wecli</span>
                         <span class="text-[9px] text-green-500 flex items-center" data-i18n="encrypted">● 已加密</span>
                     </div>
+                    <span class="tab-bar-brand-sigil" aria-hidden="true">studio</span>
                 </div>
                 <div class="page-tab" id="uid-display" style="display:none;"></div>
                 <div class="page-tab active" id="tab-chat" onclick="switchPage('chat')" data-i18n="tab_chat">💬 Chat</div>
@@ -1238,6 +1243,25 @@
                 <div style="flex:1"></div>
                 <button onclick="closeExportPreviewModal()" class="settings-btn settings-btn-cancel" data-i18n="cancel">取消</button>
                 <button onclick="confirmExportTeam()" id="export-confirm-btn" class="settings-btn settings-btn-save bg-green-600 hover:bg-green-700" data-i18n="export_download" disabled>📥 导出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BadClaude Easter Egg Overlay -->
+    <div id="badclaude-overlay" class="badclaude-overlay" style="display:none;" onclick="if(event.target===this)closeBadClaudeOverlay()">
+        <canvas id="badclaude-canvas" class="badclaude-canvas"></canvas>
+        <div class="badclaude-hud">
+            <div class="badclaude-card">
+                <div class="badclaude-card-top">
+                    <span class="badclaude-kicker">studio / badclaude</span>
+                    <button type="button" class="badclaude-close-btn" onclick="closeBadClaudeOverlay()" aria-label="Close" data-i18n-title="close" title="Close">×</button>
+                </div>
+                <div class="badclaude-card-title" data-i18n="badclaude_overlay_title">BadClaude / Whip Mode</div>
+                <div class="badclaude-card-copy" data-i18n="badclaude_overlay_hint">Move the mouse fast to trigger a crack. Each crack first interrupts the active run, then nudges the chat box and sends it if possible.</div>
+                <div class="badclaude-card-actions">
+                    <button type="button" class="badclaude-action-btn primary" onclick="badClaudeForceCrack()" data-i18n="badclaude_crack_now">Crack now</button>
+                    <button type="button" class="badclaude-action-btn" onclick="closeBadClaudeOverlay()" data-i18n="close">Close</button>
+                </div>
             </div>
         </div>
     </div>

@@ -14,6 +14,9 @@ from webot.models import (
     WeBotBuddyActionRequest,
     WeBotDreamRequest,
     WeBotKairosUpdateRequest,
+    WeBotMemoryEntryCreateRequest,
+    WeBotMemoryReindexRequest,
+    WeBotMemorySearchRequest,
     WeBotPlanUpdateRequest,
     WeBotRunInterruptRequest,
     WeBotSessionInboxDeliverRequest,
@@ -224,6 +227,27 @@ def create_webot_router(
         x_internal_token: str | None = Header(None),
     ):
         return await service.run_dream(req, x_internal_token)
+
+    @router.post("/webot/memory/search")
+    async def search_memory(
+        req: WeBotMemorySearchRequest,
+        x_internal_token: str | None = Header(None),
+    ):
+        return await service.search_memory(req, x_internal_token)
+
+    @router.post("/webot/memory/entry")
+    async def create_memory_entry(
+        req: WeBotMemoryEntryCreateRequest,
+        x_internal_token: str | None = Header(None),
+    ):
+        return await service.create_memory_entry(req, x_internal_token)
+
+    @router.post("/webot/memory/reindex")
+    async def reindex_memory(
+        req: WeBotMemoryReindexRequest,
+        x_internal_token: str | None = Header(None),
+    ):
+        return await service.reindex_memory(req, x_internal_token)
 
     @router.post("/webot/buddy")
     async def buddy_action(

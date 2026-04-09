@@ -61,6 +61,11 @@ class WeBotMemoryTests(unittest.TestCase):
                 self.assertEqual(len(entries), 2)
                 self.assertEqual(state["entry_count"], 2)
                 self.assertTrue(state["kairos_enabled"])
+                self.assertIn(state["search_provider"], {"chroma", "keyword"})
+                self.assertIn("layers", state)
+                self.assertTrue(state["layers"]["essential"])
+                self.assertTrue(state["halls"])
+                self.assertTrue(state["rooms"])
                 self.assertGreaterEqual(len(relevant), 1)
                 self.assertEqual(relevant[0]["name"], "OAuth Notes")
                 self.assertTrue(Path(persisted.index_path).is_file())
@@ -115,6 +120,7 @@ class WeBotMemoryTests(unittest.TestCase):
                     state = webot_memory.get_memory_state("alice", "default", query="auth")
                     persisted = runtime_store.get_memory_state("alice", "default")
                     summary_path = Path(result["summary_path"])
+                    reindexed = webot_memory.reindex_memory_store("alice", "default")
 
                 self.assertTrue(result["ran"])
                 self.assertTrue(summary_path.is_file())
@@ -123,8 +129,45 @@ class WeBotMemoryTests(unittest.TestCase):
                 self.assertEqual(persisted.metadata.get("last_dream_summary"), str(summary_path))
                 self.assertEqual(persisted.dream_status, "idle")
                 self.assertIn("auto_dream_summary", summary_path.name)
+                self.assertGreaterEqual(reindexed["entries_indexed"], 1)
+                self.assertGreaterEqual(reindexed["logs_indexed"], 1)
             finally:
                 runtime_store.DEFAULT_DB_PATH = original_runtime_db_path
+                webot_memory.PROJECT_ROOT = original_project_root
+                webot_memory.USER_FILES_DIR = original_user_files_dir
+
+    def test_duplicate_memory_names_create_versioned_files(self):
+        with TemporaryDirectory() as tmpdir:
+            original_project_root = webot_memory.PROJECT_ROOT
+            original_user_files_dir = webot_memory.USER_FILES_DIR
+            webot_memory.PROJECT_ROOT = Path(tmpdir)
+            webot_memory.USER_FILES_DIR = Path(tmpdir) / "user_files"
+
+            workspace = Path(tmpdir) / "workspace"
+            workspace.mkdir(parents=True, exist_ok=True)
+            workspace_ref = types.SimpleNamespace(root=workspace, cwd=workspace, mode="shared", remote="")
+            try:
+                with patch.object(webot_memory, "resolve_session_workspace", return_value=workspace_ref):
+                    first = webot_memory.append_memory_entry(
+                        "alice",
+                        "default",
+                        name="Release Notes",
+                        content="First note",
+                    )
+                    second = webot_memory.append_memory_entry(
+                        "alice",
+                        "default",
+                        name="Release Notes",
+                        content="Second note",
+                    )
+                    entries = webot_memory.list_memory_entries("alice", "default")
+
+                self.assertTrue(first.is_file())
+                self.assertTrue(second.is_file())
+                self.assertNotEqual(first, second)
+                self.assertEqual(len(entries), 2)
+                self.assertNotEqual(entries[0]["id"], entries[1]["id"])
+            finally:
                 webot_memory.PROJECT_ROOT = original_project_root
                 webot_memory.USER_FILES_DIR = original_user_files_dir
 
