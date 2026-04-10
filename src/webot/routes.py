@@ -83,6 +83,24 @@ def create_webot_router(
     ):
         return await service.update_tool_policy(req, x_internal_token)
 
+    @router.get("/webot/tool-approvals")
+    async def get_tool_approvals(
+        user_id: str,
+        status: str = "pending",
+        session_id: str = "",
+        limit: int = 20,
+        password: str = "",
+        x_internal_token: str | None = Header(None),
+    ):
+        return await service.list_tool_approvals(
+            user_id,
+            password,
+            status,
+            session_id,
+            limit,
+            x_internal_token,
+        )
+
     @router.get("/webot/session-runtime")
     async def get_session_runtime(
         user_id: str,

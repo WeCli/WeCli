@@ -100,6 +100,28 @@ def register_webot_routes(
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500
 
+    @app.route("/proxy_webot_tool_approvals")
+    def proxy_webot_tool_approvals():
+        user_id = session.get("user_id", "")
+        status = request.args.get("status", "pending")
+        session_id = request.args.get("session_id", "")
+        limit = request.args.get("limit", "20")
+        try:
+            response = requests.get(
+                f"{base_url}/webot/tool-approvals",
+                params={
+                    "user_id": user_id,
+                    "status": status,
+                    "session_id": session_id,
+                    "limit": limit,
+                },
+                headers=_internal_auth_headers(),
+                timeout=15,
+            )
+            return jsonify(response.json()), response.status_code
+        except Exception as exc:
+            return jsonify({"error": str(exc), "approvals": []}), 500
+
     @app.route("/proxy_webot_session_runtime")
     def proxy_webot_session_runtime():
         user_id = session.get("user_id", "")

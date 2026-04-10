@@ -630,6 +630,34 @@ class WeBotService:
         policy = get_tool_policy(user_id)
         return {"status": "success", "policy": serialize_tool_policy(policy)}
 
+    async def list_tool_approvals(
+        self,
+        user_id: str,
+        password: str,
+        status: str,
+        session_id: str,
+        limit: int,
+        x_internal_token: str | None,
+    ):
+        self.verify_auth_or_token(user_id, password, x_internal_token)
+        approvals = [
+            {
+                "approval_id": approval.approval_id,
+                "session_id": approval.session_id,
+                "tool_name": approval.tool_name,
+                "status": approval.status,
+                "request_reason": approval.request_reason,
+                "created_at": approval.created_at,
+            }
+            for approval in list_tool_approvals(
+                user_id,
+                session_id or None,
+                status=(status or "").strip().lower() or None,
+                limit=max(1, min(limit or 20, 100)),
+            )
+        ]
+        return {"status": "success", "approvals": approvals}
+
     async def update_tool_policy(
         self,
         req: WeBotToolPolicyUpdateRequest,
@@ -1172,10 +1200,26 @@ class WeBotService:
         )
         if approval is None:
             raise HTTPException(status_code=404, detail=f"未找到 tool approval: {req.approval_id}")
-        if req.session_id:
+        target_session = req.session_id or approval.session_id
+        if normalized_action == "approved" and target_session:
+            try:
+                await self._push_system_message(
+                    user_id=req.user_id,
+                    session_id=target_session,
+                    text=(
+                        f"[Tool Approval Approved]\n"
+                        f"approval_id: {approval.approval_id}\n"
+                        f"tool: {approval.tool_name}\n"
+                        "The required approval has been granted. Continue the interrupted task now. "
+                        "If the blocked tool call is still needed, invoke it again and proceed without asking the user to say 'continue'."
+                    ),
+                )
+            except Exception:
+                pass
+        if target_session:
             await self._publish_runtime_snapshot(
                 req.user_id,
-                req.session_id,
+                target_session,
                 reason="approval_resolution",
             )
         return {

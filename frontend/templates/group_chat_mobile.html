@@ -545,6 +545,64 @@
     background: var(--msg-system);
     border-radius: 4px; padding: 3px 10px;
   }
+  .approval-card {
+    width: min(100%, 360px);
+    background: #fff8e8;
+    border: 1px solid #f5d98c;
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+  }
+  .approval-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #7a4b00;
+  }
+  .approval-card-meta {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #7c6a45;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .approval-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .approval-card-btn {
+    border: none;
+    border-radius: 999px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .approval-card-btn.approve {
+    background: #dff5e5;
+    color: #17663a;
+  }
+  .approval-card-btn.approve-remember {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+  .approval-card-btn.deny {
+    background: #fee2e2;
+    color: #b91c1c;
+  }
+  .approval-card-btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+  .approval-strip {
+    display: none;
+    padding: 8px 12px 0;
+    gap: 8px;
+    flex-direction: column;
+    background: linear-gradient(to bottom, rgba(245,245,245,0.92), rgba(245,245,245,0));
+  }
+  .approval-strip.show { display: flex; }
 
   .msg-time {
     font-size: 11px; color: var(--text-hint);
@@ -903,6 +961,28 @@
   .tool-policy-info { flex: 1; }
   .tool-policy-name { font-size: 14px; font-weight: 600; font-family: monospace; }
   .tool-policy-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .tool-policy-mode-btn {
+    min-width: 74px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .tool-policy-mode-btn.active {
+    background: #e8eefc;
+    border-color: #c7d7fb;
+    color: var(--primary);
+  }
+  .tool-policy-mode-hint {
+    display: none;
+  }
 
   /* ── Mention popup ── */
   .mention-popup {
@@ -2815,6 +2895,7 @@
       <button class="header-btn" id="chat-more-btn" onclick="toggleChatActions()" data-i18n-title="tip_more" title="更多" style="font-size:20px;font-weight:700;min-width:36px;">⋮</button>
     </div>
   </div>
+  <div class="approval-strip" id="approval-strip"></div>
   <div class="chat-body" id="chat-body"></div>
   <div id="new-msg-banner" onclick="dismissNewMsgBanner()">
     <span class="banner-arrow">▼</span>
@@ -3709,11 +3790,26 @@ const I18N = {
     tool_policy: '工具权限管理',
     tool_policy_loading: '正在加载工具权限...',
     tool_policy_empty: '暂无工具权限数据',
+    tool_policy_default: '默认策略',
+    tool_policy_tool_rules: '工具单独规则',
+    tool_policy_follow_default: '跟随默认',
     tool_policy_allow: '允许',
+    tool_policy_allow_all: '一键允许',
+    tool_policy_manual: '手动批准',
     tool_policy_deny: '拒绝',
+    tool_policy_read_only: '一键只读',
     tool_policy_save: '保存权限设置',
     tool_policy_saved: '✅ 权限设置已保存',
-    tool_policy_hint: '配置哪些工具允许执行，哪些需要拒绝',
+    tool_policy_hint: '默认策略是兜底规则；单个工具可单独覆盖为允许、手动批准或拒绝',
+    approval_required_title: '工具调用需要批准',
+    approval_reason: '原因',
+    approval_approve: '批准',
+    approval_approve_remember: '批准并记住',
+    approval_deny: '拒绝',
+    approval_working: '处理中...',
+    approval_done: '✅ 已处理工具审批',
+    approval_failed: '审批失败',
+    approval_pending_none: '当前没有待审批工具调用',
     session_runtime: '会话运行状态',
     session_runtime_loading: '正在获取运行状态...',
     session_runtime_no_session: '请输入会话 ID 查询',
@@ -4288,11 +4384,26 @@ const I18N = {
     tool_policy: 'Tool Permissions',
     tool_policy_loading: 'Loading tool policy...',
     tool_policy_empty: 'No tool policy data',
+    tool_policy_default: 'Default Policy',
+    tool_policy_tool_rules: 'Tool Overrides',
+    tool_policy_follow_default: 'Follow Default',
     tool_policy_allow: 'Allow',
+    tool_policy_allow_all: 'Allow All',
+    tool_policy_manual: 'Manual Approval',
     tool_policy_deny: 'Deny',
+    tool_policy_read_only: 'Read-only Preset',
     tool_policy_save: 'Save Permissions',
     tool_policy_saved: '✅ Permissions saved',
-    tool_policy_hint: 'Configure which tools are allowed or denied',
+    tool_policy_hint: 'Default policy is the fallback; each tool can override it with allow, manual, or deny',
+    approval_required_title: 'Tool call needs approval',
+    approval_reason: 'Reason',
+    approval_approve: 'Approve',
+    approval_approve_remember: 'Approve & Remember',
+    approval_deny: 'Deny',
+    approval_working: 'Processing...',
+    approval_done: '✅ Approval resolved',
+    approval_failed: 'Approval failed',
+    approval_pending_none: 'No pending tool approvals',
     session_runtime: 'Session Runtime',
     session_runtime_loading: 'Loading runtime...',
     session_runtime_no_session: 'Enter a session ID to query',
@@ -6625,6 +6736,7 @@ async function openChat(groupId, name) {
     const groupName = cachedDetail.name || name || '';
     currentTeamName = groupName;
     renderMembers(cachedDetail.members || []);
+    refreshPendingApprovalsForCurrentGroup();
     renderMessages(cachedDetail.messages || []);
   } else {
     renderChatLoadingSkeleton();
@@ -6637,6 +6749,7 @@ async function openChat(groupId, name) {
     const groupName = data.name || name || '';
     currentTeamName = groupName;
     renderMembers(data.members || []);
+    await refreshPendingApprovalsForCurrentGroup();
     renderMessages(data.messages || []);
     // Check mute status
     const muteData = await api('GET', `/proxy_groups/${encodeURIComponent(groupId)}/mute_status`);
@@ -6661,6 +6774,7 @@ function goBack() {
   closeOasisSidebar();
   currentGroupId = null;
   currentTeamName = '';
+  renderPendingApprovalCards([]);
   refreshGroups();
 }
 
@@ -6765,7 +6879,12 @@ function renderOneMsgHTML(m) {
   const colorClass = isSelf ? 'self' : '';
 
   if (isSystem) {
-    const content = esc(tcNormalizeEscapedText(m.content || ''));
+    const rawSystemContent = tcNormalizeEscapedText(m.content || '');
+    const approval = parseToolApprovalMessage(rawSystemContent);
+    if (approval) {
+      return renderToolApprovalCardHTML(approval);
+    }
+    const content = esc(rawSystemContent);
     return `<div class="msg-row system"><span class="msg-system-text">${content}</span></div>`;
   }
 
@@ -6809,6 +6928,121 @@ function renderOneMsgHTML(m) {
         <div class="msg-time">${ts}</div>
       </div>
     </div>`;
+}
+
+function parseToolApprovalMessage(content) {
+  const text = String(content || '').trim();
+  if (!text.includes('需要人工批准')) return null;
+  const approvalIdMatch = text.match(/approval_id:\s*([A-Za-z0-9._:-]+)/);
+  if (!approvalIdMatch) return null;
+  const toolMatch = text.match(/工具 ['"]?([^'"\n]+)['"]? 当前需要人工批准/);
+  const reasonMatch = text.match(/原因：([^\n]+)/);
+  return {
+    approvalId: approvalIdMatch[1],
+    toolName: toolMatch ? toolMatch[1] : '',
+    reason: reasonMatch ? reasonMatch[1].trim() : ''
+  };
+}
+
+function renderToolApprovalCardHTML(approval) {
+  const toolLabel = approval.toolName ? `<div class="approval-card-meta"><strong>${esc(approval.toolName)}</strong></div>` : '';
+  const reasonLabel = approval.reason ? `<div class="approval-card-meta">${t('approval_reason')}: ${esc(approval.reason)}</div>` : '';
+  return `<div class="msg-row system" data-approval-id="${esc(approval.approvalId)}">
+    <div class="approval-card">
+      <div class="approval-card-title">${t('approval_required_title')}</div>
+      ${toolLabel}
+      ${reasonLabel}
+      <div class="approval-card-meta" style="font-family:monospace;">approval_id: ${esc(approval.approvalId)}</div>
+      <div class="approval-card-actions">
+        <button class="approval-card-btn approve" onclick="resolveMobileToolApproval('${esc(approval.approvalId)}','approve',false,'',this)">${t('approval_approve')}</button>
+        <button class="approval-card-btn approve-remember" onclick="resolveMobileToolApproval('${esc(approval.approvalId)}','approve',true,'',this)">${t('approval_approve_remember')}</button>
+        <button class="approval-card-btn deny" onclick="resolveMobileToolApproval('${esc(approval.approvalId)}','deny',false,'',this)">${t('approval_deny')}</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function resolveMobileToolApproval(approvalId, action, remember, sessionId, btn) {
+  const wrapper = btn ? btn.closest('.approval-card') : null;
+  const buttons = wrapper ? Array.from(wrapper.querySelectorAll('.approval-card-btn')) : [];
+  buttons.forEach(node => {
+    node.disabled = true;
+    if (node === btn) node.textContent = t('approval_working');
+  });
+  try {
+    const resp = await fetch('/proxy_webot_tool_approval_resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        approval_id: approvalId,
+        action,
+        remember: !!remember,
+        session_id: sessionId || ''
+      }),
+    });
+    const data = await resp.json();
+    if (!resp.ok || data.status !== 'success') {
+      throw new Error(data.detail || data.error || t('approval_failed'));
+    }
+    if (wrapper) {
+      wrapper.innerHTML = `<div class="approval-card-title">${t('approval_done')}</div>
+        <div class="approval-card-meta" style="margin-top:8px;">${esc(data.approval?.tool_name || '')} · ${esc(data.approval?.status || '')}</div>`;
+    }
+    toast(t('approval_done'));
+    await refreshPendingApprovalsForCurrentGroup();
+  } catch (e) {
+    buttons.forEach(node => {
+      node.disabled = false;
+    });
+    if (btn) {
+      if (action === 'deny') btn.textContent = t('approval_deny');
+      else if (remember) btn.textContent = t('approval_approve_remember');
+      else btn.textContent = t('approval_approve');
+    }
+    toast(`${t('approval_failed')}: ${e.message}`);
+  }
+}
+
+function renderPendingApprovalCards(approvals) {
+  const strip = document.getElementById('approval-strip');
+  if (!strip) return;
+  if (!approvals.length) {
+    strip.classList.remove('show');
+    strip.innerHTML = '';
+    return;
+  }
+  strip.classList.add('show');
+  strip.innerHTML = approvals.map(item => `
+    <div class="approval-card">
+      <div class="approval-card-title">${t('approval_required_title')}</div>
+      <div class="approval-card-meta"><strong>${esc(item.tool_name || '')}</strong></div>
+      <div class="approval-card-meta">${t('approval_reason')}: ${esc(item.request_reason || '')}</div>
+      <div class="approval-card-meta" style="font-family:monospace;">approval_id: ${esc(item.approval_id || '')}</div>
+      <div class="approval-card-actions">
+        <button class="approval-card-btn approve" onclick="resolveMobileToolApproval('${esc(item.approval_id || '')}','approve',false,'${esc(item.session_id || '')}',this)">${t('approval_approve')}</button>
+        <button class="approval-card-btn approve-remember" onclick="resolveMobileToolApproval('${esc(item.approval_id || '')}','approve',true,'${esc(item.session_id || '')}',this)">${t('approval_approve_remember')}</button>
+        <button class="approval-card-btn deny" onclick="resolveMobileToolApproval('${esc(item.approval_id || '')}','deny',false,'${esc(item.session_id || '')}',this)">${t('approval_deny')}</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function refreshPendingApprovalsForCurrentGroup() {
+  if (!currentGroupId) return;
+  const internalSessions = (currentMembers || [])
+    .filter(m => (m.member_type || '') === 'oasis')
+    .map(m => String(m.global_id || '').trim())
+    .filter(Boolean);
+  try {
+    const data = await api('GET', '/proxy_webot_tool_approvals?status=pending&limit=50');
+    const allApprovals = Array.isArray(data.approvals) ? data.approvals : [];
+    const filtered = internalSessions.length
+      ? allApprovals.filter(item => internalSessions.includes(String(item.session_id || '')))
+      : allApprovals;
+    renderPendingApprovalCards(filtered);
+  } catch (_) {
+    renderPendingApprovalCards([]);
+  }
 }
 
 // ── Attachments state ──
@@ -8177,7 +8411,10 @@ async function pollNewMessages() {
   if (_polling) return;  // 上一次 poll 还没完成，跳过
   _polling = true;
   try {
-    const data = await api('GET', `/proxy_groups/${encodeURIComponent(currentGroupId)}/messages?after_id=${lastMsgId}`);
+    const [data] = await Promise.all([
+      api('GET', `/proxy_groups/${encodeURIComponent(currentGroupId)}/messages?after_id=${lastMsgId}`),
+      refreshPendingApprovalsForCurrentGroup(),
+    ]);
     const msgs = data.messages || [];
     if (msgs.length) appendMessages(msgs);
   } catch (_) { /* silent */ } finally {
@@ -9941,6 +10178,61 @@ async function saveVoiceConfig() {
 // ── Tool Policy Sheet ──
 // ════════════════════════════════════════════════════
 let _toolPolicyData = {};
+let _toolPolicyCatalog = [];
+const _READ_ONLY_TOOL_PRESET = new Set([
+  'read_file',
+  'list_files',
+  'search_files',
+  'grep_search',
+  'list_sessions',
+  'get_current_session',
+  'list_alarms',
+  'get_telegram_status',
+  'list_oasis_topics',
+  'list_oasis_sessions',
+  'list_oasis_experts',
+  'list_oasis_workflows',
+  'list_subagents',
+  'get_subagent_history',
+  'list_webot_agent_profiles',
+  'session_inbox',
+  'claude_session_inbox',
+  'get_session_mode',
+  'ultraplan_status',
+  'ultrareview_status',
+  'list_verifications',
+  'list_tool_approvals',
+  'resolve_tool_approval',
+  'call_llm_api'
+]);
+
+function _normalizeToolPolicyPayload(raw) {
+  const fallback = {
+    default_approval: 'allow',
+    hooks: [],
+    tools: {},
+    source: '',
+    definition_path: ''
+  };
+  if (!raw || typeof raw !== 'object') return fallback;
+  return {
+    default_approval: typeof raw.default_approval === 'string' ? raw.default_approval : 'allow',
+    hooks: Array.isArray(raw.hooks) ? raw.hooks : [],
+    tools: raw.tools && typeof raw.tools === 'object' ? raw.tools : {},
+    source: typeof raw.source === 'string' ? raw.source : '',
+    definition_path: typeof raw.definition_path === 'string' ? raw.definition_path : ''
+  };
+}
+
+function _renderPolicyModeButtons(modes, selected, withLabels = true) {
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;">` + modes.map(mode => {
+    const isActive = mode.value === selected;
+    return `<button type="button" class="tool-policy-mode-btn ${isActive ? 'active' : ''}" data-mode="${esc(mode.value)}">
+      <span>${esc(mode.label)}</span>
+      ${withLabels && mode.hint ? `<span class="tool-policy-mode-hint">${esc(mode.hint)}</span>` : ''}
+    </button>`;
+  }).join('') + `</div>`;
+}
 
 async function openToolPolicySheet() {
   document.getElementById('tool-policy-sheet-overlay').classList.add('show');
@@ -9957,8 +10249,12 @@ async function loadToolPolicy() {
   const body = document.getElementById('tool-policy-body');
   body.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-hint);">${t('tool_policy_loading')}</div>`;
   try {
-    const data = await api('GET', '/proxy_webot_tool_policy');
-    _toolPolicyData = data.policy || data || {};
+    const [data, toolsResp] = await Promise.all([
+      api('GET', '/proxy_webot_tool_policy'),
+      fetch('/proxy_tools').then(r => r.ok ? r.json() : { tools: [] }).catch(() => ({ tools: [] }))
+    ]);
+    _toolPolicyData = _normalizeToolPolicyPayload(data.policy || data || {});
+    _toolPolicyCatalog = Array.isArray(toolsResp.tools) ? toolsResp.tools : [];
     renderToolPolicy(_toolPolicyData);
   } catch (e) {
     body.innerHTML = `<div style="text-align:center;padding:24px;color:#f55;">❌ ${esc(e.message)}</div>`;
@@ -9967,36 +10263,150 @@ async function loadToolPolicy() {
 
 function renderToolPolicy(policy) {
   const body = document.getElementById('tool-policy-body');
-  const keys = Object.keys(policy);
-  if (!keys.length) {
-    body.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-hint);">${t('tool_policy_empty')}</div>
-      <div style="font-size:12px;color:var(--text-hint);padding:0 4px 8px;">${t('tool_policy_hint')}</div>`;
-    return;
-  }
-  body.innerHTML = `<div style="font-size:12px;color:var(--text-hint);padding:0 0 10px;">${t('tool_policy_hint')}</div>` +
-    keys.map(tool => {
-      const val = policy[tool]; // true = allow, false = deny
-      const isAllow = val !== false;
-      return `
-        <div class="tool-policy-item">
-          <div class="tool-policy-info">
-            <div class="tool-policy-name">${esc(tool)}</div>
-          </div>
-          <button class="tc-toggle ${isAllow ? 'on' : ''}" data-tool="${esc(tool)}" onclick="tcToggle(this)"></button>
-        </div>`;
-    }).join('');
+  const normalized = _normalizeToolPolicyPayload(policy);
+  const knownToolNames = new Set(Object.keys(normalized.tools || {}));
+  (_toolPolicyCatalog || []).forEach(tool => {
+    if (tool && typeof tool.name === 'string' && tool.name) knownToolNames.add(tool.name);
+  });
+  const toolEntries = Array.from(knownToolNames)
+    .sort((a, b) => a.localeCompare(b))
+    .map(toolName => [toolName, normalized.tools?.[toolName] || {}]);
+  const defaultModes = [
+    { value: 'allow', label: t('tool_policy_allow') },
+    { value: 'manual', label: t('tool_policy_manual') },
+    { value: 'deny', label: t('tool_policy_deny') }
+  ];
+  const toolModes = [
+    { value: '', label: t('tool_policy_follow_default') },
+    { value: 'allow', label: t('tool_policy_allow') },
+    { value: 'manual', label: t('tool_policy_manual') },
+    { value: 'deny', label: t('tool_policy_deny') }
+  ];
+  body.innerHTML =
+    `<div style="font-size:12px;color:var(--text-hint);padding:0 0 12px;">${t('tool_policy_hint')}</div>
+     <div class="agent-detail-section" style="margin-bottom:12px;">
+       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
+         <div class="agent-detail-label" style="margin:0;">${t('tool_policy_default')}</div>
+         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+           <button type="button" class="tool-policy-mode-btn" onclick="applyAllowAllToolPolicyPreset()" style="flex-shrink:0;">${t('tool_policy_allow_all')}</button>
+           <button type="button" class="tool-policy-mode-btn" onclick="applyReadOnlyToolPolicyPreset()" style="flex-shrink:0;">${t('tool_policy_read_only')}</button>
+         </div>
+       </div>
+       <div class="agent-detail-value">
+         <div id="tool-policy-default" data-mode="${esc(normalized.default_approval || 'allow')}">
+           ${_renderPolicyModeButtons(defaultModes, normalized.default_approval || 'allow')}
+         </div>
+       </div>
+     </div>
+     <div class="agent-detail-section">
+       <div class="agent-detail-label">${t('tool_policy_tool_rules')}</div>
+       <div class="agent-detail-value" style="display:flex;flex-direction:column;gap:10px;">
+         ${toolEntries.length ? toolEntries.map(([tool, rule]) => {
+           const selected = rule && typeof rule === 'object' && typeof rule.approval === 'string' ? rule.approval : '';
+           return `<div class="tool-policy-item" style="display:block;">
+             <div class="tool-policy-info" style="margin-bottom:8px;">
+               <div class="tool-policy-name">${esc(tool)}</div>
+             </div>
+             <div class="tool-policy-tool-modes" data-tool="${esc(tool)}" data-mode="${esc(selected)}">
+               ${_renderPolicyModeButtons(toolModes, selected, false)}
+             </div>
+           </div>`;
+         }).join('') : `<div style="font-size:12px;color:var(--text-hint);padding:4px 0;">${t('tool_policy_empty')}</div>`}
+       </div>
+     </div>`;
+
+  body.querySelectorAll('.tool-policy-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = btn.parentElement;
+      if (!group) return;
+      group.querySelectorAll('.tool-policy-mode-btn').forEach(node => node.classList.remove('active'));
+      btn.classList.add('active');
+      const container = group.parentElement;
+      if (container) container.dataset.mode = btn.dataset.mode || '';
+    });
+  });
+}
+
+function applyReadOnlyToolPolicyPreset() {
+  const current = _normalizeToolPolicyPayload(_toolPolicyData);
+  const next = {
+    ...current,
+    default_approval: 'deny',
+    tools: { ...(current.tools || {}) }
+  };
+  const knownToolNames = new Set(Object.keys(next.tools || {}));
+  (_toolPolicyCatalog || []).forEach(tool => {
+    if (tool && typeof tool.name === 'string' && tool.name) knownToolNames.add(tool.name);
+  });
+  knownToolNames.forEach(toolName => {
+    const prevRule = (next.tools[toolName] && typeof next.tools[toolName] === 'object') ? next.tools[toolName] : {};
+    next.tools[toolName] = {
+      ...prevRule,
+      approval: _READ_ONLY_TOOL_PRESET.has(toolName) ? 'allow' : 'deny'
+    };
+  });
+  _toolPolicyData = next;
+  renderToolPolicy(_toolPolicyData);
+}
+
+function applyAllowAllToolPolicyPreset() {
+  const current = _normalizeToolPolicyPayload(_toolPolicyData);
+  const next = {
+    ...current,
+    default_approval: 'allow',
+    tools: { ...(current.tools || {}) }
+  };
+  const knownToolNames = new Set(Object.keys(next.tools || {}));
+  (_toolPolicyCatalog || []).forEach(tool => {
+    if (tool && typeof tool.name === 'string' && tool.name) knownToolNames.add(tool.name);
+  });
+  knownToolNames.forEach(toolName => {
+    const prevRule = (next.tools[toolName] && typeof next.tools[toolName] === 'object') ? next.tools[toolName] : {};
+    const cleanedRule = { ...prevRule };
+    delete cleanedRule.approval;
+    const hasMeaningfulRule = Object.keys(cleanedRule).some(key => {
+      const value = cleanedRule[key];
+      if (Array.isArray(value)) return value.length > 0;
+      return value !== undefined && value !== null && value !== '';
+    });
+    if (hasMeaningfulRule) next.tools[toolName] = cleanedRule;
+    else delete next.tools[toolName];
+  });
+  _toolPolicyData = next;
+  renderToolPolicy(_toolPolicyData);
 }
 
 async function saveToolPolicy() {
   const btn = document.getElementById('tool-policy-save-btn');
   btn.disabled = true;
   try {
-    const toggles = document.querySelectorAll('#tool-policy-body .tc-toggle[data-tool]');
-    const policy = {};
-    toggles.forEach(tog => {
-      policy[tog.dataset.tool] = tog.classList.contains('on');
+    const current = _normalizeToolPolicyPayload(_toolPolicyData);
+    const defaultEl = document.getElementById('tool-policy-default');
+    const nextPolicy = {
+      default_approval: (defaultEl && defaultEl.dataset.mode) || current.default_approval || 'allow',
+      hooks: Array.isArray(current.hooks) ? current.hooks : [],
+      tools: {}
+    };
+    const toolRows = document.querySelectorAll('#tool-policy-body .tool-policy-tool-modes[data-tool]');
+    toolRows.forEach(row => {
+      const tool = row.dataset.tool || '';
+      if (!tool) return;
+      const mode = row.dataset.mode || '';
+      const prevRule = (current.tools && current.tools[tool] && typeof current.tools[tool] === 'object') ? current.tools[tool] : {};
+      const nextRule = { ...prevRule };
+      if (mode) nextRule.approval = mode;
+      else delete nextRule.approval;
+      const hasMeaningfulRule = Object.keys(nextRule).some(key => {
+        const value = nextRule[key];
+        if (Array.isArray(value)) return value.length > 0;
+        return value !== undefined && value !== null && value !== '';
+      });
+      if (hasMeaningfulRule) nextPolicy.tools[tool] = nextRule;
     });
-    await api('POST', '/proxy_webot_tool_policy', { policy });
+    if (current.source) nextPolicy.source = current.source;
+    if (current.definition_path) nextPolicy.definition_path = current.definition_path;
+    await api('POST', '/proxy_webot_tool_policy', { policy: nextPolicy });
+    _toolPolicyData = nextPolicy;
     toast(t('tool_policy_saved'));
     closeToolPolicySheet();
   } catch (e) {

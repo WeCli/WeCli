@@ -26,6 +26,11 @@ from webot.runtime_store import (
     update_tool_approval_status,
 )
 
+_POLICY_EXEMPT_TOOLS = {
+    "resolve_tool_approval",
+    "list_tool_approvals",
+}
+
 
 @dataclass(frozen=True)
 class PermissionContext:
@@ -50,6 +55,17 @@ def resolve_permission_context(
 ) -> PermissionContext:
     effective_policy = policy or get_tool_policy(user_id)
     normalized_args = dict(args or {})
+    if tool_name in _POLICY_EXEMPT_TOOLS:
+        return PermissionContext(
+            decision="allow",
+            allowed=True,
+            requires_approval=False,
+            reason="审批流程核心工具默认放行，避免自锁。",
+            matched_rule="",
+            tool_name=tool_name,
+            args=normalized_args,
+            policy=effective_policy,
+        )
     base_decision = evaluate_tool_policy(effective_policy, tool_name, normalized_args)
 
     if base_decision.allowed:
