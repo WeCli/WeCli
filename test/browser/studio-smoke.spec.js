@@ -704,6 +704,22 @@ async function stubStudioNetwork(page, calls, options = {}) {
       ok: true,
       presets: [
         {
+          preset_id: 'code-team',
+          name: 'Code Team',
+          default_team_name: 'Code Team',
+          role_count: 6,
+          tags: ['code', 'delivery'],
+          description: '面向小项目交付的研发协作预设。',
+        },
+        {
+          preset_id: 'social-account-control',
+          name: '社交账号控制台',
+          default_team_name: '社交账号控制台',
+          role_count: 7,
+          tags: ['social', 'operations'],
+          description: '社交账号策略、内容、发布、风控与复盘预设。',
+        },
+        {
           preset_id: 'ming-neige',
           name: '明朝内阁制',
           default_team_name: '明朝内阁制',
@@ -725,19 +741,43 @@ async function stubStudioNetwork(page, calls, options = {}) {
   await page.route('**/api/team-presets/install', async (route) => {
     const payload = await route.request().postDataJSON();
     calls.teamPresetInstall.push(payload);
+    const presetMap = {
+      'code-team': {
+        name: 'Code Team',
+        internal_agents: 6,
+        experts: 6,
+        workflow_files: ['code_team_small_project.yaml'],
+      },
+      'social-account-control': {
+        name: '社交账号控制台',
+        internal_agents: 7,
+        experts: 7,
+        workflow_files: ['social_account_control_cycle.yaml'],
+      },
+      'hanlin-novel-studio': {
+        name: '翰林院小说创作局',
+        internal_agents: 6,
+        experts: 6,
+        workflow_files: ['hanlin_novel_studio.yaml'],
+      },
+      'ming-neige': {
+        name: '明朝内阁制',
+        internal_agents: 19,
+        experts: 19,
+        workflow_files: ['ming_neige_baseline.yaml', 'ming_neige_governance.yaml'],
+      },
+    };
+    const preset = presetMap[payload.preset_id] || presetMap['ming-neige'];
     return json(route, {
       ok: true,
       team: payload.team,
       preset: {
         preset_id: payload.preset_id,
-        name: payload.preset_id === 'hanlin-novel-studio' ? '翰林院小说创作局' : '明朝内阁制',
+        name: preset.name,
       },
-      internal_agents: payload.preset_id === 'hanlin-novel-studio' ? 6 : 19,
-      experts: payload.preset_id === 'hanlin-novel-studio' ? 6 : 19,
-      workflow_files:
-        payload.preset_id === 'hanlin-novel-studio'
-          ? ['hanlin_novel_studio.yaml']
-          : ['ming_neige_baseline.yaml', 'ming_neige_governance.yaml'],
+      internal_agents: preset.internal_agents,
+      experts: preset.experts,
+      workflow_files: preset.workflow_files,
     });
   });
   await page.route('**/api/discover_models', (route) => json(route, discoverModelsPayload));
@@ -1241,6 +1281,8 @@ test('studio builtin preset modal installs team presets', async ({ page }) => {
   });
 
   await expect.poll(() => calls.teamPresetList).toBe(1);
+  await expect(page.locator('#builtin-preset-list')).toContainText('Code Team');
+  await expect(page.locator('#builtin-preset-list')).toContainText('社交账号控制台');
   await expect(page.locator('#builtin-preset-list')).toContainText('明朝内阁制');
   await expect(page.locator('#builtin-preset-list')).toContainText('翰林院小说创作局');
 
@@ -1248,13 +1290,13 @@ test('studio builtin preset modal installs team presets', async ({ page }) => {
     const input = document.getElementById('builtin-preset-team-name');
     if (input) input.value = 'Smoke Preset Team';
     if (typeof window.installBuiltinTeamPreset === 'function') {
-      await window.installBuiltinTeamPreset('ming-neige');
+      await window.installBuiltinTeamPreset('code-team');
     }
   });
 
   await expect.poll(() => calls.teamPresetInstall.length).toBe(1);
   expect(calls.teamPresetInstall[0]).toMatchObject({
-    preset_id: 'ming-neige',
+    preset_id: 'code-team',
     team: 'Smoke Preset Team',
   });
   await expect.poll(() => page.evaluate(() => window.__openedBuiltinTeam)).toBe('Smoke Preset Team');

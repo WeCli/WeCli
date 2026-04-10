@@ -1,8 +1,12 @@
+import json
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
 from unittest import mock
+
+import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -464,6 +468,56 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(kwargs["user_id"], "integration-user")
             self.assertEqual(kwargs["team_name"], "现代企业制")
             self.assertEqual(kwargs["preset_id"], "modern-ceo")
+
+    def test_builtin_team_preset_routes_install_new_project_and_social_blueprints(self):
+        response = self.client.get("/api/team-presets")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        preset_ids = {item["preset_id"] for item in payload["presets"]}
+        self.assertEqual(len(payload["presets"]), 14)
+        self.assertTrue({"code-team", "social-account-control"} <= preset_ids)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.object(front, "root_dir", tmpdir):
+                code_response = self.client.post(
+                    "/api/team-presets/install",
+                    json={"preset_id": "code-team", "team": "Code 小项目队"},
+                )
+                social_response = self.client.post(
+                    "/api/team-presets/install",
+                    json={"preset_id": "social-account-control", "team": "社交账号控制台"},
+                )
+
+            self.assertEqual(code_response.status_code, 200)
+            self.assertEqual(social_response.status_code, 200)
+            self.assertTrue(code_response.get_json()["ok"])
+            self.assertTrue(social_response.get_json()["ok"])
+            self.assertEqual(code_response.get_json()["internal_agents"], 6)
+            self.assertEqual(social_response.get_json()["internal_agents"], 7)
+
+            code_team_dir = Path(tmpdir) / "data" / "user_files" / "integration-user" / "teams" / "Code 小项目队"
+            social_team_dir = Path(tmpdir) / "data" / "user_files" / "integration-user" / "teams" / "社交账号控制台"
+
+            self.assertTrue((code_team_dir / "wecli_preset_manifest.json").exists())
+            self.assertTrue((social_team_dir / "wecli_preset_manifest.json").exists())
+
+            code_agents = json.loads((code_team_dir / "internal_agents.json").read_text(encoding="utf-8"))
+            social_agents = json.loads((social_team_dir / "internal_agents.json").read_text(encoding="utf-8"))
+            self.assertTrue({"pm", "architect", "frontend", "backend", "qa", "devops"} <= {item["tag"] for item in code_agents})
+            self.assertTrue({"strategy", "content", "design", "operator", "community", "risk", "analytics"} <= {item["tag"] for item in social_agents})
+
+            code_workflow = yaml.safe_load(
+                (code_team_dir / "oasis" / "yaml" / "code_team_small_project.yaml").read_text(encoding="utf-8")
+            )
+            social_workflow = yaml.safe_load(
+                (social_team_dir / "oasis" / "yaml" / "social_account_control_cycle.yaml").read_text(encoding="utf-8")
+            )
+
+            code_edges = {tuple(edge) for edge in code_workflow["edges"]}
+            social_edges = {tuple(edge) for edge in social_workflow["edges"]}
+            self.assertTrue({("c3", "c5"), ("c4", "c5"), ("c5", "c6"), ("c6", "c7")} <= code_edges)
+            self.assertTrue({("s2", "s4"), ("s3", "s4"), ("s5", "s7"), ("s6", "s7")} <= social_edges)
 
     def test_proxy_webot_bridge_memory_and_buddy_controls_forward_payloads(self):
         with self.subTest("bridge attach"):
