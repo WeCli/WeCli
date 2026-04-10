@@ -633,8 +633,9 @@ class GroupService:
     ):
         """Send message to external agent and handle reply.
 
-        Private chat (<=2 members): reply is inserted directly into messages.
-        Group chat (>2 members): reply is logged only; agent uses CLI `groups send`.
+        Both private and group chats use push-only delivery for external agents.
+        ACP/HTTP synchronous replies are not auto-posted into the group; the
+        agent must use CLI `groups send` to publish visible messages.
         """
         # 标记正在输入
         self.set_typing(group_id, agent_name)
@@ -673,20 +674,13 @@ class GroupService:
             self.clear_typing(group_id, agent_name)
             return
 
-        # Private chat: insert reply directly so user sees it
-        # Group chat: don't auto-post, agent uses CLI tools to send messages
         members = await list_group_member_targets(self.group_db_path, group_id)
         is_private = len(members) <= 2
         if is_private:
-            import time as _time
-            logger.info("Private chat: agent %s replied: %s", agent_name, reply[:200] if reply else "")
-            await insert_group_message(
-                self.group_db_path,
-                group_id=group_id,
-                sender=agent_name,
-                sender_display=agent_name,
-                content=reply,
-                timestamp=_time.time(),
+            logger.info(
+                "Private chat: agent %s returned sync reply (ignored; waiting for push): %s",
+                agent_name,
+                reply[:200] if reply else "",
             )
         else:
             logger.info("Group chat: agent %s replied (not auto-posting): %s", agent_name, reply[:200] if reply else "")
@@ -753,7 +747,8 @@ class GroupService:
                               f"{human_user_hint}\n\n{_ext_rules}\n\n"
                               "请先 cd 到项目目录，然后使用 CLI 工具发送消息：\n"
                               f"{cli_hint}\n"
-                              "注意：不要在 ACP 响应中直接输出内容，系统不会自动发布你的回复。\n"
+                              "注意：不要在 ACP/HTTP 同步响应中直接输出回复正文；该同步响应会被系统忽略，不会显示给用户。\n"
+                              "你必须使用上面的 CLI `groups send` 主动推送消息，用户才能看到你的回复。\n"
                               "[end padding]\n[end padding]\n[end padding]")
             elif mentions and global_id in mentions:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} @你 说:\n"
@@ -761,7 +756,8 @@ class GroupService:
                               f"{human_user_hint}\n\n{_ext_rules}\n\n"
                               "请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
                               f"{cli_hint}\n"
-                              "注意：不要在 ACP 响应中直接输出群聊内容，系统不会自动发布你的回复。\n"
+                              "注意：不要在 ACP/HTTP 同步响应中直接输出群聊内容；该同步响应不会自动发布。\n"
+                              "你必须使用上面的 CLI `groups send` 主动推送消息，群里成员才能看到。\n"
                               "[end padding]\n[end padding]\n[end padding]")
             else:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} 说:\n"
@@ -772,7 +768,8 @@ class GroupService:
                     "💡 不要主动发起与当前话题无关的新讨论；回复时尽量 @ 具体对象，避免对全群广播。\n"
                     "如需回复，请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
                     f"{cli_hint}\n"
-                    "注意：不要在 ACP 响应中直接输出群聊内容，系统不会自动发布你的回复。\n"
+                    "注意：不要在 ACP/HTTP 同步响应中直接输出群聊内容；该同步响应不会自动发布。\n"
+                    "如需让群里看到你的回复，必须使用上面的 CLI `groups send` 主动推送。\n"
                     "[end padding]\n[end padding]\n[end padding]"
                 )
 

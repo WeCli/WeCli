@@ -2035,6 +2035,7 @@ header {
 .team-members-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
 }
 .team-members-table thead {
     background: #f3f4f6;
@@ -2054,12 +2055,28 @@ header {
     font-size: 13px;
     border-bottom: 1px solid #e5e7eb;
     color: #6b7280;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 .team-members-table tbody tr:hover {
     background: #f9fafb;
 }
 .team-members-table tbody tr:last-child td {
     border-bottom: none;
+}
+.team-member-cell {
+    min-width: 0;
+}
+.team-member-cell--mono {
+    font-family: monospace;
+    font-size: 12px;
+    color: #6b7280;
+}
+.team-member-cell--actions {
+    text-align: right;
+    white-space: nowrap;
+    width: 88px;
 }
 
 /* Agent配置模态框样式 */
@@ -2550,6 +2567,19 @@ header {
     line-height: 18px; text-align: center; cursor: pointer; display: none; z-index: 20;
 }
 .orch-node:hover .orch-node-del { display: block; }
+@media (max-width: 768px) {
+    .orch-node .orch-node-del {
+        display: block;
+        width: 24px;
+        height: 24px;
+        top: -10px;
+        right: -10px;
+        line-height: 24px;
+        font-size: 13px;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.28);
+        touch-action: manipulation;
+    }
+}
 
 /* 移动端添加节点闪烁动画 */
 @keyframes orch-flash {
@@ -3921,8 +3951,12 @@ body.session-panel-resizing * {
     border-radius: 8px;
     padding: 2px;
     flex-shrink: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 .oc-acp-tabs {
     display: inline-flex;
@@ -4046,6 +4080,10 @@ body.session-panel-resizing * {
 }
 @media (max-width: 768px) {
     .openclaw-chat-switcher { padding: 4px 8px; }
+    .oc-switcher-row-main { align-items: flex-start; }
+    .oc-switcher-tabs { width: 100%; }
+    .oc-acp-tabs { max-width: none; }
+    .oc-switcher-tab { flex-shrink: 0; }
     .oc-switcher-tab { padding: 4px 10px; font-size: 11px; }
     .oc-agent-select { max-width: 180px; font-size: 11px; }
 }

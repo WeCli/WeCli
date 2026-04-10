@@ -17,7 +17,9 @@ document.addEventListener('touchmove', function(e) {
     let el = e.target;
     while (el && el !== document.body) {
         const style = window.getComputedStyle(el);
-        if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+        const canScrollY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+        const canScrollX = (style.overflowX === 'auto' || style.overflowX === 'scroll') && el.scrollWidth > el.clientWidth;
+        if (canScrollY || canScrollX) {
             return; // Allow scroll inside this element
         }
         el = el.parentElement;

@@ -120,6 +120,7 @@ from integrations.openclaw_restore_naming import (
     openclaw_entries_ordered,
     restore_agent_id,
     restore_display_name,
+    restore_external_global_name,
 )
 
 _logger_oc_restore = get_logger("wecli.openclaw_restore")
@@ -5040,7 +5041,7 @@ def download_team_snapshot():
                             zipf.write(file_path, json_file)
                     elif json_file == "external_agents.json":
                         # Strip global_name field before packing — it will be
-                        # regenerated from team+name on restore.
+                        # regenerated on restore.
                         try:
                             with open(file_path, "r", encoding="utf-8") as _ef:
                                 ext_list = json.load(_ef)
@@ -5276,7 +5277,7 @@ def upload_team_snapshot():
         if agents_data:
             _ia_save(user_id, agents_data, team)
         
-        # After internal agents, also restore OpenClaw agents from external_agents.json
+        # After internal agents, restore runtime identifiers in external_agents.json.
         openclaw_agents_path = os.path.join(team_dir, "external_agents.json")
         openclaw_restored = 0
         openclaw_errors = []
@@ -5292,6 +5293,14 @@ def upload_team_snapshot():
                     openclaw_data = json.load(f)
                 
                 if isinstance(openclaw_data, list) and openclaw_data:
+                    external_ordered = [e for e in openclaw_data if isinstance(e, dict)]
+                    for agent_entry in external_ordered:
+                        if agent_entry.get("tag") == "openclaw":
+                            continue
+                        agent_entry["global_name"] = restore_external_global_name(
+                            team, agent_entry, external_ordered
+                        )
+
                     oc_ordered = openclaw_entries_ordered(openclaw_data)
                     for agent_entry in openclaw_data:
                         if agent_entry.get("tag") != "openclaw":

@@ -3659,7 +3659,7 @@ async function loadSessionList() {
                 <button class="session-edit" onclick="event.stopPropagation(); editAgentMeta('${s.session_id}')">✏️</button>
                 <button class="session-delete" onclick="event.stopPropagation(); deleteSession('${s.session_id}')">${t('delete_session')}</button>
             `;
-            div.onclick = () => switchToSession(s.session_id);
+            div.onclick = () => openAgentSession(s.session_id);
             if (!shouldShowSession(s.session_id)) {
                 div.style.display = 'none';
             }
@@ -3761,7 +3761,7 @@ async function refreshHistoryList() {
                     <button class="session-edit" onclick="event.stopPropagation(); editAgentMeta('${s.session_id}')">✏️</button>
                     <button class="session-delete" onclick="event.stopPropagation(); deleteSession('${s.session_id}')">${t('delete_session')}</button>
                 `;
-                div.onclick = () => switchToSession(s.session_id);
+                div.onclick = () => openAgentSession(s.session_id);
                 if (!shouldShowSession(s.session_id)) {
                     div.style.display = 'none';
                 }
@@ -3912,9 +3912,35 @@ async function deleteAllSessions() {
     }
 }
 
+async function openAgentSession(sessionId, options = {}) {
+    const targetSessionId = String(sessionId || '').trim();
+    if (!targetSessionId) return;
+
+    const force = options.force === true;
+    const quiet = options.quiet === true;
+    const closeSidebar = options.closeSidebar === true;
+    const sameSession = targetSessionId === currentSessionId;
+
+    if (currentPage !== 'chat') {
+        await switchPage('chat');
+    }
+
+    if (_ocChatMode !== 'internal') {
+        await ocSwitchTo('internal');
+    }
+
+    if (!force && sameSession && _ocChatMode === 'internal' && currentPage === 'chat') {
+        if (closeSidebar) closeSessionSidebar();
+        return;
+    }
+
+    await switchToSession(targetSessionId, force || sameSession, { quiet, closeSidebar });
+}
+
 async function switchToSession(sessionId, force = false, options = {}) {
     const quiet = options.quiet === true;
-    if (!force && sessionId === currentSessionId) { closeSessionSidebar(); return; }
+    const closeSidebar = options.closeSidebar === true;
+    if (!force && sessionId === currentSessionId) { if (closeSidebar) closeSessionSidebar(); return; }
     if (!quiet) showPageLoading();
     hideNewMsgBanner();
     // 切换前先重置按钮到 idle 状态（避免旧 session 的 streaming/busy 状态残留）
@@ -3928,7 +3954,7 @@ async function switchToSession(sessionId, force = false, options = {}) {
     personaInjectedSession = null;  // Reset persona injection flag for new session
     sessionStorage.setItem('sessionId', sessionId);
     updateSessionDisplay();
-    closeSessionSidebar();
+    if (closeSidebar) closeSessionSidebar();
 
     // ACP 模式：左侧会话只影响未命名时的 acpx 会话键与本地转写，不加载 WeBot 历史
     if (_ocChatMode === 'acp' && _acpTool) {
@@ -4120,7 +4146,7 @@ function ocInternalOnSessionPickChange() {
         return;
     }
     if (v === currentSessionId) return;
-    switchToSession(v);
+    openAgentSession(v);
 }
 
 async function ocInternalQuickNewSession() {
@@ -6517,7 +6543,17 @@ async function handleSend() {
     let fullText = '';
 
     try {
-        // --- 构造 workflow 前缀（隐藏在消息中发送给后端） ---
+        // --- 构造 workflow / persona 前缀（隐藏在消息中发送给后端） ---
+        let personaPrefix = '';
+        if (selectedPersona && selectedPersona.persona && personaInjectedSession !== currentSessionId) {
+            personaPrefix =
+                `【expert persona, apply it now】\n` +
+                `Name: ${selectedPersona.name || selectedPersona.tag || 'expert'}\n` +
+                `Tag: ${selectedPersona.tag || '(none)'}\n` +
+                `---\n${selectedPersona.persona}\n---\n`;
+            personaInjectedSession = currentSessionId;
+        }
+
         let workflowPrefix = '';
         for (const wf of workflowsToSend) {
             workflowPrefix += `【oasis workflow, use it now】\n` +
@@ -6525,7 +6561,7 @@ async function handleSend() {
                 `YAML Name: ${wf.name}\n` +
                 (wf.yaml ? `---\n${wf.yaml}\n---\n` : '');
         }
-        const fullText_to_send = workflowPrefix + text;
+        const fullText_to_send = personaPrefix + workflowPrefix + text;
 
         // --- 构造 OpenAI 格式的 content parts ---
         const contentParts = [];
@@ -6564,11 +6600,6 @@ async function handleSend() {
 
         // --- 构造 OpenAI /v1/chat/completions 请求 ---
         const messages = [];
-        // Inject expert persona as system message only on the first message in this session
-        if (selectedPersona && selectedPersona.persona && personaInjectedSession !== currentSessionId) {
-            messages.push({ role: 'system', content: `[Expert Persona: ${selectedPersona.name}]\n${selectedPersona.persona}` });
-            personaInjectedSession = currentSessionId;
-        }
         messages.push({ role: 'user', content: msgContent });
 
         // ── OpenClaw: /proxy_openclaw_chat · ACP (Codex/Claude/Gemini): /proxy_acpx_chat · else WeBot ──
@@ -10260,6 +10291,9 @@ async function loadTeamMembers() {
             const deleteTitle = (m.tag === 'openclaw' && !canDeleteOpenClawAgent(m.global_name || ''))
                 ? '从团队移除（main 不会被真实删除）'
                 : '删除成员';
+            const safeName = escapeHtml(m.name || '-');
+            const safeTag = escapeHtml(m.tag || '-');
+            const safeGlobalName = escapeHtml(m.global_name || '-');
             
             // For openclaw type, use the full orchestration config modal (files/tools/channels)
             const configBtn = m.tag === 'openclaw'
@@ -10268,11 +10302,11 @@ async function loadTeamMembers() {
             
             return `
                 <tr>
-                    <td class="font-medium text-gray-800">${escapeHtml(m.name)}</td>
+                    <td class="team-member-cell font-medium text-gray-800" title="${safeName}">${safeName}</td>
                     <td>${typeBadge}</td>
-                    <td>${escapeHtml(m.tag || '-')}</td>
-                    <td class="font-mono text-xs text-gray-500">${escapeHtml(m.global_name || '-')}</td>
-                    <td style="text-align:right;">
+                    <td class="team-member-cell" title="${safeTag}">${safeTag}</td>
+                    <td class="team-member-cell team-member-cell--mono" title="${safeGlobalName}">${safeGlobalName}</td>
+                    <td class="team-member-cell team-member-cell--actions">
                         ${configBtn}
                         <button onclick="deleteTeamMember('${m.type}', '${escapeHtml(m.global_name)}', '${escapeHtml(m.name)}', '${escapeHtml(m.tag || '')}')" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50" title="${deleteTitle}">🗑️</button>
                     </td>
@@ -10717,6 +10751,24 @@ async function uploadTeam(input) {
 // ── Import team dropdown & Hub import ──
 const TEAM_HUB_URL = 'https://wecli.net';
 
+function _buildWeCliHubReturnUrl() {
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('hub_download_url');
+        url.searchParams.delete('team_name');
+        return url.toString();
+    } catch (_) {
+        return window.location.origin + window.location.pathname;
+    }
+}
+
+function _buildWeCliHubUrl() {
+    const url = new URL(TEAM_HUB_URL);
+    url.searchParams.set('return_url', _buildWeCliHubReturnUrl());
+    url.searchParams.set('return_origin', window.location.origin);
+    return url.toString();
+}
+
 function toggleImportDropdown() {
     const dd = document.getElementById('import-dropdown');
     if (dd.style.display === 'none' || !dd.style.display) {
@@ -10749,7 +10801,10 @@ function showHubImportModal() {
 }
 
 function openWecliHub() {
-    window.open(TEAM_HUB_URL, '_blank');
+    const popup = window.open(_buildWeCliHubUrl(), '_blank');
+    if (!popup) {
+        window.location.assign(_buildWeCliHubUrl());
+    }
 }
 
 function closeHubImportModal() {
@@ -10888,6 +10943,58 @@ function _parseHubInput(raw) {
     return { url, teamName };
 }
 
+async function _performHubImportFromUrl(url, teamName, options = {}) {
+    const { silent = false, closeModal = false } = options;
+    const resp = await fetch('/teams/snapshot/import_from_url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, team: teamName })
+    });
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || resp.statusText || 'import failed');
+    }
+    if (closeModal) {
+        closeHubImportModal();
+    }
+    if (!silent) {
+        alert('✅ 导入成功！');
+    }
+    loadGroupList();
+}
+
+function _fillHubImportInput(raw) {
+    const input = document.getElementById('hub-curl-input');
+    if (input) input.value = raw;
+}
+
+function _handleHubImportMessage(data) {
+    if (!data || data.type !== 'wecli_hub_import') return false;
+    const hubUrl = String(data.hub_download_url || '').trim();
+    if (!hubUrl) return false;
+    _fillHubImportInput(hubUrl);
+    showHubImportModal();
+    return true;
+}
+
+async function _consumeHubReturnParams() {
+    try {
+        const params = new URLSearchParams(window.location.search || '');
+        const hubUrl = (params.get('hub_download_url') || '').trim();
+        if (!hubUrl) return;
+
+        _fillHubImportInput(hubUrl);
+        showHubImportModal();
+
+        params.delete('hub_download_url');
+        params.delete('team_name');
+        const next = window.location.pathname + (params.toString() ? ('?' + params.toString()) : '') + window.location.hash;
+        window.history.replaceState({}, '', next);
+    } catch (e) {
+        console.warn('Consume hub return params failed:', e && e.message);
+    }
+}
+
 async function importFromHub() {
     const raw = document.getElementById('hub-curl-input').value;
     if (!raw.trim()) {
@@ -10911,23 +11018,28 @@ async function importFromHub() {
     if (!confirm(`将从 Hub 下载并导入团队 "${finalTeam}"，确定继续吗？`)) return;
 
     try {
-        const resp = await fetch('/teams/snapshot/import_from_url', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, team: finalTeam })
-        });
-        if (!resp.ok) {
-            const err = await resp.json().catch(() => ({}));
-            alert('导入失败: ' + (err.error || resp.statusText));
-            return;
-        }
-        alert('✅ 导入成功！');
-        closeHubImportModal();
-        loadGroupList();
+        await _performHubImportFromUrl(url, finalTeam, { closeModal: true });
     } catch (e) {
         alert('导入失败: ' + e.message);
     }
 }
+
+window.addEventListener('load', () => {
+    _consumeHubReturnParams().catch((e) => {
+        console.warn('Hub return import bootstrap failed:', e && e.message);
+    });
+});
+
+window.addEventListener('message', (event) => {
+    try {
+        if (event.origin !== new URL(TEAM_HUB_URL).origin) return;
+        if (_handleHubImportMessage(event.data)) {
+            try { window.focus(); } catch (_) {}
+        }
+    } catch (e) {
+        console.warn('Hub import message failed:', e && e.message);
+    }
+});
 
 // Track ongoing deletion to prevent double-clicks
 let _deletingTeamMember = false;
@@ -11100,7 +11212,7 @@ function showAddTeamMemberModal() {
     overlay.className = 'orch-modal-overlay';
     overlay.id = 'add-team-member-overlay';
     overlay.innerHTML = `
-        <div class="orch-modal" style="min-width:380px;max-width:460px;">
+        <div class="orch-modal" style="width:min(560px, 92vw);max-width:92vw;max-height:min(88vh, 820px);overflow:auto;">
             <h3>➕ 添加成员</h3>
             
             <div style="display:flex;gap:6px;margin-bottom:12px;">
@@ -11167,13 +11279,13 @@ function showAddTeamMemberModal() {
                     </label>
                     <label id="add-ext-url-label" style="font-size:11px;color:#6b7280;margin-bottom:2px;margin-top:8px;display:block;" data-i18n="group_ext_url_optional">API URL（可选）</label>
                     <div id="add-ext-url-hint" style="font-size:10px;color:#9ca3af;margin:-4px 0 4px;line-height:1.35;" data-i18n="group_ext_url_hint_generic"></div>
-                    <input id="add-ext-url" type="text" placeholder="https://api.example.com/v1" style="font-family:monospace;font-size:12px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">
+                    <input id="add-ext-url" type="text" placeholder="https://api.example.com/v1" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
                     <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">API Key</label>
-                    <input id="add-ext-key" type="text" placeholder="sk-xxx (optional)" style="font-family:monospace;font-size:12px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">
+                    <input id="add-ext-key" type="text" placeholder="sk-xxx (optional)" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
                     <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">Model</label>
-                    <input id="add-ext-model" type="text" placeholder="gpt-4 / deepseek-chat (optional)" style="font-family:monospace;font-size:12px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">
+                    <input id="add-ext-model" type="text" placeholder="gpt-4 / deepseek-chat (optional)" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
                     <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">Headers (JSON)</label>
-                    <textarea id="add-ext-headers" placeholder='{"X-Custom": "value"}' style="font-family:monospace;font-size:11px;min-height:60px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;"></textarea>
+                    <textarea id="add-ext-headers" placeholder='{"X-Custom": "value"}' style="font-family:monospace;font-size:11px;min-height:60px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;box-sizing:border-box;"></textarea>
                 </div>
                 <div class="orch-modal-btns" style="margin-top:12px;">
                     <button onclick="document.getElementById('add-team-member-overlay').remove()" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;cursor:pointer;font-size:12px;">取消</button>
@@ -11687,13 +11799,13 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
     // External Agent form fields (like orchestration page)
     const externalForm = type === 'external' ? `
         <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">API URL *</label>
-        <input id="config-ext-url" type="text" value="${escapeHtml(api_url || '')}" placeholder="https://api.example.com/v1" style="font-family:monospace;font-size:12px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">
+        <input id="config-ext-url" type="text" value="${escapeHtml(api_url || '')}" placeholder="https://api.example.com/v1" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
         <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">API Key</label>
-        <input id="config-ext-key" type="text" value="${escapeHtml(api_key || '')}" placeholder="sk-xxx (optional)" style="font-family:monospace;font-size:12px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">
+        <input id="config-ext-key" type="text" value="${escapeHtml(api_key || '')}" placeholder="sk-xxx (optional)" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
         <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">Model</label>
-        <input id="config-ext-model" type="text" value="${escapeHtml(model || '')}" placeholder="gpt-4 / deepseek-chat (optional)" style="font-family:monospace;font-size:12px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">
+        <input id="config-ext-model" type="text" value="${escapeHtml(model || '')}" placeholder="gpt-4 / deepseek-chat (optional)" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
         <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">Headers (JSON)</label>
-        <textarea id="config-ext-headers" placeholder='{"X-Custom": "value"}' style="font-family:monospace;font-size:11px;min-height:60px;width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;">${escapeHtml(typeof headers === 'object' ? JSON.stringify(headers, null, 2) : headers || '')}</textarea>
+        <textarea id="config-ext-headers" placeholder='{"X-Custom": "value"}' style="font-family:monospace;font-size:11px;min-height:60px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;box-sizing:border-box;">${escapeHtml(typeof headers === 'object' ? JSON.stringify(headers, null, 2) : headers || '')}</textarea>
     ` : '';
     
     // Oasis Agent tag section
@@ -11708,7 +11820,7 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
     ` : '';
     
     overlay.innerHTML = `
-        <div class="orch-modal" style="min-width:380px;max-width:460px;">
+        <div class="orch-modal" style="width:min(560px, 92vw);max-width:92vw;max-height:min(88vh, 820px);overflow:auto;">
             <h3>⚙️ ${type === 'external' ? '🌐 ' : ''}配置成员 — ${typeLabel}</h3>
             <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0;">
                 <label style="font-size:11px;font-weight:600;color:#374151;">类型</label>
@@ -11721,7 +11833,7 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
                 ${externalForm}
                 
                 <label style="font-size:11px;font-weight:600;color:#374151;">Global Name</label>
-                <input id="config-agent-global-name" type="text" value="${globalName}" disabled style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;background:#f3f4f6;cursor:not-allowed;color:#9ca3af;">
+                <input id="config-agent-global-name" type="text" value="${escapeHtml(globalName)}" disabled style="width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;background:#f3f4f6;cursor:not-allowed;color:#9ca3af;box-sizing:border-box;">
             </div>
             <div class="orch-modal-btns">
                 <button id="config-cancel" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;cursor:pointer;font-size:12px;">取消</button>
@@ -11787,11 +11899,24 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
         }
         
         try {
-            const url = `/internal_agents/${encodeURIComponent(globalName)}?team=${encodeURIComponent(currentGroupId)}`;
+            const url = type === 'external'
+                ? `/teams/${encodeURIComponent(currentGroupId)}/members/external`
+                : `/internal_agents/${encodeURIComponent(globalName)}?team=${encodeURIComponent(currentGroupId)}`;
+            const body = type === 'external'
+                ? {
+                    global_name: globalName,
+                    new_name: newName,
+                    new_tag: tag || '',
+                    api_url: meta.api_url,
+                    api_key: meta.api_key,
+                    model: meta.model,
+                    headers: meta.headers
+                }
+                : { meta };
             const resp = await fetch(url, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ meta })
+                body: JSON.stringify(body)
             });
             
             if (!resp.ok) {

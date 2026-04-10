@@ -248,6 +248,121 @@ def ensure_openclaw_gateway_running():
         print(f"   ⚠️ OpenClaw 已安装，但启动预热失败: {exc}")
 
 
+def _command_output(args):
+    try:
+        result = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+        return result.returncode, result.stdout or ""
+    except Exception:
+        return -1, ""
+
+
+def is_port_listening(port):
+    port = str(port)
+
+    if sys.platform == "win32":
+        code, output = _command_output(["netstat", "-ano", "-p", "tcp"])
+        if code == 0:
+            target = f":{port}"
+            for line in output.splitlines():
+                upper = line.upper()
+                if target in line and "LISTENING" in upper:
+                    return True
+        return False
+
+    code, output = _command_output(["ss", "-ltn"])
+    if code == 0:
+        target = f":{port}"
+        for line in output.splitlines():
+            if target in line:
+                return True
+
+    code, output = _command_output(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"])
+    if code == 0 and output.strip():
+        return True
+
+    code, output = _command_output(["netstat", "-ltn"])
+    if code == 0:
+        target = f":{port}"
+        for line in output.splitlines():
+            if target in line:
+                return True
+
+    return False
+
+
+def wait_for_service_ready(
+    proc,
+    port,
+    label,
+    timeout=20.0,
+    poll_interval=0.2,
+):
+    deadline = time.monotonic() + timeout
+    last_error = None
+
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(
+                f"{label} 在端口 {port} 就绪前已退出（exit code {proc.returncode}）"
+            )
+
+        try:
+            if is_port_listening(port):
+                return
+        except Exception as exc:
+            last_error = exc
+        else:
+            last_error = None
+
+        time.sleep(poll_interval)
+
+    if proc.poll() is not None:
+        raise RuntimeError(
+            f"{label} 在端口 {port} 就绪前已退出（exit code {proc.returncode}）"
+        )
+
+    detail = f": {last_error}" if last_error else ""
+    raise TimeoutError(f"{label} 在 {timeout:.1f}s 内未监听端口 {port}{detail}")
+
+
+def start_service(service):
+    print(service["message"])
+    proc = subprocess.Popen(
+        [venv_python, service["script"]],
+        cwd=PROJECT_ROOT,
+        stdin=subprocess.DEVNULL,
+        stdout=None,
+        stderr=None,
+    )
+    child_procs.append(proc)
+    service["proc"] = proc
+    return proc
+
+
+def wait_for_started_services(services):
+    for service in services:
+        wait_for_service_ready(
+            proc=service["proc"],
+            port=service["port"],
+            label=service["label"],
+            timeout=service.get("timeout", 20.0),
+        )
+        print(f"   ✅ {service['label']} 已就绪 (port {service['port']})")
+
+
+def launch_services(services):
+    for service in services:
+        start_service(service)
+
+    wait_for_started_services(services)
+
+
 # 注册退出清理函数
 atexit.register(cleanup)
 
@@ -293,11 +408,29 @@ if not os.getenv("INTERNAL_TOKEN"):
 
 ensure_openclaw_gateway_running()
 
-# 服务配置列表：(显示信息, 脚本路径, 启动后等待秒数)
+# 服务配置列表
 services = [
-    (f"⏰ [1/5] 启动定时调度中心 (port {PORT_SCHEDULER})...", "src/utils/scheduler_service.py", 2),
-    (f"🏛️ [2/5] 启动 OASIS 论坛服务 (port {PORT_OASIS})...", "oasis/server.py", 2),
-    (f"🤖 [3/5] 启动 AI Agent (port {PORT_AGENT})...", "src/mainagent.py", 3),
+    {
+        "message": f"⏰ [1/5] 启动定时调度中心 (port {PORT_SCHEDULER})...",
+        "label": "定时调度中心",
+        "script": "src/utils/scheduler_service.py",
+        "port": PORT_SCHEDULER,
+        "timeout": 15.0,
+    },
+    {
+        "message": f"🏛️ [2/5] 启动 OASIS 论坛服务 (port {PORT_OASIS})...",
+        "label": "OASIS 论坛服务",
+        "script": "oasis/server.py",
+        "port": PORT_OASIS,
+        "timeout": 20.0,
+    },
+    {
+        "message": f"🤖 [3/5] 启动 AI Agent (port {PORT_AGENT})...",
+        "label": "AI Agent",
+        "script": "src/mainagent.py",
+        "port": PORT_AGENT,
+        "timeout": 25.0,
+    },
 ]
 
 # Chatbot 启动（可选组件）
@@ -311,22 +444,28 @@ if os.path.exists(chatbot_setup):
         print(f"💬 [4/5] 启动聊天机器人...")
         chatbot_dir = os.path.join(PROJECT_ROOT, "chatbot")
         subprocess.run([venv_python, "setup.py"], cwd=chatbot_dir)
-    services.append((f"🌐 [5/5] 启动前端 Web UI (port {PORT_FRONTEND})...", "src/front.py", 1))
+    services.append(
+        {
+            "message": f"🌐 [5/5] 启动前端 Web UI (port {PORT_FRONTEND})...",
+            "label": "前端 Web UI",
+            "script": "src/front.py",
+            "port": PORT_FRONTEND,
+            "timeout": 20.0,
+        }
+    )
 else:
-    services.append((f"🌐 [4/4] 启动前端 Web UI (port {PORT_FRONTEND})...", "src/front.py", 1))
+    services.append(
+        {
+            "message": f"🌐 [4/4] 启动前端 Web UI (port {PORT_FRONTEND})...",
+            "label": "前端 Web UI",
+            "script": "src/front.py",
+            "port": PORT_FRONTEND,
+            "timeout": 20.0,
+        }
+    )
 
 # 启动所有服务
-for msg, script, wait_time in services:
-    print(msg)
-    proc = subprocess.Popen(
-        [venv_python, script],
-        cwd=PROJECT_ROOT,
-        stdin=subprocess.DEVNULL,  # 防止子进程读取 stdin 导致阻塞
-        stdout=None,  # 继承父进程的 stdout
-        stderr=None,  # 继承父进程的 stderr
-    )
-    child_procs.append(proc)
-    time.sleep(wait_time)
+launch_services(services)
 
 print()
 print("============================================")
@@ -403,17 +542,7 @@ try:
             child_procs.clear()
             cleanup_done = False
             print()
-            for msg, script, wait_time in services:
-                print(msg)
-                proc = subprocess.Popen(
-                    [venv_python, script],
-                    cwd=PROJECT_ROOT,
-                    stdin=subprocess.DEVNULL,
-                    stdout=None,
-                    stderr=None,
-                )
-                child_procs.append(proc)
-                time.sleep(wait_time)
+            launch_services(services)
             print()
             print("✅ 所有服务已重启！")
             print()

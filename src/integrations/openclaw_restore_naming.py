@@ -22,6 +22,18 @@ def team_slug_ascii(team: str) -> str:
     return slug[:48]
 
 
+def name_slug_ascii(name: str) -> str:
+    """成员名小写，只保留 a-z0-9；若为空则回退到 agent + 数字后缀。"""
+    s = (name or "").strip().lower()
+    slug = re.sub(r"[^a-z0-9]+", "", s)
+    if not slug:
+        h = abs(hash(name)) % 900_000 + 100_000
+        slug = f"agent{h}"
+    if slug[0].isdigit():
+        slug = "a" + slug
+    return slug[:32]
+
+
 def openclaw_entries_ordered(entries: list) -> list:
     """团队中 openclaw 成员按列表顺序（与 JSON 一致）。"""
     return [e for e in entries if isinstance(e, dict) and e.get("tag") == "openclaw"]
@@ -47,3 +59,22 @@ def restore_display_name(team: str, short_name: str) -> str:
     if t and sn:
         return f"{t}_{sn}"
     return sn or t or "agent"
+
+
+def restore_external_global_name(team: str, entry: dict, external_ordered: list) -> str:
+    """为非 OpenClaw 外部 agent 生成稳定 ASCII global_name。"""
+    team_slug = team_slug_ascii(team)
+    base = f"{team_slug}_{name_slug_ascii(entry.get('name', ''))}"
+
+    same_name_entries = [
+        e for e in external_ordered
+        if isinstance(e, dict) and (e.get("name", "") or "").strip() == (entry.get("name", "") or "").strip()
+    ]
+    try:
+        dup_idx = same_name_entries.index(entry) + 1
+    except ValueError:
+        dup_idx = 1
+
+    if len(same_name_entries) > 1:
+        return f"{base}_{dup_idx}"
+    return base

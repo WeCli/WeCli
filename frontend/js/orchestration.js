@@ -2281,7 +2281,14 @@ function orchRenderNode(node) {
         <div class="orch-node-status ${status}">
         ${selectorBadgeHtml}
     `;
-    el.querySelector('.orch-node-del').addEventListener('click', e => { e.stopPropagation(); orchRemoveNode(node.id); });
+    const delBtn = el.querySelector('.orch-node-del');
+    const handleDeleteNode = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        orchRemoveNode(node.id);
+    };
+    delBtn.addEventListener('click', handleDeleteNode);
+    delBtn.addEventListener('touchend', handleDeleteNode, { passive: false });
 
     el.addEventListener('mousedown', e => {
         if (e.target.classList.contains('orch-port') || e.target.classList.contains('orch-node-del')) return;
