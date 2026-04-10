@@ -11228,16 +11228,21 @@ function showAddTeamMemberModal() {
                         <input id="add-oasis-name" type="text" placeholder="输入Agent名称" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;">
                     </label>
                     <label style="font-size:11px;font-weight:600;color:#374151;">标签 (Tag)
-                        <select id="add-oasis-tag" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;background:white;">
-                            <option value="">(无标签)</option>
-                        </select>
+                        <input id="add-oasis-tag" type="hidden" value="">
+                        <button type="button" id="add-oasis-tag-toggle" class="add-oasis-tag-toggle" onclick="toggleAddOasisTagList()">
+                            <span id="add-oasis-tag-summary" class="add-oasis-tag-summary">加载中...</span>
+                            <span id="add-oasis-tag-arrow" class="add-oasis-tag-arrow">▾</span>
+                        </button>
+                        <div id="add-oasis-tag-list" class="add-oasis-tag-list" style="margin-top:6px;display:none;">
+                            <div class="add-oasis-tag-empty">加载中...</div>
+                        </div>
                     </label>
                     <label style="font-size:11px;font-weight:600;color:#374151;">工具 (Tools)
-                        <div style="display:flex;gap:4px;margin:4px 0;">
+                        <div class="add-oasis-tools-actions" style="display:flex;gap:4px;margin:4px 0;">
                             <button type="button" onclick="document.querySelectorAll('.add-oasis-tool-cb').forEach(c=>c.checked=true)" style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#f0fdf4;color:#16a34a;cursor:pointer;">全选</button>
                             <button type="button" onclick="document.querySelectorAll('.add-oasis-tool-cb').forEach(c=>c.checked=false)" style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer;">全不选</button>
                         </div>
-                        <div id="add-oasis-tools-container" style="max-height:120px;overflow-y:auto;border:1px solid #d1d5db;border-radius:6px;padding:6px;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;">
+                        <div id="add-oasis-tools-container" class="add-oasis-tools-container" style="max-height:120px;overflow-y:auto;border:1px solid #d1d5db;border-radius:6px;padding:6px;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;">
                             <span style="color:#9ca3af;font-size:11px;">加载中...</span>
                         </div>
                     </label>
@@ -11342,25 +11347,24 @@ function showAddTeamMemberModal() {
     // Load expert tags for Oasis Agent select options
     (async () => {
         try {
-            const r = await fetch('/proxy_visual/experts');
+            const teamExpertsUrl = currentGroupId
+                ? `/proxy_visual/experts?team=${encodeURIComponent(currentGroupId)}`
+                : '/proxy_visual/experts';
+            const r = await fetch(teamExpertsUrl);
             const experts = await r.json();
-            const tags = [...new Set(experts.map(e => e.tag).filter(Boolean))];
-            const options = '<option value="">(无标签)</option>' +
-                tags.map(t => `<option value="${t}">${t}</option>`).join('');
-            
-            const oasisTagSelect = document.getElementById('add-oasis-tag');
-            if (oasisTagSelect) oasisTagSelect.innerHTML = options;
+            renderAddOasisTagOptions(Array.isArray(experts) ? experts : [], '');
         } catch (e) {
             console.warn('Failed to load expert tags', e);
+            renderAddOasisTagOptions([], '');
         }
 
         // Populate tools checkboxes for Oasis Agent
         const toolsContainer = document.getElementById('add-oasis-tools-container');
         if (toolsContainer && allTools.length > 0) {
             toolsContainer.innerHTML = allTools.map(t =>
-                `<label style="display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 5px;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;background:#f9fafb;white-space:nowrap;" title="${escapeHtml(t.description || '')}">
-                    <input type="checkbox" class="add-oasis-tool-cb" value="${escapeHtml(t.name)}" checked style="margin:0;">
-                    ${escapeHtml(t.name)}
+                `<label class="add-oasis-tool-chip" title="${escapeHtml(t.description || '')}">
+                    <input type="checkbox" class="add-oasis-tool-cb" value="${escapeHtml(t.name)}" checked>
+                    <span class="add-oasis-tool-name">${escapeHtml(t.name)}</span>
                 </label>`
             ).join('');
         } else if (toolsContainer) {
@@ -11390,8 +11394,7 @@ function showAddTeamMemberModal() {
             try {
                 const data = JSON.parse(e.dataTransfer.getData('application/json'));
                 if (data.tag && data.tag !== 'manual' && data.tag !== 'conditional') {
-                    const tagSelect = document.getElementById('add-oasis-tag');
-                    tagSelect.value = data.tag;
+                    selectAddOasisTag(data.tag);
                     dropZone.innerHTML = '✅ Tag: <b>' + escapeHtml(data.tag) + '</b> (' + escapeHtml(data.name || '') + ')';
                     dropZone.style.borderColor = '#2563eb';
                     dropZone.style.color = '#374151';
@@ -11479,6 +11482,94 @@ function showAddTeamMemberModal() {
             overlay.remove();
         }
     });
+}
+
+let addOasisTagOptions = [];
+
+function renderAddOasisTagOptions(experts, selectedTag) {
+    const list = document.getElementById('add-oasis-tag-list');
+    const input = document.getElementById('add-oasis-tag');
+    if (!list || !input) return;
+
+    const seen = new Set();
+    addOasisTagOptions = (Array.isArray(experts) ? experts : [])
+        .filter(exp => exp && exp.tag)
+        .filter(exp => {
+            if (seen.has(exp.tag)) return false;
+            seen.add(exp.tag);
+            return true;
+        })
+        .map(exp => {
+            const displayName = exp.name_zh || exp.name_en || exp.name || exp.tag;
+            const avatar = exp.emoji || getExpertAvatar(displayName || exp.tag).icon || '🤖';
+            return {
+                tag: exp.tag,
+                avatar,
+                title: exp.tag,
+                meta: displayName
+            };
+        });
+
+    const activeTag = addOasisTagOptions.some(opt => opt.tag === selectedTag)
+        ? selectedTag
+        : '';
+    input.value = activeTag;
+
+    if (!addOasisTagOptions.length) {
+        updateAddOasisTagSummary('');
+        list.innerHTML = '<div class="add-oasis-tag-empty">当前 team 没有可用标签</div>';
+        return;
+    }
+
+    updateAddOasisTagSummary(activeTag);
+    list.innerHTML = addOasisTagOptions.map(opt => {
+        const safeTag = String(opt.tag || '').replace(/'/g, "\\'");
+        const selected = activeTag === opt.tag ? ' selected' : '';
+        return `
+            <button type="button" class="add-oasis-tag-option${selected}" data-tag="${escapeHtml(opt.tag)}" onclick="selectAddOasisTag('${safeTag}')">
+                <span class="add-oasis-tag-avatar">${escapeHtml(opt.avatar)}</span>
+                <span class="add-oasis-tag-content">
+                    <span class="add-oasis-tag-name">${escapeHtml(opt.title)}</span>
+                    <span class="add-oasis-tag-meta">${escapeHtml(opt.meta)}</span>
+                </span>
+            </button>
+        `;
+    }).join('');
+}
+
+function selectAddOasisTag(tag) {
+    const input = document.getElementById('add-oasis-tag');
+    const list = document.getElementById('add-oasis-tag-list');
+    if (!input || !list) return;
+    input.value = input.value === tag ? '' : tag;
+    const selectedTag = input.value;
+    updateAddOasisTagSummary(selectedTag);
+    list.querySelectorAll('.add-oasis-tag-option').forEach((el) => {
+        el.classList.toggle('selected', (el.dataset.tag || '') === selectedTag && selectedTag !== '');
+    });
+    toggleAddOasisTagList(false);
+}
+
+function updateAddOasisTagSummary(selectedTag) {
+    const summary = document.getElementById('add-oasis-tag-summary');
+    if (!summary) return;
+    if (!addOasisTagOptions.length) {
+        summary.textContent = '当前 team 没有可用标签';
+        return;
+    }
+    const picked = addOasisTagOptions.find(opt => opt.tag === selectedTag);
+    summary.textContent = picked
+        ? `${picked.avatar} ${picked.title} · ${picked.meta}`
+        : '选择 team 内额外人设标签';
+}
+
+function toggleAddOasisTagList(forceOpen) {
+    const list = document.getElementById('add-oasis-tag-list');
+    const arrow = document.getElementById('add-oasis-tag-arrow');
+    if (!list || !arrow) return;
+    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : list.style.display === 'none';
+    list.style.display = shouldOpen ? 'flex' : 'none';
+    arrow.classList.toggle('open', shouldOpen);
 }
 
 function switchAddMemberTab(tab) {

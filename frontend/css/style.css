@@ -259,6 +259,131 @@ header {
 .tool-toggle-btn:hover { color: #2563eb; }
 .tool-toggle-icon { display: inline-block; transition: transform 0.3s ease; }
 .tool-toggle-icon.open { transform: rotate(180deg); }
+.add-oasis-tools-container { align-items: flex-start; }
+.add-oasis-tool-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: pointer;
+    background: #f9fafb;
+    color: #374151;
+    font-size: 10px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.add-oasis-tool-chip .add-oasis-tool-cb {
+    margin: 0;
+    flex: 0 0 auto;
+}
+.add-oasis-tool-name {
+    display: inline-block;
+    line-height: 1.2;
+}
+.add-oasis-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.add-oasis-tag-toggle {
+    width: 100%;
+    margin-top: 6px;
+    padding: 9px 11px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: #334155;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+.add-oasis-tag-summary {
+    min-width: 0;
+    font-size: 12px;
+    line-height: 1.35;
+    color: #475569;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.add-oasis-tag-arrow {
+    flex: 0 0 auto;
+    color: #64748b;
+    transition: transform 0.15s ease;
+}
+.add-oasis-tag-arrow.open {
+    transform: rotate(180deg);
+}
+.add-oasis-tag-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    width: calc(50% - 4px);
+    min-height: 52px;
+    padding: 8px 10px;
+    border: 1px solid #dbe3ee;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: #334155;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.add-oasis-tag-option:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.10);
+}
+.add-oasis-tag-option.selected {
+    border-color: #2563eb;
+    background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    box-shadow: 0 8px 22px rgba(37, 99, 235, 0.16);
+}
+.add-oasis-tag-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    color: #fff;
+    font-size: 18px;
+    flex: 0 0 auto;
+}
+.add-oasis-tag-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.add-oasis-tag-name {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #1e293b;
+    word-break: break-word;
+}
+.add-oasis-tag-meta {
+    margin-top: 2px;
+    font-size: 10px;
+    color: #64748b;
+    line-height: 1.35;
+    word-break: break-word;
+}
+.add-oasis-tag-empty {
+    width: 100%;
+    padding: 12px;
+    border: 1px dashed #d1d5db;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #94a3b8;
+    font-size: 11px;
+    text-align: center;
+}
 
 /* OASIS Panel Styles */
 .oasis-panel {
@@ -3351,6 +3476,48 @@ body.session-panel-resizing * {
     .message-content p, .message-content li { font-size: 16px !important; }
     #message-input, #message-input::placeholder { font-size: 16px !important; }
     .tool-tag { font-size: 14px !important; padding: 6px 12px !important; }
+    .add-oasis-tools-actions { flex-wrap: wrap; gap: 6px !important; }
+    .add-oasis-tools-container { gap: 6px !important; padding: 8px !important; }
+    .add-oasis-tool-chip {
+        width: calc(50% - 3px);
+        min-height: 34px;
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.25;
+        white-space: normal;
+        box-sizing: border-box;
+    }
+    .add-oasis-tool-chip .add-oasis-tool-cb {
+        width: 14px;
+        height: 14px;
+        margin-top: 1px;
+    }
+    .add-oasis-tool-name {
+        min-width: 0;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        line-height: 1.25;
+    }
+    .add-oasis-tag-option {
+        width: 100%;
+        min-height: 56px;
+        padding: 10px 12px;
+    }
+    .add-oasis-tag-summary {
+        font-size: 13px;
+    }
+    .add-oasis-tag-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 19px;
+    }
+    .add-oasis-tag-name {
+        font-size: 13px;
+    }
+    .add-oasis-tag-meta {
+        font-size: 11px;
+    }
 }
 /* Hide mobile-only elements on desktop */
 @media (min-width: 769px) {
@@ -3728,6 +3895,9 @@ body.session-panel-resizing * {
 }
 .page-loading-spinner {
     display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.page-loading-spinner:empty {
+    display: none;
 }
 .page-loading-dots {
     display: flex; gap: 6px;
