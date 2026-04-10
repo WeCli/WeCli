@@ -126,11 +126,11 @@ def install_team_preset(
     for filename, contents in bundle["workflows"].items():
         (workflow_dir / filename).write_text(contents, encoding="utf-8")
 
-    (team_dir / "wecli_preset_manifest.json").write_text(
+    (team_dir / "clawcross_preset_manifest.json").write_text(
         json.dumps(bundle["manifest"], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
-    (team_dir / "wecli_preset_source_map.json").write_text(
+    (team_dir / "clawcross_preset_source_map.json").write_text(
         json.dumps(bundle["source_map"], ensure_ascii=False, indent=2),
         encoding="utf-8",
     )

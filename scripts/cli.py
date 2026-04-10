@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Wecli CLI — 命令行控制工具
+Clawcross CLI — 命令行控制工具
 
 功能：
 - 像人操作前端一样，通过命令行控制 Agent 的各项功能
@@ -2491,12 +2491,12 @@ def cmd_status(args):
     print(f"     LLM_MODEL     = {llm_model or '(未设置)'}")
 
     if api_key_ok:
-        print(f"\n  🤖 Wecli 轻量级 Agent：可用")
+        print(f"\n  🤖 Clawcross 轻量级 Agent：可用")
         print(f"     基于 LLM API 驱动的内置 Agent，无需额外安装")
         print(f"     支持: 对话 / 工具调用 / 多轮推理")
     else:
         print(f"\n  ⚠️  API Key 未配置 → 内部 Agent (Internal Agent) 无法使用！")
-        print(f"     Wecli 轻量级 Agent 需要 LLM_API_KEY 才能工作")
+        print(f"     Clawcross 轻量级 Agent 需要 LLM_API_KEY 才能工作")
         print(f"     请运行 bash scripts/setup_apikey.sh 或手动编辑 config/.env")
         print(f"\n  💡 即使没有 API Key，仍可使用以下外部 Agent 平台:")
         print(f"     openclaw / codex / claude (claude-code) / gemini (gemini-cli) / aider")
@@ -2554,10 +2554,10 @@ def cmd_status(args):
     print("📋 总结:\n")
 
     if api_key_ok:
-        print(f"  ✅ Wecli 轻量级 Agent：可用 (内置，基于 LLM API)")
+        print(f"  ✅ Clawcross 轻量级 Agent：可用 (内置，基于 LLM API)")
         print(f"     模型: {llm_model}  Base URL: {llm_base_url}")
     else:
-        print(f"  ❌ Wecli 轻量级 Agent：不可用 (未配置 LLM_API_KEY)")
+        print(f"  ❌ Clawcross 轻量级 Agent：不可用 (未配置 LLM_API_KEY)")
         print(f"     → 设置方法: bash scripts/setup_apikey.sh")
 
     if available_platforms:
@@ -2579,8 +2579,8 @@ def cmd_status(args):
 def build_parser():
     """构建命令行参数解析器"""
     p = argparse.ArgumentParser(
-        prog="wecli",
-        description="Wecli CLI — 命令行控制工具",
+        prog="clawcross",
+        description="Clawcross CLI — 命令行控制工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 ⚠️  【必读文档】执行任何操作前，请务必先阅读对应文档，否则可能导致配置错误！
@@ -2592,7 +2592,7 @@ def build_parser():
   📖 docs/openclaw-commands.md — OpenClaw agent 集成命令
   📖 docs/ports.md            — 端口配置和冲突处理
 
-提示: 使用 'wecli <command> --help' 查看各命令的详细用法
+提示: 使用 'clawcross <command> --help' 查看各命令的详细用法
 """,
     )
     p.add_argument("-u", "--user", default=DEFAULT_USER, help="用户名 (默认: admin, chat 时必须显式指定)")

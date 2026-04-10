@@ -62,7 +62,7 @@ fi
 echo ""
 echo "========== 4/4 启动服务 =========="
 
-# 清理旧的 Wecli 进程（按进程名匹配，pgrep/pkill 在 Linux 和 macOS 上均可用）
+# 清理旧的 Clawcross 进程（按进程名匹配，pgrep/pkill 在 Linux 和 macOS 上均可用）
 _TC_SCRIPTS="scripts/launcher.py src/utils/scheduler_service.py oasis/server.py src/mainagent.py src/front.py"
 _TC_KILLED=0
 for _script in $_TC_SCRIPTS; do

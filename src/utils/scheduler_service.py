@@ -31,8 +31,8 @@ load_dotenv(dotenv_path=os.path.join(root_dir, "config", ".env"))
 
 
 def _server_host() -> str:
-    """获取调度器绑定地址。默认为 localhost；设置 WECLI_SERVER_HOST=0.0.0.0 可暴露到所有接口。"""
-    explicit_host = os.getenv("WECLI_SERVER_HOST", "").strip()
+    """获取调度器绑定地址。默认为 localhost；设置 CLAWCROSS_SERVER_HOST=0.0.0.0 可暴露到所有接口。"""
+    explicit_host = os.getenv("CLAWCROSS_SERVER_HOST", "").strip()
     if explicit_host:
         return explicit_host
     return "127.0.0.1"

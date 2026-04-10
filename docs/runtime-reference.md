@@ -1,6 +1,6 @@
 # Runtime Reference
 
-This reference captures the architecture, service responsibilities, and runtime data layout for Wecli’s Claude-Code-inspired agent runtime. It emphasizes WeBot, session state, MCP tooling, and the canonical runtime DTO that now powers the browser UI, CLI/BFF proxies, bridge clients, voice state, buddy state, and memory/Kairos surfaces.
+This reference captures the architecture, service responsibilities, and runtime data layout for Clawcross’s Claude-Code-inspired agent runtime. It emphasizes WeBot, session state, MCP tooling, and the canonical runtime DTO that now powers the browser UI, CLI/BFF proxies, bridge clients, voice state, buddy state, and memory/Kairos surfaces.
 
 ## Architecture Map
 

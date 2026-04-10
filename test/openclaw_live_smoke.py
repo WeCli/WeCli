@@ -4,7 +4,7 @@ Opt-in live smoke test for OpenClaw.
 Flow:
 1. Create an isolated OpenClaw profile
 2. Run non-interactive onboard in local mode
-3. Export Wecli/CI LLM settings into the OpenClaw config
+3. Export Clawcross/CI LLM settings into the OpenClaw config
 4. Enable /v1/chat/completions
 5. Start `openclaw gateway run` in foreground
 6. Send a tiny OpenAI-compatible chat completion request through the gateway

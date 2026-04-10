@@ -1,7 +1,7 @@
 """
 OpenClaw agent-restore 计时与结果：追加 JSON 行到本地文件（不依赖终端里能否看到 logger）。
 
-默认路径：<Wecli 仓库>/logs/restore_timing.jsonl
+默认路径：<Clawcross 仓库>/logs/restore_timing.jsonl
 自定义：环境变量 OPENCLAW_RESTORE_TIMING_LOG=/绝对路径/xxx.jsonl
 
 查看：tail -f logs/restore_timing.jsonl

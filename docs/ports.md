@@ -1,4 +1,4 @@
-# Wecli 端口大全
+# Clawcross 端口大全
 
 > 最后更新：2026-04-01
 
@@ -56,8 +56,8 @@
 - **职责**：
   - 用户交互界面（聊天、登录、设置、OASIS 面板）
   - 反向代理：将浏览器请求转发到 Agent / OASIS 等内部服务
-  - WeCli Creator 页面、构建记录与 WeCli Studio 相关入口
-  - WeCli Studio 右侧 OASIS Town 侧栏、swarm graph、ReportAgent
+  - ClawCross Creator 页面、构建记录与 ClawCross Studio 相关入口
+  - ClawCross Studio 右侧 OASIS Town 侧栏、swarm graph、ReportAgent
   - TinyFish 监控状态、手动运行、实时爬取和站点快照查询
   - Session 管理、PWA 支持
 - **安全策略**：
@@ -135,8 +135,8 @@ PORT_FRONTEND=51209
 ### 页面 & 静态资源
 
 - `GET /` — 登录/主页面
-- `GET /creator` — WeCli Creator 页面
-- `GET /studio` — WeCli Studio / workflow canvas 页面
+- `GET /creator` — ClawCross Creator 页面
+- `GET /studio` — ClawCross Studio / workflow canvas 页面
 - `GET /manifest.json` — PWA manifest
 - `GET /sw.js` — Service Worker
 
@@ -197,7 +197,7 @@ PORT_FRONTEND=51209
 
 补充说明：
 
-- `GET /studio` 页面内包含 WeCli Studio 主画布和右侧 `🏘️ OASIS Town` 侧栏
+- `GET /studio` 页面内包含 ClawCross Studio 主画布和右侧 `🏘️ OASIS Town` 侧栏
 - 第一次进入 `/studio` 时默认落在 `Chat` tab，右侧 Town 侧栏折叠、`Town Mode` 关闭、子 tab 默认是 `TOWN`
 - Town Mode、`REFORGE`、`EXPLAIN` 都在这条侧栏里，不在消息中心侧栏
 
@@ -234,16 +234,16 @@ PORT_FRONTEND=51209
 - `POST /api/tinyfish/live-run` — 透传 TinyFish SSE 实时爬取事件，并在结束后持久化结果
 - `GET /api/tinyfish/sites/<site_key>` — 查看单个站点最近一次存储的快照
 
-### WeCli Creator（front.py 本地处理 + TinyFish / OASIS）
+### ClawCross Creator（front.py 本地处理 + TinyFish / OASIS）
 
-- `POST /api/team-creator/discover` — WeCli Creator 第 1 阶段：发现 SOP / 组织结构页面，SSE 流式返回
-- `POST /api/team-creator/extract` — WeCli Creator 第 2 阶段：对单个页面执行 TinyFish 角色提取，SSE 流式返回
+- `POST /api/team-creator/discover` — ClawCross Creator 第 1 阶段：发现 SOP / 组织结构页面，SSE 流式返回
+- `POST /api/team-creator/extract` — ClawCross Creator 第 2 阶段：对单个页面执行 TinyFish 角色提取，SSE 流式返回
 - `POST /api/team-creator/smart-select` — 对提取角色做智能筛选并匹配预设专家
-- `POST /api/team-creator/build` — WeCli Creator 第 3 阶段：生成 Team 配置、Persona、workflow DAG 和 YAML
+- `POST /api/team-creator/build` — ClawCross Creator 第 3 阶段：生成 Team 配置、Persona、workflow DAG 和 YAML
 - `POST /api/team-creator/download` — 将构建结果导出为 ZIP
-- `POST /api/team-creator/translate` — WeCli Creator 动态双语翻译
+- `POST /api/team-creator/translate` — ClawCross Creator 动态双语翻译
 - `GET /api/team-creator/presets` — 兼容旧前端的预设专家列表
-- `GET /api/team-creator/jobs` — 最近 WeCli Creator 构建记录
+- `GET /api/team-creator/jobs` — 最近 ClawCross Creator 构建记录
 - `GET /api/team-creator/jobs/<job_id>` — 单条构建记录详情
 
 ### 可视化编排代理（本地处理 / → :51202）
@@ -287,7 +287,7 @@ PORT_FRONTEND=51209
 - `POST /teams/<name>/experts` — 添加团队人设 prompt
 - `PUT /teams/<name>/experts/<tag>` — 更新团队人设 prompt
 - `DELETE /teams/<name>/experts/<tag>` — 删除团队人设 prompt
-- `POST /teams/<name>/generate-from-workflow` — 从 WeCli Studio 画布节点批量生成 / 更新团队
+- `POST /teams/<name>/generate-from-workflow` — 从 ClawCross Studio 画布节点批量生成 / 更新团队
 - `POST /teams/snapshot/download` — 下载团队快照
 - `POST /teams/snapshot/upload` — 上传团队快照
 

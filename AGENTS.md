@@ -1,6 +1,6 @@
 ---
-name: "Wecli"
-description: "A multi-agent orchestration platform with visual workflow (OASIS). Create and configure agents (OpenClaw/external API), orchestrate them into Teams, build new Teams with WeCli Creator, and design workflows via visual canvas. Supports Team conversations, OASIS Town with living GraphRAG memory, scheduled tasks, Telegram/QQ bots, TinyFish internet search agent, and Cloudflare Tunnel for remote access."
+name: "Clawcross"
+description: "A multi-agent orchestration platform with visual workflow (OASIS). Create and configure agents (OpenClaw/external API), orchestrate them into Teams, build new Teams with ClawCross Creator, and design workflows via visual canvas. Supports Team conversations, OASIS Town with living GraphRAG memory, scheduled tasks, Telegram/QQ bots, TinyFish internet search agent, and Cloudflare Tunnel for remote access."
 user-invokable: true
 compatibility:
   - "deepseek"
@@ -16,7 +16,7 @@ argument-hint: "[RECOMMENDED] LLM_API_KEY, LLM_BASE_URL (auto-detected from Open
 
 metadata:
   version: "1.1.0"
-  github: "https://github.com/WeCli/WeCli"
+  github: "https://github.com/ClawCross/ClawCross"
   ports:
     agent: 51200
     scheduler: 51201
@@ -35,9 +35,9 @@ metadata:
     - "cloudflare_tunnel"
 ---
 
-# Wecli — Agent Instructions
+# Clawcross — Agent Instructions
 
-Use this file when you are an AI coding agent that needs to install, configure, run, operate, troubleshoot, or modify Wecli.
+Use this file when you are an AI coding agent that needs to install, configure, run, operate, troubleshoot, or modify Clawcross.
 
 ## Progressive Disclosure
 
@@ -65,8 +65,8 @@ Read only the docs relevant to the current task:
 | Task | Read First | Then Read |
 |---|---|---|
 | Install / configure / start | [`SKILL.md`](./SKILL.md) | [`docs/ports.md`](./docs/ports.md) if ports matter |
-| Understand what Wecli is | [`docs/overview.md`](./docs/overview.md) | [`README.md`](./README.md) |
-| Build a Team / use WeCli Creator | [`docs/team-creator.md`](./docs/team-creator.md) | [`docs/build_team.md`](./docs/build_team.md) |
+| Understand what Clawcross is | [`docs/overview.md`](./docs/overview.md) | [`README.md`](./README.md) |
+| Build a Team / use ClawCross Creator | [`docs/team-creator.md`](./docs/team-creator.md) | [`docs/build_team.md`](./docs/build_team.md) |
 | OASIS / Town Mode / GraphRAG | [`docs/oasis-reference.md`](./docs/oasis-reference.md) | [`docs/create_workflow.md`](./docs/create_workflow.md) |
 | Runtime architecture / auth | [`docs/runtime-reference.md`](./docs/runtime-reference.md) | [`docs/ports.md`](./docs/ports.md) |
 | CLI commands | [`docs/cli.md`](./docs/cli.md) | `uv run scripts/cli.py <cmd> --help` |
@@ -97,7 +97,7 @@ The goal is a **silent, non-interactive install**. NEVER repeatedly ask the user
    - Creates a default `.env` if missing
    - Starts all services even if LLM is not yet configured
    - Automatically warms an installed OpenClaw gateway and refreshes runtime `OPENCLAW_*` values
-   - If `config/.env` has no real `LLM_API_KEY` (missing/placeholder), it **tries** to import OpenClaw LLM config into Wecli (optional; **failure does not block startup**)
+   - If `config/.env` has no real `LLM_API_KEY` (missing/placeholder), it **tries** to import OpenClaw LLM config into Clawcross (optional; **failure does not block startup**)
      (it will NOT overwrite a user-provided real `LLM_API_KEY`)
    - **Automatically starts Cloudflare Tunnel** for mobile remote access and prints the public URL
    - After Tunnel (or when it is still starting), prints **Magic link** lines (local + remote when `PUBLIC_DOMAIN` is ready)
@@ -124,7 +124,7 @@ The goal is a **silent, non-interactive install**. NEVER repeatedly ask the user
 10. Before adding an OpenClaw agent into a Team, always run `openclaw sessions` and confirm the target agent already exists.
 11. On Windows PowerShell, prefer `openclaw.cmd` for channel and plugin commands.
 12. For the Weixin plugin on Windows, fall back to manual plugin install with `openclaw.cmd` if the official installer fails.
-13. If Wecli LLM settings change after OpenClaw is installed, finish the provider/model selection before pushing config back into OpenClaw. Use `sync-openclaw-llm` when the desired LLM config is final.
+13. If Clawcross LLM settings change after OpenClaw is installed, finish the provider/model selection before pushing config back into OpenClaw. Use `sync-openclaw-llm` when the desired LLM config is final.
 
 ## Reference Docs
 

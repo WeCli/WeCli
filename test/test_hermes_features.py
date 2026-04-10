@@ -381,7 +381,7 @@ class TestInsights(unittest.TestCase):
         engine = InsightsEngine()
         insights = engine.generate(days=30, user_id="alice")
         output = engine.format_terminal(insights)
-        self.assertIn("WeCli Insights", output)
+        self.assertIn("ClawCross Insights", output)
         self.assertIn("Sessions:", output)
 
 

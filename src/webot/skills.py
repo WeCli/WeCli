@@ -1,5 +1,5 @@
 """
-Self-Evolution Skill System — procedural memory for WeCli agents.
+Self-Evolution Skill System — procedural memory for ClawCross agents.
 
 Ported from Hermes Agent's skill_manager_tool concept:
 - Agent can create, edit, patch, and delete reusable skills

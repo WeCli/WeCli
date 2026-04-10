@@ -199,7 +199,7 @@ class ConfigureOpenClawSyncTests(unittest.TestCase):
     @mock.patch.object(co, "export_llm_config_to_openclaw")
     @mock.patch.object(
         co,
-        "read_wecli_llm_config",
+        "read_clawcross_llm_config",
         return_value={
             "LLM_API_KEY": "",
             "LLM_BASE_URL": "http://127.0.0.1:11434",
@@ -207,14 +207,14 @@ class ConfigureOpenClawSyncTests(unittest.TestCase):
             "LLM_PROVIDER": "ollama",
         },
     )
-    def test_sync_wecli_llm_to_openclaw_allows_keyless_ollama(
+    def test_sync_clawcross_llm_to_openclaw_allows_keyless_ollama(
         self,
-        _mock_read_wecli_llm_config,
+        _mock_read_clawcross_llm_config,
         mock_export,
     ):
         mock_export.return_value = {"ok": True, "provider": "ollama"}
 
-        result = co.sync_wecli_llm_to_openclaw()
+        result = co.sync_clawcross_llm_to_openclaw()
 
         self.assertEqual(result["provider"], "ollama")
         mock_export.assert_called_once_with(
@@ -236,7 +236,7 @@ class ConfigureOpenClawSyncTests(unittest.TestCase):
     @mock.patch.object(co, "run_cmd", return_value=(0, "started", ""))
     @mock.patch.object(co, "detect_gateway_runtime", return_value="stopped")
     @mock.patch.object(co, "detect_openclaw_bin", return_value="/usr/local/bin/openclaw")
-    def test_sync_openclaw_runtime_for_wecli_startup_refreshes_runtime_env_only(
+    def test_sync_openclaw_runtime_for_clawcross_startup_refreshes_runtime_env_only(
         self,
         _mock_detect_bin,
         _mock_runtime,
@@ -251,7 +251,7 @@ class ConfigureOpenClawSyncTests(unittest.TestCase):
         _mock_sessions,
         _mock_repair,
     ):
-        result = co.sync_openclaw_runtime_for_wecli_startup()
+        result = co.sync_openclaw_runtime_for_clawcross_startup()
 
         self.assertTrue(result["installed"])
         self.assertTrue(result["gateway_started"])

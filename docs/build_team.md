@@ -1,6 +1,6 @@
 # Build Team via CLI (Quick Reference)
 
-> This document provides a quick reference for building a team using Wecli CLI, focusing on core commands without trial-and-error details.
+> This document provides a quick reference for building a team using Clawcross CLI, focusing on core commands without trial-and-error details.
 
 If you want the browser-based flow that starts from a task description, discovered SOP pages, or a workflow canvas, read [team-creator.md](./team-creator.md) first.
 
@@ -8,7 +8,7 @@ If you want the browser-based flow that starts from a task description, discover
 
 ## 1. Prerequisites
 
-- Wecli services must be running (Agent, Scheduler, OASIS, Frontend)
+- Clawcross services must be running (Agent, Scheduler, OASIS, Frontend)
 - Check service status:
   ```bash
   bash selfskill/scripts/run.sh status
@@ -59,7 +59,7 @@ Members (1):
 
 ## 3. Agent Management
 
-Wecli supports **3 types** of agents: Internal, OpenClaw, and External.
+Clawcross supports **3 types** of agents: Internal, OpenClaw, and External.
 
 External agents communicate via HTTP or the **Agent Client Protocol (ACP)** through the `acpx` CLI adapter. ACP supports tools like `openclaw`, `codex`, `claude`, `gemini`, and `aider`. `acpx` is automatically installed during `bash selfskill/scripts/run.sh setup`.
 
@@ -410,7 +410,7 @@ uv run scripts/cli.py teams members --team-name demo_team
 
 ## 8. Summary
 
-The core workflow for building a Wecli team using CLI is:
+The core workflow for building a Clawcross team using CLI is:
 **Create Team → Add Members (Internal/OpenClaw/External) → Add Personas → Verify**.
 
 All operations are based on `scripts/cli.py`, ensure execution under `uv run` environment.

@@ -2712,7 +2712,7 @@
   }
 
   // tools/pretext_global_entry.js
-  window.WecliPretext = {
+  window.ClawcrossPretext = {
     clearCache,
     layout,
     layoutNextLine,

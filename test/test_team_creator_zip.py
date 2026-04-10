@@ -13,7 +13,7 @@ if str(SRC_DIR) not in sys.path:
 import services.team_creator_service as svc
 
 
-class WecliCreatorZipTests(unittest.TestCase):
+class ClawcrossCreatorZipTests(unittest.TestCase):
     def test_build_team_zip_matches_snapshot_layout(self):
         team_config = {
             "oasis_experts": [

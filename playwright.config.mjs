@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-const port = process.env.WECLI_BROWSER_PORT || '51219';
-const pythonBin = process.env.WECLI_TEST_PYTHON || 'python3';
+const port = process.env.CLAWCROSS_BROWSER_PORT || '51219';
+const pythonBin = process.env.CLAWCROSS_TEST_PYTHON || 'python3';
 
 export default defineConfig({
   testDir: './test/browser',
@@ -23,7 +23,7 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     env: {
       ...process.env,
-      WECLI_BROWSER_PORT: port,
+      CLAWCROSS_BROWSER_PORT: port,
     },
     timeout: 60_000,
   },

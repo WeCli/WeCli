@@ -223,7 +223,7 @@
         }
     }
 
-    window.WecliTinyFish = {
+    window.ClawcrossTinyFish = {
         consumeJsonSseStream,
         countTinyfishItems,
         formatTinyFishEventDetail,

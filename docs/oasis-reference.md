@@ -16,7 +16,7 @@ If you need the YAML grammar itself, read [create_workflow.md](./create_workflow
 
 ## What OASIS Is
 
-OASIS is Wecli's built-in orchestration engine for multi-expert discussion and execution.
+OASIS is Clawcross's built-in orchestration engine for multi-expert discussion and execution.
 
 It can:
 
@@ -278,11 +278,11 @@ The response contains:
 - `confidence`: `low|medium|high`
 - `evidence`: node / edge / memory excerpts used for the answer
 
-## WeCli Studio Town Mode
+## ClawCross Studio Town Mode
 
 The primary UI entry is the right OASIS sidebar inside `GET /studio`.
 
-Default first-entry behavior for WeCli Studio:
+Default first-entry behavior for ClawCross Studio:
 
 - active page tab: `Chat`
 - right OASIS sidebar: collapsed
@@ -291,13 +291,13 @@ Default first-entry behavior for WeCli Studio:
 
 Typical manual flow:
 
-1. open WeCli Studio
+1. open ClawCross Studio
 2. expand the right `🏘️ OASIS Town` sidebar
 3. open or create a topic
 4. use `🏘️ OFF/ON` to switch Town Mode
 5. use `NUDGE` to inject a live post, `REFORGE` to rebuild the swarm graph, and `EXPLAIN` to ask ReportAgent
 
-The current Wecli docs should treat this as the canonical Town entry, not the message-center sidebar.
+The current Clawcross docs should treat this as the canonical Town entry, not the message-center sidebar.
 
 ## Troubleshooting
 

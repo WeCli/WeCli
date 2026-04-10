@@ -103,7 +103,7 @@ from services.notification_system import (
 )
 
 
-# 调试导出（已关闭）：原 _maybe_debug_dump_llm_payload_for_minimax 在 WECLI_DEBUG_LLM_PAYLOAD=1 时
+# 调试导出（已关闭）：原 _maybe_debug_dump_llm_payload_for_minimax 在 CLAWCROSS_DEBUG_LLM_PAYLOAD=1 时
 # 将 ainvoke 前消息写入 data/debug_llm_payload_last.json；实现已从默认分支移除，需排障时查 git 历史。
 
 # --- Tools that need automatic username injection ---

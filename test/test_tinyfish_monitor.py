@@ -278,7 +278,7 @@ class TinyFishMonitorUnitTests(unittest.TestCase):
                 events = list(svc.stream_live_run(site_key="alpha", db_path=db_path))
 
             self.assertEqual(events[-1]["type"], "COMPLETE")
-            self.assertEqual(events[-1]["wecli_summary"]["snapshot_count"], 1)
+            self.assertEqual(events[-1]["clawcross_summary"]["snapshot_count"], 1)
 
             db = svc.MonitorDB(db_path)
             try:

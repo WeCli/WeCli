@@ -1,7 +1,7 @@
 """
 WeBot buddy state helpers.
 
-This maps the Claude-Code-inspired companion concept onto Wecli's durable
+This maps the Claude-Code-inspired companion concept onto Clawcross's durable
 runtime store and browser UI instead of a terminal renderer.
 """
 
@@ -82,7 +82,7 @@ def _utc_now() -> str:
 
 
 def _seed_for_user(user_id: str) -> int:
-    digest = hashlib.sha256(f"{user_id or 'anonymous'}:wecli-buddy-v1".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{user_id or 'anonymous'}:clawcross-buddy-v1".encode("utf-8")).hexdigest()
     return int(digest[:16], 16)
 
 
@@ -159,7 +159,7 @@ def ensure_buddy_state(user_id: str) -> BuddyStateRecord:
         reaction="",
         hatched_at=now,
         last_interaction_at=now,
-        metadata={"profile_version": "wecli-buddy-v1"},
+        metadata={"profile_version": "clawcross-buddy-v1"},
     )
 
 

@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a real Cloudflare quick tunnel smoke test.")
     parser.add_argument("--port", type=int, default=int(os.getenv("CLOUDFLARE_LIVE_PORT", "51239")))
     parser.add_argument("--timeout", type=int, default=int(os.getenv("CLOUDFLARE_LIVE_TIMEOUT", "180")))
-    parser.add_argument("--sentinel", default=os.getenv("CLOUDFLARE_LIVE_SENTINEL", "WECLI_CLOUDFLARE_SMOKE_OK"))
+    parser.add_argument("--sentinel", default=os.getenv("CLOUDFLARE_LIVE_SENTINEL", "CLAWCROSS_CLOUDFLARE_SMOKE_OK"))
     return parser.parse_args()
 
 

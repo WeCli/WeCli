@@ -1,19 +1,19 @@
-# WeCli Creator
+# ClawCross Creator
 
 Use this page when you want to build a Team from a business task, discovered SOP pages, or an existing workflow canvas.
 
 ## Entry Points
 
-- `GET /creator`: standalone WeCli Creator page
-- `mobile_group_chat`: WeCli Creator card in the discover area
+- `GET /creator`: standalone ClawCross Creator page
+- `mobile_group_chat`: ClawCross Creator card in the discover area
 - `GET /studio`: workflow canvas toolbar button `Generate Team`
 
 ## When To Use It
 
 | Goal | Best Entry |
 |---|---|
-| Start from a plain-language task and let the system discover roles | WeCli Creator discovery mode |
-| Paste or hand-edit a few known roles | WeCli Creator direct mode |
+| Start from a plain-language task and let the system discover roles | ClawCross Creator discovery mode |
+| Paste or hand-edit a few known roles | ClawCross Creator direct mode |
 | Start from an existing workflow canvas and bulk-create a Team | `Generate Team` in Studio |
 | Edit a Team completely through files or scripts | `docs/build_team.md` + CLI |
 
@@ -48,7 +48,7 @@ This path is the best fit when the user starts with a business scenario rather t
 
 ### 3. Build, Preview, and Export
 
-`POST /api/team-creator/build` converts the selected roles into a Wecli team config:
+`POST /api/team-creator/build` converts the selected roles into a Clawcross team config:
 
 - `oasis_experts`
 - Team member config
@@ -61,13 +61,13 @@ The page then shows:
 - editable persona cards
 - `OASIS Workflow DAG`
 - YAML source
-- ZIP download and one-click import into Wecli
+- ZIP download and one-click import into Clawcross
 
 `POST /api/team-creator/download` uses the same snapshot-style ZIP format as the regular Team export flow.
 
 ### 4. Import Colleague / Mentor Skills
 
-WeCli Creator also supports browser-native import flows for external role distillation projects:
+ClawCross Creator also supports browser-native import flows for external role distillation projects:
 
 - `colleague-skill` → import `meta.json + persona.md + work.md`
 - `supervisor` / `distill-mentor` → import `{name}.json + SKILL.md`
@@ -75,12 +75,12 @@ WeCli Creator also supports browser-native import flows for external role distil
 Both flows support:
 
 - file upload from the browser
-- local path input for files already generated on the same machine as Wecli
+- local path input for files already generated on the same machine as Clawcross
 - direct in-app generation without touching the upstream repos:
   - `ArXiv -> mentor JSON -> import mentor`
   - `Feishu -> messages -> auto distill persona/work -> import colleague`
 
-Import uses the upstream artifact files as the source of truth. The full upstream `persona.md` / generated mentor `SKILL.md` is preserved as the final Wecli expert persona instead of being compressed into the short `_build_persona()` summary.
+Import uses the upstream artifact files as the source of truth. The full upstream `persona.md` / generated mentor `SKILL.md` is preserved as the final Clawcross expert persona instead of being compressed into the short `_build_persona()` summary.
 
 ### 5. Python-Native Quick-Create Helpers
 
@@ -89,18 +89,18 @@ Two backend helpers already cover the Phase 3 collection step without relying on
 - `POST /api/team-creator/arxiv-search`
   - searches ArXiv in pure Python
   - returns a supervisor-compatible mentor JSON
-  - can optionally auto-import that JSON into WeCli Creator
-  - this is the backend used by the WeCli Creator "搜索 ArXiv 并生成导师" button
+  - can optionally auto-import that JSON into ClawCross Creator
+  - this is the backend used by the ClawCross Creator "搜索 ArXiv 并生成导师" button
 - `POST /api/team-creator/feishu-collect`
   - collects Feishu messages in pure Python
   - returns colleague-compatible `meta.json` plus the collected message corpus
   - can optionally auto-distill `persona.md + work.md`
-  - can optionally auto-import the distilled colleague directly into WeCli Creator
-  - this is the backend used by the WeCli Creator "采集并生成同事" button
+  - can optionally auto-import the distilled colleague directly into ClawCross Creator
+  - this is the backend used by the ClawCross Creator "采集并生成同事" button
 
 ## Bilingual and Dynamic Translation Behavior
 
-WeCli Creator has two layers of localization:
+ClawCross Creator has two layers of localization:
 
 - static UI strings are embedded in `frontend/js/creator.js`
 - dynamic content can be translated on demand through `POST /api/team-creator/translate`
@@ -115,9 +115,9 @@ The preset expert pool uses the same bilingual data source as the message center
 
 ## Persistence and Build History
 
-WeCli Creator persists state in two places:
+ClawCross Creator persists state in two places:
 
-- browser draft state: `window.sessionStorage` key `wecli_creator_session_v1`
+- browser draft state: `window.sessionStorage` key `clawcross_creator_session_v1`
 - server build history: `data/team_creator_jobs.db`
 
 Relevant job APIs:
@@ -148,9 +148,9 @@ Use this when the workflow graph already exists and you want to materialize the 
 
 | Route | Purpose |
 |---|---|
-| `GET /creator` | render the WeCli Creator page |
-| `POST /api/team-creator/import-colleague` | import `colleague-skill` artifacts into WeCli Creator |
-| `POST /api/team-creator/import-mentor` | import `supervisor` mentor artifacts into WeCli Creator |
+| `GET /creator` | render the ClawCross Creator page |
+| `POST /api/team-creator/import-colleague` | import `colleague-skill` artifacts into ClawCross Creator |
+| `POST /api/team-creator/import-mentor` | import `supervisor` mentor artifacts into ClawCross Creator |
 | `POST /api/team-creator/arxiv-search` | generate mentor JSON from ArXiv search, optionally auto-import |
 | `POST /api/team-creator/feishu-collect` | collect Feishu messages, optionally auto-distill persona/work, optionally auto-import |
 | `POST /api/team-creator/discover` | stream discovery events for relevant pages |
@@ -160,7 +160,7 @@ Use this when the workflow graph already exists and you want to materialize the 
 | `POST /api/team-creator/download` | export the built config as ZIP |
 | `POST /api/team-creator/translate` | dynamic bilingual translation |
 | `GET /api/team-creator/presets` | backward-compatible preset list |
-| `GET /api/team-creator/jobs` | list recent WeCli Creator build jobs |
+| `GET /api/team-creator/jobs` | list recent ClawCross Creator build jobs |
 | `GET /api/team-creator/jobs/<job_id>` | load one saved build |
 | `POST /teams/<team_name>/generate-from-workflow` | create or extend a Team from workflow nodes |
 
@@ -168,11 +168,11 @@ Use this when the workflow graph already exists and you want to materialize the 
 
 | Path | Role |
 |---|---|
-| `src/front.py` | WeCli Creator routes and workflow-to-team endpoint |
+| `src/front.py` | ClawCross Creator routes and workflow-to-team endpoint |
 | `src/services/team_creator_service.py` | discovery, extraction, build, ZIP, jobs, translation |
-| `frontend/templates/creator.html` | WeCli Creator page shell |
-| `frontend/js/creator.js` | WeCli Creator UI, i18n, persistence, preview rendering |
-| `frontend/css/creator.css` | WeCli Creator layout and DAG styling |
+| `frontend/templates/creator.html` | ClawCross Creator page shell |
+| `frontend/js/creator.js` | ClawCross Creator UI, i18n, persistence, preview rendering |
+| `frontend/css/creator.css` | ClawCross Creator layout and DAG styling |
 | `frontend/js/orchestration.js` | `Generate Team` modal on the workflow canvas |
 | `test/test_team_creator_jobs.py` | jobs persistence coverage |
 | `test/test_team_creator_workflow.py` | workflow build coverage |

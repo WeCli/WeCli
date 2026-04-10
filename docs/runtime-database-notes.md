@@ -1,6 +1,6 @@
 # Runtime Database Notes
 
-This document summarizes the runtime-related databases used by Wecli, what they store, and the current artifact-write behavior.
+This document summarizes the runtime-related databases used by Clawcross, what they store, and the current artifact-write behavior.
 
 ## Database Roles
 

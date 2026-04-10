@@ -1,16 +1,16 @@
-# Wecli
+# Clawcross
 
 **[中文版 README](./README_CN.md)**
 
 <p align="center">
-  <img src="docs/poster_en.png" alt="Wecli — Open-Source Multi-Agent Collaboration System" width="360" />
+  <img src="docs/poster_en.png" alt="Clawcross — Open-Source Multi-Agent Collaboration System" width="360" />
 </p>
 
 > **A local AI workspace where multiple expert agents collaborate, debate, and execute — with a visual workflow engine, living memory, and one-click public access.**
 
-## What is Wecli?
+## What is Clawcross?
 
-Wecli turns a single chatbot into a **programmable multi-expert system**. You create a **Team** — a group of AI agents with distinct roles and personas — and let them collaborate on tasks through visual workflows. Each discussion builds a **living knowledge graph** that persists across sessions.
+Clawcross turns a single chatbot into a **programmable multi-expert system**. You create a **Team** — a group of AI agents with distinct roles and personas — and let them collaborate on tasks through visual workflows. Each discussion builds a **living knowledge graph** that persists across sessions.
 
 **Key concepts at a glance:**
 
@@ -29,12 +29,12 @@ Wecli turns a single chatbot into a **programmable multi-expert system**. You cr
 
 <p align="center">
   <a href="https://youtube.com/shorts/OKuZNwz-CP0">
-    <img src="./docs/media/wecli-demo-poster-en.png" alt="Wecli demo video" width="360" />
+    <img src="./docs/media/clawcross-demo-poster-en.png" alt="Clawcross demo video" width="360" />
   </a>
 </p>
 
 <p align="center">
-  <a href="https://youtube.com/shorts/OKuZNwz-CP0">Watch the Wecli demo video on YouTube (Chinese version; English version coming soon)</a>
+  <a href="https://youtube.com/shorts/OKuZNwz-CP0">Watch the Clawcross demo video on YouTube (Chinese version; English version coming soon)</a>
 </p>
 
 ## Quick Start
@@ -51,7 +51,7 @@ Wecli turns a single chatbot into a **programmable multi-expert system**. You cr
 Open any AI coding assistant such as **Codex**, **Cursor**, **Claude Code**, **CodeBuddy**, or **Trae**, and say:
 
 ```text
-Clone https://github.com/WeCli/WeCli.git, read AGENTS.md, and install Wecli.
+Clone https://github.com/ClawCross/ClawCross.git, read AGENTS.md, and install Clawcross.
 ```
 
 ### Manual Setup
@@ -88,13 +88,13 @@ Open the UI at `http://127.0.0.1:51209`.
 
 For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI config, troubleshooting), see [`SKILL.md`](./SKILL.md).
 
-## Why Wecli
+## Why Clawcross
 
 ### Multi-Expert Collaboration, Not Just Chat
 
 - **Team-based orchestration** — combine internal agents, OpenClaw agents, and external API agents into a single Team with one-click import/export
 - **15 built-in Team Presets** — LLM Council, Nuwa All-Stars, Content Empire, Strategists, Tech Titans, and more — install and run immediately
-- **AI team builder** — WeCli Creator discovers SOP pages, extracts roles with TinyFish, and generates editable personas plus a DAG workflow
+- **AI team builder** — ClawCross Creator discovers SOP pages, extracts roles with TinyFish, and generates editable personas plus a DAG workflow
 - **Visual orchestration** — design workflows in OASIS with sequential, parallel, branching, or DAG-style expert coordination
 
 ### Claude-Code-Style Delegation with WeBot
@@ -118,7 +118,7 @@ For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI conf
 - **Automation** — scheduled tasks and long-running workflow execution
 - **TinyFish** — internet search agent powered by TinyFish Web Agent API
 - **Remote access** — Cloudflare Tunnel with login-token / password flows
-- **Flow distribution** — browse and share workflows on [WecliHub](https://wecli.net)
+- **Flow distribution** — browse and share workflows on [ClawcrossHub](https://clawcross.net)
 
 ## What You Can Do Today
 
@@ -127,7 +127,7 @@ For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI conf
 | **OpenAI-compatible API** | Local chat completions endpoint for apps, tools, and clients |
 | **Web UI** | Chat, settings, OASIS panel, group chat, tunnel control, WeBot runtime panel |
 | **Team Presets** | 15 ready-to-use expert teams — install and start collaborating immediately |
-| **WeCli Creator** | Turn a task description or SOP pages into roles, personas, and an OASIS workflow |
+| **ClawCross Creator** | Turn a task description or SOP pages into roles, personas, and an OASIS workflow |
 | **OASIS workflows** | Sequential, parallel, branching, and DAG-style expert orchestration |
 | **OASIS Town** | Pixel-town visualization with live residents, nudges, and swarm graph |
 | **WeBot runtime** | Claude-Code-style delegation with profiles, modes, tool policies, and bridge sessions |
@@ -140,14 +140,14 @@ For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI conf
 | **Bots** | Telegram and QQ integrations |
 | **Automation** | Scheduled tasks and long-running workflow execution |
 | **TinyFish** | Internet search agent for web crawling and structured data extraction |
-| **Flow distribution** | Browse and share flows on [WecliHub](https://wecli.net) |
+| **Flow distribution** | Browse and share flows on [ClawcrossHub](https://clawcross.net) |
 | **Remote access** | Cloudflare Tunnel plus login-token / password flows |
 
 ## Flow Distribution Platform
 
-**[WecliHub](https://wecli.net)** is the companion flow distribution platform:
+**[ClawcrossHub](https://clawcross.net)** is the companion flow distribution platform:
 
-- Browse published Wecli flows
+- Browse published Clawcross flows
 - Distribute reusable workflows to other users
 - Share flow links as a lightweight workflow catalog entry
 
@@ -165,7 +165,7 @@ For the full install guide (OpenClaw, Antigravity, MiniMax, WSL, manual CLI conf
 
 ## Acknowledgements
 
-Wecli benefited from several open-source projects:
+Clawcross benefited from several open-source projects:
 
 - [`msitarzewski/agency-agents`](https://github.com/msitarzewski/agency-agents) — inspiration for expanding the preset expert pool
 - [`AGI-Villa/agent-town`](https://github.com/AGI-Villa/agent-town) — reference for OASIS Town's interaction and presentation design
@@ -181,8 +181,8 @@ Wecli benefited from several open-source projects:
 
 ## Community
 
-- Issues & feature requests: [GitHub Issues](https://github.com/WeCli/WeCli/issues)
-- Flows & presets: [WecliHub](https://wecli.net)
+- Issues & feature requests: [GitHub Issues](https://github.com/ClawCross/ClawCross/issues)
+- Flows & presets: [ClawcrossHub](https://clawcross.net)
 
 ## License
 

@@ -17,7 +17,7 @@
 #   bash selfskill/scripts/run.sh configure --batch K1=V1 K2=V2  # 批量设置配置
 #   bash selfskill/scripts/run.sh configure --show               # 查看当前配置
 #   bash selfskill/scripts/run.sh configure --init               # 从模板初始化 .env
-#   bash selfskill/scripts/run.sh sync-openclaw-llm              # 将 Wecli 当前 LLM 配置回写到 OpenClaw
+#   bash selfskill/scripts/run.sh sync-openclaw-llm              # 将 Clawcross 当前 LLM 配置回写到 OpenClaw
 #   bash selfskill/scripts/run.sh check-openclaw                 # 检测/安装 OpenClaw
 #   bash selfskill/scripts/run.sh cli chat "你好"                # CLI: 发送消息
 #   bash selfskill/scripts/run.sh cli sessions                   # CLI: 查看会话
@@ -84,8 +84,8 @@ if ! python -c "import fastapi" &>/dev/null; then
     echo "✅ 依赖安装完成"
 fi
 
-PIDFILE="$PROJECT_ROOT/.wecli.pid"
-WECLI_SERVICE_PATTERNS=(
+PIDFILE="$PROJECT_ROOT/.clawcross.pid"
+CLAWCROSS_SERVICE_PATTERNS=(
     "scripts/launcher.py"
     "src/time.py"
     "oasis/server.py"
@@ -149,10 +149,10 @@ _magic_token_from_cli_output() {
 }
 
 # 打印本机 +（若已就绪）远程 Magic Link；启动/Tunnel 就绪后必须调用，便于手机 HTTPS 免密登录
-# 登录用户 id 默认 default，可用环境变量 WECLI_MAGIC_LINK_USER 覆盖（执行前 export）
+# 登录用户 id 默认 default，可用环境变量 CLAWCROSS_MAGIC_LINK_USER 覆盖（执行前 export）
 print_magic_links() {
     source config/.env 2>/dev/null || true
-    local ml_user="${WECLI_MAGIC_LINK_USER:-default}"
+    local ml_user="${CLAWCROSS_MAGIC_LINK_USER:-default}"
     local port="${PORT_FRONTEND:-51209}"
     local cli_output token pub
     cli_output=$(cd "$PROJECT_ROOT" && uv run scripts/cli.py token generate -u "$ml_user" --valid-hours 24 2>/dev/null)
@@ -167,7 +167,7 @@ print_magic_links() {
         return 1
     fi
     echo "   本机: http://127.0.0.1:${port}/login-link/${token}?user=${ml_user}"
-    if [ "${WECLI_NO_TUNNEL:-}" = "1" ]; then
+    if [ "${CLAWCROSS_NO_TUNNEL:-}" = "1" ]; then
         echo "   远程: （本次 start 使用了 --no-tunnel，未启动 Cloudflare Tunnel）"
         echo ""
         echo "🤖 给 AI / 助手: 仅输出上方本机 Magic link；勿声称已提供公网/手机远程 URL。"
@@ -185,7 +185,7 @@ print_magic_links() {
     return 0
 }
 
-print_wecli_docs_hint() {
+print_clawcross_docs_hint() {
     echo "📖 创建/管理 Team 前请先阅读以下文档:"
     echo "   docs/build_team.md       - 创建/配置 Team (成员、人设、JSON 文件)"
     echo "   docs/create_workflow.md  - 创建 OASIS 工作流 YAML (图格式、人设类型、示例)"
@@ -234,7 +234,7 @@ port_is_listening() {
     return 1
 }
 
-get_wecli_service_pids() {
+get_clawcross_service_pids() {
     {
         if [ -f "$PIDFILE" ]; then
             local tracked_pid=""
@@ -243,20 +243,20 @@ get_wecli_service_pids() {
                 printf '%s\n' "$tracked_pid"
             fi
         fi
-        for pattern in "${WECLI_SERVICE_PATTERNS[@]}"; do
+        for pattern in "${CLAWCROSS_SERVICE_PATTERNS[@]}"; do
             pgrep -f "$pattern" 2>/dev/null || true
         done
     } | awk '$1 ~ /^[0-9]+$/ {print $1}' | sort -u
 }
 
-stop_wecli_service_processes() {
-    mapfile -t WECLI_PIDS < <(get_wecli_service_pids)
-    if [ "${#WECLI_PIDS[@]}" -eq 0 ]; then
+stop_clawcross_service_processes() {
+    mapfile -t CLAWCROSS_PIDS < <(get_clawcross_service_pids)
+    if [ "${#CLAWCROSS_PIDS[@]}" -eq 0 ]; then
         return 1
     fi
 
-    echo "🧹 发现已有 Wecli 进程，先停止..."
-    for pid in "${WECLI_PIDS[@]}"; do
+    echo "🧹 发现已有 Clawcross 进程，先停止..."
+    for pid in "${CLAWCROSS_PIDS[@]}"; do
         local cmd=""
         cmd=$(ps -p "$pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//')
         if [ -n "$cmd" ]; then
@@ -269,7 +269,7 @@ stop_wecli_service_processes() {
 
     for i in $(seq 1 30); do
         local still_running=0
-        for pid in "${WECLI_PIDS[@]}"; do
+        for pid in "${CLAWCROSS_PIDS[@]}"; do
             if kill -0 "$pid" 2>/dev/null; then
                 still_running=1
                 break
@@ -281,7 +281,7 @@ stop_wecli_service_processes() {
         sleep 0.5
     done
 
-    for pid in "${WECLI_PIDS[@]}"; do
+    for pid in "${CLAWCROSS_PIDS[@]}"; do
         if kill -0 "$pid" 2>/dev/null; then
             echo "⚠️  进程 $pid 未响应，强制终止..."
             kill -9 "$pid" 2>/dev/null || true
@@ -359,7 +359,7 @@ for agent in agents:
 }
 
 # 与 `run.sh setup` 实质相同：缺 venv/依赖或未装 acpx（且本机有 npm）时运行 scripts/setup_env.sh
-run_wecli_setup_if_needed() {
+run_clawcross_setup_if_needed() {
     local need=false
     if [ ! -d ".venv" ]; then need=true; fi
     if [ "$need" = false ] && ! python -c "import fastapi" 2>/dev/null; then need=true; fi
@@ -378,7 +378,7 @@ run_wecli_setup_if_needed() {
 }
 
 # start / start-foreground 可选参数：--no-tunnel / --no-openclaw（$1 为子命令名）
-_wecli_parse_start_flags() {
+_clawcross_parse_start_flags() {
     NO_TUNNEL=0
     NO_OPENCLAW=0
     [ $# -ge 1 ] || return 0
@@ -395,22 +395,22 @@ _wecli_parse_start_flags() {
 case "${1:-help}" in
 
     start)
-        _wecli_parse_start_flags "$@"
-        run_wecli_setup_if_needed
+        _clawcross_parse_start_flags "$@"
+        run_clawcross_setup_if_needed
         # Auto-create .env if missing
         if [ ! -f config/.env ]; then
             echo "📋 config/.env 不存在，自动从模板初始化..."
             python selfskill/scripts/configure.py --init
         fi
 
-        # 可选：若尚未配置 LLM，尝试从本机 OpenClaw 写入 Wecli .env（失败不影响启动）。
+        # 可选：若尚未配置 LLM，尝试从本机 OpenClaw 写入 Clawcross .env（失败不影响启动）。
         # 不强制在启动阶段设置 LLM；用户可用 Magic link 进站后，在向导里填 Key 或一键导入 OpenClaw。
         source config/.env 2>/dev/null || true
         if [ "${NO_OPENCLAW:-0}" != 1 ]; then
             if [ -z "${LLM_API_KEY:-}" ] || [ "${LLM_API_KEY:-}" = "your_api_key_here" ]; then
                 echo ""
-                echo "🔄 LLM_API_KEY 仍为占位/空：尝试从 OpenClaw 同步到 Wecli .env（可忽略失败）..."
-                python selfskill/scripts/configure_openclaw.py --import-wecli-llm-from-openclaw || true
+                echo "🔄 LLM_API_KEY 仍为占位/空：尝试从 OpenClaw 同步到 Clawcross .env（可忽略失败）..."
+                python selfskill/scripts/configure_openclaw.py --import-clawcross-llm-from-openclaw || true
                 source config/.env 2>/dev/null || true
             fi
         else
@@ -418,17 +418,17 @@ case "${1:-help}" in
             echo "⏭️  已指定 --no-openclaw：跳过从 OpenClaw 导入 LLM；launcher 不会预热 OpenClaw Gateway。"
         fi
 
-        # launcher 会预热 OpenClaw gateway 并刷新 OPENCLAW_*（可用 WECLI_NO_OPENCLAW=1 禁用）
+        # launcher 会预热 OpenClaw gateway 并刷新 OPENCLAW_*（可用 CLAWCROSS_NO_OPENCLAW=1 禁用）
 
-        stop_wecli_service_processes || true
+        stop_clawcross_service_processes || true
         rm -f "$PIDFILE"
 
         echo "🚀 启动 WeBot (headless)..."
         export WEBOT_HEADLESS=1
         if [ "${NO_OPENCLAW:-0}" = 1 ]; then
-            export WECLI_NO_OPENCLAW=1
+            export CLAWCROSS_NO_OPENCLAW=1
         else
-            unset WECLI_NO_OPENCLAW
+            unset CLAWCROSS_NO_OPENCLAW
         fi
         mkdir -p "$PROJECT_ROOT/logs"
         nohup python scripts/launcher.py > "$PROJECT_ROOT/logs/launcher.log" 2>&1 &
@@ -495,20 +495,20 @@ case "${1:-help}" in
         fi
 
         if [ "${NO_TUNNEL:-0}" = 1 ]; then
-            export WECLI_NO_TUNNEL=1
+            export CLAWCROSS_NO_TUNNEL=1
         else
-            unset WECLI_NO_TUNNEL
+            unset CLAWCROSS_NO_TUNNEL
         fi
         print_magic_links
-        unset WECLI_NO_TUNNEL 2>/dev/null || true
+        unset CLAWCROSS_NO_TUNNEL 2>/dev/null || true
         echo ""
-        print_wecli_docs_hint
+        print_clawcross_docs_hint
         exit 0
         ;;
 
     start-foreground|start-fg)
-        _wecli_parse_start_flags "$@"
-        run_wecli_setup_if_needed
+        _clawcross_parse_start_flags "$@"
+        run_clawcross_setup_if_needed
         # Auto-create .env if missing
         if [ ! -f config/.env ]; then
             echo "📋 config/.env 不存在，自动从模板初始化..."
@@ -519,8 +519,8 @@ case "${1:-help}" in
         if [ "${NO_OPENCLAW:-0}" != 1 ]; then
             if [ -z "${LLM_API_KEY:-}" ] || [ "${LLM_API_KEY:-}" = "your_api_key_here" ]; then
                 echo ""
-                echo "🔄 LLM_API_KEY 仍为占位/空：尝试从 OpenClaw 同步到 Wecli .env（可忽略失败）..."
-                python selfskill/scripts/configure_openclaw.py --import-wecli-llm-from-openclaw || true
+                echo "🔄 LLM_API_KEY 仍为占位/空：尝试从 OpenClaw 同步到 Clawcross .env（可忽略失败）..."
+                python selfskill/scripts/configure_openclaw.py --import-clawcross-llm-from-openclaw || true
                 source config/.env 2>/dev/null || true
             fi
         else
@@ -533,26 +533,26 @@ case "${1:-help}" in
             echo "ℹ️  start-foreground 本身不启动 Tunnel；--no-tunnel 与此模式无关，已忽略。"
         fi
 
-        stop_wecli_service_processes || true
+        stop_clawcross_service_processes || true
         rm -f "$PIDFILE"
 
         echo "🚀 前台启动 WeBot (headless)..."
         echo "   当前终端会持续占用；按 Ctrl+C 可停止所有服务"
         export WEBOT_HEADLESS=1
         if [ "${NO_OPENCLAW:-0}" = 1 ]; then
-            export WECLI_NO_OPENCLAW=1
+            export CLAWCROSS_NO_OPENCLAW=1
         else
-            unset WECLI_NO_OPENCLAW
+            unset CLAWCROSS_NO_OPENCLAW
         fi
         exec python scripts/launcher.py
         ;;
     stop)
-        if stop_wecli_service_processes; then
+        if stop_clawcross_service_processes; then
             rm -f "$PIDFILE"
             echo "✅ WeBot 已停止"
         else
             rm -f "$PIDFILE" 2>/dev/null || true
-            echo "未找到 Wecli 进程，服务可能未运行"
+            echo "未找到 Clawcross 进程，服务可能未运行"
         fi
         exit 0
         ;;
@@ -565,12 +565,12 @@ case "${1:-help}" in
             TRACKED_PID=$(cat "$PIDFILE")
         fi
 
-        mapfile -t SERVICE_PIDS < <(get_wecli_service_pids)
+        mapfile -t SERVICE_PIDS < <(get_clawcross_service_pids)
         if [ -n "$TRACKED_PID" ]; then
             echo "✅ WeBot 正在运行 (launcher PID: $TRACKED_PID)"
         elif [ "${#SERVICE_PIDS[@]}" -gt 0 ]; then
             rm -f "$PIDFILE" 2>/dev/null || true
-            echo "⚠️  检测到 Wecli 服务仍在运行，但 launcher PID 文件已失效"
+            echo "⚠️  检测到 Clawcross 服务仍在运行，但 launcher PID 文件已失效"
             echo "   活跃进程: ${SERVICE_PIDS[*]}"
             echo "   这通常发生在前台启动，或由外部进程管理器接管 launcher 的场景"
         else
@@ -602,7 +602,7 @@ case "${1:-help}" in
         print_wsl_access_hint
         print_magic_links
         echo ""
-        print_wecli_docs_hint
+        print_clawcross_docs_hint
         exit 0
         ;;
 
@@ -652,7 +652,7 @@ case "${1:-help}" in
         ;;
 
     sync-openclaw-llm)
-        python selfskill/scripts/configure_openclaw.py --sync-wecli-llm
+        python selfskill/scripts/configure_openclaw.py --sync-clawcross-llm
         exit $?
         ;;
 
@@ -694,7 +694,7 @@ case "${1:-help}" in
             python selfskill/scripts/configure_openclaw.py --auto-detect
             if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
                 echo ""
-                echo "💡 如果 Wecli 在安装或重配 OpenClaw 之前已启动，请执行一次 stop -> start，"
+                echo "💡 如果 Clawcross 在安装或重配 OpenClaw 之前已启动，请执行一次 stop -> start，"
                 echo "   让 OASIS 重新加载 openclaw CLI 和 gateway 设置："
                 echo "   bash selfskill/scripts/run.sh stop"
                 echo "   bash selfskill/scripts/run.sh start"
@@ -707,7 +707,7 @@ case "${1:-help}" in
         # 2. OpenClaw 未安装
         echo "⚠️  OpenClaw 未安装"
         echo ""
-        echo "OpenClaw 是一个本地 AI 助手，Wecli 可以通过它进行可视化工作流编排。"
+        echo "OpenClaw 是一个本地 AI 助手，Clawcross 可以通过它进行可视化工作流编排。"
         python selfskill/scripts/configure_openclaw.py --install-guide
         echo ""
 
@@ -787,11 +787,11 @@ case "${1:-help}" in
                     echo "   自动化 / 无交互模式: openclaw onboard --non-interactive --accept-risk --install-daemon"
                     echo "   如需复用现有 OpenAI key，可追加: --openai-api-key <LLM_API_KEY>"
                     echo ""
-                    echo "   之后启用 Wecli 所需的 HTTP 兼容端点："
+                    echo "   之后启用 Clawcross 所需的 HTTP 兼容端点："
                     echo "   openclaw config set gateway.http.endpoints.chatCompletions.enabled true"
                     echo "   openclaw gateway restart"
                     echo ""
-                    echo "   向导完成后，再次运行此命令以自动配置 Wecli 集成："
+                    echo "   向导完成后，再次运行此命令以自动配置 Clawcross 集成："
                     echo "   bash selfskill/scripts/run.sh check-openclaw"
                 else
                     echo "❌ OpenClaw 安装失败，请检查 npm 和网络状态"
@@ -800,7 +800,7 @@ case "${1:-help}" in
                 ;;
             *)
                 echo "⏭️  跳过 OpenClaw 安装"
-                echo "   Wecli 仍可正常使用（无法使用 OpenClaw 可视化编排功能）"
+                echo "   Clawcross 仍可正常使用（无法使用 OpenClaw 可视化编排功能）"
                 echo "   稍后可随时运行: bash selfskill/scripts/run.sh check-openclaw"
                 ;;
         esac
@@ -877,14 +877,14 @@ case "${1:-help}" in
         echo "当前 '$2' 的 channel 绑定："
         mapfile -t CURRENT_BINDINGS < <(list_openclaw_agent_bindings "$OPENCLAW_CLI" "$2")
         if [ "${#CURRENT_BINDINGS[@]}" -eq 0 ]; then
-            echo "  (暂未读到绑定结果，请刷新 OpenClaw / Wecli 后重试)"
+            echo "  (暂未读到绑定结果，请刷新 OpenClaw / Clawcross 后重试)"
         else
             for binding in "${CURRENT_BINDINGS[@]}"; do
                 echo "  $binding"
             done
         fi
         echo ""
-        echo "可在 Wecli 中刷新 OpenClaw Channels 标签，或执行："
+        echo "可在 Clawcross 中刷新 OpenClaw Channels 标签，或执行："
         echo "  uv run scripts/cli.py openclaw bindings --agent $2"
         exit 0
         ;;
@@ -992,14 +992,14 @@ case "${1:-help}" in
         echo "  configure --show               查看当前配置"
         echo "  configure --init               从模板初始化 .env"
         echo "  auto-model                     查询 API 可用模型列表（供 agent 选择）"
-        echo "  sync-openclaw-llm              将 Wecli 当前 LLM 配置回写到 OpenClaw"
+        echo "  sync-openclaw-llm              将 Clawcross 当前 LLM 配置回写到 OpenClaw"
         echo "  check-openclaw                 检测/安装 OpenClaw 并自动配置集成"
         echo "  check-openclaw-weixin          检测/安装 OpenClaw 微信插件并提示扫码/绑定"
         echo "  bind-openclaw-channel <agent> <bind_key>  绑定 OpenClaw channel 到指定 agent"
         echo "  cli <command> [args]           命令行控制工具（chat/sessions/settings 等）"
         echo "  help                           显示此帮助"
         echo ""
-        print_wecli_docs_hint
+        print_clawcross_docs_hint
         exit 0
         ;;
 

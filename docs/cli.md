@@ -1,4 +1,4 @@
-# Wecli CLI 命令大全
+# Clawcross CLI 命令大全
 
 > 最后更新：2026-04-01
 
@@ -7,18 +7,18 @@
 **使用项目根目录作为工作目录，通过 `uv run` 直接执行：**
 
 ```bash
-cd /path/to/Wecli
+cd /path/to/Clawcross
 uv run scripts/cli.py [参数...]
 ```
 
 **Windows PowerShell：**
 
 ```powershell
-Set-Location C:\path\to\Wecli
+Set-Location C:\path\to\Clawcross
 uv run .\scripts\cli.py [参数...]
 ```
 
-> 不需要额外安装 `wecli` 命令或设置 alias。直接在项目目录下用 `uv run` 即可，它会自动解析项目依赖并执行。
+> 不需要额外安装 `clawcross` 命令或设置 alias。直接在项目目录下用 `uv run` 即可，它会自动解析项目依赖并执行。
 > 如果你更想复用当前虚拟环境，也可以直接运行 `.venv\Scripts\python.exe .\scripts\cli.py [参数...]`。
 
 ## 概览
@@ -486,7 +486,7 @@ uv run scripts/cli.py -u Avalon_01 teams snapshot-download --team-name myteam -o
 
 # 团队快照 — 选择性导出（通过 --include JSON）
 uv run scripts/cli.py -u Avalon_01 teams snapshot-download --team-name myteam \
-  --include '{"agents":true,"personas":true,"skills":{"OpenClaw助手":["Wecli","ChatBot"]},"cron":true,"workflows":true}'
+  --include '{"agents":true,"personas":true,"skills":{"OpenClaw助手":["Clawcross","ChatBot"]},"cron":true,"workflows":true}'
 
 # 团队快照 — 上传恢复
 uv run scripts/cli.py -u Avalon_01 teams snapshot-upload --team-name myteam --file snapshot.zip
@@ -529,7 +529,7 @@ uv run scripts/cli.py -u Avalon_01 teams snapshot-preview --team-name myteam
 
 🔧 skills — OpenClaw Agent 技能 (1 个 Agent):
   • OpenClaw助手  (global: main)  — 5 skills:
-    - Wecli
+    - Clawcross
     - ChatBot
     - WebSearch
     - CodeHelper
@@ -574,7 +574,7 @@ uv run scripts/cli.py -u Avalon_01 teams snapshot-preview --team-name myteam
 |------|------|------|
 | 全量 | `"skills": true` | 导出所有 Agent 的所有 skill |
 | 按 Agent | `"skills": {"OpenClaw助手": true}` | 只导出该 Agent 的全部 skill |
-| 按 Skill | `"skills": {"OpenClaw助手": ["Wecli", "ChatBot"]}` | 只导出该 Agent 下指定的 skill |
+| 按 Skill | `"skills": {"OpenClaw助手": ["Clawcross", "ChatBot"]}` | 只导出该 Agent 下指定的 skill |
 
 #### 使用示例
 
@@ -596,15 +596,15 @@ uv run scripts/cli.py -u admin teams snapshot-download --team-name myteam \
 
 # 5. 只导出特定 Agent 的特定 skill
 uv run scripts/cli.py -u admin teams snapshot-download --team-name myteam \
-  --include '{"skills":{"OpenClaw助手":["Wecli","ChatBot"]}}'
+  --include '{"skills":{"OpenClaw助手":["Clawcross","ChatBot"]}}'
 
 # 6. 混合选择：导出 agents + 特定 skills + cron
 uv run scripts/cli.py -u admin teams snapshot-download --team-name myteam \
-  --include '{"agents":true,"skills":{"OpenClaw助手":["Wecli"]},"cron":true}'
+  --include '{"agents":true,"skills":{"OpenClaw助手":["Clawcross"]},"cron":true}'
 
 # 7. 多个 Agent，一个全选，一个选特定 skill
 uv run scripts/cli.py -u admin teams snapshot-download --team-name myteam \
-  --include '{"skills":{"OpenClaw助手":["Wecli"],"另一个Agent":true}}'
+  --include '{"skills":{"OpenClaw助手":["Clawcross"],"另一个Agent":true}}'
 ```
 
 > 先运行 `snapshot-preview` 查看可导出内容，再根据预览结果构造 `--include` JSON。`snapshot-preview` 命令末尾也会自动生成选择性导出的示例命令。

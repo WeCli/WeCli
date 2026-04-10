@@ -193,7 +193,7 @@ class ZepGraphProvider:
     def __init__(self):
         self.api_key = os.getenv("ZEP_API_KEY", "").strip()
         self.base_url = os.getenv("ZEP_API_BASE_URL", "").strip()
-        self.graph_prefix = _slugify(os.getenv("OASIS_ZEP_GRAPH_PREFIX", "wecli-oasis"), "wecli-oasis")
+        self.graph_prefix = _slugify(os.getenv("OASIS_ZEP_GRAPH_PREFIX", "clawcross-oasis"), "clawcross-oasis")
         self._client = None
 
     def available(self) -> bool:

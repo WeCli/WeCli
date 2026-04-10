@@ -2,7 +2,7 @@
 """Skill Import Tools — Python-native implementations for data collection.
 
 Replaces the Node.js-based tools from colleague-skill and supervisor repos with
-pure-Python equivalents that run inside Wecli without external dependencies.
+pure-Python equivalents that run inside Clawcross without external dependencies.
 
 Two main capabilities:
   1. ArXiv search for academic mentor distillation (replaces supervisor/tools/arxiv-search.mjs)
@@ -76,7 +76,7 @@ def search_arxiv(
     xml_bytes = b""
     for attempt in range(3):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Wecli/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "Clawcross/1.0"})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 xml_bytes = resp.read()
             # ArXiv returns plain text "Rate exceeded." on rate limit
@@ -458,7 +458,7 @@ def feishu_collect_user_messages(
     short_msgs = [m for m in all_messages if len(m.get("content", "")) <= 50]
 
     lines = [
-        "# 飞书消息记录（Wecli 自动采集）",
+        "# 飞书消息记录（Clawcross 自动采集）",
         f"目标：{target_name}",
         f"共 {len(all_messages)} 条消息",
         "",

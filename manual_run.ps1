@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 $projectRoot = $PSScriptRoot
 . (Join-Path $projectRoot "scripts\common.ps1")
 
-Set-WecliUtf8
+Set-ClawcrossUtf8
 $runScript = Join-Path $projectRoot "selfskill\scripts\run.ps1"
 $envPath = Join-Path $projectRoot "config\.env"
 
@@ -18,7 +18,7 @@ if (-not (Test-Path $envPath)) {
     & $runScript configure --init
 }
 
-$envValues = Read-WecliEnvFile -Path $envPath
+$envValues = Read-ClawcrossEnvFile -Path $envPath
 $apiKeyConfigured = $envValues.ContainsKey("LLM_API_KEY") -and `
     -not [string]::IsNullOrWhiteSpace($envValues["LLM_API_KEY"]) -and `
     $envValues["LLM_API_KEY"] -ne "your_api_key_here"
@@ -33,7 +33,7 @@ if (-not $apiKeyConfigured) {
     Write-Host "LLM API configuration already exists."
 }
 
-$envValues = Read-WecliEnvFile -Path $envPath
+$envValues = Read-ClawcrossEnvFile -Path $envPath
 $modelConfigured = $envValues.ContainsKey("LLM_MODEL") -and `
     -not [string]::IsNullOrWhiteSpace($envValues["LLM_MODEL"])
 

@@ -95,7 +95,7 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run Studio browser smoke
         env:
-          WECLI_TEST_PYTHON: ${{ github.workspace }}/.venv/bin/python
+          CLAWCROSS_TEST_PYTHON: ${{ github.workspace }}/.venv/bin/python
         run: npm run test:browser-smoke
       - name: Upload Playwright report
         if: failure()

@@ -1,7 +1,7 @@
 """
 Town Genesis / Swarm blueprint generation for OASIS topics.
 
-This is the lightweight bridge between Wecli's existing OASIS discussion
+This is the lightweight bridge between Clawcross's existing OASIS discussion
 runtime and a MiroFish-style "world generation" layer:
 
 - build an immediate scaffold so Town can show a graph right away
@@ -853,7 +853,7 @@ def generate_swarm_blueprint(
 
     discussion_excerpt = _build_discussion_excerpt(posts=posts, timeline=timeline, conclusion=conclusion)
     system_prompt = (
-        "You design compact multi-agent prediction blueprints for Wecli OASIS Town.\n"
+        "You design compact multi-agent prediction blueprints for Clawcross OASIS Town.\n"
         "Return JSON only. No markdown, no prose.\n\n"
         "JSON schema:\n"
         "{\n"

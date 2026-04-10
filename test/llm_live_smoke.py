@@ -4,7 +4,7 @@ Opt-in live smoke test for a real LLM provider.
 Resolution order for config:
 1. CLI flags
 2. LLM_LIVE_* environment variables
-3. Wecli config/.env LLM_* values
+3. Clawcross config/.env LLM_* values
 """
 
 from __future__ import annotations

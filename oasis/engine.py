@@ -15,7 +15,7 @@ Three expert backends:
      - ACP agent support: tag (codex, claude, gemini, aider, etc) determines the ACP binary;
        model "agent:<name>[:<session>]" prefers ACP persistent connection,
        falls back to HTTP API if ACP unavailable and api_url is configured.
-       Session suffix defaults to weclichat if not specified in model (aligned with group ACP).
+       Session suffix defaults to clawcrosschat if not specified in model (aligned with group ACP).
 
 专家池来源（仅 YAML，需要 schedule_file 或 schedule_yaml）：
   专家池完全从 YAML 专家名称构建（去重）。
@@ -179,7 +179,7 @@ def _find_tag_in_internal_agents(agents: list[dict], session_id: str) -> str:
 def _extract_selector_choice(content: str) -> int | None:
     """从帖子的内容中提取选择器选择编号。
 
-    解析 wecli_type JSON：{"wecli_type": "oasis choose", "choose": N, ...}
+    解析 clawcross_type JSON：{"clawcross_type": "oasis choose", "choose": N, ...}
     读取 'choose' 字段，可以是：
       - int：直接使用
       - str：如果为数字则转换为 int
@@ -205,7 +205,7 @@ def _extract_selector_choice(content: str) -> int | None:
     for candidate in candidates:
         try:
             obj = json.loads(candidate)
-            if isinstance(obj, dict) and obj.get("wecli_type") == "oasis choose":
+            if isinstance(obj, dict) and obj.get("clawcross_type") == "oasis choose":
                 choose_val = obj.get("choose")
                 if isinstance(choose_val, int):
                     return choose_val
@@ -907,7 +907,7 @@ class DiscussionEngine:
                         if p.author in node_author_names:
                             selector_output = p.content
                             break
-                    # Extract choice number from wecli_type JSON ("oasis choose")
+                    # Extract choice number from clawcross_type JSON ("oasis choose")
                     print(f"  [OASIS] 🔍 Selector '{nid}' raw output (first 200 chars): {selector_output[:200]!r}")
                     choice_num = _extract_selector_choice(selector_output)
                     if choice_num is not None:
@@ -1102,13 +1102,13 @@ class DiscussionEngine:
                             '\n\n🔴 关键格式要求（必须严格遵守）：\n'
                             '你可以先进行分析和推理，但在回复中必须包含一个 JSON 对象来表达你的最终选择，'
                             '格式如下（不要包含 markdown 代码块标记，不要包含注释）：\n'
-                            '{"wecli_type": "oasis choose", "choose": N, "content": "选择理由"}\n\n'
+                            '{"clawcross_type": "oasis choose", "choose": N, "content": "选择理由"}\n\n'
                             '其中 N 是你选择的编号（数字），例如：\n'
-                            '{"wecli_type": "oasis choose", "choose": 1, "content": "选择路径1，因为..."}\n'
-                            '{"wecli_type": "oasis choose", "choose": 2, "content": "选择路径2，因为..."}\n\n'
+                            '{"clawcross_type": "oasis choose", "choose": 1, "content": "选择路径1，因为..."}\n'
+                            '{"clawcross_type": "oasis choose", "choose": 2, "content": "选择路径2，因为..."}\n\n'
                             '⚠️ 重要：\n'
                             '- JSON 前后可以有其他文字（分析推理等），系统会自动提取 JSON 部分\n'
-                            '- "wecli_type" 必须为 "oasis choose"\n'
+                            '- "clawcross_type" 必须为 "oasis choose"\n'
                             '- "choose" 必须是一个数字，对应上面的选择编号\n'
                             '- 不输出此格式将导致默认选择第一项\n'
                         )

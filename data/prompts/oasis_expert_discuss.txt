@@ -7,7 +7,7 @@
 
 请在回复中包含一个 JSON 对象（不要包含 markdown 代码块标记，不要包含注释）:
 {{
-  "wecli_type": "oasis reply",
+  "clawcross_type": "oasis reply",
   "reply_to": 2,
   "content": "你的观点（200字以内，观点鲜明）",
   "votes": [

@@ -68,12 +68,12 @@
 
     var CREATOR_I18N = {
         'zh-CN': {
-            creator_page_title: 'WeCli Creator',
+            creator_page_title: 'ClawCross Creator',
             creator_nav_msgcenter: '← 消息中心',
             creator_lang_label: '语言',
-            creator_nav_studio: 'WeCli Studio',
-            creator_badge: 'WeCli Creator · AI + TinyFish Powered',
-            creator_hero_text: '描述你的业务场景或任务目标，WeCli Creator 通过 AI Agent 发现相关 SOP/组织架构 URL，由 TinyFish 深度提取角色数据，再由 AI 智能构建 DAG 工作流，自动生成包含 Persona、工作流和依赖图的多 Agent 协作团队。',
+            creator_nav_studio: 'ClawCross Studio',
+            creator_badge: 'ClawCross Creator · AI + TinyFish Powered',
+            creator_hero_text: '描述你的业务场景或任务目标，ClawCross Creator 通过 AI Agent 发现相关 SOP/组织架构 URL，由 TinyFish 深度提取角色数据，再由 AI 智能构建 DAG 工作流，自动生成包含 Persona、工作流和依赖图的多 Agent 协作团队。',
             creator_status_ready: '就绪',
             creator_status_ready_hint: '输入任务描述开始构建团队',
             creator_step1_title: '描述你的团队目标',
@@ -89,7 +89,7 @@
             creator_import_colleague_title: '导入同事 Skill',
             creator_import_colleague_hint: '可以直接从飞书采集并生成同事，或者导入 colleague-skill 已生成的文件。',
             creator_generate_colleague_kicker: '🪶 直接生成',
-            creator_generate_colleague_hint: '填写飞书应用信息和同事基本资料，WeCli Creator 会采集消息、自动蒸馏 persona/work，并直接导入为团队角色。',
+            creator_generate_colleague_hint: '填写飞书应用信息和同事基本资料，ClawCross Creator 会采集消息、自动蒸馏 persona/work，并直接导入为团队角色。',
             creator_feishu_app_id_label: '飞书 App ID',
             creator_feishu_app_id_placeholder: '例如: cli_xxx',
             creator_feishu_app_secret_label: '飞书 App Secret',
@@ -99,7 +99,7 @@
             creator_feishu_role_label: '岗位',
             creator_feishu_role_placeholder: '例如: 后端工程师',
             creator_feishu_company_label: '公司 / 团队',
-            creator_feishu_company_placeholder: '例如: Wecli',
+            creator_feishu_company_placeholder: '例如: Clawcross',
             creator_feishu_level_label: '层级',
             creator_feishu_level_placeholder: '例如: L4 / P6',
             creator_feishu_personality_tags_label: '性格标签（逗号分隔）',
@@ -115,7 +115,7 @@
             creator_import_mentor_title: '导入导师 Skill',
             creator_import_mentor_hint: '可以直接从 ArXiv 搜索生成导师，或者导入 supervisor 已生成的文件。',
             creator_generate_mentor_kicker: '📚 直接生成',
-            creator_generate_mentor_hint: '输入导师姓名后，WeCli Creator 会搜索 ArXiv、生成导师档案，并直接导入为团队角色。',
+            creator_generate_mentor_hint: '输入导师姓名后，ClawCross Creator 会搜索 ArXiv、生成导师档案，并直接导入为团队角色。',
             creator_arxiv_author_name_label: '导师姓名',
             creator_arxiv_author_name_placeholder: '例如: Geoffrey Hinton',
             creator_arxiv_affiliation_label: '机构（可选）',
@@ -140,7 +140,7 @@
             creator_import_mentor_json_path_placeholder: '例如: ~/.claude/mentors/Geoffrey_Hinton.json',
             creator_import_skill_md_path: 'SKILL.md 路径（可选）',
             creator_import_skill_md_path_placeholder: '例如: ~/.claude/skills/geoffrey-hinton/SKILL.md',
-            creator_import_btn: '📥 导入到 WeCli Creator',
+            creator_import_btn: '📥 导入到 ClawCross Creator',
             creator_import_success: '导入成功！',
             creator_import_error: '导入失败',
             creator_step2_manual_kicker: 'Step 2 · 手动定义',
@@ -176,7 +176,7 @@
             creator_step3_title: '团队预览',
             creator_build_btn: '🔨 构建团队',
             creator_download_btn: '📦 下载 ZIP',
-            creator_import_btn: '📥 导入到 Wecli',
+            creator_import_btn: '📥 导入到 Clawcross',
             creator_workflow_dag_title: 'OASIS Workflow DAG',
             creator_zoom_out: '缩小',
             creator_zoom_in: '放大',
@@ -273,12 +273,12 @@
             creator_example_task_desc: '负责一个 B2B SaaS 产品从用户增长到续费的全链路运营，包括获客、激活、留存、变现、推荐五个阶段，需要数据分析驱动决策，结合内容营销和产品内增长手段。'
         },
         en: {
-            creator_page_title: 'WeCli Creator',
+            creator_page_title: 'ClawCross Creator',
             creator_nav_msgcenter: '← Message Center',
             creator_lang_label: 'Language',
-            creator_nav_studio: 'WeCli Studio',
-            creator_badge: 'WeCli Creator · AI + TinyFish Powered',
-            creator_hero_text: 'Describe your business scenario or target workflow. WeCli Creator uses AI Agents to discover relevant SOP and org-structure URLs, uses TinyFish to extract role data, and then builds a DAG workflow to generate a multi-agent team with personas, workflow, and dependency graph.',
+            creator_nav_studio: 'ClawCross Studio',
+            creator_badge: 'ClawCross Creator · AI + TinyFish Powered',
+            creator_hero_text: 'Describe your business scenario or target workflow. ClawCross Creator uses AI Agents to discover relevant SOP and org-structure URLs, uses TinyFish to extract role data, and then builds a DAG workflow to generate a multi-agent team with personas, workflow, and dependency graph.',
             creator_status_ready: 'Ready',
             creator_status_ready_hint: 'Describe the task to start building the team',
             creator_step1_title: 'Describe Your Team Goal',
@@ -294,7 +294,7 @@
             creator_import_colleague_title: 'Import Colleague Skill',
             creator_import_colleague_hint: 'Generate a colleague directly from Feishu or import artifacts from colleague-skill.',
             creator_generate_colleague_kicker: '🪶 Direct Generate',
-            creator_generate_colleague_hint: 'Provide Feishu app credentials and basic colleague info. WeCli Creator will collect messages, distill persona/work, and import the role directly.',
+            creator_generate_colleague_hint: 'Provide Feishu app credentials and basic colleague info. ClawCross Creator will collect messages, distill persona/work, and import the role directly.',
             creator_feishu_app_id_label: 'Feishu App ID',
             creator_feishu_app_id_placeholder: 'e.g. cli_xxx',
             creator_feishu_app_secret_label: 'Feishu App Secret',
@@ -304,7 +304,7 @@
             creator_feishu_role_label: 'Role',
             creator_feishu_role_placeholder: 'e.g. Backend Engineer',
             creator_feishu_company_label: 'Company / Team',
-            creator_feishu_company_placeholder: 'e.g. Wecli',
+            creator_feishu_company_placeholder: 'e.g. Clawcross',
             creator_feishu_level_label: 'Level',
             creator_feishu_level_placeholder: 'e.g. L4 / P6',
             creator_feishu_personality_tags_label: 'Personality Tags (comma separated)',
@@ -320,7 +320,7 @@
             creator_import_mentor_title: 'Import Mentor Skill',
             creator_import_mentor_hint: 'Generate a mentor directly from ArXiv or import artifacts from supervisor.',
             creator_generate_mentor_kicker: '📚 Direct Generate',
-            creator_generate_mentor_hint: 'Enter a mentor name and WeCli Creator will search ArXiv, build the mentor profile, and import it directly.',
+            creator_generate_mentor_hint: 'Enter a mentor name and ClawCross Creator will search ArXiv, build the mentor profile, and import it directly.',
             creator_arxiv_author_name_label: 'Mentor Name',
             creator_arxiv_author_name_placeholder: 'e.g. Geoffrey Hinton',
             creator_arxiv_affiliation_label: 'Affiliation (optional)',
@@ -345,7 +345,7 @@
             creator_import_mentor_json_path_placeholder: 'e.g. ~/.claude/mentors/Geoffrey_Hinton.json',
             creator_import_skill_md_path: 'SKILL.md path (optional)',
             creator_import_skill_md_path_placeholder: 'e.g. ~/.claude/skills/geoffrey-hinton/SKILL.md',
-            creator_import_btn: '📥 Import to WeCli Creator',
+            creator_import_btn: '📥 Import to ClawCross Creator',
             creator_import_success: 'Import successful!',
             creator_import_error: 'Import failed',
             creator_step2_manual_kicker: 'Step 2 · Manual Setup',
@@ -381,7 +381,7 @@
             creator_step3_title: 'Team Preview',
             creator_build_btn: '🔨 Build Team',
             creator_download_btn: '📦 Download ZIP',
-            creator_import_btn: '📥 Import to Wecli',
+            creator_import_btn: '📥 Import to Clawcross',
             creator_workflow_dag_title: 'OASIS Workflow DAG',
             creator_zoom_out: 'Zoom out',
             creator_zoom_in: 'Zoom in',
@@ -489,7 +489,7 @@
     function readCurrentLang() {
         var primary = normalizeLang(window.localStorage.getItem('lang'));
         if (primary && CREATOR_I18N[primary]) return primary;
-        var secondary = normalizeLang(window.localStorage.getItem('wecli_lang'));
+        var secondary = normalizeLang(window.localStorage.getItem('clawcross_lang'));
         if (secondary && CREATOR_I18N[secondary]) return secondary;
         var browserLang = normalizeLang((navigator.language || navigator.userLanguage || '').trim());
         return CREATOR_I18N[browserLang] ? browserLang : 'zh-CN';
@@ -500,7 +500,7 @@
     function persistLang(lang) {
         var normalized = normalizeLang(lang);
         window.localStorage.setItem('lang', normalized);
-        window.localStorage.setItem('wecli_lang', normalized === 'en' ? 'en' : 'zh');
+        window.localStorage.setItem('clawcross_lang', normalized === 'en' ? 'en' : 'zh');
     }
 
     function t(key, vars) {
@@ -702,8 +702,8 @@
         });
 
         refreshDynamicTextNodes();
-        if (window.__WecliCreatorBuilder && typeof window.__WecliCreatorBuilder.refreshI18n === 'function') {
-            window.__WecliCreatorBuilder.refreshI18n();
+        if (window.__ClawcrossCreatorBuilder && typeof window.__ClawcrossCreatorBuilder.refreshI18n === 'function') {
+            window.__ClawcrossCreatorBuilder.refreshI18n();
         }
     }
 
@@ -713,7 +713,7 @@
         applyTranslations();
     }
 
-    window.WecliCreatorI18n = {
+    window.ClawcrossCreatorI18n = {
         t: t,
         getLang: function () { return currentLang; },
         toggleLanguage: toggleLanguage,
@@ -745,7 +745,7 @@
                 previewStatusTone: 'muted',
             },
         };
-        var CREATOR_SESSION_KEY = 'wecli_creator_session_v1';
+        var CREATOR_SESSION_KEY = 'clawcross_creator_session_v1';
         var persistTimer = null;
         var suppressPersistence = false;
         var extractionTabBarBound = false;
@@ -800,7 +800,7 @@
                 }
                 window.sessionStorage.setItem(CREATOR_SESSION_KEY, JSON.stringify(snapshot));
             } catch (err) {
-                console.warn('[WecliCreator] session persistence failed:', err);
+                console.warn('[ClawcrossCreator] session persistence failed:', err);
             }
         }
 
@@ -1613,7 +1613,7 @@
                     setBuilderStatus('已恢复刷新前的记录；浏览器刷新会中断实时发现/构建，需要手动继续。', 'warning');
                     if (state.teamConfig) {
                         setPreviewStatus(
-                            statusSnapshot.previewStatusText || '已恢复构建结果，仍可下载 ZIP 或导入 Wecli',
+                            statusSnapshot.previewStatusText || '已恢复构建结果，仍可下载 ZIP 或导入 Clawcross',
                             statusSnapshot.previewStatusTone || 'success'
                         );
                     } else {
@@ -2044,8 +2044,8 @@
         }
 
         function eventDetail(event) {
-            if (window.WecliTinyFish && window.WecliTinyFish.formatTinyFishEventDetail) {
-                return window.WecliTinyFish.formatTinyFishEventDetail(event, { maxLength: 800 });
+            if (window.ClawcrossTinyFish && window.ClawcrossTinyFish.formatTinyFishEventDetail) {
+                return window.ClawcrossTinyFish.formatTinyFishEventDetail(event, { maxLength: 800 });
             }
             return '';
         }
@@ -2204,17 +2204,17 @@
                     throw new Error(errData.error || 'Discovery failed (HTTP ' + resp.status + ')');
                 }
 
-                if (!window.WecliTinyFish || !window.WecliTinyFish.consumeJsonSseStream) {
+                if (!window.ClawcrossTinyFish || !window.ClawcrossTinyFish.consumeJsonSseStream) {
                     throw new Error('TinyFish live helper 未加载');
                 }
 
-                await window.WecliTinyFish.consumeJsonSseStream(resp, async function (event) {
-                    if (window.WecliTinyFish && window.WecliTinyFish.normalizeTinyFishEvent) {
-                        event = window.WecliTinyFish.normalizeTinyFishEvent(event);
+                await window.ClawcrossTinyFish.consumeJsonSseStream(resp, async function (event) {
+                    if (window.ClawcrossTinyFish && window.ClawcrossTinyFish.normalizeTinyFishEvent) {
+                        event = window.ClawcrossTinyFish.normalizeTinyFishEvent(event);
                     }
                     var type = String(event._tinyfish_type || event.type || '').toUpperCase();
-                    var label = window.WecliTinyFish && window.WecliTinyFish.getTinyFishEventLabel
-                        ? window.WecliTinyFish.getTinyFishEventLabel(event)
+                    var label = window.ClawcrossTinyFish && window.ClawcrossTinyFish.getTinyFishEventLabel
+                        ? window.ClawcrossTinyFish.getTinyFishEventLabel(event)
                         : (type || 'EVENT');
 
                     if (type === 'STREAMING_URL') {
@@ -2222,7 +2222,7 @@
                         appendDiscoveryLog('STREAMING_URL', url, 'info');
                         return;
                     }
-                    if (window.WecliTinyFish && window.WecliTinyFish.isIgnorableHeartbeat && window.WecliTinyFish.isIgnorableHeartbeat(event)) {
+                    if (window.ClawcrossTinyFish && window.ClawcrossTinyFish.isIgnorableHeartbeat && window.ClawcrossTinyFish.isIgnorableHeartbeat(event)) {
                         return;
                     }
                     if (type === 'STARTED') {
@@ -2463,13 +2463,13 @@
                     throw new Error(errData.error || 'HTTP ' + resp.status);
                 }
 
-                await window.WecliTinyFish.consumeJsonSseStream(resp, async function (event) {
-                    if (window.WecliTinyFish && window.WecliTinyFish.normalizeTinyFishEvent) {
-                        event = window.WecliTinyFish.normalizeTinyFishEvent(event);
+                await window.ClawcrossTinyFish.consumeJsonSseStream(resp, async function (event) {
+                    if (window.ClawcrossTinyFish && window.ClawcrossTinyFish.normalizeTinyFishEvent) {
+                        event = window.ClawcrossTinyFish.normalizeTinyFishEvent(event);
                     }
                     var type = String(event._tinyfish_type || event.type || '').toUpperCase();
-                    var label = window.WecliTinyFish && window.WecliTinyFish.getTinyFishEventLabel
-                        ? window.WecliTinyFish.getTinyFishEventLabel(event)
+                    var label = window.ClawcrossTinyFish && window.ClawcrossTinyFish.getTinyFishEventLabel
+                        ? window.ClawcrossTinyFish.getTinyFishEventLabel(event)
                         : (type || 'EVENT');
                     if (type === 'STREAMING_URL') {
                         var url = event.streaming_url || event.url || '';
@@ -2478,7 +2478,7 @@
                         appendSessionLog(session, label, url, 'info');
                         return;
                     }
-                    if (window.WecliTinyFish && window.WecliTinyFish.isIgnorableHeartbeat && window.WecliTinyFish.isIgnorableHeartbeat(event)) {
+                    if (window.ClawcrossTinyFish && window.ClawcrossTinyFish.isIgnorableHeartbeat && window.ClawcrossTinyFish.isIgnorableHeartbeat(event)) {
                         return;
                     }
                     if (type === 'COMPLETE') {
@@ -2842,7 +2842,7 @@
                     $('builder-import-btn').disabled = false;
                 }
                 setBuilderPill('构建完成', 'success');
-                setBuilderStatus('团队构建成功！你可以继续手动精修 Persona，然后下载 ZIP 或直接导入 Wecli', 'success');
+                setBuilderStatus('团队构建成功！你可以继续手动精修 Persona，然后下载 ZIP 或直接导入 Clawcross', 'success');
                 setPreviewStatus('构建完成 · ' + (data.team_config.summary || {}).total_roles + ' 个角色 · Persona 可继续编辑', 'success');
             } catch (err) {
                 if (!state.selectedJobId) {
@@ -2983,7 +2983,7 @@
             setPreviewStatus('Persona 已更新，下载 ZIP / 导入团队会使用当前版本', 'success');
         }
 
-        // ── TAG_EMOJI map (matches WecliHub + Agency categories) ──
+        // ── TAG_EMOJI map (matches ClawcrossHub + Agency categories) ──
         var TAG_EMOJI = {
             creative: '🎨', critical: '🔍', data: '📊', synthesis: '🎯',
             economist: '📈', lawyer: '⚖️', cost_controller: '💰',
@@ -2998,7 +2998,7 @@
 
         function getCreatorTextLayout() {
             if (typeof window === 'undefined') return null;
-            return window.WecliTextLayout || null;
+            return window.ClawcrossTextLayout || null;
         }
 
         function getDagNodeLabel(node) {
@@ -3485,7 +3485,7 @@
                 setPreviewStatus('ZIP 已下载 ✅', 'success');
             } catch (err) {
                 setPreviewStatus('下载失败: ' + (err.message || String(err)), 'error');
-                console.error('[WecliCreator] downloadZip error:', err);
+                console.error('[ClawcrossCreator] downloadZip error:', err);
             } finally {
                 if (btn) {
                     btn.disabled = false;
@@ -3494,8 +3494,8 @@
             }
         }
 
-        // ── Import to Wecli ──
-        async function importToWecli() {
+        // ── Import to Clawcross ──
+        async function importToClawcross() {
             if (!state.teamConfig) return;
             var baseName = (($('builder-team-name') || {}).value || 'team').trim();
             setPreviewStatus('正在导入...', 'running');
@@ -3524,7 +3524,7 @@
                 var uploadResp = await fetch('/teams/snapshot/upload', { method: 'POST', body: formData });
                 var uploadData = await uploadResp.json();
                 if (!uploadResp.ok) throw new Error(uploadData.error || 'Upload failed');
-                setPreviewStatus('成功导入到 Wecli！' + (teamName !== baseName ? '（团队名已调整为 ' + teamName + '）' : ''), 'success');
+                setPreviewStatus('成功导入到 Clawcross！' + (teamName !== baseName ? '（团队名已调整为 ' + teamName + '）' : ''), 'success');
                 setBuilderPill('已导入', 'success');
                 // Show navigation dialog
                 var overlay = document.createElement('div');
@@ -3533,7 +3533,7 @@
                     '<div class="builder-modal" style="text-align:center;max-width:360px;">' +
                         '<div style="font-size:36px;margin-bottom:12px;">✅</div>' +
                         '<h3 style="margin:0 0 8px;">导入成功</h3>' +
-                        '<p class="builder-hint" style="margin-bottom:20px;">团队「' + escapeHtml(teamName) + '」已导入 Wecli，是否前往查看？</p>' +
+                        '<p class="builder-hint" style="margin-bottom:20px;">团队「' + escapeHtml(teamName) + '」已导入 Clawcross，是否前往查看？</p>' +
                         '<div class="builder-modal-actions">' +
                             '<button class="creator-btn creator-btn-secondary" id="creator-stay-btn" type="button">留在此页</button>' +
                             '<button class="creator-btn" id="creator-goto-btn" type="button">前往团队页面 →</button>' +
@@ -4071,7 +4071,7 @@
             // Build / Download / Import
             $('builder-build-btn').addEventListener('click', buildTeam);
             $('builder-download-btn').addEventListener('click', downloadZip);
-            $('builder-import-btn').addEventListener('click', importToWecli);
+            $('builder-import-btn').addEventListener('click', importToClawcross);
             $('builder-persona-grid').addEventListener('input', handlePersonaInput);
             $('builder-persona-grid').addEventListener('change', handlePersonaChange);
 
@@ -4120,7 +4120,7 @@
     })();
 
     // ─── Bootstrap ───────────────────────────────────
-    window.__WecliCreatorBuilder = BuilderModule;
+    window.__ClawcrossCreatorBuilder = BuilderModule;
 
     window.addEventListener('DOMContentLoaded', function () {
         BuilderModule.init();
@@ -4128,7 +4128,7 @@
     });
 
     window.addEventListener('storage', function (event) {
-        if (!event || (event.key !== 'lang' && event.key !== 'wecli_lang')) return;
+        if (!event || (event.key !== 'lang' && event.key !== 'clawcross_lang')) return;
         var nextLang = readCurrentLang();
         if (nextLang === currentLang) return;
         currentLang = nextLang;

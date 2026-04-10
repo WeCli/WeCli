@@ -754,9 +754,9 @@ plan:
 selector_edges:
   - source: router
     choices:
-      1: branch_a                  # {{"wecli_type": "oasis choose", "choose": 1}} → branch_a
-      2: branch_b                  # {{"wecli_type": "oasis choose", "choose": 2}} → branch_b
-      3: __end__                   # {{"wecli_type": "oasis choose", "choose": 3}} → end
+      1: branch_a                  # {{"clawcross_type": "oasis choose", "choose": 1}} → branch_a
+      2: branch_b                  # {{"clawcross_type": "oasis choose", "choose": 2}} → branch_b
+      3: __end__                   # {{"clawcross_type": "oasis choose", "choose": 3}} → end
 ```
 
 ### Parallel Groups (within plan):
@@ -791,7 +791,7 @@ plan:
 
 ## External ACP Agent — Session Number
 For external ACP agents (tag = openclaw, codex, etc), the `model` field controls session:
-- `model: "agent:<name>"` — session suffix defaults to **weclichat** (same as group-chat ACP; shared across teams)
+- `model: "agent:<name>"` — session suffix defaults to **clawcrosschat** (same as group-chat ACP; shared across teams)
 - `model: "agent:<name>:<session>"` — explicit suffix, e.g. separate isolation from the default
 The `<name>` in model is ignored for routing (real name comes from external_agents.json `global_name`).
 Session determines conversation isolation: same session = shared context, different session = separate context.

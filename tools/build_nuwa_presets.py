@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build WeCli team presets from alchaincyf/nuwa-skill ecosystem.
+"""Build ClawCross team presets from alchaincyf/nuwa-skill ecosystem.
 
 Reads SKILL.md files from cloned repos under /tmp/nuwa-skills/,
 extracts key persona sections, and generates team preset directories

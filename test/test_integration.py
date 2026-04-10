@@ -210,7 +210,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 {
                     "status": "success",
                     "session_id": "subagent__coder__worker-1",
-                    "workspace": "/tmp/wecli/workers/worker-1",
+                    "workspace": "/tmp/clawcross/workers/worker-1",
                     "plan": {"title": "Plan", "status": "active", "items": []},
                     "todos": {"items": []},
                     "verifications": [],
@@ -660,7 +660,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         }
 
         with mock.patch("shutil.which", return_value="/usr/local/bin/openclaw"), mock.patch.object(
-            front, "_read_saved_wecli_llm_config", return_value=saved
+            front, "_read_saved_clawcross_llm_config", return_value=saved
         ), mock.patch.dict(sys.modules, {"configure_openclaw": stub_module}):
             response = self.client.post("/api/export_openclaw_config", json=payload)
 

@@ -62,7 +62,7 @@ VALID_KEYS = {
 
 
 def get_run_command():
-    """返回当前平台建议使用的 Wecli 入口命令。"""
+    """返回当前平台建议使用的 Clawcross 入口命令。"""
     if os.name == "nt":
         return "powershell -ExecutionPolicy Bypass -File selfskill/scripts/run.ps1"
     return "bash selfskill/scripts/run.sh"
@@ -411,7 +411,7 @@ _OPENCLAW_SYNC_SAFE_KEYS = {"LLM_MODEL", "LLM_PROVIDER"}
 _OPENCLAW_SYNC_BATCH_KEYS = {"LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL"}
 
 
-def _has_complete_wecli_llm_config(kvs):
+def _has_complete_clawcross_llm_config(kvs):
     placeholder_values = {"", "your_api_key_here"}
     required_keys = ("LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL")
     for key in required_keys:
@@ -429,7 +429,7 @@ def _should_auto_sync_openclaw(updated_keys):
     )
 
 
-def _sync_openclaw_from_wecli(updated_keys):
+def _sync_openclaw_from_clawcross(updated_keys):
     keys = set(updated_keys or [])
     if not (keys & _OPENCLAW_SYNC_TRIGGER_KEYS):
         return
@@ -437,7 +437,7 @@ def _sync_openclaw_from_wecli(updated_keys):
         return
 
     _, kvs = read_env()
-    if not _has_complete_wecli_llm_config(kvs):
+    if not _has_complete_clawcross_llm_config(kvs):
         return
 
     run_command = get_run_command()
@@ -448,10 +448,10 @@ def _sync_openclaw_from_wecli(updated_keys):
         return
 
     script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configure_openclaw.py")
-    print("🦞 检测到 OpenClaw 已安装，正在同步 Wecli 当前 LLM 配置...")
+    print("🦞 检测到 OpenClaw 已安装，正在同步 Clawcross 当前 LLM 配置...")
     try:
         result = subprocess.run(
-            [sys.executable, script_path, "--sync-wecli-llm"],
+            [sys.executable, script_path, "--sync-clawcross-llm"],
             capture_output=True,
             text=True,
             timeout=60,
@@ -470,7 +470,7 @@ def _sync_openclaw_from_wecli(updated_keys):
     if result.returncode != 0:
         if stderr:
             print(stderr)
-        print("⚠️ Wecli 配置已写入 .env，但 OpenClaw 自动同步失败")
+        print("⚠️ Clawcross 配置已写入 .env，但 OpenClaw 自动同步失败")
 
 
 
@@ -543,7 +543,7 @@ def main():
                 success_count += 1
                 updated_keys.add(k)
 
-        _sync_openclaw_from_wecli(updated_keys)
+        _sync_openclaw_from_clawcross(updated_keys)
         
         print("-" * 60)
         print(f"📊 批量配置完成: {success_count}/{total_count} 项成功设置")
@@ -563,7 +563,7 @@ def main():
         print("-" * 60)
         
         if set_env_with_validation(key, value):
-            _sync_openclaw_from_wecli({key})
+            _sync_openclaw_from_clawcross({key})
             print("-" * 60)
             print("✅ 配置完成")
         else:

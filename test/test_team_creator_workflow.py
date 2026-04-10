@@ -12,7 +12,7 @@ if str(SRC_DIR) not in sys.path:
 import services.team_creator_service as svc
 
 
-class WecliCreatorWorkflowTests(unittest.TestCase):
+class ClawcrossCreatorWorkflowTests(unittest.TestCase):
     @mock.patch.object(svc, "enhance_workflow_graph_via_llm", return_value=None)
     def test_build_from_roles_creates_selector_review_loop(self, _mock_llm):
         roles = [

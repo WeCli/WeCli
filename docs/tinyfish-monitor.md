@@ -1,10 +1,10 @@
 # TinyFish Search Agent
 
-Use this page when you need to configure, operate, or debug Wecli's TinyFish internet search agent.
+Use this page when you need to configure, operate, or debug Clawcross's TinyFish internet search agent.
 
 ## What It Does
 
-The TinyFish search agent adds web crawling and data extraction capabilities to Wecli:
+The TinyFish search agent adds web crawling and data extraction capabilities to Clawcross:
 
 - submit site-crawl jobs to the TinyFish Web Agent API
 - persist each run and extracted data snapshots into SQLite
@@ -29,7 +29,7 @@ This feature is shared by the frontend, the scheduler, and a standalone CLI wrap
 
 ## Configuration
 
-Wecli reads these keys from `config/.env`:
+Clawcross reads these keys from `config/.env`:
 
 | Key | Purpose | Default |
 |---|---|---|
@@ -44,7 +44,7 @@ Recommended operator flow:
 
 1. Configure the keys from the settings UI's `TinyFish Monitor` group, or edit `config/.env` directly.
 2. Copy `config/tinyfish_targets.example.json` to `config/tinyfish_targets.json`.
-3. Save and restart Wecli if you changed the cron or target path so `src/utils/scheduler_service.py` can restore the scheduler job with the new values.
+3. Save and restart Clawcross if you changed the cron or target path so `src/utils/scheduler_service.py` can restore the scheduler job with the new values.
 
 ## Target File Format
 

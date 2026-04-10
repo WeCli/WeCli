@@ -2,7 +2,7 @@
 
 ## Feature Matrix
 
-| Capability | src-bak Claude Code | Wecli WeBot | openclaw-claude-code | claw-code (Python mirror) |
+| Capability | src-bak Claude Code | Clawcross WeBot | openclaw-claude-code | claw-code (Python mirror) |
 |---|---|---|---|---|
 | Startup / Init | Fast Bun bootstrap, OAuth + keychain prefetch, feature-flag driven entrypoints (`main.tsx`). | Flask + FastAPI services boot via `mainagent.py`/`front.py`, WeBot router ensures session auth before runtime payload. | Node/Bun CLI entry, session-manager prefetch. | Python script `src/main.py` entry with manifest-driven init (partial). |
 | Query Engine / Loop | `QueryEngine.ts`, streaming, compact+recovery loops. | WeBot uses Claude-compatible prompt loop via `agent.py`, `webot_context.py` budgets, compaction helpers, and runtime store hooks. | session-manager orchestrates persistent sessions with streaming. | `query_engine.py` placeholder logic; not a running agent but includes state machine sketches. |
@@ -23,7 +23,7 @@
 
 ## Current Parity Status
 
-Wecli now mirrors most of the Claude-Code-inspired product surface that is practical in a browser-first app: durable runtime store, MCP orchestration, mode gating, permission hooks, subagent control plane, run history, inbox delivery, plan/todo/verification persistence, compacted artifacts, current-session runtime UI, bridge attach/detach, voice state, buddy state, and Kairos/dream memory plumbing.
+Clawcross now mirrors most of the Claude-Code-inspired product surface that is practical in a browser-first app: durable runtime store, MCP orchestration, mode gating, permission hooks, subagent control plane, run history, inbox delivery, plan/todo/verification persistence, compacted artifacts, current-session runtime UI, bridge attach/detach, voice state, buddy state, and Kairos/dream memory plumbing.
 
 ## Outstanding Alignments
 

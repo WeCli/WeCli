@@ -3,8 +3,8 @@ const { test, expect } = require('@playwright/test');
 async function installMockWebSocket(page) {
   await page.addInitScript(() => {
     const sockets = [];
-    window.__wecliSocketUrls = [];
-    window.__wecliSocketSends = [];
+    window.__clawcrossSocketUrls = [];
+    window.__clawcrossSocketSends = [];
 
     class MockWebSocket {
       static CONNECTING = 0;
@@ -20,7 +20,7 @@ async function installMockWebSocket(page) {
         this.onerror = null;
         this.onclose = null;
         sockets.push(this);
-        window.__wecliSocketUrls.push(url);
+        window.__clawcrossSocketUrls.push(url);
         setTimeout(() => {
           this.readyState = MockWebSocket.OPEN;
           if (typeof this.onopen === 'function') this.onopen({ type: 'open' });
@@ -28,7 +28,7 @@ async function installMockWebSocket(page) {
       }
 
       send(data) {
-        window.__wecliSocketSends.push({ url: this.url, data: String(data || '') });
+        window.__clawcrossSocketSends.push({ url: this.url, data: String(data || '') });
       }
 
       close() {
@@ -38,7 +38,7 @@ async function installMockWebSocket(page) {
     }
 
     window.WebSocket = MockWebSocket;
-    window.__emitWecliSocket = (payload) => {
+    window.__emitClawcrossSocket = (payload) => {
       const data = JSON.stringify(payload);
       sockets.forEach((socket) => {
         if (socket.readyState === MockWebSocket.OPEN && typeof socket.onmessage === 'function') {
@@ -67,7 +67,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     status: 'success',
     session_id: 'main-session',
     session_role: 'main',
-    workspace: '/tmp/wecli/main',
+    workspace: '/tmp/clawcross/main',
     mode: { mode: 'execute', reason: 'Runtime panel smoke' },
     plan: {
       title: 'Execution swarm',
@@ -124,7 +124,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     relationships: { parent_session: '', children: [] },
     memory: {
       summary: '3 entries · kairos off',
-      project_slug: 'wecli-main',
+      project_slug: 'clawcross-main',
       entry_count: 3,
       can_dream: true,
       kairos_enabled: false,
@@ -160,7 +160,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
   const subagentRuntimeState = {
     status: 'success',
     session_id: 'subagent__coder__curie',
-    workspace: '/tmp/wecli/worktree/curie',
+    workspace: '/tmp/clawcross/worktree/curie',
     plan: {
       title: 'Review gate',
       status: 'active',
@@ -242,7 +242,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
     },
     memory: {
       summary: '2 entries · kairos off',
-      project_slug: 'wecli-curie',
+      project_slug: 'clawcross-curie',
       entry_count: 2,
       can_dream: true,
       kairos_enabled: false,
@@ -340,7 +340,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
       contentType: 'application/javascript',
       body: `
         window.marked = {
-          __wecliConfigured: false,
+          __clawcrossConfigured: false,
           parse: (value) => value,
           setOptions() {},
         };
@@ -392,7 +392,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
           updated_at: '2026-03-31T12:00:00',
           created_at: '2026-03-31T11:55:00',
           last_result: 'Collected runtime evidence.',
-          workspace: '/tmp/wecli/worktree/curie',
+          workspace: '/tmp/clawcross/worktree/curie',
           latest_run: { run_id: 'run-curie-1', status: 'running' },
         },
       ],
@@ -580,7 +580,7 @@ async function stubStudioNetwork(page, calls, options = {}) {
           run_command: { approval: 'manual' },
         },
         source: 'user',
-        definition_path: '/tmp/wecli/policy.json',
+        definition_path: '/tmp/clawcross/policy.json',
       },
     });
   });
@@ -693,7 +693,7 @@ test('studio workflow tab and settings actions stay responsive', async ({ page }
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('wecliStudioFirstVisitV2');
+    localStorage.removeItem('clawcrossStudioFirstVisitV2');
     localStorage.setItem('oasisTownModeEnabled', '1');
     localStorage.setItem('oasisTownWorkspaceView', 'graph');
   });
@@ -776,7 +776,7 @@ test('studio settings export button allows keyless ollama sync', async ({ page }
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('wecliStudioFirstVisitV2');
+    localStorage.removeItem('clawcrossStudioFirstVisitV2');
   });
 
   await page.goto('/studio');
@@ -827,7 +827,7 @@ test('studio webot current runtime card stays synced over bridge websocket', asy
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('wecliSessionRuntimePanelHeightV1');
+    localStorage.removeItem('clawcrossSessionRuntimePanelHeightV1');
   });
 
   await page.goto('/studio');
@@ -843,7 +843,7 @@ test('studio webot current runtime card stays synced over bridge websocket', asy
 
   await page.locator('#webot-current-session button').filter({ hasText: 'Attach' }).click();
   await expect.poll(() => calls.bridgeAttach).toBe(1);
-  await expect.poll(() => page.evaluate(() => window.__wecliSocketUrls.length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.__clawcrossSocketUrls.length)).toBe(1);
   await expect(page.locator('#webot-current-session')).toContainText('attach=ATTACH-42');
 
   const currentSessionId = await page.locator('#webot-current-session .webot-current-card-caption').evaluate((el) => {
@@ -851,14 +851,14 @@ test('studio webot current runtime card stays synced over bridge websocket', asy
   });
 
   await page.evaluate(({ sessionId }) => {
-    window.__emitWecliSocket({
+    window.__emitClawcrossSocket({
       type: 'runtime_update',
       changed_session_id: sessionId,
       runtime: {
         status: 'success',
         session_id: sessionId,
         session_role: 'main',
-        workspace: '/tmp/wecli/main',
+        workspace: '/tmp/clawcross/main',
         mode: { mode: 'execute', reason: 'Bridge live update' },
         plan: {
           title: 'Main session plan',
@@ -875,7 +875,7 @@ test('studio webot current runtime card stays synced over bridge websocket', asy
         relationships: { parent_session: '', children: [] },
         memory: {
           summary: '4 entries · kairos on · last dream just now',
-          project_slug: 'wecli-main',
+          project_slug: 'clawcross-main',
           entry_count: 4,
           can_dream: false,
           kairos_enabled: true,
@@ -960,7 +960,7 @@ test('studio webot runtime sidebar shows runtime state and resolves approvals', 
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('wecliSessionRuntimePanelHeightV1');
+    localStorage.removeItem('clawcrossSessionRuntimePanelHeightV1');
   });
 
   await page.goto('/studio');
@@ -978,11 +978,11 @@ test('studio webot runtime sidebar shows runtime state and resolves approvals', 
   await page.mouse.up();
   const runtimeHeightAfter = await runtimePanel.evaluate((el) => Math.round(el.getBoundingClientRect().height));
   expect(runtimeHeightAfter).toBeLessThan(runtimeHeightBefore);
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('wecliSessionRuntimePanelHeightV1'))).not.toBeNull();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('clawcrossSessionRuntimePanelHeightV1'))).not.toBeNull();
 
   await expect(page.locator('#webot-subagent-list')).toContainText('Curie');
   await expect(page.locator('#webot-subagent-detail')).toContainText('Review gate');
-  await expect(page.locator('#webot-subagent-detail')).toContainText('/tmp/wecli/worktree/curie');
+  await expect(page.locator('#webot-subagent-detail')).toContainText('/tmp/clawcross/worktree/curie');
   await expect(page.locator('#webot-subagent-detail')).toContainText('Flask proxy chain');
 
   await page
@@ -1025,7 +1025,7 @@ test('studio webot runtime surfaces recovery hints and applies workflow presets'
   await page.addInitScript(() => {
     window.alert = () => {};
     window.confirm = () => true;
-    localStorage.removeItem('wecliSessionRuntimePanelHeightV1');
+    localStorage.removeItem('clawcrossSessionRuntimePanelHeightV1');
   });
 
   await page.goto('/studio');
@@ -1168,7 +1168,7 @@ test('studio oasis swarm uses pretext-backed multiline labels', async ({ page })
       participants: [{ name: 'Planner', posts: 2, events: 1 }],
     });
     return {
-      ready: Boolean(window.WecliTextLayout && typeof window.WecliTextLayout.measureDisplay === 'function'),
+      ready: Boolean(window.ClawcrossTextLayout && typeof window.ClawcrossTextLayout.measureDisplay === 'function'),
       labelLineCount: node.labelLineCount,
       labelLines: node.labelLines,
       edgeLabels: Array.from(document.querySelectorAll('#oasis-swarm-canvas text')).map((el) => el.textContent || ''),

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title data-i18n="creator_page_title">WeCli Creator</title>
+    <title data-i18n="creator_page_title">ClawCross Creator</title>
     <link rel="stylesheet" href="/static/css/creator.css">
     <script src="/static/js/tinyfish-live-shared.js"></script>
 </head>
@@ -12,20 +12,20 @@
         <header class="creator-header">
             <a class="creator-link" href="/mobile_group_chat" data-i18n="creator_nav_msgcenter">← 消息中心</a>
             <div class="creator-title-wrap">
-                <div class="creator-kicker">WeCli Creator</div>
-                <h1 class="creator-title">WeCli Creator</h1>
+                <div class="creator-kicker">ClawCross Creator</div>
+                <h1 class="creator-title">ClawCross Creator</h1>
             </div>
             <div class="creator-header-actions">
                 <button
                     id="creator-lang-toggle"
                     class="creator-link creator-link-secondary creator-lang-toggle"
                     type="button"
-                    onclick="window.WecliCreatorI18n && window.WecliCreatorI18n.toggleLanguage()"
+                    onclick="window.ClawcrossCreatorI18n && window.ClawcrossCreatorI18n.toggleLanguage()"
                 >
                     <span class="creator-lang-toggle-label" data-i18n="creator_lang_label">语言</span>
                     <span id="creator-lang-toggle-text" class="creator-lang-toggle-text">EN</span>
                 </button>
-                <a class="creator-link creator-link-secondary" href="/studio" data-i18n="creator_nav_studio">WeCli Studio</a>
+                <a class="creator-link creator-link-secondary" href="/studio" data-i18n="creator_nav_studio">ClawCross Studio</a>
             </div>
         </header>
 
@@ -34,9 +34,9 @@
             <!-- Hero -->
             <section class="creator-hero">
                 <div class="creator-hero-copy">
-                    <div class="creator-badge" data-i18n="creator_badge">WeCli Creator · AI + TinyFish Powered</div>
+                    <div class="creator-badge" data-i18n="creator_badge">ClawCross Creator · AI + TinyFish Powered</div>
                     <p class="creator-hero-text" data-i18n="creator_hero_text">
-                        描述你的业务场景或任务目标，WeCli Creator 通过 AI Agent 发现相关 SOP/组织架构 URL，
+                        描述你的业务场景或任务目标，ClawCross Creator 通过 AI Agent 发现相关 SOP/组织架构 URL，
                         由 TinyFish 深度提取角色数据，再由 AI 智能构建 DAG 工作流
                         — 自动生成包含 Persona、工作流和依赖图的多 Agent 协作团队。
                     </p>
@@ -88,7 +88,7 @@
                         <p class="creator-item-subtitle" data-i18n="creator_import_colleague_hint">可以直接从飞书采集并生成同事，或者导入 colleague-skill 已生成的文件。</p>
                         <div class="builder-import-guide">
                             <div class="creator-card-kicker" data-i18n="creator_generate_colleague_kicker">🪶 Direct Generate</div>
-                            <p class="builder-import-steps" data-i18n="creator_generate_colleague_hint">填写飞书应用信息和同事基本资料，WeCli Creator 会采集消息、自动蒸馏 persona/work，并直接导入为团队角色。</p>
+                            <p class="builder-import-steps" data-i18n="creator_generate_colleague_hint">填写飞书应用信息和同事基本资料，ClawCross Creator 会采集消息、自动蒸馏 persona/work，并直接导入为团队角色。</p>
                         </div>
                         <div class="builder-import-form">
                             <div class="builder-import-grid">
@@ -110,7 +110,7 @@
                                 </label>
                                 <label class="creator-field">
                                     <span data-i18n="creator_feishu_company_label">公司 / 团队</span>
-                                    <input id="feishu-company" class="builder-input" type="text" data-i18n-placeholder="creator_feishu_company_placeholder" placeholder="例如: Wecli" autocomplete="off">
+                                    <input id="feishu-company" class="builder-input" type="text" data-i18n-placeholder="creator_feishu_company_placeholder" placeholder="例如: Clawcross" autocomplete="off">
                                 </label>
                                 <label class="creator-field">
                                     <span data-i18n="creator_feishu_level_label">层级</span>
@@ -146,7 +146,7 @@
                             <p class="builder-import-files-label" data-i18n="creator_import_or_local_path">或者填写本机路径：</p>
                             <label class="builder-import-label" data-i18n="creator_import_colleague_dir">colleagues/{slug} 目录路径（自动读取 meta.json / persona.md / work.md）</label>
                             <input type="text" id="import-colleague-dir" class="builder-input" data-i18n-placeholder="creator_import_colleague_dir_placeholder" placeholder="例如: ~/.claude/skills/create-colleague/colleagues/zhangsan" autocomplete="off" />
-                            <button id="import-colleague-btn" class="creator-btn creator-btn-primary" type="button" data-i18n="creator_import_btn">📥 导入到 WeCli Creator</button>
+                            <button id="import-colleague-btn" class="creator-btn creator-btn-primary" type="button" data-i18n="creator_import_btn">📥 导入到 ClawCross Creator</button>
                         </div>
                         <div id="import-colleague-status" class="builder-status-bar"></div>
                     </section>
@@ -158,7 +158,7 @@
                         <p class="creator-item-subtitle" data-i18n="creator_import_mentor_hint">可以直接从 ArXiv 搜索生成导师，或者导入 supervisor 已生成的文件。</p>
                         <div class="builder-import-guide">
                             <div class="creator-card-kicker" data-i18n="creator_generate_mentor_kicker">📚 Direct Generate</div>
-                            <p class="builder-import-steps" data-i18n="creator_generate_mentor_hint">输入导师姓名后，WeCli Creator 会搜索 ArXiv、生成导师档案，并直接导入为团队角色。</p>
+                            <p class="builder-import-steps" data-i18n="creator_generate_mentor_hint">输入导师姓名后，ClawCross Creator 会搜索 ArXiv、生成导师档案，并直接导入为团队角色。</p>
                         </div>
                         <div class="builder-import-form">
                             <div class="builder-import-grid">
@@ -196,7 +196,7 @@
                             <input type="text" id="import-mentor-json-path" class="builder-input" data-i18n-placeholder="creator_import_mentor_json_path_placeholder" placeholder="例如: ~/.claude/mentors/Geoffrey_Hinton.json" autocomplete="off" />
                             <label class="builder-import-label" data-i18n="creator_import_skill_md_path">SKILL.md 路径（可选）</label>
                             <input type="text" id="import-mentor-skill-path" class="builder-input" data-i18n-placeholder="creator_import_skill_md_path_placeholder" placeholder="例如: ~/.claude/skills/geoffrey-hinton/SKILL.md" autocomplete="off" />
-                            <button id="import-mentor-btn" class="creator-btn creator-btn-primary" type="button" data-i18n="creator_import_btn">📥 导入到 WeCli Creator</button>
+                            <button id="import-mentor-btn" class="creator-btn creator-btn-primary" type="button" data-i18n="creator_import_btn">📥 导入到 ClawCross Creator</button>
                         </div>
                         <div id="import-mentor-status" class="builder-status-bar"></div>
                     </section>
@@ -346,7 +346,7 @@
                         <div class="builder-build-actions">
                             <button id="builder-build-btn" class="creator-btn" type="button" data-i18n="creator_build_btn">🔨 构建团队</button>
                             <button id="builder-download-btn" class="creator-btn creator-btn-secondary" type="button" disabled data-i18n="creator_download_btn">📦 下载 ZIP</button>
-                            <button id="builder-import-btn" class="creator-btn creator-btn-secondary" type="button" disabled data-i18n="creator_import_btn">📥 导入到 Wecli</button>
+                            <button id="builder-import-btn" class="creator-btn creator-btn-secondary" type="button" disabled data-i18n="creator_import_btn">📥 导入到 Clawcross</button>
                         </div>
                         <div id="builder-preview-status" class="builder-preview-status"></div>
 

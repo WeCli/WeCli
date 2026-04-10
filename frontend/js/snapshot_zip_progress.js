@@ -14,7 +14,7 @@
     try {
       return (
         String(document.documentElement.lang || '').toLowerCase().indexOf('zh') === 0 ||
-        String(localStorage.getItem('wecli_lang') || '') === 'zh'
+        String(localStorage.getItem('clawcross_lang') || '') === 'zh'
       );
     } catch (e) {
       return true;

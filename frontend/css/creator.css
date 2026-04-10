@@ -1789,7 +1789,7 @@ a {
     background: linear-gradient(transparent, rgba(255, 255, 255, 0.92));
 }
 
-/* Workflow DAG — WecliHub-style interactive canvas */
+/* Workflow DAG — ClawcrossHub-style interactive canvas */
 
 .builder-workflow {
     margin-top: 18px;

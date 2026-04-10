@@ -1,6 +1,6 @@
 (function (root, factory) {
-    const api = factory(root.WecliPretext || null);
-    root.WecliTextLayout = api;
+    const api = factory(root.ClawcrossPretext || null);
+    root.ClawcrossTextLayout = api;
     if (typeof module === 'object' && module.exports) {
         module.exports = api;
     }
@@ -54,10 +54,10 @@
 
     function getCanvasContext() {
         if (typeof document === 'undefined' || !document.createElement) return null;
-        if (!root.__wecliTextMeasureCanvas) {
-            root.__wecliTextMeasureCanvas = document.createElement('canvas');
+        if (!root.__clawcrossTextMeasureCanvas) {
+            root.__clawcrossTextMeasureCanvas = document.createElement('canvas');
         }
-        return root.__wecliTextMeasureCanvas.getContext('2d');
+        return root.__clawcrossTextMeasureCanvas.getContext('2d');
     }
 
     function heuristicCharWidth(ch) {

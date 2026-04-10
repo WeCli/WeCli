@@ -1,6 +1,6 @@
 Set-StrictMode -Version Latest
 
-function Set-WecliUtf8 {
+function Set-ClawcrossUtf8 {
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [Console]::InputEncoding = $utf8NoBom
     [Console]::OutputEncoding = $utf8NoBom
@@ -80,7 +80,7 @@ function Ensure-VenvPython {
     return $pythonPath
 }
 
-function Read-WecliEnvFile {
+function Read-ClawcrossEnvFile {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path
@@ -104,7 +104,7 @@ function Read-WecliEnvFile {
     return $values
 }
 
-function Set-WecliEnvValues {
+function Set-ClawcrossEnvValues {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path,
@@ -355,7 +355,7 @@ function Test-TcpPortExcluded {
     return $false
 }
 
-function Test-WecliPortAvailability {
+function Test-ClawcrossPortAvailability {
     param(
         [Parameter(Mandatory = $true)]
         [int]$Port
@@ -379,13 +379,13 @@ function Test-WecliPortAvailability {
     }
 }
 
-function Get-WecliPortMap {
+function Get-ClawcrossPortMap {
     param(
         [Parameter(Mandatory = $true)]
         [string]$EnvPath
     )
 
-    $envValues = Read-WecliEnvFile -Path $EnvPath
+    $envValues = Read-ClawcrossEnvFile -Path $EnvPath
     $agentPort = "51200"
     $schedulerPort = "51201"
     $oasisPort = "51202"
@@ -411,7 +411,7 @@ function Get-WecliPortMap {
     }
 }
 
-function Find-WecliAvailablePortSet {
+function Find-ClawcrossAvailablePortSet {
     param(
         [int]$StartPort = 53000,
         [int]$EndPort = 64000
@@ -427,7 +427,7 @@ function Find-WecliAvailablePortSet {
 
         $allAvailable = $true
         foreach ($port in $candidate.Values) {
-            if (-not (Test-WecliPortAvailability -Port $port).Available) {
+            if (-not (Test-ClawcrossPortAvailability -Port $port).Available) {
                 $allAvailable = $false
                 break
             }
@@ -438,19 +438,19 @@ function Find-WecliAvailablePortSet {
         }
     }
 
-    throw "Could not find an available local port set for Wecli."
+    throw "Could not find an available local port set for Clawcross."
 }
 
-function Resolve-WecliPortConfiguration {
+function Resolve-ClawcrossPortConfiguration {
     param(
         [Parameter(Mandatory = $true)]
         [string]$EnvPath
     )
 
-    $currentPorts = Get-WecliPortMap -EnvPath $EnvPath
+    $currentPorts = Get-ClawcrossPortMap -EnvPath $EnvPath
     $checks = @{}
     foreach ($entry in $currentPorts.GetEnumerator()) {
-        $checks[$entry.Key] = Test-WecliPortAvailability -Port $entry.Value
+        $checks[$entry.Key] = Test-ClawcrossPortAvailability -Port $entry.Value
     }
 
     $blocked = @($checks.GetEnumerator() | Where-Object { -not $_.Value.Available })
@@ -487,7 +487,7 @@ function Resolve-WecliPortConfiguration {
         }
     }
 
-    $newPorts = Find-WecliAvailablePortSet
+    $newPorts = Find-ClawcrossAvailablePortSet
     $updates = @{
         PORT_AGENT = $newPorts["PORT_AGENT"]
         PORT_SCHEDULER = $newPorts["PORT_SCHEDULER"]
@@ -495,7 +495,7 @@ function Resolve-WecliPortConfiguration {
         PORT_FRONTEND = $newPorts["PORT_FRONTEND"]
     }
 
-    $envValues = Read-WecliEnvFile -Path $EnvPath
+    $envValues = Read-ClawcrossEnvFile -Path $EnvPath
     $currentAgentUrl = "http://127.0.0.1:$($currentPorts["PORT_AGENT"])/v1/chat/completions"
     $currentOasisUrl = "http://127.0.0.1:$($currentPorts["PORT_OASIS"])"
 
@@ -507,7 +507,7 @@ function Resolve-WecliPortConfiguration {
         $updates["OASIS_BASE_URL"] = "http://127.0.0.1:$($newPorts["PORT_OASIS"])"
     }
 
-    Set-WecliEnvValues -Path $EnvPath -Updates $updates
+    Set-ClawcrossEnvValues -Path $EnvPath -Updates $updates
 
     return [pscustomobject]@{
         AutoUpdated = $true
@@ -519,7 +519,7 @@ function Resolve-WecliPortConfiguration {
     }
 }
 
-function Get-WecliLogTail {
+function Get-ClawcrossLogTail {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path,

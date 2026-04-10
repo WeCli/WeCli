@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build WeCli team presets from awesome-human-distillation public-figure skills.
+"""Build ClawCross team presets from awesome-human-distillation public-figure skills.
 
 Reads SKILL.md files from cloned repos under /tmp/awesome-skills/,
 and generates team preset directories under data/team_presets/.

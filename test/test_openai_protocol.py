@@ -39,10 +39,10 @@ class OpenAIProtocolHelperTests(unittest.TestCase):
 
     def test_openai_msg_to_human_message_handles_none_and_plain_text(self):
         empty_msg = ChatMessage(role="user", content=None)
-        text_msg = ChatMessage(role="user", content="hello Wecli")
+        text_msg = ChatMessage(role="user", content="hello Clawcross")
 
         self.assertEqual(self.helper.openai_msg_to_human_message(empty_msg).content, "(空消息)")
-        self.assertEqual(self.helper.openai_msg_to_human_message(text_msg).content, "hello Wecli")
+        self.assertEqual(self.helper.openai_msg_to_human_message(text_msg).content, "hello Clawcross")
         self.assertEqual(self.build_calls, [])
 
     def test_openai_msg_to_human_message_collects_multimodal_parts(self):
@@ -106,7 +106,7 @@ class OpenAIProtocolHelperTests(unittest.TestCase):
         ai_msg = AIMessage(
             content="",
             tool_calls=[
-                {"id": "call_search", "name": "search", "args": {"q": "wecli"}},
+                {"id": "call_search", "name": "search", "args": {"q": "clawcross"}},
                 {"id": "call_skip", "name": "internal_only", "args": {"q": "skip"}},
             ],
         )
@@ -123,7 +123,7 @@ class OpenAIProtocolHelperTests(unittest.TestCase):
         self.assertEqual(external_names, {"search", "legacy_lookup"})
         self.assertEqual(len(formatted), 1)
         self.assertEqual(formatted[0]["function"]["name"], "search")
-        self.assertEqual(formatted[0]["function"]["arguments"], json.dumps({"q": "wecli"}, ensure_ascii=False))
+        self.assertEqual(formatted[0]["function"]["arguments"], json.dumps({"q": "clawcross"}, ensure_ascii=False))
         self.assertEqual(parsed_chunk["choices"][0]["finish_reason"], "tool_calls")
 
     def test_list_models_payload_matches_openai_shape(self):

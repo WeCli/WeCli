@@ -1,4 +1,4 @@
-# Wecli Repository Index
+# Clawcross Repository Index
 
 Use this file when an agent needs to **index the repo before reading code**. It is a task-oriented map of the main files and directories.
 
@@ -36,7 +36,7 @@ Read these first for setup or environment changes:
 | `selfskill/scripts/run.sh` | primary Linux / macOS install, configure, start flow |
 | `selfskill/scripts/run.ps1` | primary Windows install, configure, start flow |
 | `selfskill/scripts/configure.py` | `.env` initialization and configuration logic |
-| `selfskill/scripts/configure_openclaw.py` | OpenClaw detection plus Wecli/OpenClaw LLM sync logic |
+| `selfskill/scripts/configure_openclaw.py` | OpenClaw detection plus Clawcross/OpenClaw LLM sync logic |
 | `config/.env.example` | config template and inline guidance |
 | `config/tinyfish_targets.example.json` | example TinyFish search target schema |
 | `scripts/setup_apikey.sh` | legacy API key helper |
@@ -51,14 +51,14 @@ If the issue is model detection or provider-specific behavior, inspect:
 
 ## Runtime Entry Points
 
-These are the main services Wecli runs:
+These are the main services Clawcross runs:
 
 | Path | Service |
 |---|---|
 | `src/mainagent.py` | Agent API bootstrap and router composition |
 | `src/front.py` | Flask frontend and proxy gateway |
 | `src/utils/scheduler_service.py` | scheduler service |
-| `src/services/team_creator_service.py` | WeCli Creator discovery, extraction, build, jobs, and translation pipeline |
+| `src/services/team_creator_service.py` | ClawCross Creator discovery, extraction, build, jobs, and translation pipeline |
 | `src/services/tinyfish_monitor_service.py` | shared TinyFish monitor runtime used by frontend, scheduler, and CLI |
 | `oasis/server.py` | OASIS service |
 | `scripts/launcher.py` | multi-service startup order |
@@ -131,10 +131,10 @@ If the task touches the UI, start here:
 | `frontend/js/main.js` | main desktop frontend logic |
 | `frontend/css/style.css` | main desktop styling, including OASIS Town / swarm / ReportAgent panels |
 | `src/routes/front_webot_routes.py` | Flask proxy routes for WeBot runtime panel and tool policy |
-| `frontend/js/creator.js` | WeCli Creator page logic, i18n, persistence, DAG preview |
-| `frontend/css/creator.css` | WeCli Creator styles and DAG layout |
+| `frontend/js/creator.js` | ClawCross Creator page logic, i18n, persistence, DAG preview |
+| `frontend/css/creator.css` | ClawCross Creator styles and DAG layout |
 | `frontend/js/orchestration.js` | Studio canvas logic, including `Generate Team` |
-| `frontend/templates/creator.html` | WeCli Creator HTML shell |
+| `frontend/templates/creator.html` | ClawCross Creator HTML shell |
 | `frontend/templates/group_chat_mobile.html` | mobile group chat page and mobile settings UI |
 | `frontend/templates/` | other HTML templates |
 | `frontend/` | CSS, JS, images |
@@ -248,14 +248,14 @@ When changing code, check the nearest validation surface:
 | `test/test_webot_orchestration.py` | delegated subagent flow integration tests |
 | `test/test_openai_protocol.py` | OpenAI protocol unit tests |
 | `test/test_integration.py` | cross-service integration tests |
-| `test/test_team_creator_jobs.py` | WeCli Creator job persistence tests |
-| `test/test_team_creator_imports.py` | WeCli Creator colleague/mentor import and quick-create route tests |
+| `test/test_team_creator_jobs.py` | ClawCross Creator job persistence tests |
+| `test/test_team_creator_imports.py` | ClawCross Creator colleague/mentor import and quick-create route tests |
 | `test/test_skill_import_tools.py` | ArXiv / Feishu helper conversion tests |
-| `test/test_team_creator_workflow.py` | WeCli Creator workflow/build tests |
-| `test/test_team_creator_zip.py` | WeCli Creator ZIP export tests |
+| `test/test_team_creator_workflow.py` | ClawCross Creator workflow/build tests |
+| `test/test_team_creator_zip.py` | ClawCross Creator ZIP export tests |
 | `test/test_proxy_login_i18n.py` | frontend i18n and login proxy coverage |
 | `test/test_tinyfish_monitor.py` | TinyFish target loading, persistence, and polling tests |
-| `test/test_configure_openclaw_sync.py` | Wecli/OpenClaw LLM sync tests |
+| `test/test_configure_openclaw_sync.py` | Clawcross/OpenClaw LLM sync tests |
 | `test/test_oasis_swarm_engine.py` | swarm scaffold / blueprint normalization tests |
 | `test/test_oasis_graph_memory.py` | GraphRAG persistence, retrieval, and ReportAgent fallback tests |
 | `test/browser/creator-smoke.spec.js` | Playwright smoke for `/creator` direct mentor/colleague generation flows |
@@ -268,7 +268,7 @@ When changing code, check the nearest validation surface:
 | `python test/tinyfish_live_smoke.py --site <site_key>` | opt-in real TinyFish smoke test |
 | `uv run scripts/cli.py status` | smoke test services |
 | `python -m py_compile <file>` | quick syntax check for touched Python files |
-| `node --check frontend/js/creator.js` | quick WeCli Creator syntax check |
+| `node --check frontend/js/creator.js` | quick ClawCross Creator syntax check |
 | `node --check frontend/js/main.js` | quick JS syntax check |
 
 ## Task-to-File Lookup
@@ -318,7 +318,7 @@ Read:
 - `oasis/swarm_engine.py`
 - `oasis/graph_memory.py`
 
-### "WeCli Creator or workflow-to-team is wrong"
+### "ClawCross Creator or workflow-to-team is wrong"
 
 Read:
 
@@ -342,7 +342,7 @@ Read:
 - `oasis/openclaw_cli.py`
 - `docs/build_team.md`
 
-### "Wecli and OpenClaw model settings drift"
+### "Clawcross and OpenClaw model settings drift"
 
 Read:
 

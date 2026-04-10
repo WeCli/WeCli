@@ -1,4 +1,4 @@
-# Wecli Documentation Index
+# Clawcross Documentation Index
 
 This repository uses a **progressive-disclosure** documentation layout:
 
@@ -22,7 +22,7 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 
 | Task | Read First | Then Read |
 |---|---|---|
-| Install / configure / start Wecli | [`../SKILL.md`](../SKILL.md) | [`ports.md`](./ports.md) if ports matter |
+| Install / configure / start Clawcross | [`../SKILL.md`](../SKILL.md) | [`ports.md`](./ports.md) if ports matter |
 | Understand the platform | [`overview.md`](./overview.md) | [`../README.md`](../README.md) |
 | Understand WeBot agent runtime, subagents, delegated tool boundaries, runtime policy hooks, or the subagent panel | [`webot-agent-runtime.md`](./webot-agent-runtime.md) | [`runtime-reference.md`](./runtime-reference.md), [`repo-index.md`](./repo-index.md) |
 | Compare WeBot with Claude Code and inspect the runtime feature matrix that drives parity work | [`webot-claude-gap-analysis.md`](./webot-claude-gap-analysis.md) | [`webot-agent-runtime.md`](./webot-agent-runtime.md), [`repo-index.md`](./repo-index.md) |
@@ -42,13 +42,13 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 
 ### Product / Orientation
 
-- [`overview.md`](./overview.md): brief explanation of what Wecli is and how people use it
+- [`overview.md`](./overview.md): brief explanation of what Clawcross is and how people use it
 - [`../README.md`](../README.md): user-facing overview, highlights, and public-facing narrative
 
 ### Operator / Builder Guides
 
 - [`cli.md`](./cli.md): command catalog
-- [`team-creator.md`](./team-creator.md): WeCli Creator flow, jobs, bilingual UI, workflow-to-team bridge
+- [`team-creator.md`](./team-creator.md): ClawCross Creator flow, jobs, bilingual UI, workflow-to-team bridge
 - [`build_team.md`](./build_team.md): Team creation, internal agents, OpenClaw members, personas
 - [`create_workflow.md`](./create_workflow.md): workflow YAML grammar and examples
 - [`oasis-reference.md`](./oasis-reference.md): OASIS runtime model, Town Mode, swarm / GraphRAG behavior, ReportAgent
@@ -80,7 +80,7 @@ If you are an agent, do **not** load everything by default. Start with `AGENTS.m
 4. Read [`example_team.md`](./example_team.md)
 5. If behavior looks wrong, inspect the indexed runtime files in [`repo-index.md`](./repo-index.md)
 
-### Use WeCli Creator or Generate Team from Workflow
+### Use ClawCross Creator or Generate Team from Workflow
 
 1. Read [`team-creator.md`](./team-creator.md)
 2. If the output Team shape matters, read [`build_team.md`](./build_team.md)

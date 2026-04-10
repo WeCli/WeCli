@@ -56,7 +56,7 @@ const i18n = {
         close: '关闭',
 
         // 登录页
-        login_title: 'Wecli',
+        login_title: 'Clawcross',
         login_subtitle: '请登录以开始对话',
         username: '用户名',
         password: '密码',
@@ -703,7 +703,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_openclaw_import_hint_ready: '自动读取已配置的 API Key、模型和 Provider',
         settings_openclaw_import_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
         settings_openclaw_export: '🦞 导出到 OpenClaw',
-        settings_openclaw_export_hint_ready: '把当前 Wecli 的 LLM 设置写回 OpenClaw 默认模型',
+        settings_openclaw_export_hint_ready: '把当前 Clawcross 的 LLM 设置写回 OpenClaw 默认模型',
         settings_openclaw_export_hint_missing: '⚠️ 未检测到 OpenClaw（未安装）',
         settings_openclaw_importing: '正在从 OpenClaw 读取配置...',
         settings_openclaw_imported: '✅ 已从 OpenClaw 导入配置',
@@ -794,7 +794,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         oc_acp_session_refresh_title: '执行 acpx（工具）sessions list 更新列表',
         oc_acp_session_or_new: '或新建',
         oc_acp_session_label: '名称',
-        oc_acp_session_placeholder: '可选；留空则按左侧 Wecli 会话区分',
+        oc_acp_session_placeholder: '可选；留空则按左侧 Clawcross 会话区分',
         oc_acp_session_ensure: '预热',
         oc_acp_session_ensure_title: '仅创建/预热 ACP 会话，不发送消息',
         oc_internal_session_refresh_title: '从服务器刷新 WeBot 会话列表',
@@ -809,7 +809,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         close: 'Close',
 
         // Login
-        login_title: 'Wecli',
+        login_title: 'Clawcross',
         login_subtitle: 'Please login to start',
         username: 'Username',
         password: 'Password',
@@ -1464,7 +1464,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_openclaw_import_hint_ready: 'Read the configured API key, model, and provider from OpenClaw',
         settings_openclaw_import_hint_missing: '⚠️ OpenClaw was not detected',
         settings_openclaw_export: '🦞 Export to OpenClaw',
-        settings_openclaw_export_hint_ready: 'Write the current Wecli LLM settings back to OpenClaw defaults',
+        settings_openclaw_export_hint_ready: 'Write the current Clawcross LLM settings back to OpenClaw defaults',
         settings_openclaw_export_hint_missing: '⚠️ OpenClaw was not detected',
         settings_openclaw_importing: 'Reading configuration from OpenClaw...',
         settings_openclaw_imported: '✅ Imported configuration from OpenClaw',
@@ -1487,7 +1487,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         settings_help_tinyfish_targets_path: 'JSON file listing search targets. Defaults to config/tinyfish_targets.json.',
         settings_help_tinyfish_enabled: 'Set true to enable the built-in daily monitor job; set false to disable it.',
         settings_help_tinyfish_cron: 'Five-field cron expression, for example 0 9 * * * for every day at 9:00.',
-        settings_tinyfish_quick_setup: 'Enter the API key and save. Wecli will validate TinyFish and fill the remaining default settings automatically.',
+        settings_tinyfish_quick_setup: 'Enter the API key and save. Clawcross will validate TinyFish and fill the remaining default settings automatically.',
         settings_tinyfish_run_now: 'Run Now',
         settings_tinyfish_refresh: 'Refresh',
         settings_tinyfish_loading: 'Loading TinyFish monitor status...',
@@ -1555,7 +1555,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         oc_acp_session_refresh_title: 'Run acpx (tool) sessions list',
         oc_acp_session_or_new: 'or new',
         oc_acp_session_label: 'Name',
-        oc_acp_session_placeholder: 'Optional; empty = scope by Wecli session',
+        oc_acp_session_placeholder: 'Optional; empty = scope by Clawcross session',
         oc_acp_session_ensure: 'Warm up',
         oc_acp_session_ensure_title: 'Create/warm ACP session only (no message sent)',
         oc_internal_session_refresh_title: 'Refresh WeBot session list from server',
@@ -1617,7 +1617,7 @@ function applyTranslations() {
     });
 
     // 更新 title
-    document.title = 'Wecli | AI Agent';
+    document.title = 'Clawcross | AI Agent';
 
     // 刷新编排面板的专家列表（专家名称和分类标签跟随语言切换）
     if (typeof orchRenderExpertSidebar === 'function') {
@@ -1644,7 +1644,7 @@ function applyTranslations() {
 }
 
 function renderMarkdown(content) {
-    if (window.WecliMarkdown) return window.WecliMarkdown.render(content);
+    if (window.ClawcrossMarkdown) return window.ClawcrossMarkdown.render(content);
     let raw = content == null ? '' : String(content);
     if (raw.indexOf('\\') !== -1) {
         raw = raw.replace(/\\r\\n/g, '\n').replace(/\\n/g, '\n').replace(/\\r/g, '\n').replace(/\\t/g, '\t');
@@ -1653,8 +1653,8 @@ function renderMarkdown(content) {
 }
 
 function highlightMarkdownIn(root) {
-    if (window.WecliMarkdown) {
-        window.WecliMarkdown.highlight(root);
+    if (window.ClawcrossMarkdown) {
+        window.ClawcrossMarkdown.highlight(root);
         return;
     }
     if (!root || typeof hljs === 'undefined') return;
@@ -1662,8 +1662,8 @@ function highlightMarkdownIn(root) {
 }
 
 function renderMarkdownInto(element, content) {
-    if (window.WecliMarkdown) {
-        window.WecliMarkdown.renderInto(element, content);
+    if (window.ClawcrossMarkdown) {
+        window.ClawcrossMarkdown.renderInto(element, content);
         return;
     }
     if (!element) return;
@@ -2216,7 +2216,7 @@ let _currentSessionRuntime = null;
 let _webotBridgeSockets = {};
 let _webotBridgeReconnectTimers = {};
 let _webotBridgeDesired = {};
-const SESSION_RUNTIME_PANEL_HEIGHT_KEY = 'wecliSessionRuntimePanelHeightV1';
+const SESSION_RUNTIME_PANEL_HEIGHT_KEY = 'clawcrossSessionRuntimePanelHeightV1';
 const SESSION_RUNTIME_PANEL_MIN_HEIGHT = 140;
 const SESSION_RUNTIME_LIST_MIN_HEIGHT = 120;
 let _sessionPanelResizeState = null;
@@ -4217,7 +4217,7 @@ function showLoginError(errorDiv, message) {
 }
 
 function _localLoginBannerDismissKey(userId = currentUserId) {
-    return userId ? `wecli-local-login-banner-dismissed:${userId}` : '';
+    return userId ? `clawcross-local-login-banner-dismissed:${userId}` : '';
 }
 
 function _syncLocalLoginBannerDismissedState() {
@@ -7201,11 +7201,11 @@ let oasisSwarmEdgeLabelsVisible = localStorage.getItem('oasisSwarmEdgeLabelsVisi
 let oasisSwarmViewport = { scale: 1, x: 0, y: 0 };
 let oasisReportLoading = false;
 const oasisReportCache = new Map();
-const WECLI_STUDIO_FIRST_VISIT_KEY = 'wecliStudioFirstVisitV2';
+const CLAWCROSS_STUDIO_FIRST_VISIT_KEY = 'clawcrossStudioFirstVisitV2';
 
 function applyStudioFirstVisitDefaults() {
     try {
-        if (localStorage.getItem(WECLI_STUDIO_FIRST_VISIT_KEY) === '1') {
+        if (localStorage.getItem(CLAWCROSS_STUDIO_FIRST_VISIT_KEY) === '1') {
             return;
         }
         currentPage = 'chat';
@@ -7216,7 +7216,7 @@ function applyStudioFirstVisitDefaults() {
         localStorage.setItem('oasisTownModeEnabled', '0');
         localStorage.setItem('oasisTownAudioEnabled', '0');
         localStorage.setItem('oasisTownWorkspaceView', 'town');
-        localStorage.setItem(WECLI_STUDIO_FIRST_VISIT_KEY, '1');
+        localStorage.setItem(CLAWCROSS_STUDIO_FIRST_VISIT_KEY, '1');
     } catch (err) {
         console.warn('[Studio] Failed to apply first-visit defaults:', err);
     }
@@ -8075,9 +8075,9 @@ function clampOasisSwarmNumber(value, min, max) {
     return Math.max(min, Math.min(max, value));
 }
 
-function getWecliTextLayout() {
+function getClawcrossTextLayout() {
     if (typeof window === 'undefined') return null;
-    return window.WecliTextLayout || null;
+    return window.ClawcrossTextLayout || null;
 }
 
 function oasisSwarmStableHash(value) {
@@ -8125,7 +8125,7 @@ function buildOasisSwarmNodeMetrics(node) {
             : node.type === 'agent'
                 ? { radius: 13.4, maxUnits: 11.3, labelFontSize: 10.2, minLabelWidth: 50, maxLabelWidth: 120, labelGap: 13 }
                 : { radius: 12.4, maxUnits: 10.4, labelFontSize: 9.8, minLabelWidth: 46, maxLabelWidth: 112, labelGap: 12 };
-    const textLayout = getWecliTextLayout();
+    const textLayout = getClawcrossTextLayout();
     const labelLineHeight = Math.round(typeConfig.labelFontSize + 4);
     let labelLines = [truncateOasisSwarmLabelText(node.label, typeConfig.maxUnits)];
     let labelText = labelLines[0];
@@ -8470,7 +8470,7 @@ function buildOasisSwarmNodeSvg(node, selected, muted) {
     const labelY = node.y - (((node.labelHeight || labelLineHeight) - labelLineHeight) / 2) + ((node.labelFontSize || 10) * 0.34);
     const labelFill = selected ? '#fff6bf' : '#fff1e8';
     const labelStroke = selected ? 'rgba(92,68,10,0.92)' : 'rgba(8,12,26,0.9)';
-    const textLayout = getWecliTextLayout();
+    const textLayout = getClawcrossTextLayout();
     const labelMarkup = textLayout && typeof textLayout.renderSvgTspans === 'function'
         ? textLayout.renderSvgTspans(node.labelLines || [node.labelText || node.label || ''], labelX, labelY, labelLineHeight, escapeHtml)
         : escapeHtml(node.labelText || node.label || '');
@@ -8507,7 +8507,7 @@ function buildOasisSwarmEdgeSvg(edge, graphState, muted, selected) {
     const labelY = ctrlY - 8;
     const stroke = selected ? '#f9c74f' : '#c2c3c7';
     const strokeWidth = selected ? (2.6 + (edge.weight || 0.5) * 2.4) : (1.2 + (edge.weight || 0.5) * 1.9);
-    const textLayout = getWecliTextLayout();
+    const textLayout = getClawcrossTextLayout();
     const edgeLabel = textLayout && typeof textLayout.fitSingleLine === 'function'
         ? textLayout.fitSingleLine(edge.label || '', 118, { font: '600 8px Arial', lineHeight: 10, suffix: '…' }).text
         : (edge.label || '').slice(0, 18);
@@ -9001,7 +9001,7 @@ function showDiscussionOverview() {
     const barColors = ['#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#84cc16'];
     const evIcons = {start:'🚀',round:'📢',agent_call:'⏳',agent_done:'✅',conclude:'🏁',manual_post:'📝',if_branch:'🔀',post:'💬'};
 
-    const textLayout = getWecliTextLayout();
+    const textLayout = getClawcrossTextLayout();
     const overviewNames = rowKeys.map((key) => key === '__system__' ? (currentLang === 'zh-CN' ? '系统' : 'System') : key);
     const labelW = textLayout && typeof textLayout.measureLabelGutter === 'function'
         ? textLayout.measureLabelGutter(overviewNames, {
@@ -10749,9 +10749,9 @@ async function uploadTeam(input) {
 }
 
 // ── Import team dropdown & Hub import ──
-const TEAM_HUB_URL = 'https://wecli.net';
+const TEAM_HUB_URL = 'https://clawcross.net';
 
-function _buildWeCliHubReturnUrl() {
+function _buildClawCrossHubReturnUrl() {
     try {
         const url = new URL(window.location.href);
         url.searchParams.delete('hub_download_url');
@@ -10762,9 +10762,9 @@ function _buildWeCliHubReturnUrl() {
     }
 }
 
-function _buildWeCliHubUrl() {
+function _buildClawCrossHubUrl() {
     const url = new URL(TEAM_HUB_URL);
-    url.searchParams.set('return_url', _buildWeCliHubReturnUrl());
+    url.searchParams.set('return_url', _buildClawCrossHubReturnUrl());
     url.searchParams.set('return_origin', window.location.origin);
     return url.toString();
 }
@@ -10800,10 +10800,10 @@ function showHubImportModal() {
     if (modal) modal.style.display = 'flex';
 }
 
-function openWecliHub() {
-    const popup = window.open(_buildWeCliHubUrl(), '_blank');
+function openClawcrossHub() {
+    const popup = window.open(_buildClawCrossHubUrl(), '_blank');
     if (!popup) {
-        window.location.assign(_buildWeCliHubUrl());
+        window.location.assign(_buildClawCrossHubUrl());
     }
 }
 
@@ -10969,7 +10969,7 @@ function _fillHubImportInput(raw) {
 }
 
 function _handleHubImportMessage(data) {
-    if (!data || data.type !== 'wecli_hub_import') return false;
+    if (!data || data.type !== 'clawcross_hub_import') return false;
     const hubUrl = String(data.hub_download_url || '').trim();
     if (!hubUrl) return false;
     _fillHubImportInput(hubUrl);
@@ -12898,7 +12898,7 @@ function acpGetSessionPickValue() {
     return sel && String(sel.value || '').trim();
 }
 
-/** Transcript + backend session: tool + list pick, custom slug, or Wecli session id. */
+/** Transcript + backend session: tool + list pick, custom slug, or Clawcross session id. */
 function acpComputeTranscriptKey() {
     const tool = _acpTool || '';
     const pick = acpGetSessionPickValue();
@@ -12918,7 +12918,7 @@ function _acpTranscriptKey() {
 function acpSyncSessionInputFromStorage() {
     const inp = document.getElementById('oc-acp-session-name');
     if (!inp || !_acpTool) return;
-    inp.value = localStorage.getItem('wecli_acp_session_name_' + _acpTool) || '';
+    inp.value = localStorage.getItem('clawcross_acp_session_name_' + _acpTool) || '';
 }
 
 function acpUpdateSessionInputsDisabledState() {
@@ -12942,15 +12942,15 @@ function acpNotifySessionContextChanged() {
 function acpOnSessionNameBlur() {
     if (_ocChatMode !== 'acp' || !_acpTool) return;
     const inp = document.getElementById('oc-acp-session-name');
-    if (inp) localStorage.setItem('wecli_acp_session_name_' + _acpTool, String(inp.value || '').trim());
+    if (inp) localStorage.setItem('clawcross_acp_session_name_' + _acpTool, String(inp.value || '').trim());
     acpNotifySessionContextChanged();
 }
 
 function acpOnSessionPickChange() {
     if (!_acpTool) return;
     const v = acpGetSessionPickValue();
-    if (v) localStorage.setItem('wecli_acp_session_pick_' + _acpTool, v);
-    else localStorage.removeItem('wecli_acp_session_pick_' + _acpTool);
+    if (v) localStorage.setItem('clawcross_acp_session_pick_' + _acpTool, v);
+    else localStorage.removeItem('clawcross_acp_session_pick_' + _acpTool);
     acpUpdateSessionInputsDisabledState();
     acpNotifySessionContextChanged();
 }
@@ -12981,7 +12981,7 @@ async function acpLoadSessionsList() {
             opt.textContent = name + (ts ? ' · ' + ts : '') + closed;
             sel.appendChild(opt);
         }
-        const stored = localStorage.getItem('wecli_acp_session_pick_' + _acpTool);
+        const stored = localStorage.getItem('clawcross_acp_session_pick_' + _acpTool);
         if (stored && Array.from(sel.options).some((o) => o.value === stored)) sel.value = stored;
         else if (prev && Array.from(sel.options).some((o) => o.value === prev)) sel.value = prev;
         else sel.value = '';

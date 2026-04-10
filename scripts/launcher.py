@@ -17,7 +17,7 @@ import sys
 if sys.version_info < (3, 9):
     sys.stderr.write(
         "\n"
-        "ERROR: Wecli requires Python 3.11+, but this script is running under Python {}.{}.\n"
+        "ERROR: Clawcross requires Python 3.11+, but this script is running under Python {}.{}.\n"
         "\n"
         "Common cause: on macOS, system 'python' may point to Python 2.7.\n"
         "Solutions:\n"
@@ -192,9 +192,9 @@ def resolve_openclaw_cli():
 
 def ensure_openclaw_gateway_running():
     """Best-effort startup for OpenClaw Gateway when the CLI is installed."""
-    _no_oc = (os.getenv("WECLI_NO_OPENCLAW") or "").strip().lower()
+    _no_oc = (os.getenv("CLAWCROSS_NO_OPENCLAW") or "").strip().lower()
     if _no_oc in ("1", "true", "yes", "on"):
-        print("⏭️  已跳过 OpenClaw 联动（WECLI_NO_OPENCLAW）— 不预热 Gateway、不刷新 OPENCLAW_*")
+        print("⏭️  已跳过 OpenClaw 联动（CLAWCROSS_NO_OPENCLAW）— 不预热 Gateway、不刷新 OPENCLAW_*")
         return
     openclaw_cli = resolve_openclaw_cli()
     if not openclaw_cli:
@@ -205,7 +205,7 @@ def ensure_openclaw_gateway_running():
         if script_dir not in sys.path:
             sys.path.insert(0, script_dir)
 
-        from configure_openclaw import sync_openclaw_runtime_for_wecli_startup
+        from configure_openclaw import sync_openclaw_runtime_for_clawcross_startup
     except Exception as exc:
         print(f"🦞 OpenClaw 已安装，但运行时预检查不可用: {exc}")
         return
@@ -213,7 +213,7 @@ def ensure_openclaw_gateway_running():
     print("🦞 检测 OpenClaw Gateway...")
 
     try:
-        result = sync_openclaw_runtime_for_wecli_startup()
+        result = sync_openclaw_runtime_for_clawcross_startup()
         load_dotenv(dotenv_path=ENV_FILE_PATH, override=True)
 
         runtime_after = result.get("runtime_after")

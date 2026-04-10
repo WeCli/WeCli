@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reorganize WeCli repo: group src/ files by domain, separate frontend assets.
+"""Reorganize ClawCross repo: group src/ files by domain, separate frontend assets.
 
 Target layout:
   frontend/          HTML templates, JS, CSS, static assets

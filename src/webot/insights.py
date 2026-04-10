@@ -223,7 +223,7 @@ class InsightsEngine:
         """Format insights for terminal display."""
         ov = insights.get("overview", {})
         lines = [
-            "=== WeCli Insights ===",
+            "=== ClawCross Insights ===",
             "",
             f"Period: last {ov.get('period_days', 30)} days",
             f"Sessions: {ov.get('total_sessions', 0)} ({ov.get('success_rate', 'N/A')} completed)",
