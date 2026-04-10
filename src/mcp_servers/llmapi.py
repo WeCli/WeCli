@@ -336,5 +336,55 @@ async def send_to_group(
     except Exception as e:
         return f"❌ 发送群聊消息失败: {type(e).__name__}: {str(e)}"
 
+@mcp.tool()
+async def send_private_cli(
+    username: str,
+    group_id: str,
+    content: str,
+    source_session: str = "",
+) -> str:
+    """
+    Send a message to a one-to-one private chat. Use this when the incoming
+    message is marked as "[私聊]" and you want the human user to actually see
+    your reply.
+
+    Under the hood this still posts to the same two-member group chat message
+    endpoint, but the tool name is private-chat-specific to reduce confusion
+    and hallucinated group-style behavior.
+
+    Args:
+        username: (auto-injected) current user identity; do NOT set manually
+        group_id: The private chat group ID
+        content: The message content to send back to the user
+        source_session: (auto-injected) current session ID; do NOT set manually
+
+    Returns:
+        Confirmation of message delivery
+    """
+    if not _INTERNAL_TOKEN:
+        return "❌ 系统未配置 INTERNAL_TOKEN，无法发送私聊消息。"
+
+    gid = quote((group_id or "").strip(), safe="")
+    url = f"http://127.0.0.1:{_AGENT_PORT}/groups/{gid}/messages"
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.post(
+                url,
+                headers={
+                    "X-Internal-Token": _INTERNAL_TOKEN,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "content": content,
+                    "sender": f"{username}#{source_session}" if source_session else username,
+                    "sender_display": f"#{source_session}" if source_session else "",
+                },
+            )
+            if response.status_code != 200:
+                return f"❌ 发送失败 (HTTP {response.status_code}): {response.text[:500]}"
+            return f"✅ 私聊消息已发送到会话 [{group_id}]"
+    except Exception as e:
+        return f"❌ 发送私聊消息失败: {type(e).__name__}: {str(e)}"
+
 if __name__ == "__main__":
     mcp.run(transport="stdio")

@@ -127,7 +127,7 @@ USER_INJECTED_TOOLS = {
     # LLM API access tools
     "call_llm_api", "send_internal_message",
     # Group chat tools
-    "send_to_group",
+    "send_to_group", "send_private_cli",
     # WeBot subagent tools
     "list_webot_agent_profiles", "spawn_subagent", "list_subagents",
     "send_subagent_message", "get_subagent_history", "cancel_subagent",
@@ -158,6 +158,7 @@ SESSION_INJECTED_TOOLS = {
     "send_telegram_message": "source_session",
     "send_internal_message": "source_session",
     "send_to_group": "source_session",
+    "send_private_cli": "source_session",
     "spawn_subagent": "parent_session",
     "send_subagent_message": "source_session",
     "cancel_subagent": "source_session",
@@ -193,6 +194,7 @@ SESSION_INJECTED_TOOLS = {
 # Session-related tool args that must always match runtime session (model cannot override).
 SESSION_FORCE_INJECTED_TOOLS: frozenset[str] = frozenset({
     "send_to_group",
+    "send_private_cli",
     "send_internal_message",
     "send_telegram_message",
     "spawn_subagent",

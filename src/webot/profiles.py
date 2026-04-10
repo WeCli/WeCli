@@ -60,6 +60,7 @@ COMMAND_TOOLS = (
 MESSAGE_TOOLS = (
     "send_internal_message",
     "send_to_group",
+    "send_private_cli",
     "set_telegram_chat_id",
     "remove_telegram_config",
     "send_telegram_message",

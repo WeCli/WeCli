@@ -555,7 +555,7 @@ def cmd_groups(args):
         else:
             _err(code, body)
 
-    elif args.action == "send":
+    elif args.action in {"send", "private-send"}:
         # 发送消息到群组
         if not args.group_id:
             print("❌ 请指定 --group-id", file=sys.stderr)
@@ -569,7 +569,10 @@ def cmd_groups(args):
             data["sender_display"] = args.sender
         code, body = _req("POST", url, headers=hdrs, data=data)
         if code in (200, 201):
-            print("✅ 消息已发送")
+            if args.action == "private-send":
+                print("✅ 私聊消息已发送")
+            else:
+                print("✅ 消息已发送")
         else:
             _err(code, body)
 
@@ -2650,7 +2653,7 @@ def build_parser():
     c = sub.add_parser("groups", help="群组管理")
     c.add_argument("action", nargs="?", default="list",
                    choices=["list", "create", "get", "update", "delete",
-                            "messages", "send", "mute", "unmute",
+                            "messages", "send", "private-send", "mute", "unmute",
                             "mute-status", "sessions", "sync-members"],
                    help="操作 (默认: list)")
     c.add_argument("--group-id", help="群组 ID")

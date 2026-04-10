@@ -76,6 +76,7 @@ _TOOL_ACCESS_MODES: dict[str, ToolAccessMode] = {
     "remove_telegram_config": ToolAccessMode.WRITE,
     "send_internal_message": ToolAccessMode.WRITE,
     "send_to_group": ToolAccessMode.WRITE,
+    "send_private_cli": ToolAccessMode.WRITE,
     "enter_plan_mode": ToolAccessMode.WRITE,
     "exit_plan_mode": ToolAccessMode.WRITE,
 }

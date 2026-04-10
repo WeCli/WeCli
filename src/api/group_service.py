@@ -736,26 +736,28 @@ class GroupService:
             # Build message - use prompt instructions to guide agent behavior
             agent_identity = f"你是「{short_name}」"
             sender_display = f"{tag}#{member_type}#{short_name}#{global_id}" if tag else f"#{member_type}#{short_name}#{global_id}"
-            cli_hint = (f"cd {_PROJECT_ROOT} && "
-                        f"uv run scripts/cli.py groups send --group-id {group_id} --sender '{sender_display}' --message '你的回复内容'")
+            group_cli_hint = (f"cd {_PROJECT_ROOT} && "
+                              f"uv run scripts/cli.py groups send --group-id {group_id} --sender '{sender_display}' --message '你的回复内容'")
+            private_cli_hint = (f"cd {_PROJECT_ROOT} && "
+                                f"uv run scripts/cli.py groups private-send --group-id {group_id} --sender '{sender_display}' --message '你的回复内容'")
 
             _ext_rules = _external_agent_group_rules_block()
             if is_private_chat:
                 # 私聊：不需要群聊标记，直接告知是私信
                 msg_prefix = f"[私聊] {sender} 说:\n"
-                msg_suffix = (f"\n\n{agent_identity}，这是用户发给你的私信，请认真回复。\n"
-                              f"{human_user_hint}\n\n{_ext_rules}\n\n"
-                              "请先 cd 到项目目录，然后使用 CLI 工具发送消息：\n"
-                              f"{cli_hint}\n"
+                msg_suffix = (f"\n\n{agent_identity}，这是用户发给你的私聊，请直接回答问题，不要把它当成普通群聊。\n"
+                              f"{human_user_hint}\n\n"
+                              "如需让用户看到你的回复，请使用 send private cli（底层等价于群消息发送）：\n"
+                              f"{private_cli_hint}\n"
                               "注意：不要在 ACP/HTTP 同步响应中直接输出回复正文；该同步响应会被系统忽略，不会显示给用户。\n"
-                              "你必须使用上面的 CLI `groups send` 主动推送消息，用户才能看到你的回复。\n"
+                              "用户能看到的回复，必须通过上面的 send private cli 主动推送。\n"
                               "[end padding]\n[end padding]\n[end padding]")
             elif mentions and global_id in mentions:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} @你 说:\n"
                 msg_suffix = (f"\n\n⚠️ 这是专门 @你 的消息，你必须回复！{agent_identity}。\n"
                               f"{human_user_hint}\n\n{_ext_rules}\n\n"
                               "请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
-                              f"{cli_hint}\n"
+                              f"{group_cli_hint}\n"
                               "注意：不要在 ACP/HTTP 同步响应中直接输出群聊内容；该同步响应不会自动发布。\n"
                               "你必须使用上面的 CLI `groups send` 主动推送消息，群里成员才能看到。\n"
                               "[end padding]\n[end padding]\n[end padding]")
@@ -767,7 +769,7 @@ class GroupService:
                     f"{human_user_hint}\n\n{_ext_rules}\n\n"
                     "💡 不要主动发起与当前话题无关的新讨论；回复时尽量 @ 具体对象，避免对全群广播。\n"
                     "如需回复，请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
-                    f"{cli_hint}\n"
+                    f"{group_cli_hint}\n"
                     "注意：不要在 ACP/HTTP 同步响应中直接输出群聊内容；该同步响应不会自动发布。\n"
                     "如需让群里看到你的回复，必须使用上面的 CLI `groups send` 主动推送。\n"
                     "[end padding]\n[end padding]\n[end padding]"
@@ -799,12 +801,18 @@ class GroupService:
                 # Internal oasis agent: use HTTP trigger
                 trigger_url = f"http://127.0.0.1:{os.getenv('PORT_AGENT', '51200')}/system_trigger"
 
-                trigger_suffix = ("\n\n如果需要回复，请使用 send_to_group 工具发送消息到群里：\n"
-                                  f"  当前群主 owner=\"{owner_uid}\"；当前人类用户是「{owner_uid}」\n"
-                                  f"  send_to_group(group_id=\"{group_id}\", content=\"你的回复内容\")\n"
-                                  "注意：username 和 source_session 会自动注入，不要手动设置。\n"
-                                  "系统不会自动发布你的回复，必须调用 send_to_group 工具。\n"
-                                  "[end padding]\n[end padding]\n[end padding]")
+                group_trigger_suffix = ("\n\n如果需要回复，请使用 send_to_group 工具发送消息到群里：\n"
+                                        f"  当前群主 owner=\"{owner_uid}\"；当前人类用户是「{owner_uid}」\n"
+                                        f"  send_to_group(group_id=\"{group_id}\", content=\"你的回复内容\")\n"
+                                        "注意：username 和 source_session 会自动注入，不要手动设置。\n"
+                                        "系统不会自动发布你的回复，必须调用 send_to_group 工具。\n"
+                                        "[end padding]\n[end padding]\n[end padding]")
+                private_trigger_suffix = ("\n\n如果需要回复，请使用 send_private_cli 工具发送私聊消息：\n"
+                                          f"  当前群主 owner=\"{owner_uid}\"；当前人类用户是「{owner_uid}」\n"
+                                          f"  send_private_cli(group_id=\"{group_id}\", content=\"你的回复内容\")\n"
+                                          "注意：username 和 source_session 会自动注入，不要手动设置。\n"
+                                          "系统不会自动发布你的回复，必须调用 send_private_cli 工具，用户才能看到。\n"
+                                          "[end padding]\n[end padding]\n[end padding]")
 
                 attach_hint = ""
                 if attachments:
@@ -815,13 +823,13 @@ class GroupService:
 
                 if is_private_chat:
                     trigger_msg = (f"[私聊] {sender} 说:\n{content}{attach_hint}\n\n"
-                                   f"(这是用户发给你的私信，你是「{short_name}」，请认真回复。)"
-                                   f"{trigger_suffix}")
+                                   f"(这是用户发给你的私信，你是「{short_name}」。请直接回答，不要把它当成群聊，也不要写成广播口吻。)"
+                                   f"{private_trigger_suffix}")
                 elif mentions and global_id in mentions:
                     trigger_msg = (f"[群聊 {group_id} 成员数:{member_count}] {sender} @你 说:\n{content}{attach_hint}\n\n"
                                    f"(⚠️ 这是专门 @你 的消息，你必须回复！"
                                    f"你在群聊中的身份/角色是「{short_name}」，回复时请体现你的专业角色视角。)"
-                                   f"{trigger_suffix}")
+                                   f"{group_trigger_suffix}")
                 else:
                     trigger_msg = (f"[群聊 {group_id} 成员数:{member_count}] {sender} 说:\n{content}{attach_hint}\n\n"
                                    f"(你在群聊中的身份/角色是「{short_name}」，回复时请体现你的专业角色视角。"
@@ -830,7 +838,7 @@ class GroupService:
                                    f"💡 尽量等待人类用户发起讨论或提出问题后再参与，不要主动发起新话题。\n"
                                    f"⚠️ 回复时尽量精准 @具体的人，不要给群中所有人发消息。"
                                    f"例如在 send_to_group 的 content 末尾加上 @某人名字 来指定回复对象。)"
-                                   f"{trigger_suffix}")
+                                   f"{group_trigger_suffix}")
 
                 # 标记内部 agent 正在输入（thread lock 会在处理完成后自动释放，
                 # get_typing_status 会检查 lock 状态来判断是否仍在输入）
