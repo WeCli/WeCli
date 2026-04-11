@@ -1619,26 +1619,35 @@ class TeamAgent:
 
         # --- Trajectory saving (new: ported from Hermes Agent) ---
         # Save conversation trajectory when no more tool calls (session ending)
+        # Fire-and-forget: spawn in background thread to never block the agent
         if not getattr(response, "tool_calls", None) and next_turn_count > 1:
-            with contextlib.suppress(Exception):
-                model_name = getattr(llm, "model_name", "") or getattr(llm, "model", "") or ""
-                traj_messages = [
-                    {"role": type(m).__name__.replace("Message", "").lower(), "content": self._extract_text(m.content)}
-                    for m in history_messages[:20]
-                ]
-                traj_messages.append({"role": "assistant", "content": self._extract_text(response.content)[:2000]})
-                save_trajectory(
-                    user_id=user_id,
-                    session_id=session_id,
-                    messages=traj_messages,
-                    model=model_name,
-                    completed=True,
-                    tool_calls_count=current_turn_count,
-                    token_usage={
-                        "input_tokens": usage_meta.get("input_tokens", 0) if isinstance(usage_meta, dict) else 0,
-                        "output_tokens": usage_meta.get("output_tokens", 0) if isinstance(usage_meta, dict) else 0,
-                    },
+            model_name = getattr(llm, "model_name", "") or getattr(llm, "model", "") or ""
+            traj_messages = [
+                {"role": type(m).__name__.replace("Message", "").lower(), "content": self._extract_text(m.content)}
+                for m in history_messages[:20]
+            ]
+            traj_messages.append({"role": "assistant", "content": self._extract_text(response.content)[:2000]})
+            token_usage = {
+                "input_tokens": usage_meta.get("input_tokens", 0) if isinstance(usage_meta, dict) else 0,
+                "output_tokens": usage_meta.get("output_tokens", 0) if isinstance(usage_meta, dict) else 0,
+            }
+            # Non-blocking: run save in thread pool so agent can continue immediately
+            # Fire-and-forget: failures are silently ignored to avoid impacting the agent
+            try:
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        save_trajectory,
+                        user_id=user_id,
+                        session_id=session_id,
+                        messages=traj_messages,
+                        model=model_name,
+                        completed=True,
+                        tool_calls_count=current_turn_count,
+                        token_usage=token_usage,
+                    )
                 )
+            except Exception:
+                pass
 
         return {"messages": [response], "turn_count": next_turn_count}
 
