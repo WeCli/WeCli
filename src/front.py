@@ -2583,7 +2583,12 @@ def proxy_acpx_sessions():
         return jsonify({"ok": False, "error": "unsupported tool", "sessions": []}), 400
 
     try:
-        from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+        from integrations.acpx_adapter import (
+            AcpxError,
+            get_acpx_adapter,
+            load_external_agent_prompt_file,
+            load_external_agent_system_prompt,
+        )
     except ImportError as e:
         return jsonify({"ok": False, "error": str(e), "sessions": []}), 500
 
@@ -2655,6 +2660,14 @@ def proxy_acpx_chat():
         return jsonify({"error": f"acpx adapter unavailable: {e}"}), 500
 
     adapter = get_acpx_adapter(cwd=root_dir)
+    front_external_system_prompt = "\n\n".join(
+        p
+        for p in (
+            load_external_agent_system_prompt(root_dir),
+            load_external_agent_prompt_file(root_dir, "external_agent_private_rules.txt"),
+        )
+        if p
+    )
 
     async def _run_prompt() -> str:
         return await adapter.prompt(
@@ -2663,6 +2676,7 @@ def proxy_acpx_chat():
             prompt_text=prompt_text,
             timeout_sec=int(body.get("timeout_sec") or 600),
             reset_session=False,
+            system_prompt=front_external_system_prompt,
             attachments=acpx_attachments or None,
         )
 

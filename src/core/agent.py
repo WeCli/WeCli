@@ -872,6 +872,19 @@ class TeamAgent:
             # 默认私聊场景
             return self._prompts.get("private_chat_rules", "")
 
+    def _build_fixed_chat_rules(self) -> str:
+        """构造稳定的聊天规则系统提示，避免按每条消息切换 system prompt。"""
+        group_rules = self._prompts.get("group_chat_rules", "")
+        small_rules = self._prompts.get("group_chat_small", "")
+        large_rules = self._prompts.get("group_chat_large", "")
+        private_rules = self._prompts.get("private_chat_rules", "")
+
+        rendered_group_rules = group_rules.replace(
+            "{size_specific_rules}",
+            "\n\n".join(part for part in (small_rules, large_rules) if part),
+        )
+        return "\n\n".join(part for part in (rendered_group_rules, private_rules) if part)
+
     # ------------------------------------------------------------------
     # Properties
     # ------------------------------------------------------------------
@@ -1190,8 +1203,7 @@ class TeamAgent:
                 base_prompt += "\n\n" + profile_prompt
             base_prompt += f"\n\n【可用工具列表】\n{visible_tool_list_str}\n"
         else:
-            # 检测最后消息是否来自群聊，用于选择不同的聊天行为规则
-            chat_rules = self._build_chat_rules(state)
+            chat_rules = self._build_fixed_chat_rules()
             base_system_text = self._prompts["base_system"].replace("{chat_rules}", chat_rules)
             base_prompt = (
                 base_system_text + "\n\n"

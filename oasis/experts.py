@@ -54,13 +54,14 @@ _ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # 确保 src/ 在 import 路径中，以便导入 llm_factory
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
-from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt
 from services.llm_factory import create_chat_model, extract_text
 
 from oasis.forum import DiscussionForum
 
 # OASIS ACP 调试：logger [ACP_TRACE] + logs/acp_oasis_trace.jsonl（与群聊 acp_group_trace 同风格）
 _CLAWCROSS_ROOT = os.path.dirname(os.path.dirname(__file__))
+_EXTERNAL_AGENT_SYSTEM_PROMPT = load_external_agent_system_prompt(_CLAWCROSS_ROOT)
 _OASIS_ACP_TRACE_PATH = os.path.join(_CLAWCROSS_ROOT, "logs", "acp_oasis_trace.jsonl")
 _oasis_acp_trace_file_lock = threading.Lock()
 _oasis_acp_trace_log = logging.getLogger("oasis.acp_trace")
@@ -1363,6 +1364,7 @@ class ExternalExpert:
                 tool=self._acp_tool_name,
                 session_key=acp_session,
                 acpx_session=acpx_session,
+                system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT,
             )
             self._acp_started = True
             print(f"  [OASIS] ✅ ACPX session warmed for {self.name}")
@@ -1381,17 +1383,13 @@ class ExternalExpert:
         try:
             adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
             acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=cli_session)
-            await adapter.ensure_session(
-                tool=self._acp_tool_name,
-                session_key=cli_session,
-                acpx_session=acpx_session,
-            )
             reply = await adapter.prompt(
                 tool=self._acp_tool_name,
                 session_key=cli_session,
                 prompt_text=cli_message,
                 timeout_sec=180,
                 reset_session=False,
+                system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT,
             )
             _acp_oasis_trace(
                 "acp_prompt_complete",

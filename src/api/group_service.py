@@ -38,7 +38,7 @@ from api.group_repository import (
 from api.group_models import Attachment, GroupCreateRequest, GroupAddMemberRequest, GroupMessageRequest, GroupUpdateRequest
 from utils.logging_utils import get_logger
 from utils.session_summary import first_human_title
-from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt
 from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
 
 logger = get_logger("group_service")
@@ -58,6 +58,11 @@ _EXTERNAL_AGENT_GROUP_RULES_PATH = os.path.join(
     _PROJECT_ROOT, "data", "prompts", "external_agent_group_rules.txt",
 )
 _external_agent_group_rules_cache: str | None = None
+_EXTERNAL_AGENT_PRIVATE_RULES_PATH = os.path.join(
+    _PROJECT_ROOT, "data", "prompts", "external_agent_private_rules.txt",
+)
+_external_agent_private_rules_cache: str | None = None
+_external_agent_system_prompt_cache: str | None = None
 
 
 def _external_agent_group_rules_block() -> str:
@@ -74,6 +79,36 @@ def _external_agent_group_rules_block() -> str:
             "其他消息仅在与职责相关、被点名或面向众人需要专业意见时回复。"
         )
     return _external_agent_group_rules_cache
+
+
+def _external_agent_private_rules_block() -> str:
+    global _external_agent_private_rules_cache
+    if _external_agent_private_rules_cache is not None:
+        return _external_agent_private_rules_cache
+    try:
+        with open(_EXTERNAL_AGENT_PRIVATE_RULES_PATH, encoding="utf-8") as f:
+            _external_agent_private_rules_cache = f.read().strip()
+    except Exception:
+        _external_agent_private_rules_cache = (
+            "【外部 Agent 私聊须知】当前是用户与你的一对一私聊，直接回答，不要写成群发或广播口吻。"
+        )
+    return _external_agent_private_rules_cache
+
+
+def _external_agent_system_prompt() -> str:
+    global _external_agent_system_prompt_cache
+    if _external_agent_system_prompt_cache is None:
+        _external_agent_system_prompt_cache = load_external_agent_system_prompt(_PROJECT_ROOT)
+    return _external_agent_system_prompt_cache
+
+
+def _external_agent_session_prompt(*, is_private_chat: bool) -> str:
+    parts = [_external_agent_system_prompt()]
+    if is_private_chat:
+        parts.append(_external_agent_private_rules_block())
+    else:
+        parts.append(_external_agent_group_rules_block())
+    return "\n\n".join(p for p in parts if p).strip()
 
 
 # ── Temporary ACP lifecycle trace (群聊): logger [ACP_TRACE] + logs/acp_group_trace.jsonl
@@ -471,8 +506,6 @@ class GroupService:
         try:
             adapter = get_acpx_adapter(cwd=_PROJECT_ROOT)
             acpx_session = adapter.to_acpx_session_name(tool=tag, session_key=acp_session)
-            await adapter.ensure_session(tool=tag, session_key=acp_session, acpx_session=acpx_session)
-            
             # Build attachment list for acpx
             acpx_attachments = None
             if attachments:
@@ -491,6 +524,9 @@ class GroupService:
                 prompt_text=prompt_text,
                 timeout_sec=180,
                 reset_session=bool(metadata and metadata.get("resetSession")),
+                system_prompt=_external_agent_session_prompt(
+                    is_private_chat=bool(metadata and metadata.get("is_private_chat")),
+                ),
                 attachments=acpx_attachments,
             )
             _acp_group_trace(
@@ -630,6 +666,7 @@ class GroupService:
         message: str,
         agent_name: str,
         attachments: list[Attachment] | None = None,
+        metadata: dict | None = None,
     ):
         """Send message to external agent and handle reply.
 
@@ -653,7 +690,12 @@ class GroupService:
             return
         tag_lower = str(agent_info.get("tag", "")).lower()
         if transport == "acp":
-            reply = await self._send_to_acp_agent(agent_info, message, attachments=attachments)
+            reply = await self._send_to_acp_agent(
+                agent_info,
+                message,
+                attachments=attachments,
+                metadata=metadata,
+            )
             if not reply:
                 logger.info(
                     "ACP failed/no reply for %s, fallback to HTTP",
@@ -667,7 +709,12 @@ class GroupService:
                     "HTTP failed/no reply for openclaw %s, fallback to ACP",
                     agent_name,
                 )
-                reply = await self._send_to_acp_agent(agent_info, message, attachments=attachments)
+                reply = await self._send_to_acp_agent(
+                    agent_info,
+                    message,
+                    attachments=attachments,
+                    metadata=metadata,
+                )
         if not reply:
             logger.info("External agent %s did not reply", agent_name)
             # ACP/HTTP 已返回（无回复），清除输入状态
@@ -795,6 +842,7 @@ class GroupService:
                     self._handle_external_agent_reply(
                         group_id, agent_info, msg_text, short_name,
                         attachments=attachments,
+                        metadata={"is_private_chat": is_private_chat},
                     )
                 )
             else:
@@ -823,7 +871,7 @@ class GroupService:
 
                 if is_private_chat:
                     trigger_msg = (f"[私聊] {sender} 说:\n{content}{attach_hint}\n\n"
-                                   f"(这是用户发给你的私信，你是「{short_name}」。请直接回答，不要把它当成群聊，也不要写成广播口吻。)"
+                                   f"(这是发给你的私聊。你当前的身份/角色是「{short_name}」。)"
                                    f"{private_trigger_suffix}")
                 elif mentions and global_id in mentions:
                     trigger_msg = (f"[群聊 {group_id} 成员数:{member_count}] {sender} @你 说:\n{content}{attach_hint}\n\n"
@@ -832,12 +880,7 @@ class GroupService:
                                    f"{group_trigger_suffix}")
                 else:
                     trigger_msg = (f"[群聊 {group_id} 成员数:{member_count}] {sender} 说:\n{content}{attach_hint}\n\n"
-                                   f"(你在群聊中的身份/角色是「{short_name}」，回复时请体现你的专业角色视角。"
-                                   f"仅当消息与你直接相关、点名你、向你提问、或面向所有人时，"
-                                   f"才需要回复。其他情况请忽略，不要回应。\n"
-                                   f"💡 尽量等待人类用户发起讨论或提出问题后再参与，不要主动发起新话题。\n"
-                                   f"⚠️ 回复时尽量精准 @具体的人，不要给群中所有人发消息。"
-                                   f"例如在 send_to_group 的 content 末尾加上 @某人名字 来指定回复对象。)"
+                                   f"(你在群聊中的身份/角色是「{short_name}」，回复时请体现你的专业角色视角。)"
                                    f"{group_trigger_suffix}")
 
                 # 标记内部 agent 正在输入（thread lock 会在处理完成后自动释放，
