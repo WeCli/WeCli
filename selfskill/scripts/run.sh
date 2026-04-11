@@ -67,20 +67,30 @@ else
     exit 1
 fi
 
+# 始终优先使用当前项目的 venv python，避免 activate 路径缓存/迁移导致 python 丢失
+VENV_PY="$PROJECT_ROOT/.venv/bin/python"
+if [ -x "$VENV_PY" ]; then
+    export PATH="$PROJECT_ROOT/.venv/bin:$PATH"
+else
+    echo "❌ 未找到可执行的 venv python: $VENV_PY" >&2
+    echo "   请重建虚拟环境: rm -rf .venv && bash selfskill/scripts/run.sh start" >&2
+    exit 1
+fi
+
 # 验证 Python 版本（防止 venv 损坏或系统 python 泄漏）
-_PY_VER=$(python -c "import sys; print('{}.{}'.format(*sys.version_info[:2]))" 2>/dev/null || echo "0.0")
+_PY_VER=$("$VENV_PY" -c "import sys; print('{}.{}'.format(*sys.version_info[:2]))" 2>/dev/null || echo "0.0")
 _PY_MAJOR=$(echo "$_PY_VER" | cut -d. -f1)
 if [ "$_PY_MAJOR" -lt 3 ]; then
-    echo "❌ 虚拟环境中的 python 版本异常: Python $_PY_VER ($(which python))" >&2
+    echo "❌ 虚拟环境中的 python 版本异常: Python $_PY_VER ($VENV_PY)" >&2
     echo "   本项目需要 Python 3.11+。请删除 .venv 并重新创建:" >&2
     echo "   rm -rf .venv && bash selfskill/scripts/run.sh start" >&2
     exit 1
 fi
 
 # 确保依赖已安装（通过检查关键包是否可导入来决定是否需要安装）
-if ! python -c "import fastapi" &>/dev/null; then
+if ! "$VENV_PY" -c "import fastapi" &>/dev/null; then
     echo "📦 安装依赖 (config/requirements.txt)..."
-    uv pip install -r config/requirements.txt
+    uv pip install -r config/requirements.txt --python "$VENV_PY"
     echo "✅ 依赖安装完成"
 fi
 
@@ -362,7 +372,7 @@ for agent in agents:
 run_clawcross_setup_if_needed() {
     local need=false
     if [ ! -d ".venv" ]; then need=true; fi
-    if [ "$need" = false ] && ! python -c "import fastapi" 2>/dev/null; then need=true; fi
+    if [ "$need" = false ] && ! "$VENV_PY" -c "import fastapi" 2>/dev/null; then need=true; fi
     if [ "$need" = false ] && command -v npm &>/dev/null && ! command -v acpx &>/dev/null; then need=true; fi
     if [ "$need" = true ]; then
         echo "📋 首次运行或环境未齐全，正在执行 scripts/setup_env.sh …"
@@ -370,7 +380,7 @@ run_clawcross_setup_if_needed() {
         if [ -f .venv/bin/activate ]; then
             source .venv/bin/activate
         fi
-        if ! python -c "import fastapi" 2>/dev/null; then
+        if ! "$VENV_PY" -c "import fastapi" 2>/dev/null; then
             echo "❌ setup_env.sh 完成后仍无法 import fastapi" >&2
             exit 1
         fi
