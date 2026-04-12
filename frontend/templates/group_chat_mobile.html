@@ -6268,7 +6268,8 @@ async function renderCreateAgentExtPanel() {
   const panel = document.getElementById('create-agent-panel-ext');
   if (!panel) return;
   panel.innerHTML = `<div class="agent-detail-loading">${t('loading')}</div>`;
-  const tagOpts = await _mobileBuildAcpxTagOptionsHtml();
+  const tagOpts = await _mobileBuildExternalPersonaTagOptionsHtml(mobileGetCreateAgentTeam());
+  const platformOpts = _mobileExternalPlatformOptionsHtml();
   panel.innerHTML = `
     <div class="mobile-add-agent-form">
       <p class="form-hint">${esc(t('mobile_create_agent_team_hint'))}</p>
@@ -6279,13 +6280,11 @@ async function renderCreateAgentExtPanel() {
       <input type="text" id="ca-ext-global" placeholder="global_id" autocomplete="off">
       <label>${esc(t('mobile_add_ext_tag'))}</label>
       <select id="ca-ext-tag" class="ext-tag-select">${tagOpts}</select>
-      <div class="field-note">${esc(_currentLang === 'zh' ? '优先选择 codex、claudecode、gemini、trae 等标签，列表里会自动显示对应平台徽标。' : 'Prefer tags like codex, claudecode, gemini, or trae. The contact list will render a matching platform badge automatically.')}</div>
+      <div class="field-note">${esc(_currentLang === 'zh' ? 'tag 表示人设标签。' : 'Tag is the persona label.')}</div>
       <input type="text" id="ca-ext-tag-custom" class="ext-tag-custom" placeholder="${esc(t('agent_tag_placeholder'))}" style="margin-top:8px;display:none;">
       <label>${esc(t('mobile_add_ext_platform'))}</label>
       <select id="ca-ext-platform">
-        <option value="">${esc(_currentLang === 'zh' ? '默认 / ACP' : 'Default / ACP')}</option>
-        <option value="http">HTTP API</option>
-        <option value="acp">ACP</option>
+        ${platformOpts}
       </select>
       <label>${esc(t('mobile_add_ext_url'))}</label>
       <input type="text" id="ca-ext-url" placeholder="https://..." autocomplete="off">
@@ -8815,28 +8814,30 @@ function onAddAgentTeamChanged() {
   loadAddAgentMembers();
 }
 
-async function _mobileBuildAcpxTagOptionsHtml() {
-  const tools = [];
-  try {
-    const j = await api('GET', '/proxy_acpx_status');
-    if (j && j.available && Array.isArray(j.tools)) {
-      for (const x of j.tools) {
-        const v = String(x || '').trim().toLowerCase();
-        if (v) tools.push(v);
-      }
-    }
-  } catch (_) { /* ignore */ }
-  tools.sort();
-  const extras = ['codex', 'claudecode', 'claude', 'gemini', 'trae', 'cursor', 'openclaw', 'aider'];
+function _mobileExternalPlatformOptionsHtml() {
+  const platforms = ['openclaw', 'codex', 'claude', 'gemini', 'aider', 'cursor', 'trae'];
+  let opts = `<option value="">${esc(t('tag_none'))}</option>`;
+  for (const p of platforms) {
+    opts += `<option value="${esc(p)}">${esc(getPlatformBadgeInfo(p).label)}</option>`;
+  }
+  return opts;
+}
+
+async function _mobileBuildExternalPersonaTagOptionsHtml(team = '') {
+  const url = team
+    ? `/proxy_visual/experts?team=${encodeURIComponent(team)}`
+    : '/proxy_visual/experts';
   const seen = new Set();
   let opts = `<option value="">${esc(t('tag_none'))}</option>`;
-  const addOpt = (v) => {
-    if (seen.has(v)) return;
-    seen.add(v);
-    opts += `<option value="${esc(v)}">${esc(v)}</option>`;
-  };
-  for (const x of tools) addOpt(x);
-  for (const x of extras) addOpt(x);
+  try {
+    const experts = await api('GET', url).catch(() => []);
+    for (const exp of (Array.isArray(experts) ? experts : [])) {
+      const tag = String((exp && exp.tag) || '').trim();
+      if (!tag || seen.has(tag)) continue;
+      seen.add(tag);
+      opts += `<option value="${esc(tag)}">${esc(tag)}</option>`;
+    }
+  } catch (_) { /* ignore */ }
   opts += `<option value="custom">${esc(_currentLang === 'zh' ? '自定义' : 'Custom')}</option>`;
   return opts;
 }
@@ -8850,7 +8851,8 @@ async function renderMobileAddAgentExtForm() {
   const body = document.getElementById('add-agent-body');
   if (!body) return;
   body.innerHTML = `<div class="agent-detail-loading">${t('loading')}</div>`;
-  const tagOpts = await _mobileBuildAcpxTagOptionsHtml();
+  const tagOpts = await _mobileBuildExternalPersonaTagOptionsHtml(mobileGetAddAgentTeam());
+  const platformOpts = _mobileExternalPlatformOptionsHtml();
   body.innerHTML = `
     <div class="mobile-add-agent-form">
       <div style="font-weight:700;margin-bottom:6px;color:var(--text);">${esc(t('mobile_add_ext_title'))}</div>
@@ -8861,13 +8863,11 @@ async function renderMobileAddAgentExtForm() {
       <input type="text" id="mobile-ext-global" placeholder="global_id" autocomplete="off">
       <label>${esc(t('mobile_add_ext_tag'))}</label>
       <select id="mobile-ext-tag" class="ext-tag-select">${tagOpts}</select>
-      <div class="field-note">${esc(_currentLang === 'zh' ? '建议直接选平台标签，前端会按平台显示图标。' : 'Prefer a platform tag here so the frontend can show the matching platform badge.')}</div>
+      <div class="field-note">${esc(_currentLang === 'zh' ? 'tag 表示人设标签。' : 'Tag is the persona label.')}</div>
       <input type="text" id="mobile-ext-tag-custom" class="ext-tag-custom" placeholder="${esc(t('agent_tag_placeholder'))}" style="margin-top:8px;display:none;">
       <label>${esc(t('mobile_add_ext_platform'))}</label>
       <select id="mobile-ext-platform">
-        <option value="">${esc(_currentLang === 'zh' ? '默认 / ACP' : 'Default / ACP')}</option>
-        <option value="http">HTTP API</option>
-        <option value="acp">ACP</option>
+        ${platformOpts}
       </select>
       <label>${esc(t('mobile_add_ext_url'))}</label>
       <input type="text" id="mobile-ext-url" placeholder="https://..." autocomplete="off">
@@ -9685,7 +9685,6 @@ function resolveExternalPlatformKey(agentInfo, fallbackTool) {
     agentInfo.platform_hint,
     agentInfo.platform,
     fallbackTool,
-    agentInfo.tag,
     agentInfo.global_id,
     agentInfo.name,
   ];
@@ -9738,7 +9737,7 @@ function showAgentDetailBySender(senderKey) {
     global_id: member.global_id || '',
     short_name: member.short_name || '',
     tag: member.tag || '',
-    platform_hint: member.platform || member.tag || ''
+    platform_hint: member.platform || ''
   });
 }
 
@@ -10586,7 +10585,7 @@ function invalidateContactsPrefetch() {
   __contactsPrefetchPromise = null;
 }
 
-/** OpenClaw sessions + public_external_agents grouped by tag (skip openclaw dup in JSON). */
+/** OpenClaw sessions + public_external_agents grouped by platform (skip openclaw dup in JSON). */
 async function loadPublicExternalAgentGroups() {
   const [ocRes, pubRes] = await Promise.all([
     api('GET', '/proxy_openclaw_sessions').catch(() => ({ agents: [] })),
@@ -10603,17 +10602,17 @@ async function loadPublicExternalAgentGroups() {
   const rows = (pubRes && Array.isArray(pubRes.agents)) ? pubRes.agents : [];
   rows.forEach((row) => {
     if (!row || typeof row !== 'object') return;
-    const tagRaw = String(row.tag || '').trim().toLowerCase();
-    if (tagRaw === 'openclaw') return;
+    const platformKey = normalizePlatformKey(row.platform || '');
+    if (platformKey === 'openclaw') return;
     const gn = String(row.global_name || '').trim();
     if (!gn) return;
-    const key = tagRaw || '_';
+    const key = platformKey || 'default';
     const item = {
       name: row.name || row.global_name || t('unnamed'),
       type: 'ext',
       tag: row.tag || '',
       global_name: gn,
-      platform: row.platform || row.tag || ''
+      platform: row.platform || ''
     };
     if (!acpByTool[key]) acpByTool[key] = [];
     acpByTool[key].push(item);
@@ -10650,7 +10649,7 @@ function groupTeamExternalMembers(extMembers) {
   const acpByTool = {};
   (extMembers || []).forEach((m) => {
     if (!m || typeof m !== 'object') return;
-    const tagRaw = String(m.tag || '').trim().toLowerCase();
+    const platformKey = normalizePlatformKey(m.platform || '');
     const gn = String(m.global_name || m.name || m.session || '').trim();
     const item = {
       name: m.name || m.global_name || t('unnamed'),
@@ -10658,12 +10657,12 @@ function groupTeamExternalMembers(extMembers) {
       tag: m.tag || '',
       global_name: gn,
       team: m.team || '',
-      platform: m.platform || m.tag || ''
+      platform: m.platform || ''
     };
-    if (tagRaw === 'openclaw') {
+    if (platformKey === 'openclaw') {
       openclaw.push(item);
     } else {
-      const key = tagRaw || '_';
+      const key = platformKey || 'default';
       if (!acpByTool[key]) acpByTool[key] = [];
       acpByTool[key].push(item);
     }

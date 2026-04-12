@@ -2655,7 +2655,7 @@ def proxy_acpx_chat():
     stream = body.get("stream", True)
 
     try:
-        from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+        from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt, load_external_agent_prompt_file
     except ImportError as e:
         return jsonify({"error": f"acpx adapter unavailable: {e}"}), 500
 
@@ -2822,6 +2822,15 @@ def _team_openclaw_agents_save(user_id: str, team: str, data: list):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def _external_agent_platform(agent: dict) -> str:
+    """Return the canonical top-level platform for an external agent record."""
+    return str((agent or {}).get("platform", "") or "").strip()
+
+
+def _is_openclaw_external(agent: dict) -> bool:
+    return _external_agent_platform(agent).lower() == "openclaw"
+
+
 @app.route("/team_openclaw_snapshot", methods=["GET"])
 def team_openclaw_snapshot_get():
     """Get the team's saved external agent list.
@@ -2879,6 +2888,7 @@ def team_openclaw_snapshot_export():
     data.append({
         "name": short_name,
         "tag": "openclaw",
+        "platform": "openclaw",
         "global_name": agent_name,
         "config": snapshot.get("config", {}),
         "workspace_files": snapshot.get("workspace_files", {}),
@@ -2923,8 +2933,8 @@ def team_openclaw_snapshot_sync_all():
 
     # Source of truth: existing external_agents.json
     existing = _team_openclaw_agents_load(user_id, team)
-    openclaw_entries = [a for a in existing if a.get("tag") == "openclaw"]
-    non_openclaw = [a for a in existing if a.get("tag") != "openclaw"]
+    openclaw_entries = [a for a in existing if _is_openclaw_external(a)]
+    non_openclaw = [a for a in existing if not _is_openclaw_external(a)]
 
     if not openclaw_entries:
         return jsonify({"ok": True, "synced": 0, "agents": existing})
@@ -2961,6 +2971,7 @@ def team_openclaw_snapshot_sync_all():
                 new_openclaw.append({
                     "name": short_name,
                     "tag": "openclaw",
+                    "platform": "openclaw",
                     "global_name": agent_name,
                     "config": config,
                     "workspace_files": snap.get("workspace_files", {}),
@@ -3002,7 +3013,7 @@ def team_openclaw_snapshot_restore():
     data = _team_openclaw_agents_load(user_id, team)
     agent_snapshot = None
     for entry in data:
-        if entry.get("name") == short_name and entry.get("tag") == "openclaw":
+        if entry.get("name") == short_name and _is_openclaw_external(entry):
             agent_snapshot = entry
             break
     if not agent_snapshot:
@@ -3080,8 +3091,8 @@ def team_openclaw_snapshot_export_all():
 
     # Source of truth: existing external_agents.json
     existing = _team_openclaw_agents_load(user_id, team)
-    openclaw_entries = [a for a in existing if a.get("tag") == "openclaw"]
-    non_openclaw = [a for a in existing if a.get("tag") != "openclaw"]
+    openclaw_entries = [a for a in existing if _is_openclaw_external(a)]
+    non_openclaw = [a for a in existing if not _is_openclaw_external(a)]
 
     if not openclaw_entries:
         return jsonify({"ok": True, "exported": 0, "message": "No openclaw agents in JSON"}), 200
@@ -3114,6 +3125,7 @@ def team_openclaw_snapshot_export_all():
                 new_openclaw.append({
                     "name": short_name,
                     "tag": "openclaw",
+                    "platform": "openclaw",
                     "global_name": agent_name,
                     "config": snapshot.get("config", {}),
                     "workspace_files": snapshot.get("workspace_files", {}),
@@ -4174,6 +4186,7 @@ def get_team_members(team_name):
                             "name": agent.get("name", ""),
                             "type": "ext",
                             "tag": agent.get("tag", ""),
+                            "platform": _external_agent_platform(agent),
                             "global_name": agent.get("global_name", ""),
                             "meta": agent.get("meta", {})
                         })
@@ -4211,8 +4224,8 @@ def add_external_member(team_name):
     headers = body.get("headers", {})
     platform = str(body.get("platform", "") or "").strip()
     
-    if not name or not global_name:
-        return jsonify({"error": "name and global_name are required"}), 400
+    if not name or not global_name or not platform:
+        return jsonify({"error": "name, global_name, and platform are required"}), 400
     
     try:
         ext_path = os.path.join(team_dir, "external_agents.json")
@@ -4233,9 +4246,9 @@ def add_external_member(team_name):
         new_agent = {
             "name": name,
             "tag": tag,
+            "platform": platform,
             "global_name": global_name,
             "meta": {
-                "platform": platform,
                 "api_url": api_url,
                 "api_key": api_key,
                 "model": model,
@@ -4374,9 +4387,12 @@ def update_external_member(team_name):
         if "headers" in body:
             meta["headers"] = body["headers"]
         if "platform" in body:
-            meta["platform"] = str(body["platform"] or "").strip()
+            found["platform"] = str(body["platform"] or "").strip()
+        meta.pop("platform", None)
         if meta:
             found["meta"] = meta
+        elif "meta" in found:
+            found.pop("meta", None)
 
         # Save back
         with open(ext_path, "w", encoding="utf-8") as f:
@@ -4408,6 +4424,19 @@ def _public_agents_load_raw(user_id: str) -> list:
         return []
 
 
+def _external_agent_response_view(agent: dict) -> dict:
+    """Expose external agent records in the unified top-level platform shape."""
+    if not isinstance(agent, dict):
+        return {}
+    meta = dict(agent.get("meta") or {})
+    meta.pop("platform", None)
+    return {
+        **agent,
+        "platform": _external_agent_platform(agent),
+        "meta": meta,
+    }
+
+
 def _public_agents_save_raw(user_id: str, agents: list) -> None:
     p = _public_external_agents_user_path(user_id)
     os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -4423,7 +4452,7 @@ def public_external_agents():
         return jsonify({"error": "not logged in"}), 401
 
     if request.method == "GET":
-        return jsonify({"agents": _public_agents_load_raw(user_id)})
+        return jsonify({"agents": [_external_agent_response_view(a) for a in _public_agents_load_raw(user_id)]})
 
     if request.method == "POST":
         body = request.get_json(force=True)
@@ -4435,8 +4464,8 @@ def public_external_agents():
         model = body.get("model", "")
         headers = body.get("headers", {})
         platform = str(body.get("platform", "") or "").strip()
-        if not name or not global_name:
-            return jsonify({"error": "name and global_name are required"}), 400
+        if not name or not global_name or not platform:
+            return jsonify({"error": "name, global_name, and platform are required"}), 400
         try:
             agents = _public_agents_load_raw(user_id)
             if any(a.get("global_name") == global_name for a in agents if isinstance(a, dict)):
@@ -4444,9 +4473,9 @@ def public_external_agents():
             new_agent = {
                 "name": name,
                 "tag": tag,
+                "platform": platform,
                 "global_name": global_name,
                 "meta": {
-                    "platform": platform,
                     "api_url": api_url,
                     "api_key": api_key,
                     "model": model,
@@ -4853,9 +4882,10 @@ def preview_team_snapshot():
                     external_agents_info.append({
                         "name": entry.get("name", "?"),
                         "tag": entry.get("tag", ""),
+                        "platform": _external_agent_platform(entry),
                         "global_name": entry.get("global_name", ""),
                     })
-                    if entry.get("tag") == "openclaw":
+                    if _is_openclaw_external(entry):
                         openclaw_info.append({
                             "name": entry.get("name", "?"),
                             "global_name": entry.get("global_name", ""),
@@ -4870,7 +4900,7 @@ def preview_team_snapshot():
     if isinstance(ext_data, list):
         managed_collected = False
         for entry in ext_data:
-            if entry.get("tag") != "openclaw":
+            if not _is_openclaw_external(entry):
                 continue
             short_name = entry.get("name", "")
             agent_name = entry.get("global_name", "") or short_name
@@ -4919,7 +4949,7 @@ def preview_team_snapshot():
     cron_info = {}
     if isinstance(ext_data, list):
         for entry in ext_data:
-            if entry.get("tag") != "openclaw":
+            if not _is_openclaw_external(entry):
                 continue
             short_name = entry.get("name", "")
             agent_name = entry.get("global_name", "") or short_name
@@ -5096,7 +5126,7 @@ def download_team_snapshot():
 
                 if isinstance(ext_data, list):
                     for entry in ext_data:
-                        if entry.get("tag") != "openclaw":
+                        if not _is_openclaw_external(entry):
                             continue
                         short_name = entry.get("name", "")
                         # Use global_name as agentId for cron jobs
@@ -5309,7 +5339,7 @@ def upload_team_snapshot():
                 if isinstance(openclaw_data, list) and openclaw_data:
                     external_ordered = [e for e in openclaw_data if isinstance(e, dict)]
                     for agent_entry in external_ordered:
-                        if agent_entry.get("tag") == "openclaw":
+                        if _is_openclaw_external(agent_entry):
                             continue
                         agent_entry["global_name"] = restore_external_global_name(
                             team, agent_entry, external_ordered
@@ -5317,7 +5347,7 @@ def upload_team_snapshot():
 
                     oc_ordered = openclaw_entries_ordered(openclaw_data)
                     for agent_entry in openclaw_data:
-                        if agent_entry.get("tag") != "openclaw":
+                        if not _is_openclaw_external(agent_entry):
                             continue
                         short_name = agent_entry.get("name", "")
                         agent_snapshot = agent_entry

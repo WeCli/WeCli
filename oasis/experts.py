@@ -1154,6 +1154,15 @@ _OASIS_ACP_AGENT_TAGS: frozenset[str] = frozenset({
 _OASIS_HTTP_AGENT_TAGS: frozenset[str] = frozenset({"openclaw"})
 
 
+def _canonical_external_platform(platform_name: str) -> str:
+    pl = (platform_name or "").strip().lower()
+    if pl in ("claude-code", "claudecode"):
+        return "claude"
+    if pl in ("gemini-cli", "geminicli"):
+        return "gemini"
+    return pl
+
+
 class ExternalExpert:
     """
     Expert backed by an external OpenAI-compatible API or ACP long-lived connection.
@@ -1257,6 +1266,7 @@ class ExternalExpert:
         persona: str = "",
         timeout: float | None = None,
         tag: str = "",
+        platform: str = "",
         extra_headers: dict[str, str] | None = None,
         oc_agent_name: str = "",
         team: str = "",
@@ -1267,25 +1277,23 @@ class ExternalExpert:
         self.persona = persona
         self.timeout = timeout or 500.0
         self.tag = tag
+        self.platform = _canonical_external_platform(platform)
         self.model = model
         self._team = team
         self._extra_headers = extra_headers or {}
-        self._tag_lower = tag.lower()
+        self._platform_lower = self.platform
         self._http_global_name = oc_agent_name
-        self._drop_unknown_tag = (
-            self._tag_lower not in _OASIS_ACP_AGENT_TAGS
-            and self._tag_lower not in _OASIS_HTTP_AGENT_TAGS
-        )
+        self._drop_unknown_platform = not self._platform_lower
 
-        # ACP routing is decided by tag, not model format.
+        # ACP routing is decided by platform, not persona tag.
         # If model matches agent:<name>:<session>, only the optional session suffix is used.
         m = self._AGENT_MODEL_RE.match(model)
         self._session_suffix = m.group(2) if m and m.group(2) else self._DEFAULT_ACP_SESSION_SUFFIX
-        if self._tag_lower in _OASIS_ACP_AGENT_TAGS:
+        if self._platform_lower in _OASIS_ACP_AGENT_TAGS:
             self._is_acp_agent = True
             if not oc_agent_name:
                 raise ValueError(
-                    f"ACP tag '{tag}' requires a global_name in "
+                    f"ACP platform '{self.platform}' requires a global_name in "
                     f"external_agents.json, but none was found for '{name}'."
                 )
             self._oc_agent_name = oc_agent_name
@@ -1294,8 +1302,8 @@ class ExternalExpert:
             self._acp_session_suffix = self._session_suffix
 
             # Determine ACP tool binary from tag (same rules as src/group_service)
-            if self._tag_lower in _OASIS_ACP_AGENT_TAGS:
-                self._acp_tool_name = self._tag_lower
+            if self._platform_lower in _OASIS_ACP_AGENT_TAGS:
+                self._acp_tool_name = self._platform_lower
             else:
                 self._acp_tool_name = ""
             self._acp_bin = shutil.which("acpx")
@@ -1317,7 +1325,7 @@ class ExternalExpert:
             self._acp_available = False
             self._acp_started = False
 
-        if self._tag_lower == "openclaw":
+        if self._platform_lower == "openclaw":
             # OpenClaw endpoint varies by device: env has higher priority than YAML.
             api_url = os.getenv("OPENCLAW_API_URL", "") or api_url
             api_key = os.getenv("OPENCLAW_GATEWAY_TOKEN", "") or api_key
@@ -1341,7 +1349,7 @@ class ExternalExpert:
         h = {"Content-Type": "application/json"}
         if self._api_key:
             h["Authorization"] = f"Bearer {self._api_key}"
-        if self._tag_lower == "openclaw" and self._http_global_name:
+        if self._platform_lower == "openclaw" and self._http_global_name:
             h["x-openclaw-session-key"] = f"agent:{self._http_global_name}:{self._session_suffix}"
         h.update(self._extra_headers)
         return h
@@ -1446,8 +1454,8 @@ class ExternalExpert:
                               ... (default sentinel) = use self.timeout.
         """
         effective_timeout = self.timeout if timeout_override is ... else timeout_override
-        if self._drop_unknown_tag:
-            raise RuntimeError(f"Unsupported external tag '{self.tag}' for {self.name}; dropped.")
+        if self._drop_unknown_platform:
+            raise RuntimeError(f"Unsupported external platform '{self.platform}' for {self.name}; dropped.")
 
         # ── ACP agent type: keep legacy user-only extraction for sync paths ──
         if self._is_acp_agent:
@@ -1483,7 +1491,7 @@ class ExternalExpert:
         if not self._api_url:
             raise RuntimeError(f"No api_url configured for external expert {self.name}")
         req_model = self.model
-        if self._tag_lower == "openclaw" and self._http_global_name:
+        if self._platform_lower == "openclaw" and self._http_global_name:
             model_str = str(req_model or "").strip()
             if not model_str.startswith("agent:"):
                 req_model = f"agent:{self._http_global_name}"
@@ -1501,7 +1509,7 @@ class ExternalExpert:
             return data["choices"][0]["message"]["content"]
         except Exception as api_err:
             # OpenClaw: prefer HTTP first, then fallback to ACP.
-            if self._tag_lower == "openclaw" and self._http_global_name and bool(shutil.which("acpx")):
+            if self._platform_lower == "openclaw" and self._http_global_name and bool(shutil.which("acpx")):
                 try:
                     cli_message = ""
                     for msg in reversed(messages):

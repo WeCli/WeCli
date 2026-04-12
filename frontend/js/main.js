@@ -10277,11 +10277,11 @@ async function loadTeamMembers() {
         tbody.innerHTML = members.map(m => {
             let typeBadge;
             if (m.type === 'oasis') {
-                typeBadge = '<span class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">Oasis</span>';
+                typeBadge = '<span class="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded">内部</span>';
             } else if (m.tag === 'openclaw') {
-                typeBadge = '<span class="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded">🦞 OpenClaw</span>';
+                typeBadge = '<span class="text-xs bg-purple-50 text-purple-600 px-2 py-1 rounded">openclaw</span>';
             } else {
-                typeBadge = '<span class="text-xs bg-green-50 text-green-600 px-2 py-1 rounded">Ext</span>';
+                typeBadge = '<span class="text-xs bg-green-50 text-green-600 px-2 py-1 rounded">' + escapeHtml(m.platform || m.tag || 'ext') + '</span>';
             }
             const meta = m.meta || {};
             const apiUrl = meta.api_url || '';
@@ -11158,37 +11158,30 @@ async function deleteTeamMember(type, globalName, name, tag) {
 }
 
 function addExtOnPlatformChange() {
-    const pl = (document.getElementById('add-ext-platform') || {}).value || '';
     const lab = document.getElementById('add-ext-url-label');
     const hint = document.getElementById('add-ext-url-hint');
-    if (lab) {
-        if (pl === 'acp') lab.textContent = t('group_ext_url_optional_acp');
-        else if (pl === 'http') lab.textContent = t('group_ext_url_required_http');
-        else lab.textContent = t('group_ext_url_optional');
-    }
+    if (lab) lab.textContent = t('group_ext_url_optional');
     if (hint) {
-        hint.textContent = pl === 'http' ? t('group_ext_url_hint_http') : t('group_ext_url_hint_generic');
+        hint.textContent = t('group_ext_url_hint_generic');
     }
 }
 
 async function populateAddExtTagSelectOptions() {
     const sel = document.getElementById('add-ext-tag-select');
     if (!sel) return;
-    let tools = [];
+    let experts = [];
     try {
-        const r = await fetch('/proxy_acpx_status');
-        const j = await r.json();
-        if (j && j.available && Array.isArray(j.tools)) {
-            tools = j.tools.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean);
-        }
+        const teamExpertsUrl = currentGroupId
+            ? `/proxy_visual/experts?team=${encodeURIComponent(currentGroupId)}`
+            : '/proxy_visual/experts';
+        const r = await fetch(teamExpertsUrl);
+        experts = await r.json();
     } catch (e) {
         /* ignore */
     }
-    tools.sort();
-    const extras = ['openclaw', 'aider'];
     const seen = new Set();
     sel.innerHTML = '';
-    const addOpt = (v, text) => {
+    const addOpt = (v, text = v) => {
         if (seen.has(v)) return;
         seen.add(v);
         const o = document.createElement('option');
@@ -11197,8 +11190,10 @@ async function populateAddExtTagSelectOptions() {
         sel.appendChild(o);
     };
     addOpt('', t('group_ext_tag_none'));
-    for (const x of tools) addOpt(x, x);
-    for (const x of extras) addOpt(x, x);
+    for (const exp of (Array.isArray(experts) ? experts : [])) {
+        const tag = String((exp && exp.tag) || '').trim();
+        if (tag) addOpt(tag, tag);
+    }
     addOpt('custom', t('group_ext_tag_custom'));
 }
 
@@ -11277,9 +11272,14 @@ function showAddTeamMemberModal() {
                     <label style="font-size:11px;font-weight:600;color:#374151;">
                         <span data-i18n="group_ext_platform">连接方式</span>
                         <select id="add-ext-platform" onchange="addExtOnPlatformChange()" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:white;margin-top:2px;">
-                            <option value="" data-i18n="group_ext_platform_auto">自动</option>
-                            <option value="acp" data-i18n="group_ext_platform_acp">本地 ACP</option>
-                            <option value="http" data-i18n="group_ext_platform_http">HTTP</option>
+                            <option value="">请选择平台</option>
+                            <option value="openclaw">OpenClaw</option>
+                            <option value="codex">Codex</option>
+                            <option value="claude">Claude</option>
+                            <option value="gemini">Gemini</option>
+                            <option value="aider">Aider</option>
+                            <option value="cursor">Cursor</option>
+                            <option value="trae">Trae</option>
                         </select>
                     </label>
                     <label id="add-ext-url-label" style="font-size:11px;color:#6b7280;margin-bottom:2px;margin-top:8px;display:block;" data-i18n="group_ext_url_optional">API URL（可选）</label>
@@ -11695,8 +11695,7 @@ async function addExternalMember(event) {
         return;
     }
 
-    const tagLower = String(tag || '').toLowerCase();
-    if (platform === 'http' && !apiUrl && tagLower !== 'openclaw') {
+    if (platform && platform !== 'openclaw' && !apiUrl) {
         if (typeof orchToast === 'function') {
             orchToast(t('group_ext_url_required_toast'));
         } else {

@@ -806,11 +806,11 @@ function _orchMakeExtCategory(title, count) {
     return { det, body };
 }
 
-function _orchAppendPublicExternalCard(parent, row) {
+function _orchAppendPublicExternalCard(parent, row, yamlName) {
     const card = document.createElement('div');
     card.className = 'orch-expert-card';
     card.draggable = true;
-    const name = row.name || row.global_name || 'unknown';
+    const name = yamlName || row.name || row.global_name || 'unknown';
     const tag = row.tag || '';
     const meta = row.meta || {};
     const mdl = (meta.model && meta.model !== 'unknown') ? meta.model : '';
@@ -821,12 +821,13 @@ function _orchAppendPublicExternalCard(parent, row) {
         type: 'external',
         name: name,
         tag: tag || 'custom',
+        platform: row.platform || tag || 'custom',
         emoji: '🔌',
         temperature: 0.7,
         api_url: rawUrl,
         api_key: meta.api_key ? '****' : '',
         model: meta.model || '',
-        ext_id: row.global_name || name,
+        ext_id: name,  // YAML third segment = team JSON name (or row.name)
     };
     if (meta.headers && typeof meta.headers === 'object' && Object.keys(meta.headers).length) {
         nodeData.headers = meta.headers;
@@ -870,7 +871,25 @@ async function orchLoadOpenClawSessions() {
             } catch(e) { /* ignore, will fall back to prefix stripping */ }
         }
 
-        const acpByTool = _orchGroupPublicExternalAgents(pubData.agents || []);
+        // ACP agents source: team mode from /teams/${team}/members, non-team from public_external_agents
+        let acpRows = pubData.agents || [];
+        if (orch.teamEnabled && orch.teamName) {
+            try {
+                const teamResp = await fetch('/teams/' + encodeURIComponent(orch.teamName) + '/members');
+                const teamData = await teamResp.json().catch(() => ({}));
+                const members = teamData.members || [];
+                // Filter external members and transform to row format
+                acpRows = members
+                    .filter(m => (m.member_type || '') === 'ext')
+                    .map(m => ({
+                        name: m.name || m.global_name || '',
+                        global_name: m.global_name || m.name || '',
+                        tag: m.tag || '',
+                        meta: m.meta || {}
+                    }));
+            } catch(e) { /* fall back to public */ }
+        }
+        const acpByTool = _orchGroupPublicExternalAgents(acpRows);
         let acpTotal = 0;
         Object.values(acpByTool).forEach((arr) => {
             if (Array.isArray(arr)) acpTotal += arr.length;
@@ -932,7 +951,7 @@ async function orchLoadOpenClawSessions() {
             // model format: agent:<name> (CLI uses --agent <name>, no session-id)
             const modelStr = 'agent:' + yamlName;
             const nodeData = {
-                type: 'external', name: yamlName, tag: 'openclaw', emoji: '🦞', temperature: 0.7,
+                type: 'external', name: yamlName, tag: 'openclaw', platform: 'openclaw', emoji: '🦞', temperature: 0.7,
                 api_url: openclawUrl, api_key: '****',
                 model: modelStr,
                 ext_id: yamlName,  // use agent name as ext_id to distinguish different agents
@@ -1018,7 +1037,16 @@ async function orchLoadOpenClawSessions() {
             const label = tool === '_' ? t('group_ext_tag_none') : tool;
             const cat = _orchMakeExtCategory(label, items.length);
             list.appendChild(cat.det);
-            for (const row of items) _orchAppendPublicExternalCard(cat.body, row);
+            for (const row of items) {
+                // In team mode, resolve yamlName from team external_agents.json by global_name
+                let yamlName;
+                if (orch.teamEnabled && orch.teamName) {
+                    yamlName = (extAgentMap[(row.global_name || '').toLowerCase()] || {}).name || row.name;
+                } else {
+                    yamlName = row.name;
+                }
+                _orchAppendPublicExternalCard(cat.body, row, yamlName);
+            }
         }
 
         // Team mode: add Export All / Restore All buttons
@@ -2154,6 +2182,7 @@ function orchAddNode(data, x, y) {
     if (data.type === 'external') {
         node.api_url = data.api_url || '';
         node.ext_id = data.ext_id || '1';
+        node.platform = data.platform || '';
         if (data.headers && typeof data.headers === 'object') node.headers = data.headers;
         if (data.api_key) node.api_key = data.api_key;
         if (data.model) node.model = data.model;

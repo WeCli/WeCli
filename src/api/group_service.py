@@ -40,6 +40,7 @@ from utils.logging_utils import get_logger
 from utils.session_summary import first_human_title
 from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt
 from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
+from integrations.external_persona import build_external_persona_prompt
 
 logger = get_logger("group_service")
 
@@ -102,8 +103,15 @@ def _external_agent_system_prompt() -> str:
     return _external_agent_system_prompt_cache
 
 
-def _external_agent_session_prompt(*, is_private_chat: bool) -> str:
-    parts = [_external_agent_system_prompt()]
+def _external_agent_session_prompt(agent_info: dict, *, is_private_chat: bool) -> str:
+    parts = [
+        _external_agent_system_prompt(),
+        build_external_persona_prompt(
+            str(agent_info.get("tag", "") or ""),
+            user_id=str(agent_info.get("owner_user_id", "") or ""),
+            team=str(agent_info.get("team", "") or ""),
+        ),
+    ]
     if is_private_chat:
         parts.append(_external_agent_private_rules_block())
     else:
@@ -111,13 +119,38 @@ def _external_agent_session_prompt(*, is_private_chat: bool) -> str:
     return "\n\n".join(p for p in parts if p).strip()
 
 
-def _external_http_registry_prompt() -> str:
+def _external_http_registry_prompt(agent_info: dict) -> str:
     parts = [
         _external_agent_system_prompt(),
+        build_external_persona_prompt(
+            str(agent_info.get("tag", "") or ""),
+            user_id=str(agent_info.get("owner_user_id", "") or ""),
+            team=str(agent_info.get("team", "") or ""),
+        ),
         _external_agent_group_rules_block(),
         _external_agent_private_rules_block(),
     ]
     return "\n\n".join(p for p in parts if p).strip()
+
+
+def _canonical_external_platform(platform: str) -> str:
+    pl = (platform or "").strip().lower()
+    if pl in ("claude-code", "claudecode"):
+        return "claude"
+    if pl in ("gemini-cli", "geminicli"):
+        return "gemini"
+    return pl
+
+
+def _external_platform_from_agent(agent_info: dict) -> str:
+    """Resolve transport platform for external agents.
+
+    Prefer explicit ``platform``. Fall back to legacy ``tag`` because mobile
+    private-chat flows still persist ext members with tag-only metadata.
+    """
+    return _canonical_external_platform(
+        str(agent_info.get("platform", "") or agent_info.get("tag", "") or "")
+    )
 
 
 # ── Temporary ACP lifecycle trace (群聊): logger [ACP_TRACE] + logs/acp_group_trace.jsonl
@@ -130,19 +163,13 @@ def _acp_group_trace(event: str, **fields: Any) -> None:
     return
 
 
-def _select_external_transport(tag: str, platform: str = "") -> Literal["acp", "http", "drop"]:
-    pl = (platform or "").strip().lower()
-    if pl in ("acp", "acpx", "local"):
-        return "acp"
-    if pl in ("http", "openai", "openai_http"):
+def _select_external_transport(platform: str) -> Literal["acp", "http", "drop"]:
+    pl = _canonical_external_platform(platform)
+    if not pl:
+        return "drop"
+    if pl == "openclaw":
         return "http"
-    tag_lower = (tag or "").lower()
-    # OpenClaw defaults to HTTP path in Clawcross (gateway); optional platform=acp overrides.
-    if tag_lower == "openclaw":
-        return "http"
-    if tag_lower in _ACP_TOOL_NAMES and tag_lower != "openclaw":
-        return "acp"
-    if tag_lower:
+    if pl in _ACP_TOOL_NAMES:
         return "acp"
     return "drop"
 
@@ -254,7 +281,7 @@ def _public_external_agents_path(user_id: str) -> str:
     return os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "external_agents.json")
 
 
-def _parse_external_agents_file(path: str) -> list[dict]:
+def _parse_external_agents_file(path: str, *, owner_user_id: str = "", team: str = "") -> list[dict]:
     """Parse external_agents.json list into member-style dicts (shared shape with team file)."""
     if not os.path.isfile(path):
         return []
@@ -272,13 +299,15 @@ def _parse_external_agents_file(path: str) -> list[dict]:
             gn = a.get("global_name", "")
             result.append({
                 "user_id": "ext",
+                "owner_user_id": owner_user_id,
                 "global_id": gn,
                 "short_name": nm,
                 "member_type": "ext",
                 "tag": a.get("tag", ""),
                 "global_name": gn,
                 "name": nm,
-                "platform": str(ext_config.get("platform", "") or "").strip(),
+                "team": team,
+                "platform": _canonical_external_platform(str(a.get("platform", "") or "")),
                 "api_url": ext_config.get("api_url", ""),
                 "api_key": ext_config.get("api_key", ""),
                 "model": ext_config.get("model", ""),
@@ -292,7 +321,7 @@ def _load_public_external_agents(user_id: str) -> list[dict]:
     """Load external agents from user-level external_agents.json."""
     if not user_id:
         return []
-    return _parse_external_agents_file(_public_external_agents_path(user_id))
+    return _parse_external_agents_file(_public_external_agents_path(user_id), owner_user_id=user_id)
 
 
 def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
@@ -303,7 +332,7 @@ def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
     if not user_id or not team:
         return []
     path = os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "teams", team, "external_agents.json")
-    return _parse_external_agents_file(path)
+    return _parse_external_agents_file(path, owner_user_id=user_id, team=team)
 
 
 def build_external_agents_map_for_owner(owner_uid: str) -> dict[str, dict]:
@@ -498,13 +527,16 @@ class GroupService:
             logger.warning("acpx not available for %s", agent_info.get("name"))
             return None
 
-        tag = agent_info.get("tag", "").lower()
+        platform = _external_platform_from_agent(agent_info)
         global_name = agent_info.get("global_name", "")
         if not global_name:
             logger.warning("No global_name for external agent %s", agent_info.get("name"))
             return None
-        if not tag:
-            logger.warning("Missing ACP tool tag for %s", global_name)
+        if not platform:
+            logger.warning("Missing ACP tool platform for %s", global_name)
+            return None
+        if platform not in _ACP_TOOL_NAMES:
+            logger.warning("Unsupported ACP platform '%s' for %s", platform, global_name)
             return None
 
         session_suffix = _resolve_external_session_suffix(str(agent_info.get("model", "")))
@@ -516,13 +548,13 @@ class GroupService:
             "acp_ephemeral_start",
             phase="acpx_prompt",
             agent_global_name=global_name,
-            tag=tag,
+            platform=platform,
             cli_session_arg=acp_session,
             attachment_count=len(attachments or []),
         )
         try:
             adapter = get_acpx_adapter(cwd=_PROJECT_ROOT)
-            acpx_session = adapter.to_acpx_session_name(tool=tag, session_key=acp_session)
+            acpx_session = adapter.to_acpx_session_name(tool=platform, session_key=acp_session)
             # Build attachment list for acpx
             acpx_attachments = None
             if attachments:
@@ -536,12 +568,13 @@ class GroupService:
                     })
             
             reply = await adapter.prompt(
-                tool=tag,
+                tool=platform,
                 session_key=acp_session,
                 prompt_text=prompt_text,
                 timeout_sec=180,
                 reset_session=bool(metadata and metadata.get("resetSession")),
                 system_prompt=_external_agent_session_prompt(
+                    agent_info,
                     is_private_chat=bool(metadata and metadata.get("is_private_chat")),
                 ),
                 attachments=acpx_attachments,
@@ -586,16 +619,16 @@ class GroupService:
         """
         api_url = agent_info.get("api_url", "")
         api_key = agent_info.get("api_key", "")
-        tag = str(agent_info.get("tag", "")).lower()
+        platform = _external_platform_from_agent(agent_info)
         global_name = str(agent_info.get("global_name", "")).strip()
-        if tag == "openclaw":
+        if platform == "openclaw":
             # OpenClaw endpoint is device-dependent: prefer runtime env over saved config.
             api_url = os.getenv("OPENCLAW_API_URL", "") or api_url
             api_key = os.getenv("OPENCLAW_GATEWAY_TOKEN", "") or api_key
         model = agent_info.get("model", "gpt-3.5-turbo")
         # Keep OpenClaw HTTP payload aligned with /proxy_openclaw_chat:
         # use agent:<global_name> model for gateway session routing.
-        if tag == "openclaw" and global_name:
+        if platform == "openclaw" and global_name:
             model_str = str(model or "").strip()
             if not model_str.startswith("agent:"):
                 model = f"agent:{global_name}"
@@ -616,7 +649,7 @@ class GroupService:
             headers["Authorization"] = f"Bearer {api_key}"
 
         is_private_chat = bool(metadata and metadata.get("is_private_chat"))
-        session_prompt = _external_http_registry_prompt()
+        session_prompt = _external_http_registry_prompt(agent_info)
         session_key = _external_http_session_key(agent_info) if global_name else ""
         if self.group_db_path and global_name and session_key and session_prompt:
             should_inject = await upsert_http_agent_session(
@@ -630,7 +663,7 @@ class GroupService:
             if should_inject:
                 message = f"{session_prompt}\n\n{message}".strip()
 
-        if tag == "openclaw" and global_name:
+        if platform == "openclaw" and global_name:
             headers["x-openclaw-session-key"] = session_key
 
         # Build message content (multimodal if attachments present)
@@ -710,18 +743,15 @@ class GroupService:
         # 标记正在输入
         self.set_typing(group_id, agent_name)
         # Select transport explicitly by tag.
-        transport = _select_external_transport(
-            str(agent_info.get("tag", "")),
-            str(agent_info.get("platform", "") or ""),
-        )
+        platform = _external_platform_from_agent(agent_info)
+        transport = _select_external_transport(platform)
         if transport == "drop":
             logger.warning(
-                "Drop external agent %s due to unknown tag '%s'",
+                "Drop external agent %s due to unknown platform '%s'",
                 agent_name,
-                agent_info.get("tag", ""),
+                agent_info.get("platform", "") or agent_info.get("tag", ""),
             )
             return
-        tag_lower = str(agent_info.get("tag", "")).lower()
         if transport == "acp":
             reply = await self._send_to_acp_agent(
                 agent_info,
@@ -747,7 +777,7 @@ class GroupService:
                 attachments=attachments,
                 metadata=metadata,
             )
-            if not reply and tag_lower == "openclaw":
+            if not reply and platform == "openclaw":
                 logger.info(
                     "HTTP failed/no reply for openclaw %s, fallback to ACP",
                     agent_name,

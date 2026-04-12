@@ -933,22 +933,10 @@ def _parse_expert_name(raw: str) -> dict:
 
     if len(parts) >= 3 and parts[1] == "ext":
         ext_id = parts[2]
-        # For openclaw agents, ext_id is the agent name (e.g. "main", "test1")
-        if tag == "openclaw":
-            return {
-                "type": "external",
-                "tag": tag,
-                "name": ext_id,
-                "emoji": "🦞",
-                "temperature": 0.7,
-                "instance": 1,
-                "session_id": "",
-                "ext_id": ext_id,
-            }
         return {
             "type": "external",
             "tag": tag,
-            "name": _TAG_NAMES.get(tag, tag),
+            "name": ext_id,
             "emoji": "🌐",
             "temperature": 0.5,
             "instance": 1,
