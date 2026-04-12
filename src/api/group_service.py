@@ -1,6 +1,5 @@
 import asyncio
 import base64
-import hashlib
 import json
 import os
 import re
@@ -33,6 +32,7 @@ from api.group_repository import (
     list_groups_for_user,
     list_recent_group_messages,
     remove_group_member,
+    upsert_http_agent_session,
     update_group_name,
 )
 from api.group_models import Attachment, GroupCreateRequest, GroupAddMemberRequest, GroupMessageRequest, GroupUpdateRequest
@@ -111,6 +111,15 @@ def _external_agent_session_prompt(*, is_private_chat: bool) -> str:
     return "\n\n".join(p for p in parts if p).strip()
 
 
+def _external_http_registry_prompt() -> str:
+    parts = [
+        _external_agent_system_prompt(),
+        _external_agent_group_rules_block(),
+        _external_agent_private_rules_block(),
+    ]
+    return "\n\n".join(p for p in parts if p).strip()
+
+
 # ── Temporary ACP lifecycle trace (群聊): logger [ACP_TRACE] + logs/acp_group_trace.jsonl
 _ACP_TRACE_PATH = os.path.join(_PROJECT_ROOT, "logs", "acp_group_trace.jsonl")
 _acp_trace_file_lock = threading.Lock()
@@ -133,6 +142,8 @@ def _select_external_transport(tag: str, platform: str = "") -> Literal["acp", "
         return "http"
     if tag_lower in _ACP_TOOL_NAMES and tag_lower != "openclaw":
         return "acp"
+    if tag_lower:
+        return "acp"
     return "drop"
 
 
@@ -141,6 +152,12 @@ def _resolve_external_session_suffix(model: str) -> str:
     if m and m.group(1):
         return m.group(1)
     return _DEFAULT_ACP_SESSION_SUFFIX
+
+
+def _external_http_session_key(agent_info: dict) -> str:
+    global_name = str(agent_info.get("global_name", "")).strip()
+    session_suffix = _resolve_external_session_suffix(str(agent_info.get("model", "")))
+    return f"agent:{global_name}:{session_suffix}"
 
 
 # ── Text MIME helpers (shared with system_service) ──
@@ -486,8 +503,8 @@ class GroupService:
         if not global_name:
             logger.warning("No global_name for external agent %s", agent_info.get("name"))
             return None
-        if tag not in _ACP_TOOL_NAMES:
-            logger.warning("Unsupported ACP tool '%s' for %s", tag, global_name)
+        if not tag:
+            logger.warning("Missing ACP tool tag for %s", global_name)
             return None
 
         session_suffix = _resolve_external_session_suffix(str(agent_info.get("model", "")))
@@ -560,6 +577,7 @@ class GroupService:
         agent_info: dict,
         message: str,
         attachments: list[Attachment] | None = None,
+        metadata: dict | None = None,
     ) -> str | None:
         """Fallback: send message to external agent via HTTP API.
         
@@ -596,9 +614,24 @@ class GroupService:
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
+
+        is_private_chat = bool(metadata and metadata.get("is_private_chat"))
+        session_prompt = _external_http_registry_prompt()
+        session_key = _external_http_session_key(agent_info) if global_name else ""
+        if self.group_db_path and global_name and session_key and session_prompt:
+            should_inject = await upsert_http_agent_session(
+                self.group_db_path,
+                session_key=session_key,
+                global_name=global_name,
+                prompt_text=session_prompt,
+                transport="http",
+                now_ts=time.time(),
+            )
+            if should_inject:
+                message = f"{session_prompt}\n\n{message}".strip()
+
         if tag == "openclaw" and global_name:
-            session_suffix = _resolve_external_session_suffix(str(agent_info.get("model", "")))
-            headers["x-openclaw-session-key"] = f"agent:{global_name}:{session_suffix}"
+            headers["x-openclaw-session-key"] = session_key
 
         # Build message content (multimodal if attachments present)
         if attachments:
@@ -701,9 +734,19 @@ class GroupService:
                     "ACP failed/no reply for %s, fallback to HTTP",
                     agent_name,
                 )
-                reply = await self._send_to_http_agent(agent_info, message, attachments=attachments)
+                reply = await self._send_to_http_agent(
+                    agent_info,
+                    message,
+                    attachments=attachments,
+                    metadata=metadata,
+                )
         else:
-            reply = await self._send_to_http_agent(agent_info, message, attachments=attachments)
+            reply = await self._send_to_http_agent(
+                agent_info,
+                message,
+                attachments=attachments,
+                metadata=metadata,
+            )
             if not reply and tag_lower == "openclaw":
                 logger.info(
                     "HTTP failed/no reply for openclaw %s, fallback to ACP",
@@ -792,33 +835,25 @@ class GroupService:
             if is_private_chat:
                 # 私聊：不需要群聊标记，直接告知是私信
                 msg_prefix = f"[私聊] {sender} 说:\n"
-                msg_suffix = (f"\n\n{agent_identity}，这是用户发给你的私聊，请直接回答问题，不要把它当成普通群聊。\n"
+                msg_suffix = (f"\n\n{agent_identity}。\n"
                               f"{human_user_hint}\n\n"
                               "如需让用户看到你的回复，请使用 send private cli（底层等价于群消息发送）：\n"
                               f"{private_cli_hint}\n"
-                              "注意：不要在 ACP/HTTP 同步响应中直接输出回复正文；该同步响应会被系统忽略，不会显示给用户。\n"
-                              "用户能看到的回复，必须通过上面的 send private cli 主动推送。\n"
                               "[end padding]\n[end padding]\n[end padding]")
             elif mentions and global_id in mentions:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} @你 说:\n"
                 msg_suffix = (f"\n\n⚠️ 这是专门 @你 的消息，你必须回复！{agent_identity}。\n"
-                              f"{human_user_hint}\n\n{_ext_rules}\n\n"
+                              f"{human_user_hint}\n\n"
                               "请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
                               f"{group_cli_hint}\n"
-                              "注意：不要在 ACP/HTTP 同步响应中直接输出群聊内容；该同步响应不会自动发布。\n"
-                              "你必须使用上面的 CLI `groups send` 主动推送消息，群里成员才能看到。\n"
                               "[end padding]\n[end padding]\n[end padding]")
             else:
                 msg_prefix = f"[群聊 {group_id} 成员数:{member_count}] {sender} 说:\n"
                 msg_suffix = (
-                    f"\n\n{agent_identity}。请遵守下面「外部 Agent 群聊须知」："
-                    f"人类问候与 @/点名必须 groups send 回复；其他消息仅在相关或被需要时再回。\n"
-                    f"{human_user_hint}\n\n{_ext_rules}\n\n"
-                    "💡 不要主动发起与当前话题无关的新讨论；回复时尽量 @ 具体对象，避免对全群广播。\n"
+                    f"\n\n{agent_identity}。\n"
+                    f"{human_user_hint}\n\n"
                     "如需回复，请先 cd 到项目目录，然后使用 CLI 工具发送消息到群里：\n"
                     f"{group_cli_hint}\n"
-                    "注意：不要在 ACP/HTTP 同步响应中直接输出群聊内容；该同步响应不会自动发布。\n"
-                    "如需让群里看到你的回复，必须使用上面的 CLI `groups send` 主动推送。\n"
                     "[end padding]\n[end padding]\n[end padding]"
                 )
 
@@ -853,13 +888,11 @@ class GroupService:
                                         f"  当前群主 owner=\"{owner_uid}\"；当前人类用户是「{owner_uid}」\n"
                                         f"  send_to_group(group_id=\"{group_id}\", content=\"你的回复内容\")\n"
                                         "注意：username 和 source_session 会自动注入，不要手动设置。\n"
-                                        "系统不会自动发布你的回复，必须调用 send_to_group 工具。\n"
                                         "[end padding]\n[end padding]\n[end padding]")
                 private_trigger_suffix = ("\n\n如果需要回复，请使用 send_private_cli 工具发送私聊消息：\n"
                                           f"  当前群主 owner=\"{owner_uid}\"；当前人类用户是「{owner_uid}」\n"
                                           f"  send_private_cli(group_id=\"{group_id}\", content=\"你的回复内容\")\n"
                                           "注意：username 和 source_session 会自动注入，不要手动设置。\n"
-                                          "系统不会自动发布你的回复，必须调用 send_private_cli 工具，用户才能看到。\n"
                                           "[end padding]\n[end padding]\n[end padding]")
 
                 attach_hint = ""
@@ -871,7 +904,7 @@ class GroupService:
 
                 if is_private_chat:
                     trigger_msg = (f"[私聊] {sender} 说:\n{content}{attach_hint}\n\n"
-                                   f"(这是发给你的私聊。你当前的身份/角色是「{short_name}」。)"
+                                   f"(你当前的身份/角色是「{short_name}」。)"
                                    f"{private_trigger_suffix}")
                 elif mentions and global_id in mentions:
                     trigger_msg = (f"[群聊 {group_id} 成员数:{member_count}] {sender} @你 说:\n{content}{attach_hint}\n\n"

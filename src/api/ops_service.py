@@ -12,7 +12,11 @@ from fastapi.responses import StreamingResponse
 from integrations.acpx_adapter import AcpxError, get_acpx_adapter
 from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
 from utils.auth_utils import extract_user_password_session, is_internal_bearer, parse_bearer_parts
-from api.group_repository import get_group, get_group_member_by_global_id
+from api.group_repository import (
+    delete_http_agent_sessions_by_global_name,
+    get_group,
+    get_group_member_by_global_id,
+)
 from api.group_service import _load_public_external_agents, build_external_agents_map_for_owner
 from services.llm_factory import get_provider_audio_defaults, infer_provider
 from utils.logging_utils import get_logger
@@ -321,8 +325,8 @@ class OpsService:
         except AcpxError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-        use_openclaw_exec = tag in ("", "openclaw") or tag not in _ACPX_AGENT_TAGS
-        acpx_tool = tag if tag in _ACPX_AGENT_TAGS and tag != "openclaw" else "openclaw"
+        use_openclaw_exec = tag in ("", "openclaw")
+        acpx_tool = tag if tag and tag != "openclaw" else "openclaw"
 
         logger.info(
             "acp_control action=%s agent=%s session_key=%s openclaw_exec=%s acpx_tool=%s",
@@ -343,10 +347,17 @@ class OpsService:
                     await adapter.ops_non_openclaw_reset_session(
                         tool=acpx_tool, session_key=session_key
                     )
+                cleared_http_sessions = 0
+                if self.group_db_path:
+                    cleared_http_sessions = await delete_http_agent_sessions_by_global_name(
+                        self.group_db_path,
+                        global_name,
+                    )
                 return {
                     "status": "success",
                     "action": req.action,
                     "acp_session": session_key,
+                    "cleared_http_sessions": cleared_http_sessions,
                     "message": f"已为 {agent_key} 请求新会话（acpx）",
                 }
 
@@ -434,8 +445,8 @@ class OpsService:
         :return: agent 状态列表，获取失败时返回 None
         """
         # 取第一个 agent 的 tag 来决定 binary
-        first_tag = agents[0].get("tag", "").lower() if agents else ""
-        acp_tool = first_tag if first_tag in _ACP_KNOWN_TOOLS else "openclaw"
+        first_tag = (agents[0].get("tag", "") or "").strip().lower() if agents else ""
+        acp_tool = first_tag if first_tag else "openclaw"
         acp_bin = shutil.which(acp_tool)
         if not acp_bin:
             return None
@@ -502,7 +513,7 @@ class OpsService:
         if not global_name:
             return {**base_result, "status": "unavailable", "reason": "no global_name"}
 
-        acp_tool = tag if tag in _ACP_KNOWN_TOOLS else "openclaw"
+        acp_tool = tag if tag else "openclaw"
         acp_bin = shutil.which(acp_tool)
         if not acp_bin:
             return {**base_result, "status": "unavailable", "reason": f"binary '{acp_tool}' not found"}
