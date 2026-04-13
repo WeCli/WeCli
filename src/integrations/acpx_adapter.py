@@ -466,14 +466,16 @@ class AcpxAdapter:
         return None
 
 
-_adapter_singleton: AcpxAdapter | None = None
+_adapter_singletons: dict[str, AcpxAdapter] = {}
 
 
 def get_acpx_adapter(*, cwd: str | None = None) -> AcpxAdapter:
-    global _adapter_singleton
-    if _adapter_singleton is None:
-        _adapter_singleton = AcpxAdapter(cwd=cwd)
-    return _adapter_singleton
+    key = os.path.realpath(cwd or os.getcwd())
+    adapter = _adapter_singletons.get(key)
+    if adapter is None:
+        adapter = AcpxAdapter(cwd=key)
+        _adapter_singletons[key] = adapter
+    return adapter
 
 
 def load_external_agent_system_prompt(project_root: str) -> str:

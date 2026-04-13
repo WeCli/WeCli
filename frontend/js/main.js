@@ -10308,7 +10308,7 @@ async function loadTeamMembers() {
                     <td class="team-member-cell team-member-cell--mono" title="${safeGlobalName}">${safeGlobalName}</td>
                     <td class="team-member-cell team-member-cell--actions">
                         ${configBtn}
-                        <button onclick="deleteTeamMember('${m.type}', '${escapeHtml(m.global_name)}', '${escapeHtml(m.name)}', '${escapeHtml(m.tag || '')}')" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50" title="${deleteTitle}">🗑️</button>
+                        <button onclick="deleteTeamMember('${m.type}', '${escapeHtml(m.global_name)}', '${escapeHtml(m.name)}', '${escapeHtml(m.tag || '')}', '${escapeHtml(m.platform || '')}')" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50" title="${deleteTitle}">🗑️</button>
                     </td>
                 </tr>`;
         }).join('');
@@ -11061,11 +11061,21 @@ async function removeTeamExternalMember(teamName, globalName) {
     return result;
 }
 
-async function deleteTeamMember(type, globalName, name, tag) {
+function acpxToolFromPlatform(platform) {
+    const raw = String(platform || '').trim().toLowerCase();
+    if (!raw) return '';
+    if (raw === 'claudecode' || raw === 'claude-code') return 'claude-code';
+    if (raw === 'gemini-cli') return 'gemini-cli';
+    if (raw === 'openclaw' || raw === 'http' || raw === 'api') return raw;
+    return raw;
+}
+
+async function deleteTeamMember(type, globalName, name, tag, platform) {
     if (!currentGroupId) return;
     if (_deletingTeamMember) return; // Prevent double-click
 
-    const isOpenClaw = tag === 'openclaw';
+    const platformTool = acpxToolFromPlatform(platform || tag);
+    const isOpenClaw = platformTool === 'openclaw' || tag === 'openclaw';
     const canDeleteRealOpenClaw = isOpenClaw && canDeleteOpenClawAgent(globalName || '');
     const confirmMsg = isOpenClaw
         ? (canDeleteRealOpenClaw
@@ -11113,7 +11123,20 @@ async function deleteTeamMember(type, globalName, name, tag) {
             }
             await removeTeamExternalMember(currentGroupId, globalName);
         } else {
-            // External agent: remove from external_agents.json
+            if (platformTool) {
+                const acpResp = await fetch('/proxy_acpx_session_delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tool: platformTool,
+                        session_name: globalName,
+                    }),
+                });
+                const acpResult = await acpResp.json().catch(() => ({}));
+                if (!acpResp.ok || !acpResult.ok) {
+                    throw new Error(acpResult.detail || acpResult.error || '删除 ACP Agent 失败');
+                }
+            }
             await removeTeamExternalMember(currentGroupId, globalName);
         }
         
@@ -11158,12 +11181,97 @@ async function deleteTeamMember(type, globalName, name, tag) {
 }
 
 function addExtOnPlatformChange() {
-    const lab = document.getElementById('add-ext-url-label');
-    const hint = document.getElementById('add-ext-url-hint');
-    if (lab) lab.textContent = t('group_ext_url_optional');
-    if (hint) {
-        hint.textContent = t('group_ext_url_hint_generic');
+    // External agents are now restricted to OpenClaw + ACPX platforms.
+}
+
+const ADD_EXT_PLATFORM_FALLBACK = [
+    'openclaw',
+    'codex',
+    'claude',
+    'claude-code',
+    'gemini',
+    'gemini-cli',
+    'aider',
+    'cursor',
+    'copilot',
+    'droid',
+    'iflow',
+    'kilocode',
+    'kimi',
+    'kiro',
+    'opencode',
+    'pi',
+    'qoder',
+    'qwen',
+    'trae',
+];
+let _addExtPlatformOptionsCache = null;
+
+function addExtPlatformLabel(value) {
+    const v = String(value || '').trim().toLowerCase();
+    if (!v) return '';
+    const map = {
+        openclaw: 'OpenClaw',
+        codex: 'Codex',
+        claude: 'Claude',
+        'claude-code': 'Claude Code',
+        gemini: 'Gemini',
+        'gemini-cli': 'Gemini CLI',
+        aider: 'Aider',
+        cursor: 'Cursor',
+        copilot: 'Copilot',
+        droid: 'Droid',
+        iflow: 'iFlow',
+        kilocode: 'KiloCode',
+        kimi: 'Kimi',
+        kiro: 'Kiro',
+        opencode: 'OpenCode',
+        pi: 'Pi',
+        qoder: 'Qoder',
+        qwen: 'Qwen',
+        trae: 'Trae',
+    };
+    return map[v] || v;
+}
+
+function renderAddExtPlatformOptions(options, selected = '') {
+    const seen = new Set();
+    const rows = ['<option value="">请选择平台</option>'];
+    for (const raw of (Array.isArray(options) ? options : [])) {
+        const value = String(raw || '').trim().toLowerCase();
+        if (!value || value === 'http' || seen.has(value)) continue;
+        seen.add(value);
+        rows.push(`<option value="${escapeHtml(value)}"${value === selected ? ' selected' : ''}>${escapeHtml(addExtPlatformLabel(value))}</option>`);
     }
+    return rows.join('');
+}
+
+async function fetchAddExtPlatformOptions() {
+    if (Array.isArray(_addExtPlatformOptionsCache) && _addExtPlatformOptionsCache.length) {
+        return _addExtPlatformOptionsCache;
+    }
+    let tools = [];
+    try {
+        const resp = await fetch('/proxy_acpx_status');
+        const data = await resp.json();
+        tools = Array.isArray(data && data.tools)
+            ? data.tools.map((t) => String(t || '').trim().toLowerCase()).filter(Boolean)
+            : [];
+    } catch (_) {
+        tools = [];
+    }
+    const merged = ['openclaw', ...tools.filter((t) => t && t !== 'openclaw')];
+    const fallback = ADD_EXT_PLATFORM_FALLBACK.filter((t) => !merged.includes(t));
+    _addExtPlatformOptionsCache = merged.concat(fallback);
+    return _addExtPlatformOptionsCache;
+}
+
+async function populateAddExtPlatformOptions(selected = '') {
+    const sel = document.getElementById('add-ext-platform');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">加载中...</option>';
+    const options = await fetchAddExtPlatformOptions();
+    sel.innerHTML = renderAddExtPlatformOptions(options, selected);
 }
 
 async function populateAddExtTagSelectOptions() {
@@ -11272,25 +11380,9 @@ function showAddTeamMemberModal() {
                     <label style="font-size:11px;font-weight:600;color:#374151;">
                         <span data-i18n="group_ext_platform">连接方式</span>
                         <select id="add-ext-platform" onchange="addExtOnPlatformChange()" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:white;margin-top:2px;">
-                            <option value="">请选择平台</option>
-                            <option value="openclaw">OpenClaw</option>
-                            <option value="codex">Codex</option>
-                            <option value="claude">Claude</option>
-                            <option value="gemini">Gemini</option>
-                            <option value="aider">Aider</option>
-                            <option value="cursor">Cursor</option>
-                            <option value="trae">Trae</option>
+                            <option value="">加载中...</option>
                         </select>
                     </label>
-                    <label id="add-ext-url-label" style="font-size:11px;color:#6b7280;margin-bottom:2px;margin-top:8px;display:block;" data-i18n="group_ext_url_optional">API URL（可选）</label>
-                    <div id="add-ext-url-hint" style="font-size:10px;color:#9ca3af;margin:-4px 0 4px;line-height:1.35;" data-i18n="group_ext_url_hint_generic"></div>
-                    <input id="add-ext-url" type="text" placeholder="https://api.example.com/v1" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
-                    <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">API Key</label>
-                    <input id="add-ext-key" type="text" placeholder="sk-xxx (optional)" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
-                    <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">Model</label>
-                    <input id="add-ext-model" type="text" placeholder="gpt-4 / deepseek-chat (optional)" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
-                    <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">Headers (JSON)</label>
-                    <textarea id="add-ext-headers" placeholder='{"X-Custom": "value"}' style="font-family:monospace;font-size:11px;min-height:60px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;box-sizing:border-box;"></textarea>
                 </div>
                 <div class="orch-modal-btns" style="margin-top:12px;">
                     <button onclick="document.getElementById('add-team-member-overlay').remove()" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;cursor:pointer;font-size:12px;">取消</button>
@@ -11342,6 +11434,7 @@ function showAddTeamMemberModal() {
     document.body.appendChild(overlay);
     applyTranslations();
     addExtOnPlatformChange();
+    void populateAddExtPlatformOptions();
     void populateAddExtTagSelectOptions();
 
     // Load expert tags for Oasis Agent select options
@@ -11675,10 +11768,6 @@ async function addExternalMember(event) {
     
     const name = document.getElementById('add-ext-name').value.trim();
     const globalName = document.getElementById('add-ext-global-name').value.trim();
-    const apiUrl = document.getElementById('add-ext-url').value.trim();
-    const apiKey = document.getElementById('add-ext-key').value.trim();
-    const model = document.getElementById('add-ext-model').value.trim();
-    const headersStr = document.getElementById('add-ext-headers').value.trim();
     const platform = (document.getElementById('add-ext-platform') || {}).value || '';
 
     // Collect tag: custom input takes priority, then select
@@ -11694,30 +11783,15 @@ async function addExternalMember(event) {
         }
         return;
     }
-
-    if (platform && platform !== 'openclaw' && !apiUrl) {
+    if (!platform) {
         if (typeof orchToast === 'function') {
-            orchToast(t('group_ext_url_required_toast'));
+            orchToast('请选择平台');
         } else {
-            alert(t('group_ext_url_required_toast'));
+            alert('请选择平台');
         }
         return;
     }
-    
-    let headers = {};
-    if (headersStr) {
-        try {
-            headers = JSON.parse(headersStr);
-        } catch (e) {
-            if (typeof orchToast === 'function') {
-                orchToast('Headers JSON 解析错误: ' + e.message);
-            } else {
-                alert('Headers JSON 解析错误: ' + e.message);
-            }
-            return;
-        }
-    }
-    
+
     // Disable button and show loading
     if (btn) {
         btn.disabled = true;
@@ -11734,11 +11808,7 @@ async function addExternalMember(event) {
                 name: name,
                 tag: tag,
                 global_name: globalName,
-                platform: platform,
-                api_url: apiUrl,
-                api_key: apiKey,
-                model: model,
-                headers: headers
+                platform: platform
             })
         });
         
@@ -12964,7 +13034,7 @@ async function acpLoadSessionsList() {
         const r = await fetch('/proxy_acpx_sessions?tool=' + encodeURIComponent(_acpTool));
         const j = await r.json();
         if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status));
-        const sessions = j.sessions || [];
+        const sessions = (j.sessions || []).filter((s) => !(s && s.closed));
         sel.innerHTML = '';
         const o0 = document.createElement('option');
         o0.value = '';
@@ -12976,8 +13046,7 @@ async function acpLoadSessionsList() {
             const opt = document.createElement('option');
             opt.value = name;
             const ts = s.lastUsedAt ? String(s.lastUsedAt).replace('T', ' ').slice(0, 19) : '';
-            const closed = s.closed ? ' [×]' : '';
-            opt.textContent = name + (ts ? ' · ' + ts : '') + closed;
+            opt.textContent = name + (ts ? ' · ' + ts : '');
             sel.appendChild(opt);
         }
         const stored = localStorage.getItem('clawcross_acp_session_pick_' + _acpTool);
@@ -13107,10 +13176,10 @@ async function ocSwitchTo(mode, acpTool) {
     if (nextAcp && !_acpToolsCache.includes(nextAcp)) {
         return;
     }
-
-    if (mode === 'internal' && _ocChatMode === 'internal') return;
-    if (mode === 'openclaw' && _ocChatMode === 'openclaw') return;
-    if (mode === 'acp' && _ocChatMode === 'acp' && nextAcp === _acpTool) return;
+    const prevMode = _ocChatMode;
+    const prevAcpTool = _acpTool;
+    const modeChanged = prevMode !== mode;
+    const acpToolChanged = mode === 'acp' && prevAcpTool !== nextAcp;
 
     if (_ocChatMode === 'openclaw' && mode !== 'openclaw') {
         ocSaveOpenClawTranscript();
@@ -13148,11 +13217,13 @@ async function ocSwitchTo(mode, acpTool) {
     } else if (mode === 'acp') {
         if (agentSelector) agentSelector.style.display = 'none';
         acpSyncSessionInputFromStorage();
-        await acpLoadSessionsList();
+        if (modeChanged || acpToolChanged) {
+            await acpLoadSessionsList();
+        }
         acpPaintTranscript();
     } else {
         if (agentSelector) agentSelector.style.display = 'none';
-        await switchToSession(currentSessionId, true, { quiet: true });
+        await switchToSession(currentSessionId, modeChanged, { quiet: true });
     }
 
     ocSyncSessionSubrowsVisibility();

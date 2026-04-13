@@ -2569,6 +2569,15 @@ def proxy_acpx_status():
     return jsonify({"available": available, "tools": _list_acpx_tools() if available else []})
 
 
+def _session_in_current_acpx_cwd(row: dict) -> bool:
+    try:
+        session_cwd = os.path.realpath(str((row or {}).get("cwd") or "").strip())
+        current_cwd = os.path.realpath(root_dir)
+    except Exception:
+        return False
+    return bool(session_cwd) and session_cwd == current_cwd
+
+
 @app.route("/proxy_acpx_sessions", methods=["GET"])
 def proxy_acpx_sessions():
     """List existing acpx sessions for a tool (``acpx <tool> sessions list`` JSON), slim rows."""
@@ -2602,7 +2611,107 @@ def proxy_acpx_sessions():
     except AcpxError as e:
         return jsonify({"ok": False, "error": str(e), "sessions": []}), 502
 
+    sessions = [row for row in sessions if _session_in_current_acpx_cwd(row)]
     return jsonify({"ok": True, "tool": tool, "sessions": sessions})
+
+
+@app.route("/proxy_acpx_sessions_all", methods=["GET"])
+def proxy_acpx_sessions_all():
+    """List active acpx sessions across all supported tools for public contacts."""
+    import asyncio
+    import shutil
+
+    if not shutil.which("acpx"):
+        return jsonify({"ok": False, "error": "acpx not found in PATH", "sessions": []}), 503
+
+    include_closed = str(request.args.get("include_closed", "") or "").strip().lower() in {"1", "true", "yes"}
+
+    try:
+        from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+    except ImportError as e:
+        return jsonify({"ok": False, "error": str(e), "sessions": []}), 500
+
+    adapter = get_acpx_adapter(cwd=root_dir)
+    supported_tools = sorted(acpx_agent_command_names())
+
+    async def _list_all() -> list[dict]:
+        out: list[dict] = []
+        for tool in supported_tools:
+            try:
+                sessions = await adapter.list_sessions(tool=tool)
+            except AcpxError:
+                continue
+            for row in sessions:
+                if not _session_in_current_acpx_cwd(row):
+                    continue
+                if not include_closed and row.get("closed"):
+                    continue
+                out.append({
+                    **row,
+                    "tool": tool,
+                })
+        return out
+
+    try:
+        sessions = asyncio.run(_list_all())
+    except AcpxError as e:
+        return jsonify({"ok": False, "error": str(e), "sessions": []}), 502
+
+    return jsonify({"ok": True, "sessions": sessions})
+
+
+@app.route("/proxy_acpx_session_delete", methods=["POST"])
+def proxy_acpx_session_delete():
+    """Close one acpx session directly by tool + session name."""
+    import asyncio
+    import shutil
+
+    if not shutil.which("acpx"):
+        return jsonify({"ok": False, "error": "acpx not found in PATH"}), 503
+
+    body = request.get_json(silent=True) or {}
+    tool = str(body.get("tool") or "").strip().lower()
+    session_name = str(body.get("session_name") or "").strip()
+    if not session_name:
+        return jsonify({"ok": False, "error": "session_name is required"}), 400
+
+    try:
+        from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+    except ImportError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+    adapter = get_acpx_adapter(cwd=root_dir)
+
+    async def _resolve_tool() -> str:
+        valid_tools = acpx_agent_command_names()
+        if tool in valid_tools:
+            return tool
+        for candidate in valid_tools:
+            try:
+                rows = await adapter.list_sessions(tool=candidate)
+            except AcpxError:
+                continue
+            for row in (rows or []):
+                if str((row or {}).get("name") or "").strip() == session_name:
+                    return candidate
+        return ""
+
+    async def _close(resolved_tool: str) -> None:
+        await adapter.close_session(
+            tool=resolved_tool,
+            session_key=session_name,
+            acpx_session=session_name,
+        )
+
+    try:
+        resolved_tool = asyncio.run(_resolve_tool())
+        if not resolved_tool:
+            return jsonify({"ok": False, "error": "unsupported tool"}), 400
+        asyncio.run(_close(resolved_tool))
+    except AcpxError as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+
+    return jsonify({"ok": True, "tool": resolved_tool, "session_name": session_name})
 
 
 @app.route("/proxy_acpx_chat", methods=["POST", "OPTIONS"])
@@ -4444,7 +4553,7 @@ def _public_agents_save_raw(user_id: str, agents: list) -> None:
         json.dump(agents, f, ensure_ascii=False, indent=2)
 
 
-@app.route("/public_external_agents", methods=["GET", "POST", "DELETE"])
+@app.route("/public_external_agents", methods=["GET", "POST", "PUT", "DELETE"])
 def public_external_agents():
     """User-level external_agents.json: list (GET), add (POST), remove (DELETE)."""
     user_id = session.get("user_id", "")
@@ -4454,35 +4563,70 @@ def public_external_agents():
     if request.method == "GET":
         return jsonify({"agents": [_external_agent_response_view(a) for a in _public_agents_load_raw(user_id)]})
 
-    if request.method == "POST":
+    if request.method in {"POST", "PUT"}:
         body = request.get_json(force=True)
-        name = body.get("name", "")
-        tag = body.get("tag", "")
-        global_name = body.get("global_name", "")
-        api_url = body.get("api_url", "")
-        api_key = body.get("api_key", "")
-        model = body.get("model", "")
-        headers = body.get("headers", {})
-        platform = str(body.get("platform", "") or "").strip()
-        if not name or not global_name or not platform:
-            return jsonify({"error": "name, global_name, and platform are required"}), 400
         try:
             agents = _public_agents_load_raw(user_id)
-            if any(a.get("global_name") == global_name for a in agents if isinstance(a, dict)):
-                return jsonify({"error": "Global name already exists"}), 409
-            new_agent = {
-                "name": name,
-                "tag": tag,
-                "platform": platform,
-                "global_name": global_name,
-                "meta": {
-                    "api_url": api_url,
-                    "api_key": api_key,
-                    "model": model,
-                    "headers": headers,
-                },
-            }
-            agents.append(new_agent)
+            global_name = str(body.get("global_name", "") or "").strip()
+            if not global_name:
+                return jsonify({"error": "global_name is required"}), 400
+
+            if request.method == "POST":
+                name = body.get("name", "")
+                tag = body.get("tag", "")
+                api_url = body.get("api_url", "")
+                api_key = body.get("api_key", "")
+                model = body.get("model", "")
+                headers = body.get("headers", {})
+                platform = str(body.get("platform", "") or "").strip()
+                if not name or not platform:
+                    return jsonify({"error": "name and platform are required"}), 400
+                if any(a.get("global_name") == global_name for a in agents if isinstance(a, dict)):
+                    return jsonify({"error": "Global name already exists"}), 409
+                new_agent = {
+                    "name": name,
+                    "tag": tag,
+                    "platform": platform,
+                    "global_name": global_name,
+                    "meta": {
+                        "api_url": api_url,
+                        "api_key": api_key,
+                        "model": model,
+                        "headers": headers,
+                    },
+                }
+            else:
+                found = None
+                for a in agents:
+                    if isinstance(a, dict) and a.get("global_name") == global_name:
+                        found = a
+                        break
+                if not found:
+                    return jsonify({"error": "Global name not found"}), 404
+                if "new_name" in body:
+                    found["name"] = body["new_name"]
+                if "new_tag" in body:
+                    found["tag"] = body["new_tag"]
+                if "platform" in body:
+                    found["platform"] = str(body.get("platform") or "").strip()
+                meta = found.get("meta", {})
+                if "api_url" in body:
+                    meta["api_url"] = body["api_url"]
+                if "api_key" in body:
+                    meta["api_key"] = body["api_key"]
+                if "model" in body:
+                    meta["model"] = body["model"]
+                if "headers" in body:
+                    meta["headers"] = body["headers"]
+                meta.pop("platform", None)
+                if meta:
+                    found["meta"] = meta
+                elif "meta" in found:
+                    found.pop("meta", None)
+                new_agent = found
+
+            if request.method == "POST":
+                agents.append(new_agent)
             _public_agents_save_raw(user_id, agents)
             return jsonify({"status": "success", "agent": new_agent})
         except Exception as e:

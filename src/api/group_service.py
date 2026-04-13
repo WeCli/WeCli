@@ -901,8 +901,16 @@ class GroupService:
                 # External agent: use ACP or HTTP
                 agent_info = external_agents_map.get(global_id, {})
                 if not agent_info:
-                    # Minimal info from DB
-                    agent_info = {"global_name": global_id, "name": short_name, "tag": tag}
+                    tag_key = _canonical_external_platform(str(tag or ""))
+                    if tag_key != "openclaw":
+                        logger.info(
+                            "Skip untracked external ACP agent %s (%s); not found in tracked external agents map",
+                            short_name,
+                            global_id,
+                        )
+                        continue
+                    # Allow untracked public openclaw agents as a special case.
+                    agent_info = {"global_name": global_id, "name": short_name, "tag": tag, "platform": "openclaw"}
                 asyncio.create_task(
                     self._handle_external_agent_reply(
                         group_id, agent_info, msg_text, short_name,

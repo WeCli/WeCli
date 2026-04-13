@@ -390,6 +390,29 @@ class OpsService:
                     "message": f"已请求停止 {agent_key}（acpx）",
                 }
 
+            if req.action == "delete":
+                if use_openclaw_exec:
+                    raise HTTPException(status_code=400, detail="openclaw delete should use native remove endpoint")
+                acpx_session = adapter.to_acpx_session_name(tool=acpx_tool, session_key=session_key)
+                await adapter.close_session(
+                    tool=acpx_tool,
+                    session_key=session_key,
+                    acpx_session=acpx_session,
+                )
+                cleared_http_sessions = 0
+                if self.group_db_path:
+                    cleared_http_sessions = await delete_http_agent_sessions_by_global_name(
+                        self.group_db_path,
+                        global_name,
+                    )
+                return {
+                    "status": "success",
+                    "action": req.action,
+                    "acp_session": session_key,
+                    "cleared_http_sessions": cleared_http_sessions,
+                    "message": f"已关闭 {agent_key} 的 ACP 会话",
+                }
+
             raise HTTPException(status_code=400, detail=f"未知 action: {req.action}")
 
         except AcpxError as e:

@@ -770,16 +770,16 @@ async function orchDeleteInternalAgent(sessionId) {
     }
 }
 
-/** Non–OpenClaw rows from public_external_agents.json, grouped by tag (same idea as mobile contacts). */
+/** Non–OpenClaw rows grouped by platform/tool (same idea as mobile contacts). */
 function _orchGroupPublicExternalAgents(rows) {
     const acpByTool = {};
     (rows || []).forEach((row) => {
         if (!row || typeof row !== 'object') return;
-        const tagRaw = String(row.tag || '').trim().toLowerCase();
-        if (tagRaw === 'openclaw') return;
+        const platformRaw = String(row.platform || row.tag || '').trim().toLowerCase();
+        if (platformRaw === 'openclaw') return;
         const gn = String(row.global_name || '').trim();
         if (!gn) return;
-        const key = tagRaw || '_';
+        const key = platformRaw || 'unknown';
         if (!acpByTool[key]) acpByTool[key] = [];
         acpByTool[key].push(row);
     });
@@ -842,14 +842,14 @@ async function orchLoadOpenClawSessions() {
     if (!list) return;
     list.innerHTML = '<div style="padding:6px 10px;font-size:10px;color:#9ca3af;text-align:center;">⏳ ' + t('loading') + '</div>';
     try {
-        const [ocResp, pubResp] = await Promise.all([
+        const [ocResp, acpxResp] = await Promise.all([
             fetch('/proxy_openclaw_sessions'),
-            fetch('/public_external_agents'),
+            fetch('/proxy_acpx_sessions_all'),
         ]);
         const data = await ocResp.json().catch(() => ({}));
-        let pubData = { agents: [] };
+        let acpxData = { sessions: [] };
         try {
-            if (pubResp.ok) pubData = await pubResp.json();
+            if (acpxResp.ok) acpxData = await acpxResp.json();
         } catch (_) { /* ignore */ }
 
         // When team mode is active, also load external_agents.json to get
@@ -871,8 +871,14 @@ async function orchLoadOpenClawSessions() {
             } catch(e) { /* ignore, will fall back to prefix stripping */ }
         }
 
-        // ACP agents source: team mode from /teams/${team}/members, non-team from public_external_agents
-        let acpRows = pubData.agents || [];
+        // ACP agents source: team mode from /teams/${team}/members, non-team from live acpx sessions
+        let acpRows = (acpxData.sessions || []).map((s) => ({
+            name: s.name || '',
+            global_name: s.name || '',
+            tag: s.tool || '',
+            platform: s.tool || '',
+            meta: {},
+        }));
         if (orch.teamEnabled && orch.teamName) {
             try {
                 const teamResp = await fetch('/teams/' + encodeURIComponent(orch.teamName) + '/members');
@@ -885,6 +891,7 @@ async function orchLoadOpenClawSessions() {
                         name: m.name || m.global_name || '',
                         global_name: m.global_name || m.name || '',
                         tag: m.tag || '',
+                        platform: m.platform || m.tag || '',
                         meta: m.meta || {}
                     }));
             } catch(e) { /* fall back to public */ }
