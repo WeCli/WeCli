@@ -6377,6 +6377,8 @@ async function renderCreateAgentOpenClawPanel() {
       ${team ? `<p class="form-hint">${esc(t('mobile_add_team_prefix_hint', { prefix: team + '_' }))}</p>` : ''}
       <label>${esc(t('mobile_add_oc_short'))}</label>
       <input type="text" id="ca-oc-short" placeholder="work / research" pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+      <label>${esc(t('mobile_add_ext_tag'))}</label>
+      <input type="text" id="ca-oc-tag" placeholder="${esc(t('agent_tag_placeholder'))}" autocomplete="off">
       <p class="form-hint" id="ca-oc-global-hint"></p>
       <label>${esc(t('mobile_add_oc_ws'))}</label>
       <div style="display:flex;gap:6px;align-items:stretch;">
@@ -6442,6 +6444,7 @@ async function renderCreateAgentOpenClawPanel() {
 async function mobileSubmitCreateOpenClawAgent() {
   const team = mobileGetCreateAgentTeam();
   const shortName = (document.getElementById('ca-oc-short') || {}).value.trim();
+  const tag = (document.getElementById('ca-oc-tag') || {}).value.trim() || 'openclaw';
   const workspace = (document.getElementById('ca-oc-ws') || {}).value.trim();
   const globalName = team ? (team + '_' + shortName) : shortName;
   if (!shortName) {
@@ -6478,7 +6481,7 @@ async function mobileSubmitCreateOpenClawAgent() {
       try {
         await api('POST', `/teams/${encodeURIComponent(team)}/members/external`, {
           name: shortName,
-          tag: 'openclaw',
+          tag: tag,
           global_name: globalName,
           platform: 'openclaw',
         });
@@ -6491,7 +6494,7 @@ async function mobileSubmitCreateOpenClawAgent() {
       short_name: shortName,
       type: 'ext',
       global_id: globalName,
-      tag: 'openclaw',
+      tag: tag,
     });
     if (ok) {
       closeCreateAgentModal();
@@ -8981,6 +8984,8 @@ async function renderMobileAddAgentOpenClawForm() {
       ${team ? `<p class="form-hint">${esc(t('mobile_add_team_prefix_hint', { prefix: team + '_' }))}</p>` : ''}
       <label>${esc(t('mobile_add_oc_short'))}</label>
       <input type="text" id="mobile-oc-short" placeholder="work / research" pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+      <label>${esc(t('mobile_add_ext_tag'))}</label>
+      <input type="text" id="mobile-oc-tag" placeholder="${esc(t('agent_tag_placeholder'))}" autocomplete="off">
       <p class="form-hint" id="mobile-oc-global-hint"></p>
       <label>${esc(t('mobile_add_oc_ws'))}</label>
       <div style="display:flex;gap:6px;align-items:stretch;">
@@ -9043,6 +9048,7 @@ async function renderMobileAddAgentOpenClawForm() {
 async function mobileSubmitAddOpenClawAgent() {
   const team = mobileGetAddAgentTeam();
   const shortName = (document.getElementById('mobile-oc-short') || {}).value.trim();
+  const tag = (document.getElementById('mobile-oc-tag') || {}).value.trim() || 'openclaw';
   const workspace = (document.getElementById('mobile-oc-ws') || {}).value.trim();
   const globalName = team ? (team + '_' + shortName) : shortName;
   if (!shortName) {
@@ -9079,7 +9085,7 @@ async function mobileSubmitAddOpenClawAgent() {
       try {
         await api('POST', `/teams/${encodeURIComponent(team)}/members/external`, {
           name: shortName,
-          tag: 'openclaw',
+          tag: tag,
           global_name: globalName,
           platform: 'openclaw',
         });
@@ -9092,7 +9098,7 @@ async function mobileSubmitAddOpenClawAgent() {
         short_name: shortName,
         global_id: globalName,
         member_type: 'ext',
-        tag: 'openclaw',
+        tag: tag,
       });
     }
     toast(t('mobile_add_member_ok'));
