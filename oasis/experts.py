@@ -1356,29 +1356,31 @@ class ExternalExpert:
 
     # ── ACP long-lived connection lifecycle ──
 
-    async def acp_start(self):
-        """Ensure acpx session exists for this expert (optional warm-up)."""
-        if not self._acp_available or not self._is_acp_agent:
-            return
-
-        if self._acp_started:
-            return
-
-        try:
-            adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
-            acp_session = f"agent:{self._oc_agent_name}:{self._acp_session_suffix}"
-            acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=acp_session)
-            await adapter.ensure_session(
-                tool=self._acp_tool_name,
-                session_key=acp_session,
-                acpx_session=acpx_session,
-                system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT,
-            )
-            self._acp_started = True
-            print(f"  [OASIS] ✅ ACPX session warmed for {self.name}")
-        except Exception as e:
-            print(f"  [OASIS] ❌ ACPX warm failed for {self.name} (tool={self._acp_tool_name}): {e}")
-            self._acp_started = False
+    # [DEPRECATED] acp_start() was a pre-warm method that is no longer needed.
+    # The ACP session is created lazily on first prompt via _acp_pooled_prompt().
+    # async def acp_start(self):
+    #     """Ensure acpx session exists for this expert (optional warm-up)."""
+    #     if not self._acp_available or not self._is_acp_agent:
+    #         return
+    #
+    #     if self._acp_started:
+    #         return
+    #
+    #     try:
+    #         adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
+    #         acp_session = f"agent:{self._oc_agent_name}:{self._acp_session_suffix}"
+    #         acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=acp_session)
+    #         await adapter.ensure_session(
+    #             tool=self._acp_tool_name,
+    #             session_key=acp_session,
+    #             acpx_session=acpx_session,
+    #             system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT,
+    #         )
+    #         self._acp_started = True
+    #         print(f"  [OASIS] ✅ ACPX session warmed for {self.name}")
+    #     except Exception as e:
+    #         print(f"  [OASIS] ❌ ACPX warm failed for {self.name} (tool={self._acp_tool_name}): {e}")
+    #         self._acp_started = False
 
     def _acp_pool_key(self) -> str:
         return f"{self._acp_tool_name}\x1fagent:{self._oc_agent_name}:{self._acp_session_suffix}"
@@ -1391,13 +1393,18 @@ class ExternalExpert:
         try:
             adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
             acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=cli_session)
+            system_prompt = (
+                _EXTERNAL_AGENT_SYSTEM_PROMPT + "\n\n" + _build_identity_prompt(self.title, self.persona)
+                if not self._acp_started
+                else None
+            )
             reply = await adapter.prompt(
                 tool=self._acp_tool_name,
                 session_key=cli_session,
                 prompt_text=cli_message,
                 timeout_sec=180,
                 reset_session=False,
-                system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
             )
             _acp_oasis_trace(
                 "acp_prompt_complete",
@@ -1525,6 +1532,9 @@ class ExternalExpert:
                         tool="openclaw",
                         session_key=acp_session,
                         acpx_session=acpx_session,
+                        system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT
+                        + "\n\n"
+                        + _build_identity_prompt(self.title, self.persona),
                     )
                     reply = await adapter.prompt(
                         tool="openclaw",

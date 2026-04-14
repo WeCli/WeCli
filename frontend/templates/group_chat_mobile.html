@@ -6496,6 +6496,17 @@ async function mobileSubmitCreateOpenClawAgent() {
       } catch (e) {
         console.warn('team external record:', e);
       }
+    } else {
+      try {
+        await api('POST', `/public_external_agents`, {
+          name: shortName,
+          tag: tag,
+          global_name: globalName,
+          platform: 'openclaw',
+        });
+      } catch (e) {
+        console.warn('public external record:', e);
+      }
     }
     const ok = await startPrivateChat({
       name: shortName,
@@ -9107,6 +9118,17 @@ async function mobileSubmitAddOpenClawAgent() {
         });
       } catch (e) {
         console.warn('team external record:', e);
+      }
+    } else {
+      try {
+        await api('POST', `/public_external_agents`, {
+          name: shortName,
+          tag: tag,
+          global_name: globalName,
+          platform: 'openclaw',
+        });
+      } catch (e) {
+        console.warn('public external record:', e);
       }
     }
     if (currentGroupId) {

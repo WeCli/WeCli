@@ -12626,6 +12626,7 @@ async function addOpenClawMember() {
                     body: JSON.stringify({
                         name: shortName,
                         tag: 'openclaw',
+                        platform: 'openclaw',
                         global_name: globalName
                     })
                 });
