@@ -4300,7 +4300,8 @@ def get_team_members(team_name):
                             "tag": agent.get("tag", ""),
                             "platform": _external_agent_platform(agent),
                             "global_name": agent.get("global_name", ""),
-                            "meta": agent.get("meta", {})
+                            "meta": agent.get("meta", {}),
+                            "team": team_name
                         })
         
         return jsonify({
