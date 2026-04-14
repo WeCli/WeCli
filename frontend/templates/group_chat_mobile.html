@@ -6370,15 +6370,19 @@ async function renderCreateAgentOpenClawPanel() {
   const panel = document.getElementById('create-agent-panel-oc');
   if (!panel) return;
   const team = mobileGetCreateAgentTeam();
+  panel.innerHTML = `<div class="mobile-add-agent-form"><div style="text-align:center;padding:20px;">${t('loading')}</div></div>`;
+  const tagOpts = await _mobileBuildExternalPersonaTagOptionsHtml(team);
   panel.innerHTML = `
     <div class="mobile-add-agent-form">
       <p class="form-hint">${esc(t('mobile_create_agent_team_hint'))}</p>
       <div style="font-weight:700;margin-bottom:6px;color:var(--text);">${esc(t('mobile_add_oc_title'))}</div>
       ${team ? `<p class="form-hint">${esc(t('mobile_add_team_prefix_hint', { prefix: team + '_' }))}</p>` : ''}
       <label>${esc(t('mobile_add_oc_short'))}</label>
-      <input type="text" id="ca-oc-short" placeholder="work / research" pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+      <input type="text" id="ca-oc-short" placeholder="work / research" autocomplete="off">
       <label>${esc(t('mobile_add_ext_tag'))}</label>
-      <input type="text" id="ca-oc-tag" placeholder="${esc(t('agent_tag_placeholder'))}" autocomplete="off">
+      <select id="ca-oc-tag" class="ext-tag-select">${tagOpts}</select>
+      <div class="field-note">${esc(_currentLang === 'zh' ? 'tag 表示人设标签。' : 'Tag is the persona label.')}</div>
+      <input type="text" id="ca-oc-tag-custom" class="ext-tag-custom" placeholder="${esc(t('agent_tag_placeholder'))}" style="margin-top:8px;display:none;">
       <p class="form-hint" id="ca-oc-global-hint"></p>
       <label>${esc(t('mobile_add_oc_ws'))}</label>
       <div style="display:flex;gap:6px;align-items:stretch;">
@@ -6390,6 +6394,11 @@ async function renderCreateAgentOpenClawPanel() {
   const shortInp = document.getElementById('ca-oc-short');
   const wsInp = document.getElementById('ca-oc-ws');
   const hintEl = document.getElementById('ca-oc-global-hint');
+  const tagSel = document.getElementById('ca-oc-tag');
+  const tagCust = document.getElementById('ca-oc-tag-custom');
+  if (tagSel && tagCust) {
+    tagSel.onchange = () => { tagCust.style.display = tagSel.value === 'custom' ? 'block' : 'none'; };
+  }
   let parentDir = '';
   let wsManual = false;
 
@@ -6444,15 +6453,14 @@ async function renderCreateAgentOpenClawPanel() {
 async function mobileSubmitCreateOpenClawAgent() {
   const team = mobileGetCreateAgentTeam();
   const shortName = (document.getElementById('ca-oc-short') || {}).value.trim();
-  const tag = (document.getElementById('ca-oc-tag') || {}).value.trim() || 'openclaw';
+  const tagSel = document.getElementById('ca-oc-tag');
+  const tagCustom = (document.getElementById('ca-oc-tag-custom') || {}).value.trim();
+  const tagSelect = tagSel ? tagSel.value : '';
+  const tag = tagCustom || (tagSelect !== 'custom' ? tagSelect : '') || 'openclaw';
   const workspace = (document.getElementById('ca-oc-ws') || {}).value.trim();
   const globalName = team ? (team + '_' + shortName) : shortName;
   if (!shortName) {
     toast(t('agent_name_required'));
-    return;
-  }
-  if (!/^[a-zA-Z0-9_-]+$/.test(globalName)) {
-    toast(t('mobile_add_oc_name_invalid'));
     return;
   }
   if (!workspace) {
@@ -8977,15 +8985,19 @@ async function renderMobileAddAgentOpenClawForm() {
   const body = document.getElementById('add-agent-body');
   if (!body) return;
   const team = mobileGetAddAgentTeam();
+  body.innerHTML = `<div class="mobile-add-agent-form"><div style="text-align:center;padding:20px;">${t('loading')}</div></div>`;
+  const tagOpts = await _mobileBuildExternalPersonaTagOptionsHtml(team);
   body.innerHTML = `
     <div class="mobile-add-agent-form">
       <div style="font-weight:700;margin-bottom:6px;color:var(--text);">${esc(t('mobile_add_oc_title'))}</div>
       <p class="form-hint">${esc(t('mobile_add_agent_team_optional'))}</p>
       ${team ? `<p class="form-hint">${esc(t('mobile_add_team_prefix_hint', { prefix: team + '_' }))}</p>` : ''}
       <label>${esc(t('mobile_add_oc_short'))}</label>
-      <input type="text" id="mobile-oc-short" placeholder="work / research" pattern="[a-zA-Z0-9_-]+" autocomplete="off">
+      <input type="text" id="mobile-oc-short" placeholder="work / research" autocomplete="off">
       <label>${esc(t('mobile_add_ext_tag'))}</label>
-      <input type="text" id="mobile-oc-tag" placeholder="${esc(t('agent_tag_placeholder'))}" autocomplete="off">
+      <select id="mobile-oc-tag" class="ext-tag-select">${tagOpts}</select>
+      <div class="field-note">${esc(_currentLang === 'zh' ? 'tag 表示人设标签。' : 'Tag is the persona label.')}</div>
+      <input type="text" id="mobile-oc-tag-custom" class="ext-tag-custom" placeholder="${esc(t('agent_tag_placeholder'))}" style="margin-top:8px;display:none;">
       <p class="form-hint" id="mobile-oc-global-hint"></p>
       <label>${esc(t('mobile_add_oc_ws'))}</label>
       <div style="display:flex;gap:6px;align-items:stretch;">
@@ -8997,6 +9009,11 @@ async function renderMobileAddAgentOpenClawForm() {
   const shortInp = document.getElementById('mobile-oc-short');
   const wsInp = document.getElementById('mobile-oc-ws');
   const hintEl = document.getElementById('mobile-oc-global-hint');
+  const tagSel = document.getElementById('mobile-oc-tag');
+  const tagCust = document.getElementById('mobile-oc-tag-custom');
+  if (tagSel && tagCust) {
+    tagSel.onchange = () => { tagCust.style.display = tagSel.value === 'custom' ? 'block' : 'none'; };
+  }
   let parentDir = '';
   let wsManual = false;
 
@@ -9048,15 +9065,14 @@ async function renderMobileAddAgentOpenClawForm() {
 async function mobileSubmitAddOpenClawAgent() {
   const team = mobileGetAddAgentTeam();
   const shortName = (document.getElementById('mobile-oc-short') || {}).value.trim();
-  const tag = (document.getElementById('mobile-oc-tag') || {}).value.trim() || 'openclaw';
+  const tagSel = document.getElementById('mobile-oc-tag');
+  const tagCustom = (document.getElementById('mobile-oc-tag-custom') || {}).value.trim();
+  const tagSelect = tagSel ? tagSel.value : '';
+  const tag = tagCustom || (tagSelect !== 'custom' ? tagSelect : '') || 'openclaw';
   const workspace = (document.getElementById('mobile-oc-ws') || {}).value.trim();
   const globalName = team ? (team + '_' + shortName) : shortName;
   if (!shortName) {
     toast(t('agent_name_required'));
-    return;
-  }
-  if (!/^[a-zA-Z0-9_-]+$/.test(globalName)) {
-    toast(t('mobile_add_oc_name_invalid'));
     return;
   }
   if (!workspace) {
