@@ -903,7 +903,7 @@ async function orchLoadOpenClawSessions() {
                         platform: m.platform || m.tag || '',
                         meta: m.meta || {}
                     }));
-            } catch(e) { /* fall back to public */ }
+            } catch(e) { /* team fetch failed: clear acpRows so only team members are shown */ acpRows = []; }
         }
         const acpByTool = _orchGroupPublicExternalAgents(acpRows);
         let acpTotal = 0;
