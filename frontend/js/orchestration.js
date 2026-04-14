@@ -880,14 +880,8 @@ async function orchLoadOpenClawSessions() {
             } catch(e) { /* ignore, will fall back to prefix stripping */ }
         }
 
-        // ACP agents source: team mode from /teams/${team}/members, non-team from live acpx sessions
-        let acpRows = (acpxData.sessions || []).map((s) => ({
-            name: s.name || '',
-            global_name: s.name || '',
-            tag: s.tool || '',
-            platform: s.tool || '',
-            meta: {},
-        }));
+        // ACP agents source: team mode from /teams/${team}/members, non-team from /public_external_agents
+        let acpRows = [];
         if (orch.teamEnabled && orch.teamName) {
             try {
                 const teamResp = await fetch('/teams/' + encodeURIComponent(orch.teamName) + '/members');
@@ -904,6 +898,20 @@ async function orchLoadOpenClawSessions() {
                         meta: m.meta || {}
                     }));
             } catch(e) { /* team fetch failed: clear acpRows so only team members are shown */ acpRows = []; }
+        } else {
+            // In public mode (no team), load from user's external_agents.json via /public_external_agents
+            try {
+                const pubResp = await fetch('/public_external_agents');
+                const pubData = await pubResp.json().catch(() => ({}));
+                const agents = pubData.agents || [];
+                acpRows = agents.map(a => ({
+                    name: a.name || a.global_name || '',
+                    global_name: a.global_name || a.name || '',
+                    tag: a.tag || '',
+                    platform: a.platform || a.tag || '',
+                    meta: a.meta || {}
+                }));
+            } catch(e) { /* use empty list if fetch fails */ }
         }
         const acpByTool = _orchGroupPublicExternalAgents(acpRows);
         let acpTotal = 0;

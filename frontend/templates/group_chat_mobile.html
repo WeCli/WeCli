@@ -6480,6 +6480,7 @@ async function mobileSubmitCreateOpenClawAgent() {
           name: shortName,
           tag: 'openclaw',
           global_name: globalName,
+          platform: 'openclaw',
         });
       } catch (e) {
         console.warn('team external record:', e);
@@ -9080,6 +9081,7 @@ async function mobileSubmitAddOpenClawAgent() {
           name: shortName,
           tag: 'openclaw',
           global_name: globalName,
+          platform: 'openclaw',
         });
       } catch (e) {
         console.warn('team external record:', e);
@@ -9957,18 +9959,17 @@ function renderAgentBasicInfo(name, memberType, agentInfo) {
       <button onclick="startPrivateChat(JSON.parse(this.dataset.info))" data-info="${pcInfo}" ${needsTrackFirst ? 'disabled' : ''} style="width:100%;padding:14px;background:${needsTrackFirst ? '#9ca3af' : '#07c160'};color:white;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:${needsTrackFirst ? 'not-allowed' : 'pointer'};">${needsTrackFirst ? (_currentLang === 'zh' ? '先追踪再私聊' : 'Track before chat') : t('start_private_chat')}</button>`;
 
     if (memberType === 'ext') {
-      if (!agentInfo.team) {
-        const editInfo = JSON.stringify({
-          global_id: globalId,
-          name: shortName,
-          tag: tag,
-          tracked: isTracked,
-          platform: agentInfo.platform || '',
-          platform_hint: agentInfo.platform_hint || platformKey,
-        }).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-        html += `
+      const editInfo = JSON.stringify({
+        global_id: globalId,
+        name: shortName,
+        tag: tag,
+        tracked: isTracked,
+        team: agentInfo.team || '',
+        platform: agentInfo.platform || '',
+        platform_hint: agentInfo.platform_hint || platformKey,
+      }).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      html += `
       <button onclick="openPublicExternalAgentConfigModal(JSON.parse(this.dataset.info))" data-info="${editInfo}" style="width:100%;padding:14px;background:transparent;color:#2563eb;border:2px solid #2563eb;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">${_currentLang === 'zh' ? '追踪 / 编辑' : 'Track / Edit'}</button>`;
-      }
       const delInfo = JSON.stringify({
         global_id: globalId,
         name: shortName,
@@ -10105,10 +10106,18 @@ async function openPublicExternalAgentConfigModal(info) {
     toast(_currentLang === 'zh' ? '缺少 Global ID' : 'Missing global ID');
     return;
   }
+  const team = (info && info.team) || '';
   let tracked = null;
   try {
-    const data = await api('GET', '/public_external_agents');
-    tracked = (Array.isArray(data && data.agents) ? data.agents : []).find((a) => String((a && a.global_name) || '').trim() === globalId) || null;
+    if (team) {
+      // For team agents, check if exists in team's external_agents.json via /teams/{team}/members
+      const data = await api('GET', `/teams/${encodeURIComponent(team)}/members`);
+      const members = Array.isArray(data && data.members) ? data.members : [];
+      tracked = members.find((a) => String((a && a.global_name) || '').trim() === globalId && a.type === 'ext') || null;
+    } else {
+      const data = await api('GET', '/public_external_agents');
+      tracked = (Array.isArray(data && data.agents) ? data.agents : []).find((a) => String((a && a.global_name) || '').trim() === globalId) || null;
+    }
   } catch (_) { /* ignore */ }
 
   closeAgentDetail();
@@ -10158,22 +10167,41 @@ async function openPublicExternalAgentConfigModal(info) {
       return;
     }
     try {
-      if (tracked) {
-        await api('PUT', '/public_external_agents', {
-          global_name: globalId,
-          new_name: name,
-          new_tag: tag,
-          platform,
-        });
+      if (team) {
+        if (tracked) {
+          await api('PUT', `/teams/${encodeURIComponent(team)}/members/external`, {
+            global_name: globalId,
+            new_name: name,
+            new_tag: tag,
+            platform,
+          });
+        } else {
+          await api('POST', `/teams/${encodeURIComponent(team)}/members/external`, {
+            name,
+            tag,
+            global_name: globalId,
+            platform,
+          });
+        }
+        toast(_currentLang === 'zh' ? '已写入团队外部 Agent 列表' : 'Saved to team external agents');
       } else {
-        await api('POST', '/public_external_agents', {
-          name,
-          tag,
-          global_name: globalId,
-          platform,
-        });
+        if (tracked) {
+          await api('PUT', '/public_external_agents', {
+            global_name: globalId,
+            new_name: name,
+            new_tag: tag,
+            platform,
+          });
+        } else {
+          await api('POST', '/public_external_agents', {
+            name,
+            tag,
+            global_name: globalId,
+            platform,
+          });
+        }
+        toast(_currentLang === 'zh' ? '已写入公共外部 Agent 列表' : 'Saved to public external agents');
       }
-      toast(_currentLang === 'zh' ? '已写入公共外部 Agent 列表' : 'Saved to public external agents');
       close();
       closeAgentDetail();
       invalidateContactsPrefetch();
