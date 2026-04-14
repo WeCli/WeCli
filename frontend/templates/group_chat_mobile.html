@@ -9115,11 +9115,6 @@ async function startPrivateChat(agentInfo) {
   closeAgentDetail();
   const userId = window.__currentUser;
   if (!userId) { toast(t('not_logged_in')); return false; }
-  const platformKey = resolveExternalPlatformKey(agentInfo);
-  if (agentInfo && agentInfo.type === 'ext' && !agentInfo.team && !agentInfo.tracked && platformKey !== 'openclaw') {
-    toast(_currentLang === 'zh' ? '未追踪的 ACP Agent 不能直接私聊，请先追踪。' : 'Track this ACP agent before starting a chat.');
-    return false;
-  }
 
   const agentName = agentInfo.short_name || agentInfo.name;
   const memberType = agentInfo.type;
@@ -9900,7 +9895,7 @@ function renderAgentBasicInfo(name, memberType, agentInfo) {
   const tag = agentInfo.tag || '';
   const platformKey = memberType === 'ext' ? resolveExternalPlatformKey(agentInfo) : '';
   const isTracked = !!agentInfo.tracked;
-  const needsTrackFirst = memberType === 'ext' && !agentInfo.team && !isTracked && platformKey !== 'openclaw';
+  const needsTrackFirst = false;  // all agents from JSON are tracked
   let html = `<div class="agent-detail-section">
     <div class="agent-detail-label">${t('basic_info')}</div>
     <div class="agent-detail-value">
@@ -10832,31 +10827,18 @@ async function loadPublicExternalAgentGroups() {
     platform: 'openclaw'
   }));
   ocList.forEach(mergeItem);
-  const acpxRows = (acpxRes && Array.isArray(acpxRes.sessions)) ? acpxRes.sessions : [];
-  acpxRows.forEach((row) => {
-    if (!row || typeof row !== 'object') return;
-    const gn = String(row.name || '').trim();
-    if (!gn) return;
-    mergeItem({
-      name: gn,
-      type: 'ext',
-      tag: row.tool || '',
-      global_name: gn,
-      platform: row.tool || 'unknown',
-      meta: {},
-    });
-  });
+  // JSON entries (authoritative names) - only show agents that are tracked in JSON
   trackedRows.forEach((row) => {
     if (!row || typeof row !== 'object') return;
-    mergeItem({
-      name: row.name || row.global_name || t('unnamed'),
-      type: 'ext',
-      tag: row.tag || '',
-      global_name: row.global_name || '',
-      platform: row.platform || '',
-      meta: row.meta || {},
+    const key = String(row.global_name || '').trim();
+    if (!key) return;
+    merged.set(key, {
+      ...row,
+      global_name: key,
+      tracked: true,
     });
   });
+  // Don't read acpx sessions - only show agents that are in JSON
   const openclaw = [];
   const acpByTool = {};
   Array.from(merged.values()).forEach((item) => {
@@ -10933,7 +10915,7 @@ function renderExternalAgentGroupsHtml(groups, idPrefix) {
     const platformRaw = String(a.platform || a.tag || '').trim();
     const tracked = !!a.tracked;
     const platformKey = normalizePlatformKey(platformRaw || platformHint || '');
-    const needsTrackFirst = !tracked && platformKey !== 'openclaw';
+    const needsTrackFirst = false;  // all agents from JSON are tracked
     const info = JSON.stringify({
       name: a.name,
       type: 'ext',
@@ -10993,7 +10975,7 @@ function renderExternalAgentGroupsForAddMembersHtml(groups, idPrefix) {
     const tag = a.tag || '';
     const tracked = !!a.tracked;
     const platformKey = normalizePlatformKey(String(a.platform || platformHint || '').trim());
-    const blocked = !tracked && platformKey !== 'openclaw';
+    const blocked = false;  // all agents from JSON are tracked
     const teamLabel = a.team ? `<span style="font-size:11px;color:var(--text-hint);margin-left:4px;">[${esc(a.team)}]</span>` : '';
     const initial = avatarLabelFromDisplayName(name);
     return `
