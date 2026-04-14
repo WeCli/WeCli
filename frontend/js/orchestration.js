@@ -810,7 +810,16 @@ function _orchAppendPublicExternalCard(parent, row, yamlName) {
     const card = document.createElement('div');
     card.className = 'orch-expert-card';
     card.draggable = true;
-    const name = yamlName || row.name || row.global_name || 'unknown';
+    // name = display name (friendly yamlName, or row.name for team-only agents)
+    const name = yamlName || row.name || 'unknown';
+    // ext_id = YAML third segment; for ACP agents (global_name like "agent:cc7:clawcrosschat"),
+    // extract the middle segment; for team agents use name directly
+    let extId = yamlName || row.name || '';
+    if (!yamlName && row.global_name) {
+        // ACP public agent: global_name = "agent:{session}:{suffix}", extract middle segment
+        const parts = row.global_name.split(':');
+        extId = parts.length >= 2 ? parts[1] : row.global_name;
+    }
     const tag = row.tag || '';
     const meta = row.meta || {};
     const mdl = (meta.model && meta.model !== 'unknown') ? meta.model : '';
@@ -827,7 +836,7 @@ function _orchAppendPublicExternalCard(parent, row, yamlName) {
         api_url: rawUrl,
         api_key: meta.api_key ? '****' : '',
         model: meta.model || '',
-        ext_id: name,  // YAML third segment = team JSON name (or row.name)
+        ext_id: extId,  // YAML third segment = parsed session name (not full ACP key)
     };
     if (meta.headers && typeof meta.headers === 'object' && Object.keys(meta.headers).length) {
         nodeData.headers = meta.headers;
