@@ -454,21 +454,32 @@ class DiscussionEngine:
                     platform_name = _canonical_external_platform(first)
                 is_acp_agent = platform_name in ExternalExpert._ACP_TOOL_TAGS
                 is_openclaw_http = platform_name == "openclaw"
-                cfg = ext_configs.get(full_name, {})
-                has_http_url = bool(cfg.get("api_url")) or (is_openclaw_http and bool(os.getenv("OPENCLAW_API_URL", "")))
-                if not has_http_url and not is_acp_agent:
-                    print(f"  [OASIS] ⚠️ External expert '{full_name}' missing platform/api_url, skipping.")
-                    continue
-                api_url = cfg.get("api_url", "") or ""
-                model_str = cfg.get("model", "gpt-3.5-turbo")
-                config = self._lookup_by_tag(first, user_id, self._team)
-                if is_acp_agent:
-                    expert_name = ext_name
-                    persona = config.get("persona", "") if config else ""
-                else:
+                # Public OpenClaw: YAML name IS global_name, no JSON lookup needed
+                if is_openclaw_http and not self._team:
+                    oc_name = ext_name
+                    external_agent = {}
+                    cfg = ext_configs.get(full_name, {})
+                    config = self._lookup_by_tag(first, user_id, self._team)
                     expert_name = config["name"] if config else first
                     persona = config.get("persona", "") if config else ""
-                oc_name = str(external_agent.get("global_name", "") or "") if external_agent else ""
+                    api_url = cfg.get("api_url", "") or os.getenv("OPENCLAW_API_URL", "") or ""
+                    model_str = cfg.get("model", "gpt-3.5-turbo")
+                else:
+                    cfg = ext_configs.get(full_name, {})
+                    has_http_url = bool(cfg.get("api_url")) or (is_openclaw_http and bool(os.getenv("OPENCLAW_API_URL", "")))
+                    if not has_http_url and not is_acp_agent:
+                        print(f"  [OASIS] ⚠️ External expert '{full_name}' missing platform/api_url, skipping.")
+                        continue
+                    api_url = cfg.get("api_url", "") or ""
+                    model_str = cfg.get("model", "gpt-3.5-turbo")
+                    config = self._lookup_by_tag(first, user_id, self._team)
+                    if is_acp_agent:
+                        expert_name = ext_name
+                        persona = config.get("persona", "") if config else ""
+                    else:
+                        expert_name = config["name"] if config else first
+                        persona = config.get("persona", "") if config else ""
+                    oc_name = str(external_agent.get("global_name", "") or "") if external_agent else ""
                 expert = ExternalExpert(
                     name=expert_name,
                     ext_id=ext_name,

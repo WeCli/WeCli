@@ -886,7 +886,7 @@ async function orchLoadOpenClawSessions() {
                 const members = teamData.members || [];
                 // Filter external members and transform to row format
                 acpRows = members
-                    .filter(m => (m.member_type || '') === 'ext')
+                    .filter(m => (m.type || m.member_type || '') === 'ext')
                     .map(m => ({
                         name: m.name || m.global_name || '',
                         global_name: m.global_name || m.name || '',
