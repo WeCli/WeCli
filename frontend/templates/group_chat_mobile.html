@@ -10050,6 +10050,7 @@ async function deleteExternalAgent(info) {
   const msg = t('delete_agent_confirm').replace('{name}', name);
   if (!confirm(msg)) return;
 
+  // Try to close session (best-effort, don't block on failure)
   try {
     if (isOpenClaw && canDeleteRealOpenClaw) {
       const resp = await fetch('/proxy_openclaw_remove', {
@@ -10059,27 +10060,27 @@ async function deleteExternalAgent(info) {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok || !data.ok) {
-        throw new Error(data.error || '删除 OpenClaw Agent 失败');
+        console.warn('OpenClaw remove failed:', data.error);
       }
     } else if (platform && platform !== 'openclaw') {
       const tool = acpxToolFromAgentInfo(info);
-      if (!tool) {
-        throw new Error('无法识别 ACPX 平台');
-      }
-      const resp = await fetch('/proxy_acpx_session_delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tool: tool,
-          session_name: globalId,
-        }),
-      });
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data.ok) {
-        throw new Error(data.detail || data.error || '删除 ACP Agent 失败');
+      if (tool) {
+        await fetch('/proxy_acpx_session_delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tool: tool,
+            session_name: globalId,
+          }),
+        }).catch(() => null);  // best-effort, ignore failure
       }
     }
+  } catch (e) {
+    console.warn('Session close failed (ignored):', e);
+  }
 
+  // Always delete JSON entry regardless of session close result
+  try {
     if (team) {
       await api('DELETE', `/teams/${encodeURIComponent(team)}/members/external`, {
         global_name: globalId,
@@ -10087,9 +10088,8 @@ async function deleteExternalAgent(info) {
     } else {
       await api('DELETE', '/public_external_agents', {
         global_name: globalId,
-      }).catch(() => null);
+      });
     }
-
     toast(t('agent_deleted') + ': ' + name);
     closeAgentDetail();
     invalidateContactsPrefetch();
