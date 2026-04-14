@@ -2682,36 +2682,39 @@ def proxy_acpx_session_delete():
 
     adapter = get_acpx_adapter(cwd=root_dir)
 
-    async def _resolve_tool() -> str:
+    async def _resolve_tool() -> tuple[str, str]:
+        """Returns (tool, actual_session_name) tuple."""
         valid_tools = acpx_agent_command_names()
         if tool in valid_tools:
-            return tool
+            return tool, session_name
         for candidate in valid_tools:
             try:
                 rows = await adapter.list_sessions(tool=candidate)
             except AcpxError:
                 continue
             for row in (rows or []):
-                if str((row or {}).get("name") or "").strip() == session_name:
-                    return candidate
-        return ""
+                row_name = str((row or {}).get("name") or "").strip()
+                # Match session name pattern: agent:{global_name}:{suffix}
+                if row_name == f"agent:{session_name}:" or row_name.startswith(f"agent:{session_name}:"):
+                    return candidate, row_name
+        return "", ""
 
-    async def _close(resolved_tool: str) -> None:
+    async def _close(resolved_tool: str, actual_session: str) -> None:
         await adapter.close_session(
             tool=resolved_tool,
             session_key=session_name,
-            acpx_session=session_name,
+            acpx_session=actual_session,
         )
 
     try:
-        resolved_tool = asyncio.run(_resolve_tool())
+        resolved_tool, actual_session = asyncio.run(_resolve_tool())
         if not resolved_tool:
-            return jsonify({"ok": False, "error": "unsupported tool"}), 400
-        asyncio.run(_close(resolved_tool))
+            return jsonify({"ok": False, "error": "unsupported tool or session not found"}), 400
+        asyncio.run(_close(resolved_tool, actual_session))
     except AcpxError as e:
         return jsonify({"ok": False, "error": str(e)}), 502
 
-    return jsonify({"ok": True, "tool": resolved_tool, "session_name": session_name})
+    return jsonify({"ok": True, "tool": resolved_tool, "session_name": actual_session})
 
 
 @app.route("/proxy_acpx_chat", methods=["POST", "OPTIONS"])
