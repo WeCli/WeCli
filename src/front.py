@@ -2685,9 +2685,9 @@ def proxy_acpx_session_delete():
     async def _resolve_tool() -> tuple[str, str]:
         """Returns (tool, actual_session_name) tuple."""
         valid_tools = acpx_agent_command_names()
-        if tool in valid_tools:
-            return tool, session_name
-        for candidate in valid_tools:
+        # Even if tool is provided, still look up actual session name
+        search_tools = [tool] if tool in valid_tools else valid_tools
+        for candidate in search_tools:
             try:
                 rows = await adapter.list_sessions(tool=candidate)
             except AcpxError:
