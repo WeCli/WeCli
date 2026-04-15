@@ -31,3 +31,6 @@ av
 static_ffmpeg
 
 agent-client-protocol
+
+# Test support
+pytest-asyncio
