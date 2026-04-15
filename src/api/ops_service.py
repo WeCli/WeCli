@@ -12,7 +12,11 @@ from fastapi.responses import StreamingResponse
 from integrations.acpx_adapter import AcpxError, get_acpx_adapter
 from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
 from utils.auth_utils import extract_user_password_session, is_internal_bearer, parse_bearer_parts
-from api.group_repository import get_group, get_group_member_by_global_id
+from api.group_repository import (
+    delete_http_agent_sessions_by_global_name,
+    get_group,
+    get_group_member_by_global_id,
+)
 from api.group_service import _load_public_external_agents, build_external_agents_map_for_owner
 from services.llm_factory import get_provider_audio_defaults, infer_provider
 from utils.logging_utils import get_logger
@@ -33,6 +37,15 @@ _ACP_KNOWN_TOOLS: frozenset = frozenset({
 _DEFAULT_ACP_SESSION_SUFFIX = "clawcrosschat"
 _AGENT_MODEL_RE = re.compile(r"^agent:[^:]+(?::(.+))?$")
 _ACPX_AGENT_TAGS: frozenset[str] = acpx_agent_tags_with_legacy()
+
+
+def _canonical_external_platform(platform: str) -> str:
+    pl = (platform or "").strip().lower()
+    if pl in ("claude-code", "claudecode"):
+        return "claude"
+    if pl in ("gemini-cli", "geminicli"):
+        return "gemini"
+    return pl
 
 
 def _resolve_external_session_suffix(model: str) -> str:
@@ -66,6 +79,7 @@ def _load_team_external_agents(user_id: str, team: str) -> list[dict]:
                 "member_type": "ext",
                 "name": agent.get("name", ""),
                 "tag": agent.get("tag", ""),
+                "platform": _canonical_external_platform(str(agent.get("platform", "") or "")),
                 "global_name": agent.get("global_name", ""),
                 "api_url": ext_config.get("api_url", ""),
                 "api_key": ext_config.get("api_key", ""),
@@ -292,7 +306,7 @@ class OpsService:
             if not agent_info:
                 short_n = str(member.get("short_name") or "").strip()
                 tag_m = str(member.get("tag") or "").strip()
-                agent_info = {"global_name": agent_key, "name": short_n, "tag": tag_m}
+                agent_info = {"global_name": agent_key, "name": short_n, "tag": tag_m, "platform": ""}
         else:
             agent_info = _resolve_external_agent_record(req.user_id, team_hint, agent_key)
             if not agent_info:
@@ -309,7 +323,7 @@ class OpsService:
         if not global_name:
             raise HTTPException(status_code=400, detail="该 agent 未配置 global_name")
 
-        tag = (agent_info.get("tag") or "").strip().lower()
+        platform = _canonical_external_platform(str(agent_info.get("platform", "") or ""))
         suffix = _resolve_external_session_suffix(str(agent_info.get("model", "")))
         session_key = f"agent:{global_name}:{suffix}"
 
@@ -321,8 +335,8 @@ class OpsService:
         except AcpxError as e:
             raise HTTPException(status_code=500, detail=str(e)) from e
 
-        use_openclaw_exec = tag in ("", "openclaw") or tag not in _ACPX_AGENT_TAGS
-        acpx_tool = tag if tag in _ACPX_AGENT_TAGS and tag != "openclaw" else "openclaw"
+        use_openclaw_exec = platform == "openclaw"
+        acpx_tool = platform
 
         logger.info(
             "acp_control action=%s agent=%s session_key=%s openclaw_exec=%s acpx_tool=%s",
@@ -332,6 +346,11 @@ class OpsService:
             use_openclaw_exec,
             acpx_tool,
         )
+
+        if not platform:
+            raise HTTPException(status_code=400, detail="external agent missing platform")
+        if not use_openclaw_exec and acpx_tool not in _ACP_KNOWN_TOOLS and acpx_tool not in _ACPX_AGENT_TAGS:
+            raise HTTPException(status_code=400, detail=f"unsupported external platform: {platform}")
 
         try:
             if req.action == "new":
@@ -343,10 +362,17 @@ class OpsService:
                     await adapter.ops_non_openclaw_reset_session(
                         tool=acpx_tool, session_key=session_key
                     )
+                cleared_http_sessions = 0
+                if self.group_db_path:
+                    cleared_http_sessions = await delete_http_agent_sessions_by_global_name(
+                        self.group_db_path,
+                        global_name,
+                    )
                 return {
                     "status": "success",
                     "action": req.action,
                     "acp_session": session_key,
+                    "cleared_http_sessions": cleared_http_sessions,
                     "message": f"已为 {agent_key} 请求新会话（acpx）",
                 }
 
@@ -362,6 +388,29 @@ class OpsService:
                     "action": req.action,
                     "acp_session": session_key,
                     "message": f"已请求停止 {agent_key}（acpx）",
+                }
+
+            if req.action == "delete":
+                if use_openclaw_exec:
+                    raise HTTPException(status_code=400, detail="openclaw delete should use native remove endpoint")
+                acpx_session = adapter.to_acpx_session_name(tool=acpx_tool, session_key=session_key)
+                await adapter.close_session(
+                    tool=acpx_tool,
+                    session_key=session_key,
+                    acpx_session=acpx_session,
+                )
+                cleared_http_sessions = 0
+                if self.group_db_path:
+                    cleared_http_sessions = await delete_http_agent_sessions_by_global_name(
+                        self.group_db_path,
+                        global_name,
+                    )
+                return {
+                    "status": "success",
+                    "action": req.action,
+                    "acp_session": session_key,
+                    "cleared_http_sessions": cleared_http_sessions,
+                    "message": f"已关闭 {agent_key} 的 ACP 会话",
                 }
 
             raise HTTPException(status_code=400, detail=f"未知 action: {req.action}")
@@ -433,9 +482,9 @@ class OpsService:
         :param agents: 外部 agent 配置列表
         :return: agent 状态列表，获取失败时返回 None
         """
-        # 取第一个 agent 的 tag 来决定 binary
-        first_tag = agents[0].get("tag", "").lower() if agents else ""
-        acp_tool = first_tag if first_tag in _ACP_KNOWN_TOOLS else "openclaw"
+        # 取第一个 agent 的 platform 来决定 binary
+        first_platform = _canonical_external_platform(str(agents[0].get("platform", "") or "")) if agents else ""
+        acp_tool = first_platform if first_platform else "openclaw"
         acp_bin = shutil.which(acp_tool)
         if not acp_bin:
             return None
@@ -470,6 +519,7 @@ class OpsService:
                     "name": agent_info["name"],
                     "global_name": gn,
                     "tag": agent_info.get("tag", ""),
+                    "platform": agent_info.get("platform", ""),
                     "status": "online" if agent_sessions else "idle",
                     "session_count": len(agent_sessions),
                     "sessions": agent_sessions,
@@ -491,18 +541,19 @@ class OpsService:
         """
         name = agent_info.get("name", "")
         global_name = agent_info.get("global_name", "")
-        tag = agent_info.get("tag", "").lower()
+        platform = _canonical_external_platform(str(agent_info.get("platform", "") or ""))
 
         base_result = {
             "name": name,
             "global_name": global_name,
             "tag": agent_info.get("tag", ""),
+            "platform": agent_info.get("platform", ""),
         }
 
         if not global_name:
             return {**base_result, "status": "unavailable", "reason": "no global_name"}
 
-        acp_tool = tag if tag in _ACP_KNOWN_TOOLS else "openclaw"
+        acp_tool = platform if platform else "openclaw"
         acp_bin = shutil.which(acp_tool)
         if not acp_bin:
             return {**base_result, "status": "unavailable", "reason": f"binary '{acp_tool}' not found"}

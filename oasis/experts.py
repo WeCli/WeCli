@@ -54,13 +54,14 @@ _ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # 确保 src/ 在 import 路径中，以便导入 llm_factory
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
-from integrations.acpx_adapter import AcpxError, get_acpx_adapter
+from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt
 from services.llm_factory import create_chat_model, extract_text
 
 from oasis.forum import DiscussionForum
 
 # OASIS ACP 调试：logger [ACP_TRACE] + logs/acp_oasis_trace.jsonl（与群聊 acp_group_trace 同风格）
 _CLAWCROSS_ROOT = os.path.dirname(os.path.dirname(__file__))
+_EXTERNAL_AGENT_SYSTEM_PROMPT = load_external_agent_system_prompt(_CLAWCROSS_ROOT)
 _OASIS_ACP_TRACE_PATH = os.path.join(_CLAWCROSS_ROOT, "logs", "acp_oasis_trace.jsonl")
 _oasis_acp_trace_file_lock = threading.Lock()
 _oasis_acp_trace_log = logging.getLogger("oasis.acp_trace")
@@ -1153,6 +1154,15 @@ _OASIS_ACP_AGENT_TAGS: frozenset[str] = frozenset({
 _OASIS_HTTP_AGENT_TAGS: frozenset[str] = frozenset({"openclaw"})
 
 
+def _canonical_external_platform(platform_name: str) -> str:
+    pl = (platform_name or "").strip().lower()
+    if pl in ("claude-code", "claudecode"):
+        return "claude"
+    if pl in ("gemini-cli", "geminicli"):
+        return "gemini"
+    return pl
+
+
 class ExternalExpert:
     """
     Expert backed by an external OpenAI-compatible API or ACP long-lived connection.
@@ -1256,6 +1266,7 @@ class ExternalExpert:
         persona: str = "",
         timeout: float | None = None,
         tag: str = "",
+        platform: str = "",
         extra_headers: dict[str, str] | None = None,
         oc_agent_name: str = "",
         team: str = "",
@@ -1266,25 +1277,23 @@ class ExternalExpert:
         self.persona = persona
         self.timeout = timeout or 500.0
         self.tag = tag
+        self.platform = _canonical_external_platform(platform)
         self.model = model
         self._team = team
         self._extra_headers = extra_headers or {}
-        self._tag_lower = tag.lower()
+        self._platform_lower = self.platform
         self._http_global_name = oc_agent_name
-        self._drop_unknown_tag = (
-            self._tag_lower not in _OASIS_ACP_AGENT_TAGS
-            and self._tag_lower not in _OASIS_HTTP_AGENT_TAGS
-        )
+        self._drop_unknown_platform = not self._platform_lower
 
-        # ACP routing is decided by tag, not model format.
+        # ACP routing is decided by platform, not persona tag.
         # If model matches agent:<name>:<session>, only the optional session suffix is used.
         m = self._AGENT_MODEL_RE.match(model)
         self._session_suffix = m.group(2) if m and m.group(2) else self._DEFAULT_ACP_SESSION_SUFFIX
-        if self._tag_lower in _OASIS_ACP_AGENT_TAGS:
+        if self._platform_lower in _OASIS_ACP_AGENT_TAGS:
             self._is_acp_agent = True
             if not oc_agent_name:
                 raise ValueError(
-                    f"ACP tag '{tag}' requires a global_name in "
+                    f"ACP platform '{self.platform}' requires a global_name in "
                     f"external_agents.json, but none was found for '{name}'."
                 )
             self._oc_agent_name = oc_agent_name
@@ -1293,8 +1302,8 @@ class ExternalExpert:
             self._acp_session_suffix = self._session_suffix
 
             # Determine ACP tool binary from tag (same rules as src/group_service)
-            if self._tag_lower in _OASIS_ACP_AGENT_TAGS:
-                self._acp_tool_name = self._tag_lower
+            if self._platform_lower in _OASIS_ACP_AGENT_TAGS:
+                self._acp_tool_name = self._platform_lower
             else:
                 self._acp_tool_name = ""
             self._acp_bin = shutil.which("acpx")
@@ -1316,7 +1325,7 @@ class ExternalExpert:
             self._acp_available = False
             self._acp_started = False
 
-        if self._tag_lower == "openclaw":
+        if self._platform_lower == "openclaw":
             # OpenClaw endpoint varies by device: env has higher priority than YAML.
             api_url = os.getenv("OPENCLAW_API_URL", "") or api_url
             api_key = os.getenv("OPENCLAW_GATEWAY_TOKEN", "") or api_key
@@ -1340,35 +1349,38 @@ class ExternalExpert:
         h = {"Content-Type": "application/json"}
         if self._api_key:
             h["Authorization"] = f"Bearer {self._api_key}"
-        if self._tag_lower == "openclaw" and self._http_global_name:
+        if self._platform_lower == "openclaw" and self._http_global_name:
             h["x-openclaw-session-key"] = f"agent:{self._http_global_name}:{self._session_suffix}"
         h.update(self._extra_headers)
         return h
 
     # ── ACP long-lived connection lifecycle ──
 
-    async def acp_start(self):
-        """Ensure acpx session exists for this expert (optional warm-up)."""
-        if not self._acp_available or not self._is_acp_agent:
-            return
-
-        if self._acp_started:
-            return
-
-        try:
-            adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
-            acp_session = f"agent:{self._oc_agent_name}:{self._acp_session_suffix}"
-            acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=acp_session)
-            await adapter.ensure_session(
-                tool=self._acp_tool_name,
-                session_key=acp_session,
-                acpx_session=acpx_session,
-            )
-            self._acp_started = True
-            print(f"  [OASIS] ✅ ACPX session warmed for {self.name}")
-        except Exception as e:
-            print(f"  [OASIS] ❌ ACPX warm failed for {self.name} (tool={self._acp_tool_name}): {e}")
-            self._acp_started = False
+    # [DEPRECATED] acp_start() was a pre-warm method that is no longer needed.
+    # The ACP session is created lazily on first prompt via _acp_pooled_prompt().
+    # async def acp_start(self):
+    #     """Ensure acpx session exists for this expert (optional warm-up)."""
+    #     if not self._acp_available or not self._is_acp_agent:
+    #         return
+    #
+    #     if self._acp_started:
+    #         return
+    #
+    #     try:
+    #         adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
+    #         acp_session = f"agent:{self._oc_agent_name}:{self._acp_session_suffix}"
+    #         acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=acp_session)
+    #         await adapter.ensure_session(
+    #             tool=self._acp_tool_name,
+    #             session_key=acp_session,
+    #             acpx_session=acpx_session,
+    #             system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT,
+    #         )
+    #         self._acp_started = True
+    #         print(f"  [OASIS] ✅ ACPX session warmed for {self.name}")
+    #     except Exception as e:
+    #         print(f"  [OASIS] ❌ ACPX warm failed for {self.name} (tool={self._acp_tool_name}): {e}")
+    #         self._acp_started = False
 
     def _acp_pool_key(self) -> str:
         return f"{self._acp_tool_name}\x1fagent:{self._oc_agent_name}:{self._acp_session_suffix}"
@@ -1381,10 +1393,10 @@ class ExternalExpert:
         try:
             adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
             acpx_session = adapter.to_acpx_session_name(tool=self._acp_tool_name, session_key=cli_session)
-            await adapter.ensure_session(
-                tool=self._acp_tool_name,
-                session_key=cli_session,
-                acpx_session=acpx_session,
+            system_prompt = (
+                _EXTERNAL_AGENT_SYSTEM_PROMPT + "\n\n" + _build_identity_prompt(self.title, self.persona)
+                if not self._acp_started
+                else None
             )
             reply = await adapter.prompt(
                 tool=self._acp_tool_name,
@@ -1392,6 +1404,7 @@ class ExternalExpert:
                 prompt_text=cli_message,
                 timeout_sec=180,
                 reset_session=False,
+                system_prompt=system_prompt,
             )
             _acp_oasis_trace(
                 "acp_prompt_complete",
@@ -1448,8 +1461,8 @@ class ExternalExpert:
                               ... (default sentinel) = use self.timeout.
         """
         effective_timeout = self.timeout if timeout_override is ... else timeout_override
-        if self._drop_unknown_tag:
-            raise RuntimeError(f"Unsupported external tag '{self.tag}' for {self.name}; dropped.")
+        if self._drop_unknown_platform:
+            raise RuntimeError(f"Unsupported external platform '{self.platform}' for {self.name}; dropped.")
 
         # ── ACP agent type: keep legacy user-only extraction for sync paths ──
         if self._is_acp_agent:
@@ -1485,7 +1498,7 @@ class ExternalExpert:
         if not self._api_url:
             raise RuntimeError(f"No api_url configured for external expert {self.name}")
         req_model = self.model
-        if self._tag_lower == "openclaw" and self._http_global_name:
+        if self._platform_lower == "openclaw" and self._http_global_name:
             model_str = str(req_model or "").strip()
             if not model_str.startswith("agent:"):
                 req_model = f"agent:{self._http_global_name}"
@@ -1503,7 +1516,7 @@ class ExternalExpert:
             return data["choices"][0]["message"]["content"]
         except Exception as api_err:
             # OpenClaw: prefer HTTP first, then fallback to ACP.
-            if self._tag_lower == "openclaw" and self._http_global_name and bool(shutil.which("acpx")):
+            if self._platform_lower == "openclaw" and self._http_global_name and bool(shutil.which("acpx")):
                 try:
                     cli_message = ""
                     for msg in reversed(messages):
@@ -1519,6 +1532,9 @@ class ExternalExpert:
                         tool="openclaw",
                         session_key=acp_session,
                         acpx_session=acpx_session,
+                        system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT
+                        + "\n\n"
+                        + _build_identity_prompt(self.title, self.persona),
                     )
                     reply = await adapter.prompt(
                         tool="openclaw",
