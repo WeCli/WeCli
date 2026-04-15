@@ -8,9 +8,11 @@ _oasis_path = _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__)))
 if _oasis_path not in _sys.path:
     _sys.path.insert(0, _oasis_path)
 
-_DEBUG_FILE = _os.environ.get("CLAWCROSS_PERSONA_DEBUG", "/tmp/cc_persona_debug.txt")
+_DEBUG_FILE = _os.environ.get("CLAWCROSS_PERSONA_DEBUG", "")
 
 def _log(*args):
+    if not _DEBUG_FILE:
+        return
     try:
         with open(_DEBUG_FILE, "a") as f:
             import time as _time
