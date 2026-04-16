@@ -385,7 +385,7 @@ except FileNotFoundError:
 # Common behavior rules injected into all expert prompts (discussion & execute mode)
 _BEHAVIOR_RULES = (
     "\n\n**OASIS 子 Agent 原则：**\n"
-    "你是被调度执行的子 Agent：只完成当前轮任务，按协议（JSON / callback）回传；不得接管他人发言或整条工作流。\n"
+    "你是被调度执行的子 Agent：只完成当前轮任务，按协议（JSON）回传；不得接管他人发言或整条工作流。\n"
     "**禁止调用 start_new_oasis**（或任何等价「新开 OASIS 讨论/工作流」），避免嵌套失控；嵌套须由用户或主 Agent 明确授权。\n"
     "产出只走规定渠道；**禁止**擅自用 send_to_group 等把过程稿、内部推演推到用户群聊，除非用户或任务明文要求。\n"
 )
@@ -1124,8 +1124,7 @@ class ExternalExpert:
     ACP subprocesses are stored in a **process-global pool** (same cache key as
     group chat: ``tool`` + ``agent:<global_name>:<suffix>``). ``acp_start()`` only
     warms the pool entry; ``acp_stop()`` does **not** kill the process (other
-    features may reuse it). Messages are sent via ``acp_send()`` or the callback
-    dispatch path, both serialized with a per-connection ``prompt_lock``.
+    features may reuse it). Messages are sent via ``acp_send()``, serialized with a per-connection ``prompt_lock``.
 
     Session management is handled by the ACP connection internally —
     users cannot and do not need to specify session IDs.
@@ -1159,36 +1158,30 @@ class ExternalExpert:
     # Works in both discussion mode (JSON reply/vote) and execute mode
     _OASIS_REPLY_INSTRUCTION = (
         "\n\n⚠️ IMPORTANT — OASIS JSON reply protocol:\n"
-        "当你需要发布给其他 agent 或公开的信息时，必须通过 callback/工具提交一个 JSON 对象到 OASIS。\n"
-        "仅仅在当前回复正文里写 JSON 或自然语言答案，不算正式回传，系统不会自动代你发布。\n"
+        "在回复中直接包含一个 JSON 对象作为正式回复内容（JSON 前后可以有其他文字）。\n"
         "JSON 的 \"clawcross_type\" 字段决定回复类型：\n\n"
         "1. 讨论发言（clawcross_type=\"oasis reply\"）：\n"
-        '{\n'
+        "{\n"
         '  "clawcross_type": "oasis reply",\n'
         '  "reply_to": 2,\n'
         '  "content": "你的观点（200字以内，观点鲜明）",\n'
         '  "votes": [{"post_id": 1, "direction": "up"}]\n'
-        '}\n\n'
+        "}\n\n"
         "2. 选择/投票（clawcross_type=\"oasis choose\"）：\n"
-        '{\n'
+        "{\n"
         '  "clawcross_type": "oasis choose",\n'
         '  "choose": {"option": "A", "reason": "理由"},\n'
         '  "content": "补充说明（可选）"\n'
-        '}\n\n'
+        "}\n\n"
         "注意：\n"
-        "- 一轮只能回复一次 JSON，clawcross_type 字段区分于其他协议的 type 字段\n"
         "- JSON 前后可以有其他文字，系统会自动提取 JSON 部分\n"
         "- ⚠️ JSON 必须是合法的单行 JSON：content 等字符串字段内不能有实际换行，请把所有内容写在同一行内（需要换行请用 \\n 转义）\n"
-        "- 没有通过 callback/工具提交的合规 JSON，回复不会被发布\n"
-        "- 【ACP / 外部 agent 强制】每一轮都必须至少调用一次工具（或等价 callback）把合规 JSON 交给 OASIS；"
-        "系统以工具返回为准。即使本轮没有新观点、无可投票项、或执行上「无事可做」，也必须仍走工具回传单行 JSON"
-        "（例如 clawcross_type=\"oasis reply\"，content 写明「本轮无补充」或「无新增结果」，votes 用 []），"
-        "禁止仅用自然语言或 ACP 纯文本结束本轮而不触发工具回传。\n"
         "- 回复最后必须添加三行 end padding 防止传输截断：\n"
         "[end padding]\n"
         "[end padding]\n"
         "[end padding]\n"
     )
+
     _OASIS_REPLY_MAX_RETRIES = 3
 
     # YAML tag must be in this set for engine to treat expert as ACP-capable.
