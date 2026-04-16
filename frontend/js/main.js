@@ -11556,13 +11556,16 @@ function showAddTeamMemberModal() {
             const content = '# ' + (expert.name || expert.tag) + '\n\n' + (expert.persona || '');
             // Store selected expert content on the button for later access
             overlay.querySelector('#add-oc-pick-expert')._selectedExpertContent = content;
+            overlay.querySelector('#add-oc-pick-expert')._selectedExpertTag = expert.tag || '';
             
             ocExpertPreview.style.display = 'block';
             ocExpertPreview.innerHTML = '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:16px;">' + (expert.emoji || '⭐') + '</span><span style="font-weight:600;">' + escapeHtml(expert.name) + '</span><button id="add-oc-clear-expert" type="button" style="margin-left:auto;padding:1px 6px;border:1px solid #d1d5db;border-radius:4px;background:#f9fafb;cursor:pointer;font-size:10px;color:#6b7280;">✕</button></div>'
+                + '<div style="font-size:10px;color:#6b7280;margin-top:4px;">tag: ' + escapeHtml(expert.tag || '-') + '</div>'
                 + '<div style="font-size:10px;color:#6b7280;margin-top:4px;max-height:60px;overflow:hidden;white-space:pre-wrap;word-break:break-all;">' + escapeHtml((expert.persona || '').slice(0, 120) + ((expert.persona || '').length > 120 ? '…' : '')) + '</div>';
             ocExpertPreview.querySelector('#add-oc-clear-expert').addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 overlay.querySelector('#add-oc-pick-expert')._selectedExpertContent = null;
+                overlay.querySelector('#add-oc-pick-expert')._selectedExpertTag = '';
                 ocExpertPreview.style.display = 'none';
                 ocExpertPreview.innerHTML = '';
             });
@@ -11968,15 +11971,15 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
         <textarea id="config-ext-headers" placeholder='{"X-Custom": "value"}' style="font-family:monospace;font-size:11px;min-height:60px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;box-sizing:border-box;">${escapeHtml(typeof headers === 'object' ? JSON.stringify(headers, null, 2) : headers || '')}</textarea>
     ` : '';
     
-    // Oasis Agent tag section
-    const tagSection = type === 'oasis' ? `
+    // Agent persona tag section
+    const tagSection = (type === 'oasis' || type === 'external') ? `
         <label style="font-size:11px;font-weight:600;color:#374151;">标签 (Tag)</label>
         <select id="config-agent-tag" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;background:white;">
             <option value="">(无标签)</option>
         </select>
-        <div id="config-tag-drop-zone" style="border:2px dashed #d1d5db;border-radius:8px;padding:12px;text-align:center;font-size:11px;color:#9ca3af;cursor:default;transition:all .15s;margin-top:8px;">
+        ${type === 'oasis' ? `<div id="config-tag-drop-zone" style="border:2px dashed #d1d5db;border-radius:8px;padding:12px;text-align:center;font-size:11px;color:#9ca3af;cursor:default;transition:all .15s;margin-top:8px;">
             📦 拖入专家设置标签
-        </div>
+        </div>` : ''}
     ` : '';
     
     overlay.innerHTML = `
@@ -12030,9 +12033,11 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
         
         const meta = { name: newName };
         
+        const tagInput = document.getElementById('config-agent-tag');
+        const newTag = tagInput ? tagInput.value.trim() : '';
+
         // Oasis Agent: save tag
         if (type === 'oasis') {
-            const newTag = document.getElementById('config-agent-tag').value.trim();
             meta.tag = newTag;
         } else {
             // External Agent: save api_url, api_key, model, headers
@@ -12066,7 +12071,7 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
                 ? {
                     global_name: globalName,
                     new_name: newName,
-                    new_tag: tag || '',
+                    new_tag: newTag,
                     api_url: meta.api_url,
                     api_key: meta.api_key,
                     model: meta.model,
@@ -12094,10 +12099,13 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
         }
     });
     
-    // Load expert tags for Oasis Agent
-    if (type === 'oasis') {
+    // Load expert tags for agent persona binding
+    if (type === 'oasis' || type === 'external') {
         try {
-            const r = await fetch('/proxy_visual/experts');
+            const expertsUrl = currentGroupId
+                ? `/proxy_visual/experts?team=${encodeURIComponent(currentGroupId)}`
+                : '/proxy_visual/experts';
+            const r = await fetch(expertsUrl);
             const experts = await r.json();
             const tags = [...new Set(experts.map(e => e.tag).filter(Boolean))];
             const tagSelect = document.getElementById('config-agent-tag');
@@ -12107,36 +12115,38 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
         } catch (e) {
             console.warn('Failed to load expert tags', e);
         }
-        
-        // Setup drop zone for expert tags
-        const dropZone = document.getElementById('config-tag-drop-zone');
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-            dropZone.style.borderColor = '#2563eb';
-            dropZone.style.background = '#eff6ff';
-        });
-        
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.style.borderColor = '#d1d5db';
-            dropZone.style.background = '';
-        });
-        
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.style.borderColor = '#d1d5db';
-            dropZone.style.background = '';
-            try {
-                const data = JSON.parse(e.dataTransfer.getData('application/json'));
-                if (data.tag && data.tag !== 'manual' && data.tag !== 'conditional') {
-                    const tagSelect = document.getElementById('config-agent-tag');
-                    tagSelect.value = data.tag;
-                dropZone.innerHTML = '✅ Tag: <b>' + escapeHtml(data.tag) + '</b> (' + escapeHtml(data.name || '') + ')';
-                    dropZone.style.borderColor = '#2563eb';
-                    dropZone.style.color = '#374151';
-                }
-            } catch(err) {}
-        });
+
+        if (type === 'oasis') {
+            // Setup drop zone for expert tags
+            const dropZone = document.getElementById('config-tag-drop-zone');
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                dropZone.style.borderColor = '#2563eb';
+                dropZone.style.background = '#eff6ff';
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.style.borderColor = '#d1d5db';
+                dropZone.style.background = '';
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.style.borderColor = '#d1d5db';
+                dropZone.style.background = '';
+                try {
+                    const data = JSON.parse(e.dataTransfer.getData('application/json'));
+                    if (data.tag && data.tag !== 'manual' && data.tag !== 'conditional') {
+                        const tagSelect = document.getElementById('config-agent-tag');
+                        tagSelect.value = data.tag;
+                        dropZone.innerHTML = '✅ Tag: <b>' + escapeHtml(data.tag) + '</b> (' + escapeHtml(data.name || '') + ')';
+                        dropZone.style.borderColor = '#2563eb';
+                        dropZone.style.color = '#374151';
+                    }
+                } catch(err) {}
+            });
+        }
     }
 }
 
@@ -12167,7 +12177,10 @@ async function showExpertPickerForTeam(onSelect) {
     let allExperts = [];
 
     try {
-        const r = await fetch('/proxy_visual/experts');
+        const expertsUrl = currentGroupId
+            ? `/proxy_visual/experts?team=${encodeURIComponent(currentGroupId)}`
+            : '/proxy_visual/experts';
+        const r = await fetch(expertsUrl);
         allExperts = await r.json();
     } catch(e) {
         listEl.innerHTML = '<div style="color:#ef4444;padding:20px;text-align:center;font-size:11px;">❌ 网络错误</div>';
@@ -12592,6 +12605,7 @@ async function addOpenClawMember() {
     // Get selected expert content
     const pickBtn = overlay.querySelector('#add-oc-pick-expert');
     const selectedExpertContent = pickBtn ? pickBtn._selectedExpertContent : null;
+    const selectedExpertTag = pickBtn ? (pickBtn._selectedExpertTag || '') : '';
 
     try {
         // 1. Create the agent on OASIS server (use globalName as the OASIS agent name)
@@ -12618,14 +12632,14 @@ async function addOpenClawMember() {
                 } catch(e) { console.warn('Failed to write IDENTITY.md:', e); }
             }
 
-            // 3. Save to external_agents.json (name=shortName, tag=openclaw, global_name=globalName)
+            // 3. Save to external_agents.json (tag stores persona binding; platform stores transport)
             try {
                 await fetch(`/teams/${encodeURIComponent(currentGroupId)}/members/external`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: shortName,
-                        tag: 'openclaw',
+                        tag: selectedExpertTag,
                         platform: 'openclaw',
                         global_name: globalName
                     })
@@ -12781,6 +12795,7 @@ async function _doImportOasis() {
 
 // ─── Import existing OpenClaw Agent into team ───
 let _importSelectedOC = null;
+let _importSelectedOCTag = '';
 
 function showImportOpenClawModal() {
     // Close the add-member modal
@@ -12803,6 +12818,13 @@ function showImportOpenClawModal() {
                        style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;"
                        pattern="[a-zA-Z0-9_-]+" title="仅支持字母、数字、下划线、短横线">
             </label>
+            <div style="border:1px dashed #c4b5fd;border-radius:8px;padding:10px;background:#faf5ff;margin-top:8px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <span style="font-size:11px;font-weight:600;color:#7c3aed;">📥 绑定专家人设 (可选)</span>
+                    <button id="import-oc-pick-expert" type="button" style="padding:3px 10px;border-radius:4px;border:1px solid #8b5cf6;background:#f5f3ff;color:#7c3aed;cursor:pointer;font-size:10px;font-weight:500;">选择专家</button>
+                </div>
+                <div id="import-oc-expert-preview" style="display:none;margin-top:8px;padding:6px 8px;background:white;border-radius:6px;border:1px solid #e5e7eb;font-size:11px;color:#374151;"></div>
+            </div>
             <div class="orch-modal-btns" style="margin-top:12px;">
                 <button onclick="document.getElementById('import-oc-overlay').remove()" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;cursor:pointer;font-size:12px;">取消</button>
                 <button id="import-oc-join-btn" onclick="_doImportOpenClaw()" disabled style="padding:6px 14px;border-radius:6px;border:none;background:#7c3aed;color:white;cursor:pointer;font-size:12px;opacity:0.5;">🦞 加入团队</button>
@@ -12813,6 +12835,22 @@ function showImportOpenClawModal() {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
     _importSelectedOC = null;
+    _importSelectedOCTag = '';
+    const preview = overlay.querySelector('#import-oc-expert-preview');
+    overlay.querySelector('#import-oc-pick-expert').addEventListener('click', () => {
+        showExpertPickerForTeam((expert) => {
+            _importSelectedOCTag = expert.tag || '';
+            preview.style.display = 'block';
+            preview.innerHTML = '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:16px;">' + (expert.emoji || '⭐') + '</span><span style="font-weight:600;">' + escapeHtml(expert.name) + '</span><button id="import-oc-clear-expert" type="button" style="margin-left:auto;padding:1px 6px;border:1px solid #d1d5db;border-radius:4px;background:#f9fafb;cursor:pointer;font-size:10px;color:#6b7280;">✕</button></div>'
+                + '<div style="font-size:10px;color:#6b7280;margin-top:4px;">tag: ' + escapeHtml(expert.tag || '-') + '</div>';
+            preview.querySelector('#import-oc-clear-expert').addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                _importSelectedOCTag = '';
+                preview.style.display = 'none';
+                preview.innerHTML = '';
+            });
+        });
+    });
     _loadImportOCList();
 }
 
@@ -12874,11 +12912,11 @@ async function _doImportOpenClaw() {
     const shortName = (teamNameInput && teamNameInput.value.trim()) || ocGlobalName;
 
     try {
-        // Save to external_agents.json (tag=openclaw, global_name=original openclaw agent name)
+        // Save to external_agents.json (tag is persona binding; platform is transport)
         const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/members/external`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: shortName, tag: 'openclaw', global_name: ocGlobalName })
+            body: JSON.stringify({ name: shortName, tag: _importSelectedOCTag, platform: 'openclaw', global_name: ocGlobalName })
         });
         if (!resp.ok) {
             const err = await resp.json();

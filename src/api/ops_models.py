@@ -57,3 +57,21 @@ class ACPStatusRequest(BaseModel):
     password: str = ""
     team: str
     agent_name: str = ""                   # 为空则查所有外部 agent
+
+class SessionsListRequest(BaseModel):
+    """列出所有 acpx sessions 和 http_agent_sessions。"""
+    user_id: str
+    password: str = ""
+
+class SessionsDeleteRequest(BaseModel):
+    """删除指定的 http_agent_session 记录。"""
+    user_id: str
+    password: str = ""
+    session_key: str
+
+class SessionsCloseRequest(BaseModel):
+    """关闭指定的 acpx session。"""
+    user_id: str
+    password: str = ""
+    platform: str
+    session_name: str

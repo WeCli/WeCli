@@ -469,3 +469,42 @@ async def delete_http_agent_sessions_by_global_name(group_db_path: str, global_n
         )
         await db.commit()
     return cursor.rowcount or 0
+
+
+async def list_http_agent_sessions(group_db_path: str) -> list[dict]:
+    """Return all http_agent_sessions records, oldest first."""
+    async with aiosqlite.connect(group_db_path) as db:
+        await db.execute("PRAGMA busy_timeout = 5000")
+        cursor = await db.execute(
+            """
+            SELECT session_key, global_name, prompt_text, transport,
+                   created_at, updated_at, last_used_at
+            FROM http_agent_sessions
+            ORDER BY last_used_at DESC
+            """,
+        )
+        rows = await cursor.fetchall()
+    return [
+        {
+            "session_key": r[0],
+            "global_name": r[1],
+            "prompt_text": r[2],
+            "transport": r[3],
+            "created_at": r[4],
+            "updated_at": r[5],
+            "last_used_at": r[6],
+        }
+        for r in rows
+    ]
+
+
+async def delete_http_agent_session_by_key(group_db_path: str, session_key: str) -> int:
+    """Delete a single http_agent_sessions record by session_key."""
+    async with aiosqlite.connect(group_db_path) as db:
+        await db.execute("PRAGMA busy_timeout = 5000")
+        cursor = await db.execute(
+            "DELETE FROM http_agent_sessions WHERE session_key = ?",
+            (session_key,),
+        )
+        await db.commit()
+    return cursor.rowcount or 0

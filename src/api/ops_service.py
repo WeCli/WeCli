@@ -14,8 +14,10 @@ from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
 from utils.auth_utils import extract_user_password_session, is_internal_bearer, parse_bearer_parts
 from api.group_repository import (
     delete_http_agent_sessions_by_global_name,
+    delete_http_agent_session_by_key,
     get_group,
     get_group_member_by_global_id,
+    list_http_agent_sessions,
 )
 from api.group_service import _load_public_external_agents, build_external_agents_map_for_owner
 from services.llm_factory import get_provider_audio_defaults, infer_provider
@@ -603,3 +605,95 @@ class OpsService:
             return {**base_result, "status": "timeout", "reason": "CLI sessions timeout"}
         except (json.JSONDecodeError, Exception) as e:
             return {**base_result, "status": "error", "reason": str(e)}
+
+
+
+
+    async def list_all_sessions(self, user_id: str) -> dict:
+        """Return acpx sessions (via acpx sessions list) + http_agent_sessions (from DB)."""
+        acpx_sessions: list[dict] = []
+        platforms = ["openclaw", "claude", "gemini", "codex", "aider"]
+        acpx_bin = shutil.which("acpx")
+        if not acpx_bin:
+            platforms = []  # fallback: try direct binary names
+        for plat_name in platforms:
+            bin_path = acpx_bin if acpx_bin else shutil.which(plat_name)
+            if not bin_path:
+                continue
+            try:
+                args = [acpx_bin, plat_name, "sessions", "list"] if acpx_bin else [bin_path, "sessions"]
+                proc = await asyncio.create_subprocess_exec(
+                    *args,
+
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+                if proc.returncode != 0:
+                    continue
+                lines = stdout.decode("utf-8", errors="replace").strip().splitlines()
+                for line in lines:
+                    if not line.strip():
+                        continue
+                    parts = line.split("	")
+                    if len(parts) < 2:
+                        continue
+                    session_id = parts[0].replace(" [closed]", "").strip()
+                    name = parts[1].strip() if len(parts) > 1 else ""
+                    cwd = parts[2].strip() if len(parts) > 2 else ""
+                    last_used = parts[3].strip() if len(parts) > 3 else ""
+                    closed = "[closed]" in parts[0]
+                    acpx_sessions.append({
+                        "platform": plat_name,
+                        "session_id": session_id,
+                        "name": name,
+                        "cwd": cwd,
+                        "last_used_at": last_used,
+                        "closed": closed,
+                    })
+            except (asyncio.TimeoutError, Exception):
+                continue
+
+        http_records: list[dict] = []
+        if self.group_db_path:
+            try:
+                http_records = await list_http_agent_sessions(self.group_db_path)
+            except Exception:
+                pass
+
+        return {
+            "status": "success",
+            "acpx_sessions": acpx_sessions,
+            "http_agent_sessions": http_records,
+        }
+
+
+    async def delete_http_agent_session(self, user_id: str, session_key: str) -> dict:
+        """Delete a single http_agent_sessions record by session_key."""
+        if not self.group_db_path:
+            return {"status": "error", "reason": "no db"}
+        try:
+            deleted = await delete_http_agent_session_by_key(self.group_db_path, session_key)
+            return {"status": "success", "deleted": deleted}
+        except Exception as e:
+            return {"status": "error", "reason": str(e)}
+
+
+    async def close_acp_session(self, platform: str, session_name: str) -> dict:
+        """Close an acpx session via 'acpx <platform> sessions close <name>'."""
+        acpx_bin = shutil.which("acpx")
+        if not acpx_bin:
+            return {"status": "error", "reason": "acpx not found"}
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                acpx_bin, platform, "sessions", "close", session_name,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15)
+            # exit 0 = just closed, exit 1 = already closed (both are fine)
+            if proc.returncode in (0, 1):
+                return {"status": "success"}
+            return {"status": "error", "reason": stderr.decode()[:200]}
+        except Exception as e:
+            return {"status": "error", "reason": str(e)}
