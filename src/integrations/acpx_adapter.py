@@ -76,17 +76,12 @@ class AcpxAdapter:
         )
 
     async def ops_non_openclaw_reset_session(self, *, tool: str, session_key: str) -> None:
-        """``sessions close`` (best-effort) + ``sessions new --name``."""
+        """``sessions close`` only; let the next real prompt recreate the session."""
         acpx_session = self.to_acpx_session_name(tool=tool, session_key=session_key)
         prefix = self._command_prefix(tool=tool, session_key=session_key)
         await self._ops_run_acpx(
             prefix + ["sessions", "close", acpx_session],
             timeout_sec=15,
-            allow_nonzero=True,
-        )
-        await self._ops_run_acpx(
-            prefix + ["sessions", "new", "--name", acpx_session],
-            timeout_sec=30,
             allow_nonzero=True,
         )
 
@@ -266,7 +261,11 @@ class AcpxAdapter:
             sessions = await self.list_sessions(tool=normalized_tool)
         except Exception:
             return None
-        return any(str(row.get("name") or "").strip() == acpx_session for row in sessions)
+        return any(
+            str(row.get("name") or "").strip() == acpx_session
+            and not bool(row.get("closed"))
+            for row in sessions
+        )
 
     async def _send_prompt_file(
         self,
