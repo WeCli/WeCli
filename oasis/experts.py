@@ -390,6 +390,19 @@ _BEHAVIOR_RULES = (
     "产出只走规定渠道；**禁止**擅自用 send_to_group 等把过程稿、内部推演推到用户群聊，除非用户或任务明文要求。\n"
 )
 
+_EXEC_JSON_HINT = (
+    '\n\n请将你的执行结果用以下 JSON 格式返回'
+    '（不要包含 markdown 代码块标记，不要包含注释）：\n'
+    '⚠️ JSON 必须写在一行内，content 字段中不能有实际换行符（需要换行请用 \\n 转义）。\n'
+    '{"clawcross_type": "oasis reply", "reply_to": null, '
+    '"content": "你的执行结果", "votes": []}\n'
+    'JSON 前后可以有其他文字。回复最后请添加：\n'
+    '[end padding]\n'
+    '[end padding]\n'
+    '[end padding]\n'
+)
+
+
 
 def _get_llm(
     temperature: float = 0.7,
@@ -477,49 +490,6 @@ def _build_discuss_prompt(
         return f"{system_prompt}\n\n{user_prompt}"
 
 
-def _build_discuss_callback_prompt(
-    expert_name: str,
-    persona: str,
-    question: str,
-    posts_text: str,
-    callback_hint: str,
-    instruction: str = "",
-) -> tuple[str, str]:
-    """Build the prompt for ACP agents that must callback via CLI/API."""
-    _is_rich_persona = persona and ("## " in persona or "# " in persona)
-    if _is_rich_persona:
-        identity = (
-            f"你在 OASIS 论坛中的显示名称是「{expert_name}」。\n\n"
-            f"以下是你的完整身份与行为指南：\n\n{persona}"
-        )
-    else:
-        identity = f"你是论坛专家「{expert_name}」。{persona}" if persona else ""
-    system_prompt = "\n".join(
-        p for p in [
-            identity,
-            "你正在通过 ACP 长连接被 OASIS 调度。",
-            "公开发言/投票/选择必须由你主动调用 CLI callback 回传到 OASIS，系统不会解析你的 ACP 文本并代发。",
-            "换句话说：如果你没有执行 callback 命令/工具，哪怕你在 ACP 正文里写了完整答案，也会被视为本轮没有回复。",
-            "每一轮都必须至少调用一次 callback/工具回传；即使本轮无新观点、无票可投，也要通过工具提交合规单行 JSON"
-            "（例如 content 写「本轮无补充」，votes 为 []），不得以纯 ACP 正文代替工具回传。",
-            _BEHAVIOR_RULES.strip(),
-        ] if p
-    )
-    user_parts = [
-        f"讨论主题: {question}",
-        f"\n当前论坛内容:\n{posts_text}",
-        "\n如果你要公开发言、投票或做分支选择，你必须主动执行以下命令回传：",
-        callback_hint,
-        "\n回传 JSON 格式示例：",
-        '{"clawcross_type": "oasis reply", "reply_to": 2, "content": "你的观点（200字以内，观点鲜明）", "votes": [{"post_id": 1, "direction": "up"}]}',
-        '{"clawcross_type": "oasis choose", "choose": {"option": "A", "reason": "理由"}, "content": "补充说明"}',
-        "\n注意：不要把最终 JSON 直接放在 ACP 回复正文里；正式内容必须以工具/callback 的返回为准。",
-        "⚠️ 只有 callback 命令/工具提交到 OASIS 的内容才算正式回复；纯文本正文不算。无实质内容时也要走工具回传上述最小 JSON。",
-    ]
-    if instruction:
-        user_parts.append(f"\n📋 本轮你的专项指令：{instruction}\n请在 callback 的内容里体现这个指令。")
-    return system_prompt, "\n".join(user_parts)
-
 
 def _build_identity_prompt(expert_name: str, persona: str) -> str:
     """Build identity text for execute mode. Handles both short and rich personas."""
@@ -534,34 +504,6 @@ def _build_identity_prompt(expert_name: str, persona: str) -> str:
     else:
         return f"你是「{expert_name}」。{persona}\n\n"
 
-
-def _build_execute_callback_prompt(
-    question: str,
-    prior_posts_text: str,
-    callback_hint: str,
-    instruction: str = "",
-    *,
-    first_turn: bool,
-) -> str:
-    """Build execute-mode prompt for ACP agents that callback explicitly."""
-    parts = [f"任务主题: {question}"]
-    if instruction:
-        parts.append(f"\n执行指令: {instruction}")
-    if prior_posts_text:
-        label = "前序 agent 的执行结果" if first_turn else "其他 agent 的新结果"
-        parts.append(f"\n{label}:\n{prior_posts_text}")
-    parts.append(_BEHAVIOR_RULES)
-    parts.append("\n请不要把最终 JSON 直接写在 ACP 回复正文里；结构化结果必须通过工具/callback 回传。")
-    parts.append("每一轮都必须主动执行以下命令至少一次，把合规单行 JSON 回传到 OASIS（系统以工具返回为准）：")
-    parts.append(callback_hint)
-    parts.append("\n回传 JSON 示例：")
-    parts.append('{"clawcross_type": "oasis reply", "reply_to": null, "content": "你的执行结果", "votes": []}')
-    parts.append("⚠️ 只有 callback 命令/工具回传的结果才会进入 OASIS；你在 ACP 正文里直接写结果不会被采纳。")
-    parts.append(
-        "\n即使本轮没有新的执行产出，也必须仍通过上述命令/工具回传一次合规 JSON"
-        "（例如 content 写「本轮无新增结果」、votes 为 []），禁止仅回复自然语言而省略 callback。"
-    )
-    return "\n".join(parts)
 
 
 def _format_posts(posts) -> str:
@@ -1560,18 +1502,6 @@ class ExternalExpert:
                 msg["content"] = msg["content"] + self._OASIS_REPLY_INSTRUCTION
                 return
 
-    def _build_callback_hint(self, forum: DiscussionForum, round_num: int) -> str:
-        """Return the CLI template ACP agents should use for explicit OASIS callback."""
-        project_root = os.path.dirname(os.path.dirname(__file__))
-        topic_id = shlex.quote(forum.topic_id)
-        user_id = shlex.quote(forum.user_id or "anonymous")
-        author = shlex.quote(self.name)
-        return (
-            f"cd {shlex.quote(project_root)}\n"
-            f"uv run scripts/cli.py -u {user_id} topics callback --topic-id {topic_id} --author {author} "
-            f"--round-num {round_num} --data '<JSON对象>'"
-        )
-
     def _compose_acp_prompt(self, messages: list[dict]) -> str:
         """Compose the transient ACP prompt for one round without replaying old turns."""
         parts: list[str] = []
@@ -1771,52 +1701,42 @@ class ExternalExpert:
             self._seen_post_ids.update(p.id for p in others)
 
             if self._is_acp_agent:
-                callback_hint = self._build_callback_hint(forum, forum.current_round)
                 messages: list[dict] = []
                 if not self._initialized:
                     identity_prompt = _build_identity_prompt(self.title, self.persona).strip()
                     if identity_prompt:
                         messages.append({"role": "system", "content": identity_prompt})
-                    messages.append({
-                        "role": "user",
-                        "content": _build_execute_callback_prompt(
-                            forum.question,
-                            _format_posts(others) if others else "",
-                            callback_hint,
-                            instruction=instruction,
-                            first_turn=True,
-                        ),
-                    })
+                    task_parts = [f"任务主题: {forum.question}"]
+                    if instruction:
+                        task_parts.append(f"\n执行指令: {instruction}")
+                    if others:
+                        task_parts.append(f"\n前序 agent 的执行结果:\n{_format_posts(others)}")
+                    task_parts.append("\n请直接执行任务并返回结果。")
+                    task_parts.append(_BEHAVIOR_RULES)
+                    task_parts.append(_EXEC_JSON_HINT)
+                    messages.append({"role": "user", "content": "\n".join(task_parts)})
                     self._initialized = True
                 else:
-                    messages.append({
-                        "role": "user",
-                        "content": _build_execute_callback_prompt(
-                            forum.question,
-                            _format_posts(new_posts) if new_posts else "",
-                            callback_hint,
-                            instruction=instruction,
-                            first_turn=False,
-                        ),
-                    })
+                    ctx_parts = [f"【第 {forum.current_round} 轮】"]
+                    if instruction:
+                        ctx_parts.append(f"执行指令: {instruction}")
+                    if new_posts:
+                        ctx_parts.append(f"其他 agent 的新结果:\n{_format_posts(new_posts)}")
+                    ctx_parts.append("请继续执行任务并返回结果。")
+                    ctx_parts.append(_BEHAVIOR_RULES)
+                    ctx_parts.append(_EXEC_JSON_HINT)
+                    messages.append({"role": "user", "content": "\n".join(ctx_parts)})
 
                 try:
-                    await self._call_api_with_agent_callback(forum, messages, timeout_override=None)
+                    reply = await self._call_api_with_oasis_check(messages)
+                    if isinstance(reply, dict):
+                        result = reply
+                    else:
+                        result = _parse_expert_response(reply)
+                    await _apply_response(result, self.name, forum, others)
                 except Exception as e:
                     print(f"  [OASIS] ❌ {self.name} (external ACP execute) error: {e}")
                 return
-
-            _EXEC_JSON_HINT = (
-                '\n\n请将你的执行结果用以下 JSON 格式返回'
-                '（不要包含 markdown 代码块标记，不要包含注释）：\n'
-                '⚠️ JSON 必须写在一行内，content 字段中不能有实际换行符（需要换行请用 \\n 转义）。\n'
-                '{"clawcross_type": "oasis reply", "reply_to": null, '
-                '"content": "你的执行结果", "votes": []}\n'
-                'JSON 前后可以有其他文字。回复最后请添加：\n'
-                '[end padding]\n'
-                '[end padding]\n'
-                '[end padding]\n'
-            )
 
             messages: list[dict] = []
             if not self._initialized:
@@ -1866,44 +1786,26 @@ class ExternalExpert:
         self._seen_post_ids.update(p.id for p in others)
 
         if self._is_acp_agent:
-            callback_hint = self._build_callback_hint(forum, forum.current_round)
             messages: list[dict] = []
+            posts_text = _format_posts(others) if others else "(还没有其他人发言，你来开启讨论吧)"
+            system_prompt, user_prompt = _build_discuss_prompt(
+                self.title, self.persona, forum.question, posts_text, split=True,
+            )
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            if instruction:
+                user_prompt += f"\n\n📋 本轮你的专项指令：{instruction}\n请在回复中重点关注和执行这个指令。"
+            messages.append({"role": "user", "content": user_prompt})
             if not self._initialized:
-                posts_text = _format_posts(others) if others else "(还没有其他人发言，你来开启讨论吧)"
-                system_prompt, user_prompt = _build_discuss_callback_prompt(
-                    self.title,
-                    self.persona,
-                    forum.question,
-                    posts_text,
-                    callback_hint,
-                    instruction=instruction,
-                )
-                if system_prompt:
-                    messages.append({"role": "system", "content": system_prompt})
-                messages.append({"role": "user", "content": user_prompt})
                 self._initialized = True
-            else:
-                if new_posts:
-                    posts_text = _format_posts(new_posts)
-                else:
-                    posts_text = (
-                        "本轮没有新的帖子。你仍必须通过 callback/工具回传一轮合规单行 JSON；"
-                        "若无新观点，可将 content 写为「本轮无补充」等，votes 用 []，不得以无新帖为由省略回传。"
-                    )
-                system_prompt, user_prompt = _build_discuss_callback_prompt(
-                    self.title,
-                    self.persona,
-                    forum.question,
-                    posts_text,
-                    callback_hint,
-                    instruction=instruction,
-                )
-                if system_prompt:
-                    messages.append({"role": "system", "content": system_prompt})
-                messages.append({"role": "user", "content": user_prompt})
 
             try:
-                await self._call_api_with_agent_callback(forum, messages)
+                reply = await self._call_api_with_oasis_check(messages)
+                if isinstance(reply, dict):
+                    result = reply
+                else:
+                    result = _parse_expert_response(reply)
+                await _apply_response(result, self.name, forum, others)
             except Exception as e:
                 print(f"  [OASIS] ❌ {self.name} (external ACP discussion) error: {e}")
             return
