@@ -2,7 +2,7 @@
 OASIS Forum - Expert Agent definitions
 
 Three expert backends:
-  1. ExpertAgent  — direct LLM call (stateless, single-shot)
+  1. ExpertAgent  — temp sender call (stateless, single-shot)
      name = "display_name#temp#N" (display_name from preset by tag)
   2. SessionExpert — calls WeBot's /v1/chat/completions endpoint
      using an existing or auto-created session_id.
@@ -46,15 +46,13 @@ import threading
 import time
 from typing import Any
 
-import httpx
-from langchain_core.messages import HumanMessage
-
 # ACPX-backed ACP support
 _ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # 确保 src/ 在 import 路径中，以便导入 llm_factory
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt
+from integrations.agent_sender import SendToAgentRequest, send_to_agent
 from services.llm_factory import create_chat_model, extract_text
 
 from oasis.forum import DiscussionForum
@@ -438,7 +436,7 @@ def _build_discuss_prompt(
 
     Args:
         split: If True, return (system_prompt, user_prompt) tuple for session mode.
-               If False, return a single combined string for direct LLM mode.
+               If False, return a single combined string for single-shot temp mode.
     """
     if _DISCUSS_PROMPT_TPL and not split:
         return _DISCUSS_PROMPT_TPL.format(
@@ -683,15 +681,15 @@ async def _apply_response(
 
 
 # ======================================================================
-# Backend 1: ExpertAgent — direct LLM call (stateless)
+# Backend 1: ExpertAgent — temp sender call (stateless)
 #   name = "title#temp#1", "title#temp#2", ...
 # ======================================================================
 
 class ExpertAgent:
     """
-    A forum-resident expert agent (direct LLM backend).
+    A forum-resident expert agent (temp sender backend).
 
-    Each call is stateless: reads posts → single LLM call → publish + vote.
+    Each call is stateless: reads posts → single-shot sender call → publish + vote.
     name is "title#temp#N" to ensure uniqueness.
     """
 
@@ -712,13 +710,37 @@ class ExpertAgent:
         self.name = f"{name}#{self.session_id}"
         self.persona = persona
         self.tag = tag
-        self.llm = _get_llm(
-            temperature,
-            model=model,
-            api_key=api_key,
-            base_url=base_url,
-            provider=provider,
+        self.temperature = temperature
+        self._llm_override: dict[str, Any] | None = None
+        override: dict[str, Any] = {}
+        if model:
+            override["model"] = model
+        if api_key:
+            override["api_key"] = api_key
+        if base_url:
+            override["base_url"] = base_url
+        if provider:
+            override["provider"] = provider
+        if override:
+            self._llm_override = override
+
+    async def _call_temp_sender(self, *, prompt: str, forum: DiscussionForum, mode: str) -> str:
+        result = await send_to_agent(
+            SendToAgentRequest(
+                prompt=prompt,
+                connect_type="http",
+                platform="temp",
+                session=f"{self.session_id}:{mode}:r{forum.current_round}",
+                options={
+                    "temperature": self.temperature,
+                    "max_tokens": 1024,
+                    **(self._llm_override or {}),
+                },
+            )
         )
+        if not result.ok:
+            raise RuntimeError(result.error or "temp sender call failed")
+        return result.content or ""
 
     async def participate(
         self,
@@ -755,15 +777,15 @@ class ExpertAgent:
             task_prompt += _BEHAVIOR_RULES
             task_prompt += _EXEC_JSON_HINT
 
+            text = ""
             try:
-                resp = await self.llm.ainvoke([HumanMessage(content=task_prompt)])
-                text = extract_text(resp.content)
+                text = await self._call_temp_sender(prompt=task_prompt, forum=forum, mode="execute")
                 result = _parse_expert_response(text)
                 await _apply_response(result, self.name, forum, others)
             except json.JSONDecodeError as e:
                 print(f"  [OASIS] ⚠️ {self.name} JSON parse error: {e}")
                 try:
-                    await forum.publish(author=self.name, content=extract_text(resp.content).strip()[:2000])
+                    await forum.publish(author=self.name, content=text.strip()[:2000])
                 except Exception:
                     pass
             except Exception as e:
@@ -776,15 +798,15 @@ class ExpertAgent:
         if instruction:
             prompt += f"\n\n📋 本轮你的专项指令：{instruction}\n请在回复中重点关注和执行这个指令。"
 
+        text = ""
         try:
-            resp = await self.llm.ainvoke([HumanMessage(content=prompt)])
-            text = extract_text(resp.content)
+            text = await self._call_temp_sender(prompt=prompt, forum=forum, mode="discuss")
             result = _parse_expert_response(text)
             await _apply_response(result, self.name, forum, others)
         except json.JSONDecodeError as e:
             print(f"  [OASIS] ⚠️ {self.name} JSON parse error: {e}")
             try:
-                await forum.publish(author=self.name, content=extract_text(resp.content).strip()[:300])
+                await forum.publish(author=self.name, content=text.strip()[:300])
             except Exception:
                 pass
         except Exception as e:
@@ -871,6 +893,26 @@ class SessionExpert:
         h.update(self._extra_headers)
         return h
 
+    async def _send_messages(self, body: dict, *, timeout_override: float | None = ...) -> str:
+        effective_timeout = self.timeout if timeout_override is ... else timeout_override
+        result = await send_to_agent(
+            SendToAgentRequest(
+                prompt=body.get("messages", []),
+                connect_type="http",
+                platform="internal",
+                session=self.session_id,
+                options={
+                    "api_url": self._bot_url,
+                    "headers": self._auth_header(),
+                    "body": body,
+                    "timeout": effective_timeout,
+                },
+            )
+        )
+        if not result.ok:
+            raise RuntimeError(result.error or "bot API call failed")
+        return result.content or ""
+
     async def participate(
         self,
         forum: DiscussionForum,
@@ -940,7 +982,6 @@ class SessionExpert:
                 "model": "webot",
                 "messages": messages,
                 "stream": False,
-                "session_id": self.session_id,
             }
             if self.enabled_tools is not None:
                 body["enabled_tools"] = self.enabled_tools
@@ -948,15 +989,7 @@ class SessionExpert:
                 body["llm_override"] = self._llm_override
 
             try:
-                async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=None)) as client:
-                    resp = await client.post(
-                        self._bot_url, json=body, headers=self._auth_header(),
-                    )
-                if resp.status_code != 200:
-                    print(f"  [OASIS] ❌ {self.name} bot API error {resp.status_code}: {resp.text[:200]}")
-                    return
-                data = resp.json()
-                raw_content = data["choices"][0]["message"]["content"]
+                raw_content = await self._send_messages(body, timeout_override=None)
                 result = _parse_expert_response(raw_content)
                 await _apply_response(result, self.name, forum, others)
             except json.JSONDecodeError as e:
@@ -1040,7 +1073,6 @@ class SessionExpert:
             "model": "webot",
             "messages": messages,
             "stream": False,
-            "session_id": self.session_id,
         }
         if self.enabled_tools is not None:
             body["enabled_tools"] = self.enabled_tools
@@ -1048,19 +1080,7 @@ class SessionExpert:
             body["llm_override"] = self._llm_override
 
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=self.timeout)) as client:
-                resp = await client.post(
-                    self._bot_url,
-                    json=body,
-                    headers=self._auth_header(),
-                )
-
-            if resp.status_code != 200:
-                print(f"  [OASIS] ❌ {self.name} bot API error {resp.status_code}: {resp.text[:200]}")
-                return
-
-            data = resp.json()
-            raw_content = data["choices"][0]["message"]["content"]
+            raw_content = await self._send_messages(body)
             result = _parse_expert_response(raw_content)
             await _apply_response(result, self.name, forum, others)
 
@@ -1333,14 +1353,22 @@ class ExternalExpert:
                 if not self._acp_started
                 else None
             )
-            reply = await adapter.prompt(
-                tool=self._acp_tool_name,
-                session_key=cli_session,
-                prompt_text=cli_message,
-                timeout_sec=180,
-                reset_session=False,
-                system_prompt=system_prompt,
+            result = await send_to_agent(
+                SendToAgentRequest(
+                    prompt=cli_message,
+                    connect_type="acp",
+                    platform=self._acp_tool_name,
+                    session=cli_session,
+                    options={
+                        "cwd": os.path.dirname(os.path.dirname(__file__)),
+                        "timeout_sec": 180,
+                        "system_prompt": system_prompt,
+                    },
+                )
             )
+            if not result.ok:
+                raise AcpxError(result.error or "unknown acpx send error")
+            reply = result.content or ""
             _acp_oasis_trace(
                 "acp_prompt_complete",
                 agent_global_name=self._oc_agent_name,
@@ -1442,50 +1470,60 @@ class ExternalExpert:
             "messages": messages,
             "stream": False,
         }
-        try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=effective_timeout)) as client:
-                resp = await client.post(self._api_url, json=body, headers=self._headers())
-            if resp.status_code != 200:
-                raise RuntimeError(f"External API error {resp.status_code}: {resp.text[:300]}")
-            data = resp.json()
-            return data["choices"][0]["message"]["content"]
-        except Exception as api_err:
-            # OpenClaw: prefer HTTP first, then fallback to ACP.
-            if self._platform_lower == "openclaw" and self._http_global_name and bool(shutil.which("acpx")):
-                try:
-                    cli_message = ""
-                    for msg in reversed(messages):
-                        if msg.get("role") == "user":
-                            cli_message = msg.get("content", "")
-                            break
-                    if not cli_message:
-                        cli_message = messages[-1].get("content", "") if messages else ""
-                    adapter = get_acpx_adapter(cwd=os.path.dirname(os.path.dirname(__file__)))
-                    acp_session = f"agent:{self._http_global_name}:{self._session_suffix}"
-                    acpx_session = adapter.to_acpx_session_name(tool="openclaw", session_key=acp_session)
-                    await adapter.ensure_session(
-                        tool="openclaw",
-                        session_key=acp_session,
-                        acpx_session=acpx_session,
-                        system_prompt=_EXTERNAL_AGENT_SYSTEM_PROMPT
-                        + "\n\n"
-                        + _build_identity_prompt(self.title, self.persona),
-                    )
-                    reply = await adapter.prompt(
-                        tool="openclaw",
-                        session_key=acp_session,
-                        prompt_text=cli_message,
-                        timeout_sec=180,
-                        reset_session=False,
-                    )
-                    print(f"  [OASIS] ⚠️ HTTP failed for {self.name}, fallback to ACP succeeded")
-                    return reply
-                except Exception as acp_err:
-                    raise RuntimeError(
-                        f"API call failed for {self.name}: {api_err}; ACP fallback failed: {acp_err}"
-                    ) from acp_err
-            raise RuntimeError(f"API call failed for {self.name}: {api_err}")
+        result = await send_to_agent(
+            SendToAgentRequest(
+                prompt=messages,
+                connect_type="http",
+                platform=self.platform,
+                session=f"agent:{self._http_global_name}:{self._session_suffix}" if self._platform_lower == "openclaw" and self._http_global_name else None,
+                options={
+                    "api_url": self._api_url,
+                    "headers": self._headers(),
+                    "body": body,
+                    "timeout": effective_timeout,
+                },
+            )
+        )
+        if result.ok:
+            return result.content or ""
 
+        api_err = result.error or "unknown HTTP send error"
+        # OpenClaw: prefer HTTP first, then fallback to ACP.
+        if self._platform_lower == "openclaw" and self._http_global_name and bool(shutil.which("acpx")):
+            try:
+                cli_message = ""
+                for msg in reversed(messages):
+                    if msg.get("role") == "user":
+                        cli_message = msg.get("content", "")
+                        break
+                if not cli_message:
+                    cli_message = messages[-1].get("content", "") if messages else ""
+                acp_session = f"agent:{self._http_global_name}:{self._session_suffix}"
+                fallback = await send_to_agent(
+                    SendToAgentRequest(
+                        prompt=cli_message,
+                        connect_type="acp",
+                        platform="openclaw",
+                        session=acp_session,
+                        options={
+                            "cwd": os.path.dirname(os.path.dirname(__file__)),
+                            "timeout_sec": 180,
+                            "system_prompt": _EXTERNAL_AGENT_SYSTEM_PROMPT
+                            + "\n\n"
+                            + _build_identity_prompt(self.title, self.persona),
+                        },
+                    )
+                )
+                if not fallback.ok:
+                    raise RuntimeError(fallback.error or "openclaw ACP fallback failed")
+                reply = fallback.content or ""
+                print(f"  [OASIS] ⚠️ HTTP failed for {self.name}, fallback to ACP succeeded")
+                return reply
+            except Exception as acp_err:
+                raise RuntimeError(
+                    f"API call failed for {self.name}: {api_err}; ACP fallback failed: {acp_err}"
+                ) from acp_err
+        raise RuntimeError(f"API call failed for {self.name}: {api_err}")
     def _inject_oasis_reply_instruction(self, messages: list[dict]) -> None:
         """Append OASIS JSON reply instruction to the last user message (ACP agent only)."""
         if not self._is_acp_agent:

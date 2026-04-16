@@ -40,6 +40,7 @@ from utils.logging_utils import get_logger
 from utils.session_summary import first_human_title
 from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt
 from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
+from integrations.agent_sender import SendToAgentRequest, send_to_agent
 from integrations.external_persona import build_external_persona_prompt
 
 logger = get_logger("group_service")
@@ -555,30 +556,39 @@ class GroupService:
         try:
             adapter = get_acpx_adapter(cwd=_PROJECT_ROOT)
             acpx_session = adapter.to_acpx_session_name(tool=platform, session_key=acp_session)
-            # Build attachment list for acpx
             acpx_attachments = None
             if attachments:
-                acpx_attachments = []
-                for att in attachments:
-                    acpx_attachments.append({
+                acpx_attachments = [
+                    {
                         "type": att.type,
                         "mime_type": att.mime_type,
                         "data": att.data,
                         "name": att.name,
-                    })
-            
-            reply = await adapter.prompt(
-                tool=platform,
-                session_key=acp_session,
-                prompt_text=prompt_text,
-                timeout_sec=180,
-                reset_session=bool(metadata and metadata.get("resetSession")),
-                system_prompt=_external_agent_session_prompt(
-                    agent_info,
-                    is_private_chat=bool(metadata and metadata.get("is_private_chat")),
-                ),
-                attachments=acpx_attachments,
+                    }
+                    for att in attachments
+                ]
+
+            result = await send_to_agent(
+                SendToAgentRequest(
+                    prompt=prompt_text,
+                    connect_type="acp",
+                    platform=platform,
+                    session=acp_session,
+                    options={
+                        "cwd": _PROJECT_ROOT,
+                        "timeout_sec": 180,
+                        "reset_session": bool(metadata and metadata.get("resetSession")),
+                        "system_prompt": _external_agent_session_prompt(
+                            agent_info,
+                            is_private_chat=bool(metadata and metadata.get("is_private_chat")),
+                        ),
+                        "attachments": acpx_attachments,
+                    },
+                )
             )
+            if not result.ok:
+                raise AcpxError(result.error or "unknown acpx send error")
+            reply = result.content or ""
             _acp_group_trace(
                 "acp_prompt_complete",
                 agent_global_name=global_name,
@@ -713,17 +723,25 @@ class GroupService:
             "stream": False,
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(api_url, json=body, headers=headers)
-            if resp.status_code != 200:
-                logger.warning("HTTP API error %d for %s: %s", resp.status_code, agent_info.get("name"), resp.text[:200])
-                return None
-            data = resp.json()
-            return data["choices"][0]["message"]["content"]
-        except Exception as e:
-            logger.warning("HTTP send failed for %s: %s", agent_info.get("name"), e)
+        result = await send_to_agent(
+            SendToAgentRequest(
+                prompt=body["messages"],
+                connect_type="http",
+                platform=platform,
+                session=session_key or None,
+                options={
+                    "api_url": api_url,
+                    "api_key": api_key,
+                    "headers": headers,
+                    "body": body,
+                    "timeout": 60,
+                },
+            )
+        )
+        if not result.ok:
+            logger.warning("HTTP send failed for %s: %s", agent_info.get("name"), result.error)
             return None
+        return result.content
 
     async def _handle_external_agent_reply(
         self,

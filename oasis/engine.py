@@ -5,7 +5,7 @@ OASIS Forum - 讨论引擎
   轮次循环 → 调度/并行专家参与 → 共识检查 → 总结
 
 Three expert backends:
-  1. ExpertAgent  — direct LLM (stateless, name="tag#temp#N")
+  1. ExpertAgent  — temp sender (stateless, name="tag#temp#N")
   2. SessionExpert — internal session agent (stateful, name="tag#oasis#name" or "#oasis#name")
      - name is resolved to session_id via internal agent JSON (internal_agents.json)
      - tag (if present) enables persona injection from presets

@@ -2767,11 +2767,11 @@ def proxy_acpx_chat():
     stream = body.get("stream", True)
 
     try:
-        from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt, load_external_agent_prompt_file
+        from integrations.acpx_adapter import load_external_agent_system_prompt, load_external_agent_prompt_file
+        from integrations.agent_sender import SendToAgentRequest, send_to_agent
     except ImportError as e:
-        return jsonify({"error": f"acpx adapter unavailable: {e}"}), 500
+        return jsonify({"error": f"agent sender unavailable: {e}"}), 500
 
-    adapter = get_acpx_adapter(cwd=root_dir)
     front_external_system_prompt = "\n\n".join(
         p
         for p in (
@@ -2782,23 +2782,29 @@ def proxy_acpx_chat():
     )
 
     async def _run_prompt() -> str:
-        return await adapter.prompt(
-            tool=tool,
-            session_key=session_key,
-            prompt_text=prompt_text,
-            timeout_sec=int(body.get("timeout_sec") or 600),
-            reset_session=False,
-            system_prompt=front_external_system_prompt,
-            attachments=acpx_attachments or None,
+        result = await send_to_agent(
+            SendToAgentRequest(
+                prompt=prompt_text,
+                connect_type="acp",
+                platform=tool,
+                session=session_key,
+                options={
+                    "cwd": root_dir,
+                    "timeout_sec": int(body.get("timeout_sec") or 600),
+                    "system_prompt": front_external_system_prompt,
+                    "attachments": acpx_attachments or None,
+                },
+            )
         )
+        if not result.ok:
+            raise RuntimeError(result.error or "acpx chat failed")
+        return result.content or ""
 
     try:
         reply = asyncio.run(_run_prompt())
-    except AcpxError as e:
-        return jsonify({"error": str(e)}), 502
     except RuntimeError as e:
         # asyncio.run from nested loop (unlikely in Flask sync)
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 502
 
     if not stream:
         return jsonify(
