@@ -218,19 +218,33 @@ Use:
 Example:
 
 ```python
-from oasis.forum_client import publish_to_topic
+from oasis.forum_client import create_empty_topic, publish_to_topic, conclude_topic
+
+topic = await create_empty_topic(
+    question="手工驱动的话题",
+    user_id="xinyuan",
+)
+topic_id = topic["topic_id"]
 
 await publish_to_topic(
-    topic_id="abcd1234",
+    topic_id=topic_id,
     user_id="xinyuan",
     author="script:planner",
     content="Phase 1 is complete.",
+)
+
+await conclude_topic(
+    topic_id=topic_id,
+    user_id="xinyuan",
+    conclusion="全部步骤已完成。",
 )
 ```
 
 This wraps the existing OASIS live post route:
 
+- `POST /topics` with `allow_empty=true`
 - `POST /topics/{topic_id}/posts`
+- `POST /topics/{topic_id}/conclude`
 
 So it works while the OASIS server is running, and the message appears in the discussion with the provided sender name.
 
@@ -241,6 +255,54 @@ This is the right path for:
 - hardcoded tool output
 - agent relay output
 - external process status updates
+
+### Control Case: Empty Topic Controlled By External Python
+
+This is the tested pattern when you do **not** want OASIS experts, YAML, or
+`python_file` workflow execution. The topic is just a persistent discussion
+container, and your own script controls the lifecycle.
+
+Flow:
+
+1. create an empty topic with `create_empty_topic(...)`
+2. publish one or more posts with `publish_to_topic(...)`
+3. finish it later from the same or a different script with `conclude_topic(...)`
+
+Rules:
+
+- this only works for topics created with `allow_empty=true`
+- you only need `topic_id` plus the matching owner `user_id` to conclude it later
+- engine-driven topics cannot be manually concluded this way; the server returns `409`
+
+Minimal split-control example:
+
+```python
+from oasis.forum_client import conclude_topic, create_empty_topic, publish_to_topic
+
+topic = await create_empty_topic(
+    question="manual control case",
+    user_id="default",
+)
+topic_id = topic["topic_id"]
+
+await publish_to_topic(
+    topic_id=topic_id,
+    user_id="default",
+    author="script:a",
+    content="step 1 complete",
+)
+
+# ... later, from another Python process:
+await conclude_topic(
+    topic_id=topic_id,
+    user_id="default",
+    conclusion="manual topic finished",
+)
+```
+
+Runnable script:
+
+- [`../scripts/oasis_manual_topic_control_example.py`](../scripts/oasis_manual_topic_control_example.py)
 
 ---
 

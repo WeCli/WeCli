@@ -85,6 +85,7 @@ from oasis.models import (
     CreateTopicRequest,
     HumanReplyRequest,
     HumanWaitInfo,
+    ManualConclusionRequest,
     ManualPostRequest,
     TopicDetail,
     TopicSummary,
@@ -319,6 +320,16 @@ async def create_topic(req: CreateTopicRequest):
     discussions[topic_id] = forum
     forum.save()
 
+    if req.allow_empty and not req.python_file and not req.schedule_yaml and not req.schedule_file:
+        forum.status = "discussing"
+        forum.start_clock()
+        forum.save()
+        return {
+            "topic_id": topic_id,
+            "status": "discussing",
+            "message": "Empty topic created; external scripts may publish posts and conclude it later",
+        }
+
     try:
         if req.python_file:
             engine = PythonWorkflowEngine(
@@ -462,7 +473,10 @@ async def add_manual_post(topic_id: str, req: ManualPostRequest):
 
     task = tasks.get(topic_id)
     engine = engines.get(topic_id)
-    if forum.status != "discussing" or not engine or not task or task.done():
+    manual_topic = engine is None and task is None
+    if forum.status != "discussing":
+        raise HTTPException(409, "Only active topics accept live posts")
+    if not manual_topic and (not engine or not task or task.done()):
         raise HTTPException(409, "Only actively running discussions accept live posts")
 
     content = (req.content or "").strip()
@@ -484,6 +498,32 @@ async def add_manual_post(topic_id: str, req: ManualPostRequest):
         timestamp=post.timestamp,
         elapsed=post.elapsed,
     )
+
+
+@app.post("/topics/{topic_id}/conclude", response_model=dict)
+async def conclude_manual_topic(topic_id: str, req: ManualConclusionRequest):
+    """Manually conclude an externally-driven topic."""
+    forum = _get_forum_or_404(topic_id)
+    _check_owner(forum, req.user_id)
+
+    task = tasks.get(topic_id)
+    engine = engines.get(topic_id)
+    if engine or task:
+        raise HTTPException(409, "Use the workflow engine to finish non-manual topics")
+    if forum.status != "discussing":
+        raise HTTPException(409, f"Topic is already {forum.status}")
+
+    author = (req.author or req.user_id or "主持人").strip() or "主持人"
+    conclusion = req.conclusion.strip()
+    forum.log_event("conclude", agent=author[:80], detail="manual conclusion")
+    forum.conclusion = conclusion
+    forum.status = "concluded"
+    forum.save()
+    return {
+        "topic_id": topic_id,
+        "status": forum.status,
+        "conclusion": forum.conclusion,
+    }
 
 
 @app.post("/topics/{topic_id}/callback", response_model=dict)
