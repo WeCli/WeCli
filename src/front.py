@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from utils.env_settings import read_env_all, write_env_settings
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 from utils.cron_utils import get_agent_cron_jobs, restore_cron_jobs
-from services.llm_factory import infer_provider
+from services.llm_factory import create_chat_model, extract_text, infer_provider
 from routes.front_group_routes import register_group_routes
 from routes.front_oasis_routes import register_oasis_routes
 from routes.front_session_routes import register_session_routes
@@ -3400,11 +3400,56 @@ except Exception:
     _vis_yaml_to_layout = None
 
 
+def _extract_tagged_block(text: str, tag: str) -> str:
+    """Extract a tagged payload like <TAG>...</TAG> from LLM output."""
+    if not text:
+        return ""
+    pattern = rf"<{tag}>\s*(.*?)\s*</{tag}>"
+    match = _re.search(pattern, text, _re.DOTALL | _re.IGNORECASE)
+    return match.group(1).strip() if match else ""
+
+
+def _extract_python_from_response(text: str) -> str:
+    """Extract workflowpy code from possible wrappers or markdown fences."""
+    tagged = _extract_tagged_block(text, "WORKFLOWPY_CODE")
+    if tagged:
+        return tagged
+
+    fenced = _re.search(r"```(?:python)?\s*\n(.*?)```", text or "", _re.DOTALL | _re.IGNORECASE)
+    if fenced:
+        return fenced.group(1).strip()
+
+    return (text or "").strip()
+
+
 def _yaml_dir(user_id: str, team: str = "") -> str:
     """Return the YAML workflow directory path for a user (team-scoped when team is provided)."""
     if team:
         return os.path.join(root_dir, "data", "user_files", user_id, "teams", team, "oasis", "yaml")
     return os.path.join(root_dir, "data", "user_files", user_id, "oasis", "yaml")
+
+
+def _python_dir(user_id: str, team: str = "") -> str:
+    """Return the workflowpy directory path for a user (team-scoped when team is provided)."""
+    if team:
+        return os.path.join(root_dir, "data", "user_files", user_id, "teams", team, "oasis", "python")
+    return os.path.join(root_dir, "data", "user_files", user_id, "oasis", "python")
+
+
+def _workflow_mode() -> str:
+    mode = (request.args.get("mode") or request.form.get("mode") or "").strip().lower()
+    if not mode and request.is_json:
+        body = request.get_json(silent=True) or {}
+        mode = str(body.get("mode") or "").strip().lower()
+    return "python" if mode == "python" else "yaml"
+
+
+def _workflow_dir(user_id: str, team: str = "", mode: str = "yaml") -> str:
+    return _python_dir(user_id, team) if mode == "python" else _yaml_dir(user_id, team)
+
+
+def _workflow_ext(mode: str = "yaml") -> str:
+    return ".py" if mode == "python" else ".yaml"
 
 
 @app.route("/proxy_visual/experts", methods=["GET"])
@@ -3507,124 +3552,207 @@ def proxy_visual_generate_yaml():
 
 @app.route("/proxy_visual/agent-generate-yaml", methods=["POST"])
 def proxy_visual_agent_generate_yaml():
-    """Build prompt + send to main agent using session credentials → get YAML."""
+    """Build prompt + call the configured LLM directly for one-shot workflow generation."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data"}), 400
 
-    user_id = session.get("user_id", "")
+    mode = str(data.get("mode") or "yaml").strip().lower()
+    mode = "python" if mode == "python" else "yaml"
+    guidance = str(data.get("guidance") or "").strip()
+    current_code = str(data.get("current_code") or "").rstrip()
+    prompt_context = data.get("prompt_context")
 
     try:
-        prompt = _vis_build_llm_prompt(data) if _vis_build_llm_prompt else "Error: visual module unavailable"
+        if mode == "python":
+            prompt = (
+                "You are writing a workflowpy Python script for OASIS.\n"
+                "Return the result in this exact format:\n"
+                "<WORKFLOWPY_CODE>\n"
+                "# python code here\n"
+                "</WORKFLOWPY_CODE>\n"
+                "Do not output anything before or after those tags.\n"
+                "This is a one-shot code generation request, not a chat session.\n"
+                "Reference behavior from docs/workflowpy.md and docs/oasis-reference.md.\n"
+                "The script runs inside workflowpy with these globals already available:\n"
+                "ctx, question, user_id, team, topic_id, list_agents, list_personas, get_agent, get_persona,\n"
+                "send_agent, send_persona, publish, set_conclusion, set_result.\n"
+                "Rules:\n"
+                "- Write the file body as the async main script itself. Do NOT wrap it in run(ctx), main(), or if __name__ == '__main__'.\n"
+                "- Use async/await style.\n"
+                "- Do NOT import the injected workflowpy helpers above; they already exist in the runtime.\n"
+                "- Import Python standard-library or project modules only when the task truly needs them.\n"
+                "- Use the injected workflowpy helpers and plain Python control flow directly.\n"
+                "- Prefer clear, readable code over abstraction.\n"
+                "- If useful, publish intermediate progress messages with publish(...).\n"
+                "- Finish with set_conclusion(...) or set_result(...). A bare return is acceptable only if it is the natural final result.\n"
+                "- The code must be directly runnable when saved under oasis/python/.\n"
+                "- Do not include prose, markdown fences, or explanation.\n\n"
+                f"Task:\n{data.get('question') or 'Implement a useful workflowpy script'}\n"
+            )
+            if current_code:
+                prompt += (
+                    "\nExisting workflowpy script to revise or extend:\n"
+                    "<EXISTING_WORKFLOWPY>\n"
+                    f"{current_code}\n"
+                    "</EXISTING_WORKFLOWPY>\n"
+                    "Preserve the user's working structure when possible. Improve or complete it instead of rewriting everything unless the current code is fundamentally wrong for the task.\n"
+                )
+        else:
+            base_prompt = _vis_build_llm_prompt(data) if _vis_build_llm_prompt else "Error: visual module unavailable"
+            prompt = (
+                "You are designing a YAML workflow for the OASIS orchestration engine.\n"
+                "Return the result in this exact format:\n"
+                "<OASIS_YAML>\n"
+                "version: 2\n"
+                "...\n"
+                "</OASIS_YAML>\n"
+                "Do not output anything before or after those tags.\n"
+                "This is a one-shot generation request, not a chat session.\n"
+                "The YAML must be directly runnable by OASIS.\n\n"
+                "Reference behavior from docs/create_workflow.md and docs/oasis-reference.md.\n"
+                "Hard rules:\n"
+                "- Use version: 2 graph mode.\n"
+                "- Every node in plan must have a unique id.\n"
+                "- Nodes with no incoming edges are entry points.\n"
+                "- Use regular edges for normal fan-out/fan-in dependencies.\n"
+                "- Use conditional_edges only for true runtime branching.\n"
+                "- If a node has selector: true, its outgoing branches MUST be declared in selector_edges, not regular edges.\n"
+                "- Manual begin/bend nodes are allowed when they make the flow clearer.\n"
+                "- Keep the schedule valid for OASIS discussion/execution mode without unsupported fields.\n\n"
+                "Design goals:\n"
+                "- Keep the workflow compact and practical.\n"
+                "- Preserve real branching, review loops, or selectors only when they add value.\n"
+                "- Avoid redundant nodes and decorative complexity.\n\n"
+                f"{base_prompt}"
+            )
+        if prompt_context:
+            try:
+                prompt += "\n\nCurrent ClawCross workspace context:\n"
+                prompt += json.dumps(prompt_context, ensure_ascii=False, indent=2)
+                prompt += "\nUse this context when deciding whether to design for public scope vs team scope, which personas are actually available in the current expert pool, and which internal agent sessions already exist or are currently running.\n"
+            except Exception:
+                pass
+        if guidance:
+            prompt += f"\n\nAdditional user guidance:\n{guidance}\n"
 
-        # Call main agent with INTERNAL_TOKEN credentials
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {INTERNAL_TOKEN}:{user_id}",
-        }
-        payload = {
-            "model": "webot",
-            "messages": [
-                {"role": "system", "content": (
-                    "You are a YAML schedule generator for the OASIS expert orchestration engine. "
-                    "Output ONLY valid YAML, no markdown fences, no explanations, no commentary. "
-                    "The YAML must start with 'version: 1' and contain a 'plan:' section."
-                )},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "session_id": data.get("target_session_id") or "visual_orchestrator",
-            "temperature": 0.3,
-        }
-        resp = requests.post(LOCAL_OPENAI_COMPLETIONS_URL, json=payload, headers=headers, timeout=60)
-        if resp.status_code != 200:
-            return jsonify({"prompt": prompt, "error": f"Agent returned HTTP {resp.status_code}: {resp.text[:500]}", "agent_yaml": None})
+        llm = create_chat_model(
+            temperature=0.2 if mode == "yaml" else 0.25,
+            max_tokens=4096,
+            timeout=90,
+        )
+        response = llm.invoke(prompt)
+        agent_reply = extract_text(response.content if hasattr(response, "content") else str(response)).strip()
 
-        result = resp.json()
-        agent_reply = ""
-        try:
-            agent_reply = result["choices"][0]["message"]["content"]
-        except (KeyError, IndexError):
-            agent_reply = str(result)
+        if mode == "yaml":
+            tagged_yaml = _extract_tagged_block(agent_reply, "OASIS_YAML")
+            agent_yaml = tagged_yaml or (_vis_extract_yaml(agent_reply) if _vis_extract_yaml else agent_reply)
+        else:
+            agent_yaml = _extract_python_from_response(agent_reply)
+        validation = (
+            _vis_validate_yaml(agent_yaml) if (mode == "yaml" and _vis_validate_yaml)
+            else {"valid": bool(str(agent_yaml).strip()), "steps": 0, "step_types": ["python"] if mode == "python" else []}
+        )
 
-        agent_yaml = _vis_extract_yaml(agent_reply) if _vis_extract_yaml else agent_reply
-        validation = _vis_validate_yaml(agent_yaml) if _vis_validate_yaml else {"valid": False, "error": "validator unavailable"}
-
-        # Auto-save valid YAML to user's oasis/yaml directory (team-scoped)
+        user_id = session.get("user_id", "")
+        # Auto-save valid workflow to user's oasis directory (team-scoped)
         saved_path = None
         if validation.get("valid"):
             try:
                 import time as _time
                 team = data.get("team", "")
-                yd = _yaml_dir(user_id, team)
+                yd = _workflow_dir(user_id, team, mode)
                 os.makedirs(yd, exist_ok=True)
                 fname = data.get("save_name") or f"orch_{_time.strftime('%Y%m%d_%H%M%S')}"
-                if not fname.endswith((".yaml", ".yml")):
+                if mode == "python":
+                    if not fname.endswith(".py"):
+                        fname += ".py"
+                elif not fname.endswith((".yaml", ".yml")):
                     fname += ".yaml"
                 fpath = os.path.join(yd, fname)
                 with open(fpath, "w", encoding="utf-8") as _yf:
-                    _yf.write(f"# Auto-generated from visual orchestrator\n{agent_yaml}")
+                    if mode == "python":
+                        _yf.write(agent_yaml if str(agent_yaml).endswith("\n") else f"{agent_yaml}\n")
+                    else:
+                        _yf.write(f"# Auto-generated from visual orchestrator\n{agent_yaml}")
                 saved_path = fname
             except Exception as save_err:
                 saved_path = f"save_error: {save_err}"
 
-        return jsonify({"prompt": prompt, "agent_yaml": agent_yaml, "agent_reply_raw": agent_reply, "validation": validation, "saved_file": saved_path})
+        return jsonify({"prompt": prompt, "mode": mode, "agent_yaml": agent_yaml, "agent_reply_raw": agent_reply, "validation": validation, "saved_file": saved_path})
 
-    except requests.exceptions.ConnectionError:
-        prompt = _vis_build_llm_prompt(data) if _vis_build_llm_prompt else ""
-        return jsonify({"prompt": prompt, "error": "Cannot connect to main agent. Is mainagent.py running?", "agent_yaml": None})
-    except requests.exceptions.Timeout:
-        prompt = _vis_build_llm_prompt(data) if _vis_build_llm_prompt else ""
-        return jsonify({"prompt": prompt, "error": "Agent request timed out (60s).", "agent_yaml": None})
+    except ValueError as e:
+        return jsonify({"prompt": "", "error": str(e), "agent_yaml": None}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/proxy_visual/save-layout", methods=["POST"])
 def proxy_visual_save_layout():
-    """Save canvas layout as YAML (no separate layout JSON stored)."""
+    """Save a workflow in either YAML(canvas) or workflowpy mode."""
     user_id = session.get("user_id", "")
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data"}), 400
-    if not _vis_layout_to_yaml:
-        return jsonify({"error": "Layout-to-YAML converter unavailable"}), 500
+    mode = str(data.get("mode") or "yaml").strip().lower()
+    mode = "python" if mode == "python" else "yaml"
     name = data.get("name", "untitled")
     safe = "".join(c for c in name if c.isalnum() or c in "-_ ").strip() or "untitled"
+    team = data.get("team", "")
+    yd = _workflow_dir(user_id, team, mode)
+    os.makedirs(yd, exist_ok=True)
+    ext = _workflow_ext(mode)
+    fpath = os.path.join(yd, f"{safe}{ext}")
+    if mode == "python":
+        content = str(data.get("content") or "")
+        if not content.strip():
+            return jsonify({"error": "No python workflow content"}), 400
+        with open(fpath, "w", encoding="utf-8") as f:
+            f.write(content if content.endswith("\n") else content + "\n")
+        return jsonify({"saved": True, "mode": mode, "file": os.path.basename(fpath), "path": fpath, "name": safe})
+
+    if not _vis_layout_to_yaml:
+        return jsonify({"error": "Layout-to-YAML converter unavailable"}), 500
     try:
         yaml_out = _vis_layout_to_yaml(data)
     except Exception as e:
         return jsonify({"error": f"YAML conversion failed: {e}"}), 500
-    team = data.get("team", "")
-    yd = _yaml_dir(user_id, team)
-    os.makedirs(yd, exist_ok=True)
-    fpath = os.path.join(yd, f"{safe}.yaml")
     with open(fpath, "w", encoding="utf-8") as f:
         f.write(f"# Saved from visual orchestrator\n{yaml_out}")
-    return jsonify({"saved": True})
+    return jsonify({"saved": True, "mode": mode, "file": os.path.basename(fpath), "path": fpath, "name": safe})
 
 
 @app.route("/proxy_visual/load-layouts", methods=["GET"])
 def proxy_visual_load_layouts():
-    """List saved YAML workflows as available layouts (team-scoped)."""
+    """List saved workflows for the selected mode (team-scoped)."""
     user_id = session.get("user_id", "")
     team = request.args.get("team", "")
-    yd = _yaml_dir(user_id, team)
+    mode = _workflow_mode()
+    yd = _workflow_dir(user_id, team, mode)
     if not os.path.isdir(yd):
         return jsonify([])
+    if mode == "python":
+        return jsonify([f[:-3] for f in sorted(os.listdir(yd)) if f.endswith(".py")])
     return jsonify([f.replace('.yaml', '').replace('.yml', '') for f in sorted(os.listdir(yd)) if f.endswith((".yaml", ".yml"))])
 
 
 @app.route("/proxy_visual/load-layout/<name>", methods=["GET"])
 def proxy_visual_load_layout(name):
-    """Load a layout by reading the YAML file and converting to layout on-the-fly."""
+    """Load a workflow by mode."""
     user_id = session.get("user_id", "")
-    if not _vis_yaml_to_layout:
-        return jsonify({"error": "YAML-to-layout converter unavailable"}), 500
     safe = "".join(c for c in name if c.isalnum() or c in "-_ ").strip()
     team = request.args.get("team", "")
-    yd = _yaml_dir(user_id, team)
-    # Try .yaml then .yml
+    mode = _workflow_mode()
+    yd = _workflow_dir(user_id, team, mode)
+    if mode == "python":
+        fpath = os.path.join(yd, f"{safe}.py")
+        if not os.path.isfile(fpath):
+            return jsonify({"error": "Not found"}), 404
+        with open(fpath, "r", encoding="utf-8") as f:
+            return jsonify({"name": safe, "mode": mode, "content": f.read()})
+
+    if not _vis_yaml_to_layout:
+        return jsonify({"error": "YAML-to-layout converter unavailable"}), 500
     fpath = os.path.join(yd, f"{safe}.yaml")
     if not os.path.isfile(fpath):
         fpath = os.path.join(yd, f"{safe}.yml")
@@ -3658,14 +3786,18 @@ def proxy_visual_load_yaml_raw(name):
 
 @app.route("/proxy_visual/delete-layout/<name>", methods=["DELETE"])
 def proxy_visual_delete_layout(name):
-    """Delete a saved YAML workflow."""
+    """Delete a saved workflow for the selected mode."""
     user_id = session.get("user_id", "")
     safe = "".join(c for c in name if c.isalnum() or c in "-_ ").strip()
     team = request.args.get("team", "")
-    yd = _yaml_dir(user_id, team)
-    fpath = os.path.join(yd, f"{safe}.yaml")
-    if not os.path.isfile(fpath):
-        fpath = os.path.join(yd, f"{safe}.yml")
+    mode = _workflow_mode()
+    yd = _workflow_dir(user_id, team, mode)
+    if mode == "python":
+        fpath = os.path.join(yd, f"{safe}.py")
+    else:
+        fpath = os.path.join(yd, f"{safe}.yaml")
+        if not os.path.isfile(fpath):
+            fpath = os.path.join(yd, f"{safe}.yml")
     if os.path.isfile(fpath):
         os.remove(fpath)
         return jsonify({"deleted": True})

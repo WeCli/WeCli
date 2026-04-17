@@ -11946,6 +11946,84 @@ function toggleOrchFocusMode() {
     if (btn) btn.classList.toggle('focus-active', !isFocused);
 }
 
+let currentOrchMode = 'yaml'; // 'yaml' or 'python'
+
+function orchSetWorkflowMode(mode) {
+    currentOrchMode = mode;
+    const yamlBtn = document.getElementById('orch-mode-yaml-btn');
+    const pythonBtn = document.getElementById('orch-mode-python-btn');
+    const yamlPanel = document.getElementById('orch-yaml-panel');
+    const canvasArea = document.getElementById('orch-canvas-area');
+    const pythonCanvasPanel = document.getElementById('orch-python-canvas-panel');
+    const codeTitle = document.getElementById('orch-code-panel-title');
+    const aiBtn = document.getElementById('orch-ai-btn');
+    const exportLabel = document.getElementById('orch-export-btn-label');
+    const downloadLabel = document.getElementById('orch-download-btn-label');
+    const uploadLabel = document.getElementById('orch-upload-btn-label');
+    const runLabel = document.getElementById('orch-run-btn-label');
+    const runBtn = document.getElementById('orch-run-btn');
+    const settingsSection = document.getElementById('orch-settings-section');
+    const aiTitle = document.getElementById('orch-ai-section-title');
+    const guidanceLabel = document.getElementById('orch-guidance-label');
+    const guidanceInput = document.getElementById('orch-guidance-input');
+    const statusEl = document.getElementById('orch-agent-status');
+    const promptLabel = document.getElementById('orch-prompt-label');
+    const outputLabel = document.getElementById('orch-agent-output-label');
+    const promptContent = document.getElementById('orch-prompt-content');
+    const outputContent = document.getElementById('orch-agent-yaml');
+    const zh = currentLang === 'zh-CN';
+
+    if (mode === 'python') {
+        yamlBtn.classList.remove('active');
+        pythonBtn.classList.add('active');
+        yamlPanel.style.display = 'none';
+        if (canvasArea) canvasArea.style.display = 'none';
+        if (pythonCanvasPanel) pythonCanvasPanel.style.display = 'flex';
+        if (aiBtn) aiBtn.style.display = '';
+        if (settingsSection) settingsSection.style.display = 'none';
+        if (aiTitle) aiTitle.textContent = zh ? '🤖 AI 写 Python 工作流' : '🤖 AI Write Python Workflow';
+        if (guidanceLabel) guidanceLabel.textContent = zh ? '🧭 写代码指引' : '🧭 Coding Guidance';
+        if (guidanceInput) guidanceInput.placeholder = zh
+            ? '例如：写成 async workflowpy；优先调用 send_agent；把 review / retry 流程写清楚。'
+            : 'Example: write async workflowpy; prefer send_agent; include explicit review/retry flow.';
+        if (statusEl) statusEl.textContent = zh ? '点击「🤖 AI优化工作流」自动生成 Python workflow' : 'Click "AI Optimize Workflow" to generate Python workflow';
+        if (promptLabel) promptLabel.textContent = zh ? '📨 发送的代码指令' : '📨 Coding Prompt Sent';
+        if (outputLabel) outputLabel.textContent = zh ? '🤖 Agent Python' : '🤖 Agent Python';
+        if (promptContent) promptContent.textContent = zh ? '点击 AI 后显示发送给 Agent 的 Python 指令' : 'Shows the Python prompt after AI generation';
+        if (outputContent) outputContent.textContent = zh ? '等待 Agent 生成 Python 代码' : 'Waiting for Agent Python';
+        if (exportLabel) exportLabel.textContent = zh ? '📋 复制 Python' : '📋 Copy Python';
+        if (downloadLabel) downloadLabel.textContent = zh ? '⬇️ 导出 Python' : '⬇️ Export Python';
+        if (uploadLabel) uploadLabel.textContent = zh ? '⬆️ 导入 Python' : '⬆️ Import Python';
+        if (runLabel) runLabel.textContent = zh ? '▶️ 运行工作流' : '▶️ Run Workflow';
+        if (runBtn) runBtn.title = zh ? '运行当前编辑器里的工作流' : 'Run the workflow in the current editor';
+        if (codeTitle) codeTitle.innerHTML = '🐍 Python 脚本';
+    } else {
+        pythonBtn.classList.remove('active');
+        yamlBtn.classList.add('active');
+        yamlPanel.style.display = 'flex';
+        if (pythonCanvasPanel) pythonCanvasPanel.style.display = 'none';
+        if (canvasArea) canvasArea.style.display = 'block';
+        if (aiBtn) aiBtn.style.display = '';
+        if (settingsSection) settingsSection.style.display = '';
+        if (aiTitle) aiTitle.textContent = zh ? '🤖 AI 生成' : '🤖 AI Generate';
+        if (guidanceLabel) guidanceLabel.textContent = zh ? '🧭 优化指引' : '🧭 Optimization Guidance';
+        if (guidanceInput) guidanceInput.placeholder = zh
+            ? '例如：减少节点数；保留 reviewer 回环；让 planner 先出计划再并行执行。'
+            : 'Example: reduce node count; keep reviewer loop; let planner draft first, then parallel execution.';
+        if (statusEl) statusEl.textContent = zh ? '点击「🤖 AI编排」自动生成 YAML' : 'Click "AI Optimize Workflow" to generate YAML';
+        if (promptLabel) promptLabel.textContent = zh ? '📨 发送的 Prompt' : '📨 Prompt Sent';
+        if (outputLabel) outputLabel.textContent = zh ? '🤖 Agent YAML' : '🤖 Agent YAML';
+        if (promptContent) promptContent.textContent = zh ? '点击 AI编排 后显示' : 'Shown after AI Orch';
+        if (outputContent) outputContent.textContent = zh ? '等待 Agent 生成' : 'Waiting for Agent';
+        if (exportLabel) exportLabel.textContent = zh ? '📋 复制工作流到粘贴板' : '📋 Copy Workflow to Clipboard';
+        if (downloadLabel) downloadLabel.textContent = zh ? '⬇️ 导出工作流' : '⬇️ Export Workflow';
+        if (uploadLabel) uploadLabel.textContent = zh ? '⬆️ 导入工作流' : '⬆️ Import Workflow';
+        if (runLabel) runLabel.textContent = zh ? '▶️ 运行工作流' : '▶️ Run Workflow';
+        if (runBtn) runBtn.title = zh ? '运行当前画布里的工作流' : 'Run the workflow from the current canvas';
+        if (codeTitle) codeTitle.innerHTML = '📄 规则 YAML';
+    }
+}
+
 // Agent 配置模态框
 let currentConfigAgent = null;
 
@@ -12340,25 +12418,37 @@ async function loadTeamWorkflows() {
     tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-400 py-8">加载中...</td></tr>';
 
     try {
-        const resp = await fetch(`/proxy_visual/load-layouts?team=${encodeURIComponent(currentGroupId)}`, { cache: 'no-store' });
-        if (!resp.ok) {
+        const [yamlResp, pyResp] = await Promise.all([
+            fetch(`/proxy_visual/load-layouts?team=${encodeURIComponent(currentGroupId)}&mode=yaml`, { cache: 'no-store' }),
+            fetch(`/proxy_visual/load-layouts?team=${encodeURIComponent(currentGroupId)}&mode=python`, { cache: 'no-store' }),
+        ]);
+        if (!yamlResp.ok || !pyResp.ok) {
             tbody.innerHTML = '<tr><td colspan="3" class="text-center text-red-400 py-8">加载失败</td></tr>';
             return;
         }
-        const workflows = await resp.json();
+        const [yamlWorkflows, pythonWorkflows] = await Promise.all([yamlResp.json(), pyResp.json()]);
+        const workflows = [
+            ...(Array.isArray(yamlWorkflows) ? yamlWorkflows : []).map(name => ({ name, mode: 'yaml' })),
+            ...(Array.isArray(pythonWorkflows) ? pythonWorkflows : []).map(name => ({ name, mode: 'python' })),
+        ];
         if (!workflows || workflows.length === 0) {
             tbody.innerHTML = '<tr><td colspan="3" class="text-center text-gray-400 py-8">暂无工作流（在编排页面保存后会出现在这里）</td></tr>';
             return;
         }
-        tbody.innerHTML = workflows.map(name => {
-            const safeName = escapeHtml(name);
+        tbody.innerHTML = workflows.map(item => {
+            const safeName = escapeHtml(item.name);
+            const mode = item.mode === 'python' ? 'python' : 'yaml';
+            const badge = mode === 'python'
+                ? '<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#ecfeff;color:#0f766e;font-size:10px;font-weight:700;margin-left:8px;">PY</span>'
+                : '<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:10px;font-weight:700;margin-left:8px;">YAML</span>';
+            const fileName = mode === 'python' ? `${safeName}.py` : `${safeName}.yaml`;
             return `
                 <tr>
-                    <td class="font-medium text-gray-800">📂 ${safeName}</td>
-                    <td class="font-mono text-xs text-gray-500">${safeName}.yaml</td>
+                    <td class="font-medium text-gray-800">📂 ${safeName} ${badge}</td>
+                    <td class="font-mono text-xs text-gray-500">${fileName}</td>
                     <td style="text-align:right;white-space:nowrap;">
-<button onclick="viewTeamWorkflowYaml('${safeName}')" class="text-blue-500 hover:text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-50" title="在画布中查看">👁️ 查看</button>
-                        <button onclick="deleteTeamWorkflow('${safeName}')" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50" title="删除">🗑️</button>
+                        <button onclick="viewTeamWorkflow('${safeName}', '${mode}')" class="text-blue-500 hover:text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-50" title="打开工作流">👁️ 查看</button>
+                        <button onclick="deleteTeamWorkflow('${safeName}', '${mode}')" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50" title="删除">🗑️</button>
                     </td>
                 </tr>`;
         }).join('');
@@ -12369,7 +12459,7 @@ async function loadTeamWorkflows() {
 }
 
 // ── View Team Workflow on Canvas ──
-async function viewTeamWorkflowYaml(name) {
+async function viewTeamWorkflow(name, mode = 'yaml') {
     if (!currentGroupId) return;
     try {
         // Switch to orchestrate page
@@ -12387,19 +12477,19 @@ async function viewTeamWorkflowYaml(name) {
         orchLoadExperts();
         orchLoadSessionAgents();
         orchLoadOpenClawSessions();
-        // Load the workflow onto the canvas
-        await orchDoLoadLayout(name);
+        if (typeof orchSetWorkflowMode === 'function') orchSetWorkflowMode(mode);
+        await orchDoLoadLayout(name, mode);
     } catch (err) {
         alert('加载失败: ' + err.message);
     }
 }
 
 // ── Delete Team Workflow ──
-async function deleteTeamWorkflow(name) {
+async function deleteTeamWorkflow(name, mode = 'yaml') {
     if (!currentGroupId) return;
     if (!confirm(`确定删除工作流 "${name}" 吗？此操作不可撤销。`)) return;
     try {
-        const resp = await fetch(`/proxy_visual/delete-layout/${encodeURIComponent(name)}?team=${encodeURIComponent(currentGroupId)}`, { method: 'DELETE' });
+        const resp = await fetch(`/proxy_visual/delete-layout/${encodeURIComponent(name)}?team=${encodeURIComponent(currentGroupId)}&mode=${encodeURIComponent(mode)}`, { method: 'DELETE' });
         if (resp.ok) {
             loadTeamWorkflows();
         } else {
