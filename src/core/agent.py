@@ -1559,11 +1559,9 @@ class TeamAgent:
                         "max_turns": effective_max_turns,
                     },
                 )
-            from services.llm_factory import extract_text as _extract_text
-
             response = AIMessage(
                 content=build_turn_limit_message(
-                    _extract_text(response.content),
+                    extract_text(response.content),
                     effective_max_turns,
                 )
             )
@@ -1613,7 +1611,7 @@ class TeamAgent:
                     "has_tool_calls": bool(getattr(response, "tool_calls", None)),
                 },
                 result={
-                    "content": self._extract_text(response.content)[:500],
+                    "content": extract_text(response.content)[:500],
                 },
             )
 
@@ -1623,10 +1621,10 @@ class TeamAgent:
         if not getattr(response, "tool_calls", None) and next_turn_count > 1:
             model_name = getattr(llm, "model_name", "") or getattr(llm, "model", "") or ""
             traj_messages = [
-                {"role": type(m).__name__.replace("Message", "").lower(), "content": self._extract_text(m.content)}
+                {"role": type(m).__name__.replace("Message", "").lower(), "content": extract_text(m.content)}
                 for m in history_messages[:20]
             ]
-            traj_messages.append({"role": "assistant", "content": self._extract_text(response.content)[:2000]})
+            traj_messages.append({"role": "assistant", "content": extract_text(response.content)[:2000]})
             token_usage = {
                 "input_tokens": usage_meta.get("input_tokens", 0) if isinstance(usage_meta, dict) else 0,
                 "output_tokens": usage_meta.get("output_tokens", 0) if isinstance(usage_meta, dict) else 0,
