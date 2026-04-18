@@ -5254,6 +5254,57 @@ function escapeHtml(str) {
     return div.innerHTML.replace(/"/g, '&quot;');
 }
 
+function triggerBlobDownload(blob, filename) {
+    const safeName = String(filename || 'download.bin')
+        .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_')
+        .trim() || 'download.bin';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = safeName;
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    try {
+        a.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    } catch (e) {
+        try {
+            a.click();
+        } catch (_) {
+            window.open(url, '_blank', 'noopener');
+        }
+    }
+    setTimeout(() => {
+        try { a.remove(); } catch (_) {}
+        try { URL.revokeObjectURL(url); } catch (_) {}
+    }, 5000);
+}
+
+function getAttachmentFilename(resp, fallbackName) {
+    const fallback = String(fallbackName || 'download.bin').trim() || 'download.bin';
+    const disposition = resp && typeof resp.headers?.get === 'function'
+        ? (resp.headers.get('Content-Disposition') || '')
+        : '';
+    if (!disposition) return fallback;
+
+    const starMatch = disposition.match(/filename\*\s*=\s*([^;]+)/i);
+    if (starMatch) {
+        let value = starMatch[1].trim();
+        value = value.replace(/^UTF-8''/i, '').replace(/^"(.*)"$/, '$1');
+        try {
+            return decodeURIComponent(value);
+        } catch (_) {
+            return value;
+        }
+    }
+
+    const plainMatch = disposition.match(/filename\s*=\s*"([^"]+)"/i) || disposition.match(/filename\s*=\s*([^;]+)/i);
+    if (plainMatch) {
+        return plainMatch[1].trim();
+    }
+    return fallback;
+}
+
 function closeSettings() {
     document.getElementById('settings-modal').style.display = 'none';
 }
@@ -9845,6 +9896,7 @@ async function openGroup(teamName) {
         '<button id="team-tab-members" onclick="switchTeamTab(\'members\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #2563eb;background:#2563eb;color:white;">👥 成员</button>' +
         '<button id="team-tab-experts" onclick="switchTeamTab(\'experts\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #d1d5db;background:#f9fafb;color:#374151;">🧑‍💼 人设池</button>' +
         '<button id="team-tab-workflows" onclick="switchTeamTab(\'workflows\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #d1d5db;background:#f9fafb;color:#374151;">📂 工作流</button>' +
+        '<button id="team-tab-settings" onclick="switchTeamTab(\'settings\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #d1d5db;background:#f9fafb;color:#374151;">⚙️ 设置</button>' +
         '</div>' +
         '<div style="display:flex;gap:8px;align-items:center;">' +
         '<span id="team-tab-actions-members">' +
@@ -9859,6 +9911,7 @@ async function openGroup(teamName) {
         '<button onclick="loadTeamWorkflows()" class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 px-2 py-1 rounded transition-colors" title="刷新工作流列表">🔄</button>' +
         '<button onclick="newTeamWorkflowOnCanvas()" class="text-xs bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-1 rounded border border-purple-200" title="新建工作流（跳转画布）">➕ 创建工作流</button>' +
         '</span>' +
+        '<span id="team-tab-actions-settings" style="display:none;"></span>' +
         '<button onclick="toggleTeamMembersView()" class="text-gray-400 hover:text-gray-600 text-sm">&times;</button>' +
         '</div>' +
         '</div>' +
@@ -9904,6 +9957,23 @@ async function openGroup(teamName) {
         '<tbody id="team-workflows-table-body">' +
         '</tbody>' +
         '</table>' +
+        '</div>' +
+        '<div id="team-panel-settings" class="team-members-table-container" style="display:none;padding:16px;">' +
+        '<div style="max-width:480px;">' +
+        '<h4 style="font-size:14px;font-weight:600;color:#374151;margin-bottom:12px;">⚙️ 团队设置</h4>' +
+        '<div style="margin-bottom:16px;">' +
+        '<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Fallback Agent</label>' +
+        '<input id="team-settings-fallback-agent" type="text" placeholder="当 agent 恢复失败时的备用 agent 名称" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;">' +
+        '<div style="font-size:11px;color:#6b7280;margin-top:4px;">设置后，当导入快照时 OpenClaw agent 恢复失败，会自动使用此 fallback agent</div>' +
+        '</div>' +
+        '<div style="margin-bottom:16px;">' +
+        '<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Fallback Agent Config (JSON)</label>' +
+        '<textarea id="team-settings-fallback-config" rows="4" placeholder="{"model": "...", "api_key": "...", ...}" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:11px;font-family:monospace;box-sizing:border-box;resize:vertical;"></textarea>' +
+        '<div style="font-size:11px;color:#6b7280;margin-top:4px;">Fallback agent 的配置，恢复时会使用此配置创建 agent</div>' +
+        '</div>' +
+        '<button id="team-settings-save-btn" onclick="saveTeamSettings()" style="padding:8px 16px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">保存设置</button>' +
+        '<div id="team-settings-status" style="margin-top:8px;font-size:12px;"></div>' +
+        '</div>' +
         '</div>' +
         '</div>';
 
@@ -10298,7 +10368,7 @@ async function loadTeamMembers() {
             // For openclaw type, use the full orchestration config modal (files/tools/channels)
             const configBtn = m.tag === 'openclaw'
                 ? `<button onclick="orchShowAgentConfigModal('${escapeHtml(m.global_name)}')" class="text-purple-500 hover:text-purple-700 text-xs px-2 py-1 rounded hover:bg-purple-50" title="OpenClaw 配置 (Files / Tools / Channels)">🦞⚙️</button>`
-                : `<button onclick="showAgentConfigModal('${m.type}', '${escapeHtml(m.global_name)}', '${escapeHtml(m.name)}', '${escapeHtml(m.tag || '')}', '${escapeHtml(apiUrl)}', '${escapeHtml(apiKey)}', '${escapeHtml(model)}', '${escapeHtml(typeof headers === 'object' ? JSON.stringify(headers).replace(/"/g, '&quot;').replace(/'/g, "\\'") : headers)}')" class="text-blue-500 hover:text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-50" title="配置">⚙️</button>`;
+                : `<button onclick="showAgentConfigModal('${m.type}', '${escapeHtml(m.global_name)}', '${escapeHtml(m.name)}', '${escapeHtml(m.tag || '')}', '${escapeHtml(apiUrl)}', '${escapeHtml(apiKey)}', '${escapeHtml(model)}', '${escapeHtml(typeof headers === 'object' ? JSON.stringify(headers).replace(/"/g, '&quot;').replace(/'/g, "\\'") : headers)}', '${escapeHtml(m.platform || '')}')" class="text-blue-500 hover:text-blue-700 text-xs px-2 py-1 rounded hover:bg-blue-50" title="配置">⚙️</button>`;
             
             return `
                 <tr>
@@ -10682,18 +10752,11 @@ async function confirmExportTeam() {
             return;
         }
         const blob = await resp.blob();
-        const disposition = resp.headers.get('Content-Disposition') || '';
-        let filename = `team_${currentGroupId}_snapshot.zip`;
-        const match = disposition.match(/filename="?([^"]+)"?/);
-        if (match) filename = match[1];
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        if (!blob || !blob.size) {
+            throw new Error('empty snapshot zip');
+        }
+        const filename = getAttachmentFilename(resp, `team_${currentGroupId}_snapshot.zip`);
+        triggerBlobDownload(blob, filename);
         
         // Close modal after successful download
         closeExportPreviewModal();
@@ -10703,7 +10766,7 @@ async function confirmExportTeam() {
             window.orchToast(t('orch_toast_snapshot_downloaded'));
         }
     } catch (e) {
-        alert('导出失败: ' + e.message);
+        alert('导出失败: ' + (e && e.message ? e.message : String(e)));
     } finally {
         confirmBtn.disabled = false;
         confirmBtn.textContent = originalText;
@@ -11070,6 +11133,17 @@ function acpxToolFromPlatform(platform) {
     return raw;
 }
 
+function platformNeedsApiUrl(platform) {
+    const raw = String(platform || '').trim().toLowerCase();
+    if (!raw) return true;
+    if (raw === 'openclaw') return false;
+    return !ADD_EXT_PLATFORM_FALLBACK.includes(raw);
+}
+
+function shouldShowExternalApiFields(platform) {
+    return platformNeedsApiUrl(platform);
+}
+
 async function deleteTeamMember(type, globalName, name, tag, platform) {
     if (!currentGroupId) return;
     if (_deletingTeamMember) return; // Prevent double-click
@@ -11123,21 +11197,32 @@ async function deleteTeamMember(type, globalName, name, tag, platform) {
             }
             await removeTeamExternalMember(currentGroupId, globalName);
         } else {
-            if (platformTool) {
+            let closeError = '';
+            if (platformTool || globalName) {
                 const acpResp = await fetch('/proxy_acpx_session_delete', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        tool: platformTool,
-                        session_name: globalName,
-                    }),
+                    body: JSON.stringify(Object.assign(
+                        { session_name: globalName },
+                        platformTool ? { tool: platformTool } : {}
+                    )),
                 });
                 const acpResult = await acpResp.json().catch(() => ({}));
                 if (!acpResp.ok || !acpResult.ok) {
-                    throw new Error(acpResult.detail || acpResult.error || '删除 ACP Agent 失败');
+                    closeError = String(acpResult.detail || acpResult.error || '删除 ACP Agent 失败');
+                    const low = closeError.toLowerCase();
+                    const ignorable = low.includes('session not found')
+                        || low.includes('unsupported tool')
+                        || low.includes('unsupported tool or session not found');
+                    if (!ignorable) {
+                        throw new Error(closeError);
+                    }
                 }
             }
             await removeTeamExternalMember(currentGroupId, globalName);
+            if (closeError && typeof orchToast === 'function') {
+                orchToast(`成员 "${name}" 已删除（会话已不存在）`);
+            }
         }
         
         // Use non-blocking toast instead of alert
@@ -11185,7 +11270,6 @@ function addExtOnPlatformChange() {
 }
 
 const ADD_EXT_PLATFORM_FALLBACK = [
-    'openclaw',
     'codex',
     'claude',
     'claude-code',
@@ -11237,11 +11321,16 @@ function addExtPlatformLabel(value) {
 function renderAddExtPlatformOptions(options, selected = '') {
     const seen = new Set();
     const rows = ['<option value="">请选择平台</option>'];
+    const selectedValue = String(selected || '').trim().toLowerCase();
+    if (selectedValue === 'http') {
+        seen.add('http');
+        rows.push('<option value="http" selected>HTTP</option>');
+    }
     for (const raw of (Array.isArray(options) ? options : [])) {
         const value = String(raw || '').trim().toLowerCase();
-        if (!value || value === 'http' || seen.has(value)) continue;
+        if (!value || value === 'openclaw' || value === 'http' || value === 'api' || seen.has(value)) continue;
         seen.add(value);
-        rows.push(`<option value="${escapeHtml(value)}"${value === selected ? ' selected' : ''}>${escapeHtml(addExtPlatformLabel(value))}</option>`);
+        rows.push(`<option value="${escapeHtml(value)}"${value === selectedValue ? ' selected' : ''}>${escapeHtml(addExtPlatformLabel(value))}</option>`);
     }
     return rows.join('');
 }
@@ -11260,7 +11349,7 @@ async function fetchAddExtPlatformOptions() {
     } catch (_) {
         tools = [];
     }
-    const merged = ['openclaw', ...tools.filter((t) => t && t !== 'openclaw')];
+    const merged = tools.filter((t) => t && t !== 'openclaw' && t !== 'http' && t !== 'api');
     const fallback = ADD_EXT_PLATFORM_FALLBACK.filter((t) => !merged.includes(t));
     _addExtPlatformOptionsCache = merged.concat(fallback);
     return _addExtPlatformOptionsCache;
@@ -12187,18 +12276,30 @@ function orchSetWorkflowMode(mode) {
 // Agent 配置模态框
 let currentConfigAgent = null;
 
-async function showAgentConfigModal(type, globalName, name, tag, api_url, api_key, model, headers) {
-    currentConfigAgent = { type, globalName, name, tag, api_url, api_key, model, headers };
+async function showAgentConfigModal(type, globalName, name, tag, api_url, api_key, model, headers, platform) {
+    const normalizedType = type === 'ext' ? 'external' : type;
+    currentConfigAgent = { type: normalizedType, globalName, name, tag, api_url, api_key, model, headers, platform };
+    const platformValue = String(platform || '').trim().toLowerCase();
+    let platformOptionsHtml = '';
+    if (normalizedType === 'external') {
+        const options = await fetchAddExtPlatformOptions();
+        const normalized = Array.isArray(options) ? options.slice() : [];
+        if (platformValue && !normalized.includes(platformValue) && platformValue !== 'http') {
+            normalized.push(platformValue);
+        }
+        platformOptionsHtml = renderAddExtPlatformOptions(normalized, platformValue);
+    }
     
     // Create modal dynamically like orchestration page
     const overlay = document.createElement('div');
     overlay.className = 'orch-modal-overlay';
     overlay.id = 'agent-config-overlay';
     
-    const typeLabel = type === 'oasis' ? 'Oasis Agent' : 'External Agent';
+    const typeLabel = normalizedType === 'oasis' ? 'Oasis Agent' : 'External Agent';
     
     // External Agent form fields (like orchestration page)
-    const externalForm = type === 'external' ? `
+    const externalForm = normalizedType === 'external' ? `
+        <div id="config-ext-api-fields" style="display:${shouldShowExternalApiFields(platformValue) ? 'block' : 'none'};">
         <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">API URL *</label>
         <input id="config-ext-url" type="text" value="${escapeHtml(api_url || '')}" placeholder="https://api.example.com/v1" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
         <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">API Key</label>
@@ -12207,38 +12308,49 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
         <input id="config-ext-model" type="text" value="${escapeHtml(model || '')}" placeholder="gpt-4 / deepseek-chat (optional)" style="font-family:monospace;font-size:12px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;box-sizing:border-box;">
         <label style="font-size:11px;color:#9ca3af;margin-bottom:2px;margin-top:8px;display:block;">Headers (JSON)</label>
         <textarea id="config-ext-headers" placeholder='{"X-Custom": "value"}' style="font-family:monospace;font-size:11px;min-height:60px;width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;resize:vertical;box-sizing:border-box;">${escapeHtml(typeof headers === 'object' ? JSON.stringify(headers, null, 2) : headers || '')}</textarea>
+        </div>
     ` : '';
     
     // Agent persona tag section
-    const tagSection = (type === 'oasis' || type === 'external') ? `
+    const tagSection = (normalizedType === 'oasis' || normalizedType === 'external') ? `
         <label style="font-size:11px;font-weight:600;color:#374151;">标签 (Tag)</label>
         <select id="config-agent-tag" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;background:white;">
             <option value="">(无标签)</option>
         </select>
-        ${type === 'oasis' ? `<div id="config-tag-drop-zone" style="border:2px dashed #d1d5db;border-radius:8px;padding:12px;text-align:center;font-size:11px;color:#9ca3af;cursor:default;transition:all .15s;margin-top:8px;">
+        ${normalizedType === 'oasis' ? `<div id="config-tag-drop-zone" style="border:2px dashed #d1d5db;border-radius:8px;padding:12px;text-align:center;font-size:11px;color:#9ca3af;cursor:default;transition:all .15s;margin-top:8px;">
             📦 拖入专家设置标签
         </div>` : ''}
     ` : '';
     
+    // Platform selector for external agents
+    const platformSection = normalizedType === 'external' ? `
+        <label style="font-size:11px;font-weight:600;color:#374151;">平台 (Platform)</label>
+        <select id="config-agent-platform" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;background:white;">
+            ${platformOptionsHtml}
+        </select>
+    ` : '';
+
     overlay.innerHTML = `
         <div class="orch-modal" style="width:min(560px, 92vw);max-width:92vw;max-height:min(88vh, 820px);overflow:auto;">
-            <h3>⚙️ ${type === 'external' ? '🌐 ' : ''}配置成员 — ${typeLabel}</h3>
+            <h3>⚙️ ${normalizedType === 'external' ? '🌐 ' : ''}配置成员 — ${typeLabel}</h3>
             <div style="display:flex;flex-direction:column;gap:8px;margin:10px 0;">
                 <label style="font-size:11px;font-weight:600;color:#374151;">类型</label>
                 <div id="config-agent-type" style="padding:6px 8px;background:#f3f4f6;border-radius:6px;font-size:12px;color:#374151;">${typeLabel}</div>
-                
+
+                ${platformSection}
+
                 <label style="font-size:11px;font-weight:600;color:#374151;">名称</label>
                 <input id="config-agent-name" type="text" placeholder="输入成员名称" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;">
-                
+
                 ${tagSection}
                 ${externalForm}
-                
+
                 <label style="font-size:11px;font-weight:600;color:#374151;">Global Name</label>
                 <input id="config-agent-global-name" type="text" value="${escapeHtml(globalName)}" disabled style="width:100%;max-width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;background:#f3f4f6;cursor:not-allowed;color:#9ca3af;box-sizing:border-box;">
             </div>
             <div class="orch-modal-btns">
                 <button id="config-cancel" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;cursor:pointer;font-size:12px;">取消</button>
-                <button id="config-save" style="padding:6px 14px;border-radius:6px;border:none;background:${type === 'external' ? '#10b981' : '#2563eb'};color:white;cursor:pointer;font-size:12px;">保存</button>
+                <button id="config-save" style="padding:6px 14px;border-radius:6px;border:none;background:${normalizedType === 'external' ? '#10b981' : '#2563eb'};color:white;cursor:pointer;font-size:12px;">保存</button>
             </div>
         </div>
     `;
@@ -12247,6 +12359,16 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
     
     // Set initial values
     document.getElementById('config-agent-name').value = name;
+    const configPlatformSelect = document.getElementById('config-agent-platform');
+    const configApiFields = document.getElementById('config-ext-api-fields');
+    function syncConfigExternalFields() {
+        if (!configApiFields || !configPlatformSelect) return;
+        configApiFields.style.display = shouldShowExternalApiFields(configPlatformSelect.value) ? 'block' : 'none';
+    }
+    if (configPlatformSelect) {
+        configPlatformSelect.addEventListener('change', syncConfigExternalFields);
+        syncConfigExternalFields();
+    }
     
     // Setup event handlers
     overlay.querySelector('#config-cancel').addEventListener('click', () => {
@@ -12275,12 +12397,13 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
         const newTag = tagInput ? tagInput.value.trim() : '';
 
         // Oasis Agent: save tag
-        if (type === 'oasis') {
+        if (normalizedType === 'oasis') {
             meta.tag = newTag;
         } else {
             // External Agent: save api_url, api_key, model, headers
+            const platformValue = document.getElementById('config-agent-platform')?.value || '';
             const extUrl = document.getElementById('config-ext-url').value.trim();
-            if (!extUrl) {
+            if (platformNeedsApiUrl(platformValue) && !extUrl) {
                 alert('API URL 不能为空');
                 return;
             }
@@ -12302,14 +12425,15 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
         }
         
         try {
-            const url = type === 'external'
+            const url = normalizedType === 'external'
                 ? `/teams/${encodeURIComponent(currentGroupId)}/members/external`
                 : `/internal_agents/${encodeURIComponent(globalName)}?team=${encodeURIComponent(currentGroupId)}`;
-            const body = type === 'external'
+            const body = normalizedType === 'external'
                 ? {
                     global_name: globalName,
                     new_name: newName,
                     new_tag: newTag,
+                    platform: document.getElementById('config-agent-platform')?.value || '',
                     api_url: meta.api_url,
                     api_key: meta.api_key,
                     model: meta.model,
@@ -12493,25 +12617,30 @@ function switchTeamTab(tab) {
     const btnMembers = document.getElementById('team-tab-members');
     const btnExperts = document.getElementById('team-tab-experts');
     const btnWorkflows = document.getElementById('team-tab-workflows');
+    const btnSettings = document.getElementById('team-tab-settings');
     const panelMembers = document.getElementById('team-panel-members');
     const panelExperts = document.getElementById('team-panel-experts');
     const panelWorkflows = document.getElementById('team-panel-workflows');
+    const panelSettings = document.getElementById('team-panel-settings');
     const actionsMembers = document.getElementById('team-tab-actions-members');
     const actionsExperts = document.getElementById('team-tab-actions-experts');
     const actionsWorkflows = document.getElementById('team-tab-actions-workflows');
+    const actionsSettings = document.getElementById('team-tab-actions-settings');
     if (!btnMembers || !btnExperts) return;
 
     // Reset all tabs to inactive
     const inactiveStyle = {background: '#f9fafb', color: '#374151', borderColor: '#d1d5db'};
-    [btnMembers, btnExperts, btnWorkflows].forEach(btn => {
+    [btnMembers, btnExperts, btnWorkflows, btnSettings].forEach(btn => {
         if (btn) { btn.style.background = inactiveStyle.background; btn.style.color = inactiveStyle.color; btn.style.borderColor = inactiveStyle.borderColor; }
     });
     if (panelMembers) panelMembers.style.display = 'none';
     if (panelExperts) panelExperts.style.display = 'none';
     if (panelWorkflows) panelWorkflows.style.display = 'none';
+    if (panelSettings) panelSettings.style.display = 'none';
     if (actionsMembers) actionsMembers.style.display = 'none';
     if (actionsExperts) actionsExperts.style.display = 'none';
     if (actionsWorkflows) actionsWorkflows.style.display = 'none';
+    if (actionsSettings) actionsSettings.style.display = 'none';
 
     if (tab === 'experts') {
         btnExperts.style.background = '#7c3aed'; btnExperts.style.color = 'white'; btnExperts.style.borderColor = '#7c3aed';
@@ -12523,6 +12652,11 @@ function switchTeamTab(tab) {
         if (panelWorkflows) panelWorkflows.style.display = '';
         if (actionsWorkflows) actionsWorkflows.style.display = '';
         loadTeamWorkflows();
+    } else if (tab === 'settings') {
+        if (btnSettings) { btnSettings.style.background = '#f59e0b'; btnSettings.style.color = 'white'; btnSettings.style.borderColor = '#f59e0b'; }
+        if (panelSettings) panelSettings.style.display = '';
+        if (actionsSettings) actionsSettings.style.display = '';
+        loadTeamSettings();
     } else {
         btnMembers.style.background = '#2563eb'; btnMembers.style.color = 'white'; btnMembers.style.borderColor = '#2563eb';
         if (panelMembers) panelMembers.style.display = '';
@@ -12567,6 +12701,78 @@ async function loadTeamExperts() {
     } catch (err) {
         console.error('Failed to load team experts:', err);
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-red-400 py-8">加载失败: ' + err.message + '</td></tr>';
+    }
+}
+
+// ── Load / Save Team Settings ──
+async function loadTeamSettings() {
+    if (!currentGroupId) return;
+    const fallbackAgentInput = document.getElementById('team-settings-fallback-agent');
+    const fallbackConfigInput = document.getElementById('team-settings-fallback-config');
+    const statusEl = document.getElementById('team-settings-status');
+    if (!fallbackAgentInput) return;
+
+    fallbackAgentInput.value = '';
+    fallbackConfigInput.value = '';
+    if (statusEl) statusEl.textContent = '加载中...';
+
+    try {
+        const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/settings`, { cache: 'no-store' });
+        if (!resp.ok) {
+            if (statusEl) statusEl.textContent = '加载失败';
+            return;
+        }
+        const data = await resp.json();
+        const settings = data.settings || {};
+        fallbackAgentInput.value = settings.fallback_agent || '';
+        fallbackConfigInput.value = settings.fallback_agent_config
+            ? JSON.stringify(settings.fallback_agent_config, null, 2)
+            : '';
+        if (statusEl) statusEl.textContent = '';
+    } catch (e) {
+        if (statusEl) statusEl.textContent = '加载失败: ' + e.message;
+    }
+}
+
+async function saveTeamSettings() {
+    if (!currentGroupId) return;
+    const fallbackAgentInput = document.getElementById('team-settings-fallback-agent');
+    const fallbackConfigInput = document.getElementById('team-settings-fallback-config');
+    const statusEl = document.getElementById('team-settings-status');
+    const saveBtn = document.getElementById('team-settings-save-btn');
+    if (!fallbackAgentInput || !fallbackConfigInput) return;
+
+    const fallback_agent = fallbackAgentInput.value.trim();
+    let fallback_agent_config = {};
+    const configStr = fallbackConfigInput.value.trim();
+    if (configStr) {
+        try {
+            fallback_agent_config = JSON.parse(configStr);
+        } catch (e) {
+            alert('Fallback Config JSON 格式错误: ' + e.message);
+            return;
+        }
+    }
+
+    if (statusEl) statusEl.textContent = '保存中...';
+    if (saveBtn) saveBtn.disabled = true;
+
+    try {
+        const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/settings`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fallback_agent, fallback_agent_config }),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error || '保存失败');
+        }
+        if (statusEl) statusEl.textContent = '✅ 保存成功';
+        setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+    } catch (e) {
+        if (statusEl) statusEl.textContent = '❌ 保存失败: ' + e.message;
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
     }
 }
 

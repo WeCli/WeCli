@@ -4779,6 +4779,73 @@ def update_external_member(team_name):
 
 
 # ------------------------------------------------------------------
+# Team-level settings (fallback_agent, etc.)
+# Stored in data/user_files/<user>/teams/<team>/team_settings.json
+# ------------------------------------------------------------------
+
+def _team_settings_path(user_id: str, team_name: str) -> str:
+    return os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name, "team_settings.json")
+
+
+def _team_settings_load(user_id: str, team_name: str) -> dict:
+    """Load team settings. Returns default empty dict if not found."""
+    path = _team_settings_path(user_id, team_name)
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f) or {}
+    except Exception:
+        return {}
+
+
+def _team_settings_save(user_id: str, team_name: str, settings: dict) -> None:
+    """Save team settings."""
+    team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name)
+    os.makedirs(team_dir, exist_ok=True)
+    path = _team_settings_path(user_id, team_name)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
+
+
+@app.route("/teams/<team_name>/settings", methods=["GET"])
+def get_team_settings(team_name):
+    """Get team-level settings including fallback_agent."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+    team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name)
+    if not os.path.exists(team_dir):
+        return jsonify({"error": "Team not found"}), 404
+    settings = _team_settings_load(user_id, team_name)
+    return jsonify({"ok": True, "settings": settings})
+
+
+@app.route("/teams/<team_name>/settings", methods=["PUT"])
+def update_team_settings(team_name):
+    """Update team-level settings (e.g., fallback_agent)."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+    team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name)
+    if not os.path.exists(team_dir):
+        return jsonify({"error": "Team not found"}), 404
+    body = request.get_json(force=True) or {}
+    settings = _team_settings_load(user_id, team_name)
+    # Only update provided fields
+    if "fallback_agent" in body:
+        settings["fallback_agent"] = str(body["fallback_agent"] or "").strip()
+    if "fallback_agent_config" in body:
+        settings["fallback_agent_config"] = body["fallback_agent_config"]
+    _team_settings_save(user_id, team_name, settings)
+    return jsonify({"ok": True, "settings": settings})
+
+
+# ------------------------------------------------------------------
 # User-level external_agents.json  (data/user_files/<user>/external_agents.json)
 # Same entry shape as team external_agents.json; used for non-team Ext + fast contacts.
 # ------------------------------------------------------------------
@@ -5227,7 +5294,8 @@ def preview_team_snapshot():
     """Preview what would be exported in a team snapshot.
     Returns a JSON summary of all exportable sections:
     agents (internal_agents), personas (oasis_experts),
-    skills (openclaw workspace/managed skills), cron jobs, workflows (yaml files).
+    skills (openclaw workspace/managed skills), cron jobs, workflows (yaml/python files),
+    and preset metadata files.
     """
     user_id = session.get("user_id", "")
 
@@ -5375,15 +5443,22 @@ def preview_team_snapshot():
                 cron_info[short_name] = {"count": 0}
     result["sections"]["cron"] = cron_info
 
-    # --- 6. workflows (yaml files) ---
-    yaml_files = []
+    # --- 6. workflows (yaml + python files) ---
+    workflow_files = []
     for root_path, dirs, files in os.walk(team_dir):
         for file in files:
-            if file.endswith(('.yaml', '.yml')):
+            if file.endswith(('.yaml', '.yml', '.py')):
                 file_path = os.path.join(root_path, file)
                 rel_path = os.path.relpath(file_path, team_dir)
-                yaml_files.append(rel_path)
-    result["sections"]["workflows"] = {"count": len(yaml_files), "items": yaml_files}
+                workflow_files.append(rel_path)
+    result["sections"]["workflows"] = {"count": len(workflow_files), "items": workflow_files}
+
+    # --- 7. preset metadata ---
+    preset_files = []
+    for filename in ("clawcross_preset_manifest.json", "clawcross_preset_source_map.json"):
+        if os.path.isfile(os.path.join(team_dir, filename)):
+            preset_files.append(filename)
+    result["sections"]["preset_metadata"] = {"count": len(preset_files), "items": preset_files}
 
     return jsonify(result)
 
@@ -5391,8 +5466,8 @@ def preview_team_snapshot():
 @app.route("/teams/snapshot/download", methods=["POST"])
 def download_team_snapshot():
     """Download a compressed snapshot of the team's data.
-    Includes: internal_agents.json, oasis_experts.json, 
-             external_agents.json, all .yaml files,
+    Includes: internal_agents.json, oasis_experts.json,
+             external_agents.json, preset metadata, all .yaml/.yml/.py workflow files,
              and skill folders (workspace + managed) for each openclaw agent.
     Note: session fields inside internal_agents.json are excluded (private).
     Supports selective export via 'include' field in request body.
@@ -5512,11 +5587,17 @@ def download_team_snapshot():
                     else:
                         zipf.write(file_path, json_file)
             
-            # Add all .yaml files (workflows)
+            # Add preset metadata files
+            for preset_file in ("clawcross_preset_manifest.json", "clawcross_preset_source_map.json"):
+                preset_path = os.path.join(team_dir, preset_file)
+                if os.path.isfile(preset_path):
+                    zipf.write(preset_path, preset_file)
+
+            # Add workflow files (.yaml/.yml/.py)
             if _inc("workflows"):
                 for root_path, dirs, files in os.walk(team_dir):
                     for file in files:
-                        if file.endswith(('.yaml', '.yml')):
+                        if file.endswith(('.yaml', '.yml', '.py')):
                             file_path = os.path.join(root_path, file)
                             # Use relative path inside zip
                             rel_path = os.path.relpath(file_path, team_dir)
@@ -5614,7 +5695,7 @@ def download_team_snapshot():
             zip_buffer.read(),
             mimetype='application/zip',
             headers={
-                'Content-Disposition': f'attachment; filename="{filename}"'
+                'Content-Disposition': build_attachment_content_disposition(filename)
             }
         )
     except Exception as e:
@@ -5672,9 +5753,9 @@ def upload_team_snapshot():
                 if filename.endswith('/') or filename.startswith('/'):
                     continue
                 # Allow files inside skills/ directory (any file type)
-                # For other files, only allow json and yaml
+                # For other files, allow team metadata plus workflow formats (json/yaml/python)
                 if not filename.startswith('skills/'):
-                    if not (filename.endswith(('.json', '.yaml', '.yml'))):
+                    if not (filename.endswith(('.json', '.yaml', '.yml', '.py'))):
                         return jsonify({"error": f"Invalid file type in zip: {filename}"}), 400
                 # Preserve relative directory structure from zip
                 target_path = os.path.join(team_dir, filename)
@@ -5730,13 +5811,18 @@ def upload_team_snapshot():
         # Save agents using _ia_save (writes unified internal_agents.json)
         if agents_data:
             _ia_save(user_id, agents_data, team)
-        
+
         # After internal agents, restore runtime identifiers in external_agents.json.
         openclaw_agents_path = os.path.join(team_dir, "external_agents.json")
         openclaw_restored = 0
         openclaw_errors = []
         openclaw_restore_details = []
-        
+
+        # Load team settings for fallback agent
+        team_settings = _team_settings_load(user_id, team)
+        fallback_agent = team_settings.get("fallback_agent", "")
+        fallback_agent_config = team_settings.get("fallback_agent_config", {})
+
         # Paths for extracted skill folders
         extracted_skills_dir = os.path.join(team_dir, "skills")
         managed_skills_src = os.path.join(extracted_skills_dir, "_managed")
@@ -5815,9 +5901,50 @@ def upload_team_snapshot():
                                                 shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
                                     skills_ms = round((time.perf_counter() - t_skills) * 1000, 2)
                             else:
-                                openclaw_errors.append(
-                                    f"{target_name}: {result.get('errors', result.get('error', 'failed'))}"
-                                )
+                                # Restore failed — try fallback agent if configured
+                                if fallback_agent and fallback_agent_config:
+                                    _logger_oc_restore.info(
+                                        "[clawcross-restore] route=snapshot_upload agent=%s restore failed, trying fallback=%s",
+                                        target_name,
+                                        fallback_agent,
+                                    )
+                                    try:
+                                        t_fb = time.perf_counter()
+                                        fb_r = requests.post(
+                                            f"{OASIS_BASE_URL}/sessions/openclaw/agent-restore",
+                                            json={
+                                                "agent_name": fallback_agent,
+                                                "display_name": display_oc_name,
+                                                "config": fallback_agent_config,
+                                                "workspace_files": {},
+                                            },
+                                            timeout=60,
+                                        )
+                                        fb_result = fb_r.json()
+                                        fb_ms = round((time.perf_counter() - t_fb) * 1000, 2)
+                                        if fb_result.get("ok"):
+                                            result = fb_result
+                                            result["fallback_used"] = True
+                                            openclaw_restored += 1
+                                            agent_entry["global_name"] = fallback_agent
+                                            agent_entry["_fallback"] = True
+                                            _logger_oc_restore.info(
+                                                "[clawcross-restore] route=snapshot_upload agent=%s fallback=ok agent=%s",
+                                                target_name,
+                                                fallback_agent,
+                                            )
+                                        else:
+                                            openclaw_errors.append(
+                                                f"{target_name}: {result.get('errors', result.get('error', 'failed'))} (fallback={fallback_agent} also failed)"
+                                            )
+                                    except Exception as fb_e:
+                                        openclaw_errors.append(
+                                            f"{target_name}: {result.get('errors', result.get('error', 'failed'))} (fallback exception: {fb_e})"
+                                        )
+                                else:
+                                    openclaw_errors.append(
+                                        f"{target_name}: {result.get('errors', result.get('error', 'failed'))}"
+                                    )
                             detail = {
                                 "agent": target_name,
                                 "ok": bool(result.get("ok")),

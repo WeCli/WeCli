@@ -223,14 +223,19 @@ async function orchDownloadSnapshot() {
             return;
         }
         const blob = await resp.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `team_${teamName}_snapshot.zip`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        if (!blob || !blob.size) {
+            throw new Error('empty snapshot zip');
+        }
+        const filename = (typeof getAttachmentFilename === 'function')
+            ? getAttachmentFilename(resp, `team_${teamName}_snapshot.zip`)
+            : `team_${teamName}_snapshot.zip`;
+        if (typeof triggerBlobDownload === 'function') {
+            triggerBlobDownload(blob, filename);
+        } else {
+            const url = window.URL.createObjectURL(blob);
+            window.open(url, '_blank', 'noopener');
+            setTimeout(() => window.URL.revokeObjectURL(url), 5000);
+        }
         orchToast(t('orch_toast_snapshot_downloaded') || 'Snapshot downloaded');
     } catch (e) {
         orchToast(t('orch_toast_network_error') || 'Network error');
