@@ -9966,11 +9966,6 @@ async function openGroup(teamName) {
         '<input id="team-settings-fallback-agent" type="text" placeholder="当 agent 恢复失败时的备用 agent 名称" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;">' +
         '<div style="font-size:11px;color:#6b7280;margin-top:4px;">设置后，当导入快照时 OpenClaw agent 恢复失败，会自动使用此 fallback agent</div>' +
         '</div>' +
-        '<div style="margin-bottom:16px;">' +
-        '<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Fallback Agent Config (JSON)</label>' +
-        '<textarea id="team-settings-fallback-config" rows="4" placeholder="{"model": "...", "api_key": "...", ...}" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:11px;font-family:monospace;box-sizing:border-box;resize:vertical;"></textarea>' +
-        '<div style="font-size:11px;color:#6b7280;margin-top:4px;">Fallback agent 的配置，恢复时会使用此配置创建 agent</div>' +
-        '</div>' +
         '<button id="team-settings-save-btn" onclick="saveTeamSettings()" style="padding:8px 16px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">保存设置</button>' +
         '<div id="team-settings-status" style="margin-top:8px;font-size:12px;"></div>' +
         '</div>' +
@@ -11485,10 +11480,17 @@ function showAddTeamMemberModal() {
                     <label style="font-size:11px;font-weight:600;color:#374151;">
                         Team内名称
                         <input id="add-oc-name" type="text" placeholder="work, research, coding"
-                               style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;"
-                               pattern="[a-zA-Z0-9_-]+" title="仅支持字母、数字、下划线、短横线">
+                               style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;margin-top:2px;">
                         <div style="font-size:10px;color:#6b7280;margin-top:3px;">
-                            🔗 Global Name 将自动生成为 <b>${escapeHtml(currentGroupId)}_&lt;名称&gt;</b>
+                            🔗 Global Name 将自动生成为安全 ID：<b id="add-oc-global-preview">加载中...</b>
+                        </div>
+                    </label>
+                    <label style="font-size:11px;font-weight:600;color:#374151;">标签 (Tag)
+                        <div style="display:flex;gap:4px;margin-top:2px;">
+                            <select id="add-oc-tag-select" onchange="document.getElementById('add-oc-tag-custom').value=this.value" style="flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;background:white;">
+                                <option value="">（无标签）</option>
+                            </select>
+                            <input id="add-oc-tag-custom" type="text" placeholder="或输入自定义 tag" style="flex:1;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;">
                         </div>
                     </label>
                     <label style="font-size:11px;font-weight:600;color:#374151;">
@@ -11525,6 +11527,7 @@ function showAddTeamMemberModal() {
     addExtOnPlatformChange();
     void populateAddExtPlatformOptions();
     void populateAddExtTagSelectOptions();
+    void populateAddOpenClawTagSelectOptions();
 
     // Load expert tags for Oasis Agent select options
     (async () => {
@@ -11588,6 +11591,7 @@ function showAddTeamMemberModal() {
     // ── OpenClaw Agent Form Setup ──
     const ocNameInp = document.getElementById('add-oc-name');
     const ocWsInp = document.getElementById('add-oc-workspace');
+    const ocGlobalPreview = document.getElementById('add-oc-global-preview');
     let ocParentDir = '';
     let ocWsManualEdit = false;
 
@@ -11607,16 +11611,36 @@ function showAddTeamMemberModal() {
     }).catch(() => { ocWsInp.placeholder = '请输入工作空间路径'; });
 
     // Derive workspace-friendly agent name (includes team prefix)
+    function _ocSafeSlugPart(raw) {
+        const source = String(raw || '').trim();
+        if (!source) return '';
+        const parts = Array.from(source).map((ch) => {
+            if (/[a-zA-Z0-9_-]/.test(ch)) return ch;
+            return 'u' + ch.codePointAt(0).toString(16);
+        });
+        return parts.join('_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+    }
+
+    function _ocGlobalName() {
+        const n = ocNameInp.value.trim();
+        if (!n) return '';
+        const safeTeam = _ocSafeSlugPart(currentGroupId || 'team');
+        const safeName = _ocSafeSlugPart(n);
+        if (!safeName) return '';
+        return safeTeam ? `${safeTeam}_${safeName}` : safeName;
+    }
+
     function _ocWsAgentName() {
         const n = ocNameInp.value.trim();
         if (!n) return '';
         return currentGroupId ? (currentGroupId + '_' + n) : n;
     }
 
-    // Name changes → auto-update workspace (unless user has manually edited it)
-    ocNameInp.addEventListener('input', () => {
-        ocNameInp.style.borderColor = '#d1d5db';
-        ocNameInp.style.background = '';
+    function _ocSyncDerivedFields() {
+        const globalName = _ocGlobalName();
+        if (ocGlobalPreview) {
+            ocGlobalPreview.textContent = globalName || '(等待输入名称)';
+        }
         if (!ocWsManualEdit) {
             const wn = _ocWsAgentName();
             if (wn) {
@@ -11625,6 +11649,13 @@ function showAddTeamMemberModal() {
                 ocWsInp.value = '';
             }
         }
+    }
+
+    // Name changes → auto-update workspace (unless user has manually edited it)
+    ocNameInp.addEventListener('input', () => {
+        ocNameInp.style.borderColor = '#d1d5db';
+        ocNameInp.style.background = '';
+        _ocSyncDerivedFields();
     });
 
     // Track manual workspace edits
@@ -11633,8 +11664,7 @@ function showAddTeamMemberModal() {
     // Reset button: revert workspace to auto-derived value
     overlay.querySelector('#add-oc-ws-reset').addEventListener('click', () => {
         ocWsManualEdit = false;
-        const wn = _ocWsAgentName();
-        ocWsInp.value = wn ? ((ocParentDir || '') + '/workspace-' + wn) : '';
+        _ocSyncDerivedFields();
         ocWsInp.style.borderColor = '#d1d5db';
     });
 
@@ -11646,6 +11676,12 @@ function showAddTeamMemberModal() {
             // Store selected expert content on the button for later access
             overlay.querySelector('#add-oc-pick-expert')._selectedExpertContent = content;
             overlay.querySelector('#add-oc-pick-expert')._selectedExpertTag = expert.tag || '';
+            const ocTagCustom = document.getElementById('add-oc-tag-custom');
+            const ocTagSelect = document.getElementById('add-oc-tag-select');
+            if (expert.tag && ocTagCustom && !ocTagCustom.value.trim()) {
+                ocTagCustom.value = expert.tag;
+                if (ocTagSelect) ocTagSelect.value = expert.tag;
+            }
             
             ocExpertPreview.style.display = 'block';
             ocExpertPreview.innerHTML = '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:16px;">' + (expert.emoji || '⭐') + '</span><span style="font-weight:600;">' + escapeHtml(expert.name) + '</span><button id="add-oc-clear-expert" type="button" style="margin-left:auto;padding:1px 6px;border:1px solid #d1d5db;border-radius:4px;background:#f9fafb;cursor:pointer;font-size:10px;color:#6b7280;">✕</button></div>'
@@ -11667,6 +11703,8 @@ function showAddTeamMemberModal() {
             overlay.remove();
         }
     });
+
+    _ocSyncDerivedFields();
 }
 
 let addOasisTagOptions = [];
@@ -11932,6 +11970,37 @@ async function addExternalMember(event) {
             }
         }
     }
+}
+
+async function populateAddOpenClawTagSelectOptions() {
+    const sel = document.getElementById('add-oc-tag-select');
+    if (!sel) return;
+    let experts = [];
+    try {
+        const teamExpertsUrl = currentGroupId
+            ? `/proxy_visual/experts?team=${encodeURIComponent(currentGroupId)}`
+            : '/proxy_visual/experts';
+        const r = await fetch(teamExpertsUrl);
+        experts = await r.json();
+    } catch (e) {
+        /* ignore */
+    }
+    const seen = new Set();
+    sel.innerHTML = '';
+    const addOpt = (v, text = v) => {
+        if (seen.has(v)) return;
+        seen.add(v);
+        const o = document.createElement('option');
+        o.value = v;
+        o.textContent = text;
+        sel.appendChild(o);
+    };
+    addOpt('', '（无标签）');
+    for (const exp of (Array.isArray(experts) ? experts : [])) {
+        const tag = String((exp && exp.tag) || '').trim();
+        if (tag) addOpt(tag, tag);
+    }
+    addOpt('custom', '自定义');
 }
 
 async function deleteGroup(groupId) {    if (!confirm(t('group_delete_confirm'))) return;
@@ -12708,12 +12777,10 @@ async function loadTeamExperts() {
 async function loadTeamSettings() {
     if (!currentGroupId) return;
     const fallbackAgentInput = document.getElementById('team-settings-fallback-agent');
-    const fallbackConfigInput = document.getElementById('team-settings-fallback-config');
     const statusEl = document.getElementById('team-settings-status');
     if (!fallbackAgentInput) return;
 
     fallbackAgentInput.value = '';
-    fallbackConfigInput.value = '';
     if (statusEl) statusEl.textContent = '加载中...';
 
     try {
@@ -12725,9 +12792,6 @@ async function loadTeamSettings() {
         const data = await resp.json();
         const settings = data.settings || {};
         fallbackAgentInput.value = settings.fallback_agent || '';
-        fallbackConfigInput.value = settings.fallback_agent_config
-            ? JSON.stringify(settings.fallback_agent_config, null, 2)
-            : '';
         if (statusEl) statusEl.textContent = '';
     } catch (e) {
         if (statusEl) statusEl.textContent = '加载失败: ' + e.message;
@@ -12737,22 +12801,11 @@ async function loadTeamSettings() {
 async function saveTeamSettings() {
     if (!currentGroupId) return;
     const fallbackAgentInput = document.getElementById('team-settings-fallback-agent');
-    const fallbackConfigInput = document.getElementById('team-settings-fallback-config');
     const statusEl = document.getElementById('team-settings-status');
     const saveBtn = document.getElementById('team-settings-save-btn');
-    if (!fallbackAgentInput || !fallbackConfigInput) return;
+    if (!fallbackAgentInput) return;
 
     const fallback_agent = fallbackAgentInput.value.trim();
-    let fallback_agent_config = {};
-    const configStr = fallbackConfigInput.value.trim();
-    if (configStr) {
-        try {
-            fallback_agent_config = JSON.parse(configStr);
-        } catch (e) {
-            alert('Fallback Config JSON 格式错误: ' + e.message);
-            return;
-        }
-    }
 
     if (statusEl) statusEl.textContent = '保存中...';
     if (saveBtn) saveBtn.disabled = true;
@@ -12761,7 +12814,7 @@ async function saveTeamSettings() {
         const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/settings`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fallback_agent, fallback_agent_config }),
+            body: JSON.stringify({ fallback_agent }),
         });
         if (!resp.ok) {
             const err = await resp.json();
@@ -13022,23 +13075,19 @@ async function addOpenClawMember() {
 
     const ocNameInp = document.getElementById('add-oc-name');
     const ocWsInp = document.getElementById('add-oc-workspace');
+    const ocTagCustom = document.getElementById('add-oc-tag-custom');
+    const ocTagSelect = document.getElementById('add-oc-tag-select');
     
     const shortName = ocNameInp.value.trim();
     const workspace = ocWsInp.value.trim();
+    const selectedTag = (ocTagCustom && ocTagCustom.value.trim())
+        || ((ocTagSelect && ocTagSelect.value !== 'custom') ? ocTagSelect.value : '');
     
     if (!shortName) {
         if (typeof orchToast === 'function') {
             orchToast('请输入Agent名称');
         } else {
             alert('请输入Agent名称');
-        }
-        return;
-    }
-    if (!/^[a-zA-Z0-9_-]+$/.test(shortName)) {
-        if (typeof orchToast === 'function') {
-            orchToast('名称只能包含字母、数字、下划线、短横线');
-        } else {
-            alert('名称只能包含字母、数字、下划线、短横线');
         }
         return;
     }
@@ -13052,7 +13101,29 @@ async function addOpenClawMember() {
     }
 
     // Auto-generate global name: team + "_" + shortName
-    const globalName = currentGroupId + '_' + shortName;
+    const safeTeam = String(currentGroupId || 'team')
+        .trim()
+        .split('')
+        .map((ch) => /[a-zA-Z0-9_-]/.test(ch) ? ch : 'u' + ch.codePointAt(0).toString(16))
+        .join('_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    const safeShortName = String(shortName)
+        .trim()
+        .split('')
+        .map((ch) => /[a-zA-Z0-9_-]/.test(ch) ? ch : 'u' + ch.codePointAt(0).toString(16))
+        .join('_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    const globalName = (safeTeam ? `${safeTeam}_` : '') + safeShortName;
+    if (!safeShortName) {
+        if (typeof orchToast === 'function') {
+            orchToast('名称不能为空');
+        } else {
+            alert('名称不能为空');
+        }
+        return;
+    }
 
     const btn = overlay.querySelector('#form-openclaw button[onclick="addOpenClawMember()"]');
     btn.disabled = true;
@@ -13095,7 +13166,7 @@ async function addOpenClawMember() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: shortName,
-                        tag: selectedExpertTag,
+                        tag: selectedTag || selectedExpertTag,
                         platform: 'openclaw',
                         global_name: globalName
                     })

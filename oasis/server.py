@@ -87,6 +87,7 @@ from oasis.models import (
     HumanWaitInfo,
     ManualConclusionRequest,
     ManualPostRequest,
+    ManualVoteRequest,
     TopicDetail,
     TopicSummary,
     PostInfo,
@@ -498,6 +499,34 @@ async def add_manual_post(topic_id: str, req: ManualPostRequest):
         timestamp=post.timestamp,
         elapsed=post.elapsed,
     )
+
+
+@app.post("/topics/{topic_id}/vote", response_model=dict)
+async def add_manual_vote(topic_id: str, req: ManualVoteRequest):
+    """Vote on an existing topic post."""
+    forum = _get_forum_or_404(topic_id)
+    _check_owner(forum, req.user_id)
+
+    if forum.status != "discussing":
+        raise HTTPException(409, "Only active topics accept votes")
+
+    voter = (req.voter or req.user_id or "workflowpy").strip() or "workflowpy"
+    await forum.vote(voter[:80], req.post_id, req.direction)
+    forum.save()
+
+    posts = await forum.browse()
+    post = next((p for p in posts if p.id == req.post_id), None)
+    if not post:
+        raise HTTPException(404, "Post not found")
+
+    return {
+        "topic_id": topic_id,
+        "post_id": post.id,
+        "voter": voter[:80],
+        "direction": req.direction,
+        "upvotes": post.upvotes,
+        "downvotes": post.downvotes,
+    }
 
 
 @app.post("/topics/{topic_id}/conclude", response_model=dict)

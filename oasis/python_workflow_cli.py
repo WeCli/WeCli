@@ -14,10 +14,25 @@ if _SRC_DIR not in sys.path:
 
 from integrations.agent_sender import SendToAgentResult
 from oasis.agent_center import AgentCenter
-from oasis.forum_client import conclude_topic, create_empty_topic, publish_to_topic
+from oasis.forum_client import conclude_topic, create_empty_topic, publish_to_topic, vote_topic_post
 
 _TOPIC_POST_MAX_LEN = 8000
 _TOPIC_POST_TRUNCATE_SUFFIX = "\n\n...[truncated by workflow runtime]"
+
+
+def _parse_oasis_publish_payload(content: str) -> dict[str, Any] | None:
+    raw = str(content or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    if parsed.get("clawcross_type") != "oasis reply":
+        return None
+    return parsed
 
 
 class StandaloneWorkflowContext:
@@ -46,6 +61,60 @@ class StandaloneWorkflowContext:
         return self._agent_center.get_persona(target)
 
     async def publish(self, content: str, *, author: str = "workflowpy", reply_to: int | None = None) -> None:
+        parsed = _parse_oasis_publish_payload(content)
+        if parsed and self.topic_id:
+            parsed_content = str(parsed.get("content") or "")
+            parsed_reply_to = parsed.get("reply_to")
+            if parsed_reply_to is None:
+                parsed_reply_to = reply_to
+            try:
+                parsed_reply_to = int(parsed_reply_to) if parsed_reply_to is not None else None
+            except Exception:
+                parsed_reply_to = None
+
+            entry = {
+                "author": author,
+                "content": parsed_content,
+                "reply_to": parsed_reply_to,
+                "votes": parsed.get("votes", []),
+                "clawcross_type": "oasis reply",
+            }
+            self.published_messages.append(entry)
+            print(f"[workflow:{author}] {parsed_content}", flush=True)
+
+            mirror_content = parsed_content
+            if len(mirror_content) > _TOPIC_POST_MAX_LEN:
+                limit = _TOPIC_POST_MAX_LEN - len(_TOPIC_POST_TRUNCATE_SUFFIX)
+                mirror_content = mirror_content[: max(0, limit)] + _TOPIC_POST_TRUNCATE_SUFFIX
+
+            await publish_to_topic(
+                topic_id=self.topic_id,
+                user_id=self.user_id,
+                author=author,
+                content=mirror_content,
+                reply_to=parsed_reply_to,
+            )
+
+            for vote in (parsed.get("votes") or []):
+                if not isinstance(vote, dict):
+                    continue
+                target_post_id = vote.get("post_id")
+                direction = str(vote.get("direction") or "").strip().lower()
+                try:
+                    target_post_id = int(target_post_id)
+                except Exception:
+                    continue
+                if direction not in ("up", "down"):
+                    continue
+                await vote_topic_post(
+                    topic_id=self.topic_id,
+                    user_id=self.user_id,
+                    post_id=target_post_id,
+                    direction=direction,
+                    voter=author,
+                )
+            return
+
         entry = {"author": author, "content": content, "reply_to": reply_to}
         self.published_messages.append(entry)
         print(f"[workflow:{author}] {content}", flush=True)

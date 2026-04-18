@@ -61,6 +61,14 @@ class ManualPostRequest(BaseModel):
     reply_to: Optional[int] = None        # 回复目标帖子ID
 
 
+class ManualVoteRequest(BaseModel):
+    """向现有 topic 帖子投票。"""
+    user_id: str = "anonymous"
+    voter: Optional[str] = None
+    post_id: int = Field(ge=1)
+    direction: str = Field(pattern="^(up|down)$")
+
+
 class ManualConclusionRequest(BaseModel):
     """手动结束一个纯人工或外部脚本驱动的话题。"""
     user_id: str = "anonymous"
