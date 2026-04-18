@@ -6575,6 +6575,7 @@ async function handleSend() {
         mode: w.mode || 'yaml',
         displayName: w.displayName,
         content: w.content || '',
+        path: w.path || '',
     }));
     const workflowNames = pendingWorkflows.map(w => `${(w.mode || 'yaml').toUpperCase()} ${w.displayName}`);
 
@@ -6617,11 +6618,13 @@ async function handleSend() {
                 workflowPrefix += `【python workflow, use it now】\n` +
                     `Team Name: ${wf.team || '(non-team)'}\n` +
                     `Python Name: ${wf.name}\n` +
+                    `Absolute Path: ${wf.path || '(unknown)'}\n` +
                     (wf.content ? `---\n${wf.content}\n---\n` : '');
             } else {
                 workflowPrefix += `【oasis workflow, use it now】\n` +
                     `Team Name: ${wf.team || '(non-team)'}\n` +
                     `YAML Name: ${wf.name}\n` +
+                    `Absolute Path: ${wf.path || '(unknown)'}\n` +
                     (wf.content ? `---\n${wf.content}\n---\n` : '');
             }
         }
@@ -7068,6 +7071,7 @@ async function addWorkflowToContext(name, team, mode = 'yaml', target = 'chat') 
     if (cfg.list.some(w => w.displayName === displayName && (w.mode || 'yaml') === mode)) return;
 
     let contentText = '';
+    let workflowPath = '';
     try {
         const teamQ = team ? `?team=${encodeURIComponent(team)}` : '';
         if (mode === 'python') {
@@ -7075,16 +7079,18 @@ async function addWorkflowToContext(name, team, mode = 'yaml', target = 'chat') 
             const r = await fetch(`/proxy_visual/load-layout/${encodeURIComponent(name)}${modeQ}`);
             const data = await r.json();
             contentText = data.content || '';
+            workflowPath = data.path || '';
         } else {
             const r = await fetch(`/proxy_visual/load-yaml-raw/${encodeURIComponent(name)}${teamQ}`);
             const data = await r.json();
             contentText = data.yaml || '';
+            workflowPath = data.path || '';
         }
     } catch(e) {
         console.warn('Failed to load workflow content:', e);
     }
 
-    cfg.list.push({ name, team, mode, displayName, content: contentText });
+    cfg.list.push({ name, team, mode, displayName, content: contentText, path: workflowPath });
     renderWorkflowPreviews(target);
     const input = document.getElementById(cfg.inputId);
     if (input && typeof input.focus === 'function') input.focus();
@@ -9403,6 +9409,7 @@ async function submitOasisTopicPost() {
         mode: w.mode || 'yaml',
         displayName: w.displayName,
         content: w.content || '',
+        path: w.path || '',
     }));
     if (!baseContent && workflowsToSend.length === 0) {
         input.focus();
@@ -9412,12 +9419,16 @@ async function submitOasisTopicPost() {
     for (const wf of workflowsToSend) {
         if ((wf.mode || 'yaml') === 'python') {
             workflowPrefix += `【python workflow, use it now】\n`
-                + `${wf.displayName || wf.name}\n`
-                + `${wf.content || ''}\n\n`;
+                + `Team Name: ${wf.team || '(non-team)'}\n`
+                + `Python Name: ${wf.name}\n`
+                + `Absolute Path: ${wf.path || '(unknown)'}\n`
+                + (wf.content ? `---\n${wf.content}\n---\n\n` : '\n');
         } else {
             workflowPrefix += `【oasis workflow, use it now】\n`
-                + `${wf.displayName || wf.name}\n`
-                + `${wf.content || ''}\n\n`;
+                + `Team Name: ${wf.team || '(non-team)'}\n`
+                + `YAML Name: ${wf.name}\n`
+                + `Absolute Path: ${wf.path || '(unknown)'}\n`
+                + (wf.content ? `---\n${wf.content}\n---\n\n` : '\n');
         }
     }
     const content = workflowPrefix + baseContent;
@@ -12221,23 +12232,30 @@ function orchDefaultPythonScaffold() {
     const teamName = (typeof orch !== 'undefined' && orch && orch.teamName) ? orch.teamName : '';
     const teamHint = teamName || '<team-or-empty>';
     return `import asyncio
-from pathlib import Path
+import os
 import sys
 
-# Make the project root importable even when this file lives under data/user_files/.../oasis/python/
-_HERE = Path(__file__).resolve()
-for _parent in [_HERE.parent, *_HERE.parents]:
-    if (_parent / "oasis").is_dir() and (_parent / "src").is_dir():
-        if str(_parent) not in sys.path:
-            sys.path.insert(0, str(_parent))
-        break
-
-from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli
+try:
+    from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli
+except ModuleNotFoundError:
+    extra_paths = [
+        p for p in os.environ.get("CLAWCROSS_PYTHONPATH", "").split(os.pathsep) if p
+    ]
+    project_root = os.environ.get("CLAWCROSS_PROJECT_ROOT", "").strip()
+    if project_root:
+        extra_paths.append(project_root)
+    for path_entry in extra_paths:
+        if path_entry and path_entry not in sys.path:
+            sys.path.insert(0, path_entry)
+    from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli
 
 
 async def main(ctx: StandaloneWorkflowContext):
     # This script can be launched directly:
     #   python my_workflow.py --question "Do the work" --user-id xinyuan --team "${teamHint}"
+    # If oasis imports already work, no path bootstrap is needed.
+    # If they do not, you can use PYTHONPATH, custom sys.path logic,
+    # CLAWCROSS_PYTHONPATH / CLAWCROSS_PROJECT_ROOT, or any wrapper you prefer.
     #
     # By default, the runtime auto-creates one OASIS topic before main(ctx) starts.
     #   ctx.topic_id is usually already available

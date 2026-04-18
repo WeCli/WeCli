@@ -61,6 +61,10 @@ from services.team_preset_assets import install_team_preset, list_team_presets
 current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.dirname(current_dir)
 load_dotenv(dotenv_path=os.path.join(root_dir, "config", ".env"))
+WORKFLOW_PYTHON = os.path.join(root_dir, ".venv", "bin", "python")
+if not os.path.isfile(WORKFLOW_PYTHON):
+    WORKFLOW_PYTHON = _sys.executable
+WORKFLOW_IMPORT_PATHS = os.pathsep.join([root_dir, os.path.join(root_dir, "src")])
 
 app = Flask(__name__,
             template_folder=os.path.join(root_dir, 'frontend', 'templates'),
@@ -3478,7 +3482,7 @@ def _spawn_standalone_python_workflow(
     log_path = os.path.join(runs_dir, f"{run_id}.log")
     result_path = os.path.join(runs_dir, f"{run_id}.json")
     cmd = [
-        _sys.executable,
+        WORKFLOW_PYTHON,
         python_file,
         "--user-id",
         user_id or "default",
@@ -3494,6 +3498,11 @@ def _spawn_standalone_python_workflow(
     proc = subprocess.Popen(
         cmd,
         cwd=root_dir,
+        env={
+            **os.environ,
+            "CLAWCROSS_PROJECT_ROOT": root_dir,
+            "CLAWCROSS_PYTHONPATH": WORKFLOW_IMPORT_PATHS,
+        },
         stdout=log_file,
         stderr=subprocess.STDOUT,
         start_new_session=True,
@@ -3505,6 +3514,7 @@ def _spawn_standalone_python_workflow(
         "log_file": log_path,
         "result_file": result_path,
         "python_file": python_file,
+        "python_executable": WORKFLOW_PYTHON,
     }
 
 
@@ -3635,7 +3645,7 @@ def proxy_visual_agent_generate_yaml():
                 "The script must run as:\n"
                 "python my_workflow.py --question '...' --user-id '...' --team '...'\n"
                 "Required structure:\n"
-                "- bootstrap sys.path by searching upward for the project root that contains both oasis/ and src/; do not search for oasis/python/\n"
+                "- import StandaloneWorkflowContext and run_cli from oasis.python_workflow_cli\n"
                 "- from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli\n"
                 "- define async def main(ctx: StandaloneWorkflowContext)\n"
                 "- end with: if __name__ == '__main__': raise SystemExit(run_cli(main))\n"
@@ -3648,6 +3658,9 @@ def proxy_visual_agent_generate_yaml():
                 "Rules:\n"
                 "- Use async/await.\n"
                 "- Keep the script directly executable with plain Python.\n"
+                "- If oasis.python_workflow_cli is already importable, do not add any bootstrap path logic.\n"
+                "- If imports do not work yet, you may use any import bootstrap you want: set PYTHONPATH, append custom sys.path entries, use a wrapper, or read CLAWCROSS_PYTHONPATH / CLAWCROSS_PROJECT_ROOT from the environment.\n"
+                "- Do not assume that searching upward for a repository root is required, or that the workflow file lives inside the repo tree.\n"
                 "- Import extra modules only when needed.\n"
                 "- By default the runtime auto-creates an OASIS topic before main(ctx) starts, so ctx.topic_id is usually already set.\n"
                 "- ctx.publish(...) writes local logs and also mirrors the message into the auto-created topic when one exists.\n"
@@ -3942,7 +3955,7 @@ def proxy_visual_load_yaml_raw(name):
     if not os.path.isfile(fpath):
         return jsonify({"error": "Not found"}), 404
     with open(fpath, "r", encoding="utf-8") as f:
-        return jsonify({"yaml": f.read()})
+        return jsonify({"yaml": f.read(), "path": fpath, "name": safe, "mode": "yaml"})
 
 
 @app.route("/proxy_visual/delete-layout/<name>", methods=["DELETE"])

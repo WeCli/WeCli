@@ -8,9 +8,14 @@ import sys
 import uuid
 from typing import Any, Awaitable, Callable
 
+from dotenv import load_dotenv
+
 _SRC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "src")
 if _SRC_DIR not in sys.path:
     sys.path.insert(0, _SRC_DIR)
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
+load_dotenv(dotenv_path=os.path.join(_PROJECT_ROOT, "config", ".env"))
 
 from integrations.agent_sender import SendToAgentResult
 from oasis.agent_center import AgentCenter

@@ -18,7 +18,7 @@ written as **self-bootstrapped scripts**, not the old injected top-level style.
 
 A Python workflow is just a `.py` file that:
 
-1. bootstraps the project root into `sys.path`
+1. makes `oasis.python_workflow_cli` importable
 2. imports `StandaloneWorkflowContext` and `run_cli`
 3. defines `async def main(ctx)`
 4. ends with `raise SystemExit(run_cli(main))`
@@ -33,17 +33,22 @@ That means the same file can be started from:
 Example:
 
 ```python
-from pathlib import Path
+import os
 import sys
 
-_HERE = Path(__file__).resolve()
-for _parent in [_HERE.parent, *_HERE.parents]:
-    if (_parent / "oasis").is_dir() and (_parent / "src").is_dir():
-        if str(_parent) not in sys.path:
-            sys.path.insert(0, str(_parent))
-        break
-
-from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli
+try:
+    from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli
+except ModuleNotFoundError:
+    extra_paths = [
+        p for p in os.environ.get("CLAWCROSS_PYTHONPATH", "").split(os.pathsep) if p
+    ]
+    project_root = os.environ.get("CLAWCROSS_PROJECT_ROOT", "").strip()
+    if project_root:
+        extra_paths.append(project_root)
+    for path_entry in extra_paths:
+        if path_entry and path_entry not in sys.path:
+            sys.path.insert(0, path_entry)
+    from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli
 
 
 async def main(ctx: StandaloneWorkflowContext):
@@ -56,6 +61,18 @@ async def main(ctx: StandaloneWorkflowContext):
 if __name__ == "__main__":
     raise SystemExit(run_cli(main))
 ```
+
+If `oasis.python_workflow_cli` is already importable, do not add any bootstrap code.
+If it is not importable yet, any import strategy is acceptable:
+
+- set `PYTHONPATH`
+- append your own custom `sys.path`
+- use a wrapper script
+- set `CLAWCROSS_PYTHONPATH`
+- set `CLAWCROSS_PROJECT_ROOT`
+- install the project in editable mode
+
+The workflow file does not need to live under the repository tree.
 
 ---
 
