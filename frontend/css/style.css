@@ -259,9 +259,23 @@ header {
 .tool-toggle-btn:hover { color: #2563eb; }
 .tool-toggle-icon { display: inline-block; transition: transform 0.3s ease; }
 .tool-toggle-icon.open { transform: rotate(180deg); }
-.add-oasis-tools-container { align-items: flex-start; }
+.add-oasis-tools-container,
+.agent-meta-tools-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    align-items: start;
+    align-content: start;
+    gap: 6px;
+}
+.add-oasis-tools-actions,
+.agent-meta-tools-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
 .add-oasis-tool-chip {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 4px;
     padding: 3px 6px;
@@ -272,7 +286,8 @@ header {
     color: #374151;
     font-size: 10px;
     line-height: 1.2;
-    white-space: nowrap;
+    min-width: 0;
+    white-space: normal;
 }
 .add-oasis-tool-chip .add-oasis-tool-cb {
     margin: 0;
@@ -280,7 +295,33 @@ header {
 }
 .add-oasis-tool-name {
     display: inline-block;
+    min-width: 0;
     line-height: 1.2;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+.agent-meta-tool-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    min-height: 34px;
+    padding: 6px 8px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #f9fafb;
+    color: #374151;
+    font-size: 11px;
+    line-height: 1.25;
+}
+.agent-meta-tool-chip .agent-meta-tool-cb {
+    flex: 0 0 auto;
+}
+.agent-meta-tool-name {
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 .add-oasis-tag-list {
     display: flex;
@@ -630,6 +671,7 @@ header {
 .oasis-btn-cancel:hover { background: #fef3c7; }
 .oasis-btn-delete:hover { background: #fee2e2; }
 .oasis-detail-action-btn { font-size: 9px; padding: 7px 9px; border-radius: 8px; cursor: pointer; }
+.oasis-detail-action-btn.workflow { color: #60a5fa; border-color: rgba(96,165,250,0.45); cursor: default; }
 .oasis-detail-action-btn.cancel { color: var(--oasis-pixel-gold); border-color: rgba(255,163,0,0.55); }
 .oasis-detail-action-btn.delete { color: #ff7790; border-color: rgba(255,0,77,0.45); }
 .oasis-detail-action-btn.overview { color: var(--oasis-pixel-blue); border-color: rgba(41,173,255,0.55); font-weight: 600; }
@@ -962,6 +1004,36 @@ header {
     color: #9f96a8;
     cursor: not-allowed;
 }
+.oasis-workflow-preview-area {
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+}
+.oasis-town-composer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 12px;
+}
+.oasis-town-workflow-btn {
+    flex-shrink: 0;
+    border: 2px solid #c4b5fd;
+    border-radius: 10px;
+    padding: 9px 12px;
+    background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+    color: #6d28d9;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+    box-shadow: 0 2px 0 rgba(109,40,217,0.18);
+}
+.oasis-town-workflow-btn:hover:not(:disabled) {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+}
 .oasis-town-submit-btn {
     flex-shrink: 0;
     border: 3px solid var(--oasis-pixel-border);
@@ -983,6 +1055,19 @@ header {
     opacity: 0.58;
     cursor: not-allowed;
     box-shadow: none;
+}
+@media (max-width: 768px) {
+    .oasis-town-composer-actions {
+        gap: 8px;
+    }
+    .oasis-town-workflow-btn,
+    .oasis-town-submit-btn {
+        min-height: 38px;
+        padding: 8px 10px;
+    }
+    .oasis-town-workflow-btn {
+        font-size: 11px;
+    }
 }
 .oasis-discussion-box {
     height: calc(100vh - 420px);
@@ -2758,6 +2843,7 @@ header {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    position: relative;
     background:
         radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 34%),
         linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
@@ -3007,6 +3093,12 @@ header {
     .orch-right-panel.mobile-open {
         transform: translateX(0);
         box-shadow: -4px 0 24px rgba(0,0,0,0.18);
+    }
+    .orch-python-canvas-head {
+        padding-top: 48px;
+    }
+    .orch-python-editor-canvas {
+        margin-top: 8px;
     }
     /* backdrop */
     .orch-mobile-backdrop {
@@ -3638,15 +3730,19 @@ body.session-panel-resizing * {
     #message-input, #message-input::placeholder { font-size: 16px !important; }
     .tool-tag { font-size: 14px !important; padding: 6px 12px !important; }
     .add-oasis-tools-actions { flex-wrap: wrap; gap: 6px !important; }
-    .add-oasis-tools-container { gap: 6px !important; padding: 8px !important; }
-    .add-oasis-tool-chip {
-        width: calc(50% - 3px);
+    .add-oasis-tools-container,
+    .agent-meta-tools-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px !important;
+        padding: 8px !important;
+    }
+    .add-oasis-tool-chip,
+    .agent-meta-tool-chip {
         min-height: 34px;
         padding: 6px 8px;
         border-radius: 8px;
         font-size: 12px;
         line-height: 1.25;
-        white-space: normal;
         box-sizing: border-box;
     }
     .add-oasis-tool-chip .add-oasis-tool-cb {
@@ -3654,7 +3750,13 @@ body.session-panel-resizing * {
         height: 14px;
         margin-top: 1px;
     }
-    .add-oasis-tool-name {
+    .agent-meta-tool-chip .agent-meta-tool-cb {
+        width: 14px;
+        height: 14px;
+        margin-top: 1px;
+    }
+    .add-oasis-tool-name,
+    .agent-meta-tool-name {
         min-width: 0;
         word-break: break-word;
         overflow-wrap: anywhere;

@@ -3868,7 +3868,10 @@ def proxy_visual_load_layouts():
 
 @app.route("/proxy_visual/run-python-workflow", methods=["POST"])
 def proxy_visual_run_python_workflow():
-    """Run a saved python workflow in standalone mode without auto-creating an OASIS topic."""
+    """Run a saved python workflow through the standalone runner used by current frontends.
+
+    The script itself decides whether to auto-create and conclude an OASIS topic.
+    """
     user_id = session.get("user_id", "")
     data = request.get_json(silent=True) or {}
     python_file = str(data.get("python_file") or "").strip()
@@ -3907,7 +3910,7 @@ def proxy_visual_load_layout(name):
         if not os.path.isfile(fpath):
             return jsonify({"error": "Not found"}), 404
         with open(fpath, "r", encoding="utf-8") as f:
-            return jsonify({"name": safe, "mode": mode, "content": f.read()})
+            return jsonify({"name": safe, "mode": mode, "content": f.read(), "path": fpath})
 
     if not _vis_yaml_to_layout:
         return jsonify({"error": "YAML-to-layout converter unavailable"}), 500

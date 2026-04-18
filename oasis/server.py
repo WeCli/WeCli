@@ -333,6 +333,10 @@ async def create_topic(req: CreateTopicRequest):
 
     try:
         if req.python_file:
+            # Legacy compatibility path:
+            # /topics + python_file still routes into the old injected-style
+            # PythonWorkflowEngine. Newer frontends should start Python workflows
+            # via the standalone runner instead of sending python_file here.
             engine = PythonWorkflowEngine(
                 forum=forum,
                 python_file=req.python_file,

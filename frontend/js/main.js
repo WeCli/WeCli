@@ -628,7 +628,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         // Add Workflow
         wf_btn_title: '添加工作流',
         wf_btn_label: '+ 工作流',
-        wf_popup_title: '📋 选择工作流',
+        wf_popup_title: '选择工作流',
         wf_no_workflows: '暂无已保存的工作流',
         wf_team_no_layouts: '该团队暂无已保存工作流',
         wf_cancel: '取消',
@@ -1389,7 +1389,7 @@ orch_openclaw_sessions: '🦞 OpenClaw',
         // Add Workflow
         wf_btn_title: 'Add Workflow',
         wf_btn_label: '+ Workflow',
-        wf_popup_title: '📋 Select Workflow',
+        wf_popup_title: 'Select Workflow',
         wf_no_workflows: 'No saved workflows',
         wf_team_no_layouts: 'No saved workflows for this team',
         wf_cancel: 'Cancel',
@@ -2016,15 +2016,15 @@ async function openAgentMetaModal(mode, sessionId, existingMeta) {
     // allTools comes from loadTools() global
     if (allTools.length > 0) {
         toolsContainer.innerHTML = `
-            <div style="width:100%;display:flex;gap:6px;margin-bottom:4px;">
+            <div class="agent-meta-tools-actions">
                 <button type="button" onclick="_agentMetaToolsSelectAll(true)" style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#f0fdf4;color:#16a34a;cursor:pointer;">全选</button>
                 <button type="button" onclick="_agentMetaToolsSelectAll(false)" style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer;">全不选</button>
             </div>` +
             allTools.map(t => {
                 const checked = (enabledToolNames === null || enabledToolNames.has(t.name)) ? 'checked' : '';
-                return `<label style="display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:3px 6px;border:1px solid #e5e7eb;border-radius:5px;cursor:pointer;background:#f9fafb;white-space:nowrap;" title="${escapeHtml(t.description || '')}">
+                return `<label class="agent-meta-tool-chip" title="${escapeHtml(t.description || '')}">
                     <input type="checkbox" class="agent-meta-tool-cb" value="${escapeHtml(t.name)}" ${checked} style="margin:0;">
-                    ${escapeHtml(t.name)}
+                    <span class="agent-meta-tool-name">${escapeHtml(t.name)}</span>
                 </label>`;
             }).join('');
     } else {
@@ -6569,8 +6569,14 @@ async function handleSend() {
     const fileNames = pendingFiles.map(f => f.name);
     const audiosToSend = pendingAudios.map(a => ({ base64: a.base64, name: a.name, format: a.format }));
     const audioNames = pendingAudios.map(a => a.name);
-    const workflowsToSend = pendingWorkflows.map(w => ({ name: w.name, team: w.team, displayName: w.displayName, yaml: w.yaml }));
-    const workflowNames = pendingWorkflows.map(w => w.displayName);
+    const workflowsToSend = pendingWorkflows.map(w => ({
+        name: w.name,
+        team: w.team,
+        mode: w.mode || 'yaml',
+        displayName: w.displayName,
+        content: w.content || '',
+    }));
+    const workflowNames = pendingWorkflows.map(w => `${(w.mode || 'yaml').toUpperCase()} ${w.displayName}`);
 
     const label = text || (imagePreviewSrcs.length ? '('+t('image_placeholder')+')' : audioNames.length ? '('+t('audio_placeholder')+')' : workflowNames.length ? '(workflow)' : '('+t('file_placeholder')+')');
     appendMessage(label, true, imagePreviewSrcs, fileNames, audioNames, workflowNames);
@@ -6607,10 +6613,17 @@ async function handleSend() {
 
         let workflowPrefix = '';
         for (const wf of workflowsToSend) {
-            workflowPrefix += `【oasis workflow, use it now】\n` +
-                `Team Name: ${wf.team || '(non-team)'}\n` +
-                `YAML Name: ${wf.name}\n` +
-                (wf.yaml ? `---\n${wf.yaml}\n---\n` : '');
+            if ((wf.mode || 'yaml') === 'python') {
+                workflowPrefix += `【python workflow, use it now】\n` +
+                    `Team Name: ${wf.team || '(non-team)'}\n` +
+                    `Python Name: ${wf.name}\n` +
+                    (wf.content ? `---\n${wf.content}\n---\n` : '');
+            } else {
+                workflowPrefix += `【oasis workflow, use it now】\n` +
+                    `Team Name: ${wf.team || '(non-team)'}\n` +
+                    `YAML Name: ${wf.name}\n` +
+                    (wf.content ? `---\n${wf.content}\n---\n` : '');
+            }
         }
         const fullText_to_send = personaPrefix + workflowPrefix + text;
 
@@ -6869,46 +6882,94 @@ inputField.addEventListener('paste', handlePasteImage);
 // ===== Add Workflow 功能 =====
 // ================================================================
 let pendingWorkflows = [];  // [{name: 'xxx'}, ...]
+let pendingOasisWorkflows = [];  // [{name: 'xxx'}, ...]
 
-function renderWorkflowPreviews() {
-    const area = document.getElementById('workflow-preview-area');
-    if (!pendingWorkflows.length) { area.style.display = 'none'; return; }
+function getWorkflowTargetConfig(target = 'chat') {
+    if (target === 'oasis') {
+        return {
+            list: pendingOasisWorkflows,
+            areaId: 'oasis-workflow-preview-area',
+            inputId: 'oasis-town-input',
+            removeFn: 'removeOasisWorkflow',
+        };
+    }
+    return {
+        list: pendingWorkflows,
+        areaId: 'workflow-preview-area',
+        inputId: 'message-input',
+        removeFn: 'removeWorkflow',
+    };
+}
+
+function renderWorkflowPreviews(target = 'chat') {
+    const cfg = getWorkflowTargetConfig(target);
+    const area = document.getElementById(cfg.areaId);
+    if (!area) return;
+    if (!cfg.list.length) {
+        area.style.display = 'none';
+        area.innerHTML = '';
+        return;
+    }
     area.style.display = 'flex';
-    area.innerHTML = pendingWorkflows.map((wf, i) =>
-        `<span class="workflow-tag">📋 Workflow: ${escapeHtml(wf.displayName)}<span class="wf-remove" onclick="removeWorkflow(${i})">&times;</span></span>`
+    area.innerHTML = cfg.list.map((wf, i) =>
+        `<span class="workflow-tag">${escapeHtml((wf.mode || 'yaml').toUpperCase())} Workflow: ${escapeHtml(wf.displayName)}<span class="wf-remove" onclick="${cfg.removeFn}(${i})">&times;</span></span>`
     ).join('');
 }
 
 function removeWorkflow(idx) {
     pendingWorkflows.splice(idx, 1);
-    renderWorkflowPreviews();
+    renderWorkflowPreviews('chat');
 }
 
-async function showWorkflowPopup() {
+function removeOasisWorkflow(idx) {
+    pendingOasisWorkflows.splice(idx, 1);
+    renderWorkflowPreviews('oasis');
+}
+
+async function showWorkflowPopup(target = 'chat') {
     try {
         // Load team list and global workflows in parallel
-        const [teamsResp, globalResp] = await Promise.all([
+        const [teamsResp, globalYamlResp, globalPyResp] = await Promise.all([
             fetch('/teams'),
             fetch('/proxy_visual/load-layouts'),
+            fetch('/proxy_visual/load-layouts?mode=python'),
         ]);
         const teamsData = await teamsResp.json();
-        const globalLayouts = await globalResp.json();
+        const globalYamlLayouts = await globalYamlResp.json();
+        const globalPyLayouts = await globalPyResp.json();
         const teams = teamsData.teams || [];
 
         // Load team workflows in parallel
         const teamResults = await Promise.all(teams.map(async (teamName) => {
             try {
-                const r = await fetch('/proxy_visual/load-layouts?team=' + encodeURIComponent(teamName));
-                const layouts = await r.json();
-                return { team: teamName, layouts: layouts || [] };
+                const [yamlResp, pyResp] = await Promise.all([
+                    fetch('/proxy_visual/load-layouts?team=' + encodeURIComponent(teamName)),
+                    fetch('/proxy_visual/load-layouts?team=' + encodeURIComponent(teamName) + '&mode=python'),
+                ]);
+                const [yamlLayouts, pyLayouts] = await Promise.all([
+                    yamlResp.json(),
+                    pyResp.json(),
+                ]);
+                return { team: teamName, yamlLayouts: yamlLayouts || [], pyLayouts: pyLayouts || [] };
             } catch { return { team: teamName, layouts: [] }; }
         }));
 
-        // Build grouped data: [{group, team, layouts}]
+        // Build grouped data: [{group, team, items}]
         const groups = [];
-        if (globalLayouts.length) groups.push({ group: '(公共)', team: '', layouts: globalLayouts });
+        const globalItems = [
+            ...(Array.isArray(globalYamlLayouts) ? globalYamlLayouts.map((name) => ({ name, mode: 'yaml' })) : []),
+            ...(Array.isArray(globalPyLayouts) ? globalPyLayouts.map((name) => ({ name, mode: 'python' })) : []),
+        ];
+        if (globalItems.length) groups.push({ group: '(公共)', team: '', items: globalItems });
         teamResults.forEach((tr) => {
-            groups.push({ group: tr.team, team: tr.team, layouts: tr.layouts });
+            groups.push({
+                group: tr.team,
+                team: tr.team,
+                items: [
+                    ...(Array.isArray(tr.yamlLayouts) ? tr.yamlLayouts.map((name) => ({ name, mode: 'yaml' })) : []),
+                    ...(Array.isArray(tr.pyLayouts) ? tr.pyLayouts.map((name) => ({ name, mode: 'python' })) : []),
+                ],
+            });
         });
 
         if (!groups.length) { alert(t('wf_no_workflows')); return; }
@@ -6930,6 +6991,7 @@ async function showWorkflowPopup() {
 
         let selectedName = null;
         let selectedTeam = '';
+        let selectedMode = 'yaml';
         overlay.querySelector('#wf-cancel-btn').addEventListener('click', () => overlay.remove());
         overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
@@ -6941,19 +7003,21 @@ async function showWorkflowPopup() {
             header.innerHTML = `<span style="font-size:14px;">${grp.team ? '👥' : '🌐'}</span>${escapeHtml(grp.group)}`;
             listEl.appendChild(header);
 
-            if (!grp.layouts.length) {
+            if (!grp.items.length) {
                 const emptyRow = document.createElement('div');
                 emptyRow.className = 'orch-session-item';
                 emptyRow.style.cssText = 'padding:8px 12px 8px 24px;border-radius:8px;cursor:default;opacity:0.65;margin-bottom:2px;display:flex;align-items:center;gap:8px;font-size:12px;color:#6b7280;';
-                emptyRow.innerHTML = `<span style="font-size:14px;">📭</span><span style="flex:1;">${escapeHtml(t('wf_team_no_layouts'))}</span>`;
+                emptyRow.innerHTML = `<span style="flex:1;">${escapeHtml(t('wf_team_no_layouts'))}</span>`;
                 listEl.appendChild(emptyRow);
                 continue;
             }
-            for (const name of grp.layouts) {
+            for (const itemDef of grp.items) {
+                const name = itemDef.name;
+                const mode = itemDef.mode === 'python' ? 'python' : 'yaml';
                 const item = document.createElement('div');
                 item.className = 'orch-session-item';
                 item.style.cssText = 'padding:8px 12px 8px 24px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:2px;display:flex;align-items:center;gap:8px;transition:all 0.15s;';
-                item.innerHTML = `<span style="font-size:14px;">📋</span><span style="flex:1;font-size:13px;color:#374151;">${escapeHtml(name)}</span>`;
+                item.innerHTML = `<span style="display:inline-flex;align-items:center;justify-content:center;min-width:56px;padding:2px 8px;border-radius:999px;background:${mode === 'python' ? '#eff6ff' : '#f5f3ff'};border:1px solid ${mode === 'python' ? '#93c5fd' : '#c4b5fd'};font-size:11px;font-weight:700;color:${mode === 'python' ? '#1d4ed8' : '#6d28d9'};">${mode === 'python' ? 'Python' : 'YAML'}</span><span style="flex:1;font-size:13px;color:#374151;">${escapeHtml(name)}</span>`;
                 const teamVal = grp.team;
                 item.addEventListener('click', () => {
                     listEl.querySelectorAll('.orch-session-item').forEach(el => {
@@ -6964,6 +7028,7 @@ async function showWorkflowPopup() {
                     item.style.borderColor = '#c4b5fd';
                     selectedName = name;
                     selectedTeam = teamVal;
+                    selectedMode = mode;
                     const btn = overlay.querySelector('#wf-confirm-btn');
                     btn.disabled = false;
                     btn.style.opacity = '1';
@@ -6971,7 +7036,8 @@ async function showWorkflowPopup() {
                 item.addEventListener('dblclick', async () => {
                     selectedName = name;
                     selectedTeam = teamVal;
-                    await addWorkflowToContext(selectedName, selectedTeam);
+                    selectedMode = mode;
+                    await addWorkflowToContext(selectedName, selectedTeam, selectedMode, target);
                     overlay.remove();
                 });
                 listEl.appendChild(item);
@@ -6980,7 +7046,7 @@ async function showWorkflowPopup() {
 
         overlay.querySelector('#wf-confirm-btn').addEventListener('click', async () => {
             if (selectedName) {
-                await addWorkflowToContext(selectedName, selectedTeam);
+                await addWorkflowToContext(selectedName, selectedTeam, selectedMode, target);
                 overlay.remove();
             }
         });
@@ -6989,26 +7055,39 @@ async function showWorkflowPopup() {
     }
 }
 
-async function addWorkflowToContext(name, team) {
-    team = team || '';
-    const displayName = team ? `${team}/${name}` : name;
-    // Avoid duplicate
-    if (pendingWorkflows.some(w => w.displayName === displayName)) return;
+function showOasisWorkflowPopup() {
+    return showWorkflowPopup('oasis');
+}
 
-    // Load raw YAML content for this workflow (team-scoped)
-    let yamlText = '';
+async function addWorkflowToContext(name, team, mode = 'yaml', target = 'chat') {
+    team = team || '';
+    mode = mode === 'python' ? 'python' : 'yaml';
+    const displayName = team ? `${team}/${name}` : name;
+    const cfg = getWorkflowTargetConfig(target);
+    // Avoid duplicate
+    if (cfg.list.some(w => w.displayName === displayName && (w.mode || 'yaml') === mode)) return;
+
+    let contentText = '';
     try {
-        const teamQ = team ? '?team=' + encodeURIComponent(team) : '';
-        const r = await fetch(`/proxy_visual/load-yaml-raw/${encodeURIComponent(name)}${teamQ}`);
-        const data = await r.json();
-        yamlText = data.yaml || '';
+        const teamQ = team ? `?team=${encodeURIComponent(team)}` : '';
+        if (mode === 'python') {
+            const modeQ = teamQ ? `${teamQ}&mode=python` : '?mode=python';
+            const r = await fetch(`/proxy_visual/load-layout/${encodeURIComponent(name)}${modeQ}`);
+            const data = await r.json();
+            contentText = data.content || '';
+        } else {
+            const r = await fetch(`/proxy_visual/load-yaml-raw/${encodeURIComponent(name)}${teamQ}`);
+            const data = await r.json();
+            contentText = data.yaml || '';
+        }
     } catch(e) {
-        console.warn('Failed to load workflow YAML:', e);
+        console.warn('Failed to load workflow content:', e);
     }
 
-    pendingWorkflows.push({ name: name, team: team, displayName: displayName, yaml: yamlText });
-    renderWorkflowPreviews();
-    inputField.focus();
+    cfg.list.push({ name, team, mode, displayName, content: contentText });
+    renderWorkflowPreviews(target);
+    const input = document.getElementById(cfg.inputId);
+    if (input && typeof input.focus === 'function') input.focus();
 }
 
 // ================================================================
@@ -7917,6 +7996,8 @@ function updateOasisTownComposer(detail) {
     const sameTopic = input.dataset.topicId === topicId;
     if (!sameTopic) {
         input.value = '';
+        pendingOasisWorkflows = [];
+        renderWorkflowPreviews('oasis');
     }
     input.dataset.topicId = topicId;
 
@@ -8892,15 +8973,20 @@ function renderTopicDetail(detail) {
     const actionsEl = document.getElementById('oasis-detail-actions');
     const isRunning = detail.status === 'discussing' || detail.status === 'pending';
     let btns = '';
+    if (detail.workflow_mode) {
+        const modeText = detail.workflow_mode === 'python' ? 'Python Workflow' : 'YAML Workflow';
+        const refText = detail.workflow_ref ? ` · ${escapeHtml(detail.workflow_ref)}` : '';
+        btns += `<span class="oasis-detail-action-btn workflow" title="${escapeHtml(modeText)}${detail.workflow_ref ? `: ${escapeHtml(detail.workflow_ref)}` : ''}">${modeText}${refText}</span>`;
+    }
     // Always show overview button when there is data
     const hasData = (detail.posts && detail.posts.length > 0) || (detail.timeline && detail.timeline.length > 0);
     if (hasData) {
-        btns += `<button onclick="showDiscussionOverview()" class="oasis-detail-action-btn overview">📊 ${currentLang==='zh-CN'?'讨论概览':'Overview'}</button>`;
+        btns += `<button onclick="showDiscussionOverview()" class="oasis-detail-action-btn overview">${currentLang==='zh-CN'?'讨论概览':'Overview'}</button>`;
     }
     if (isRunning) {
-        btns += `<button onclick="cancelOasisTopic('${detail.topic_id}')" class="oasis-detail-action-btn cancel">⏹ ${t('oasis_cancel')}</button>`;
+        btns += `<button onclick="cancelOasisTopic('${detail.topic_id}')" class="oasis-detail-action-btn cancel">${t('oasis_cancel')}</button>`;
     }
-    btns += `<button onclick="deleteOasisTopic('${detail.topic_id}')" class="oasis-detail-action-btn delete">🗑 ${t('oasis_delete')}</button>`;
+    btns += `<button onclick="deleteOasisTopic('${detail.topic_id}')" class="oasis-detail-action-btn delete">${t('oasis_delete')}</button>`;
     actionsEl.innerHTML = btns;
 
     renderPosts(detail.posts || [], detail.timeline || [], detail.discussion !== false);
@@ -9310,11 +9396,31 @@ async function submitOasisTopicPost() {
 
     const input = document.getElementById('oasis-town-input');
     if (!input) return;
-    const content = (input.value || '').trim();
-    if (!content) {
+    const baseContent = (input.value || '').trim();
+    const workflowsToSend = pendingOasisWorkflows.map(w => ({
+        name: w.name,
+        team: w.team || '',
+        mode: w.mode || 'yaml',
+        displayName: w.displayName,
+        content: w.content || '',
+    }));
+    if (!baseContent && workflowsToSend.length === 0) {
         input.focus();
         return;
     }
+    let workflowPrefix = '';
+    for (const wf of workflowsToSend) {
+        if ((wf.mode || 'yaml') === 'python') {
+            workflowPrefix += `【python workflow, use it now】\n`
+                + `${wf.displayName || wf.name}\n`
+                + `${wf.content || ''}\n\n`;
+        } else {
+            workflowPrefix += `【oasis workflow, use it now】\n`
+                + `${wf.displayName || wf.name}\n`
+                + `${wf.content || ''}\n\n`;
+        }
+    }
+    const content = workflowPrefix + baseContent;
 
     oasisManualPostSubmitting = true;
     updateOasisTownComposer(detail);
@@ -9331,10 +9437,14 @@ async function submitOasisTopicPost() {
                 throw new Error(data.error || data.detail || data.message || `HTTP ${resp.status}`);
             }
             input.value = '';
+            pendingOasisWorkflows = [];
+            renderWorkflowPreviews('oasis');
             await loadTopicDetail(oasisCurrentTopicId);
         } else {
             const created = await createOasisTopicFromTownPrompt(content);
             input.value = '';
+            pendingOasisWorkflows = [];
+            renderWorkflowPreviews('oasis');
             await refreshOasisTopics();
             if (created.topic_id) {
                 await openOasisTopic(created.topic_id);
@@ -11430,7 +11540,7 @@ function showAddTeamMemberModal() {
                             <button type="button" onclick="document.querySelectorAll('.add-oasis-tool-cb').forEach(c=>c.checked=true)" style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#f0fdf4;color:#16a34a;cursor:pointer;">全选</button>
                             <button type="button" onclick="document.querySelectorAll('.add-oasis-tool-cb').forEach(c=>c.checked=false)" style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer;">全不选</button>
                         </div>
-                        <div id="add-oasis-tools-container" class="add-oasis-tools-container" style="max-height:120px;overflow-y:auto;border:1px solid #d1d5db;border-radius:6px;padding:6px;display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;">
+                        <div id="add-oasis-tools-container" class="add-oasis-tools-container" style="max-height:120px;overflow-y:auto;border:1px solid #d1d5db;border-radius:6px;padding:6px;margin-top:2px;">
                             <span style="color:#9ca3af;font-size:11px;">加载中...</span>
                         </div>
                     </label>
@@ -12288,6 +12398,9 @@ function orchSetWorkflowMode(mode) {
     const outputContent = document.getElementById('orch-agent-yaml');
     const pythonEditor = document.getElementById('orch-python-editor');
     const zh = currentLang === 'zh-CN';
+    const isMobile = typeof window !== 'undefined'
+        && typeof window.matchMedia === 'function'
+        && window.matchMedia('(max-width: 768px)').matches;
 
     if (mode === 'python') {
         yamlBtn.classList.remove('active');
@@ -12316,6 +12429,9 @@ function orchSetWorkflowMode(mode) {
         if (pythonEditor && !String(pythonEditor.value || '').trim()) {
             pythonEditor.value = orchDefaultPythonScaffold();
         }
+        if (isMobile) {
+            orchCloseMobilePanels();
+        }
     } else {
         pythonBtn.classList.remove('active');
         yamlBtn.classList.add('active');
@@ -12340,6 +12456,9 @@ function orchSetWorkflowMode(mode) {
         if (runLabel) runLabel.textContent = zh ? '▶️ 运行工作流' : '▶️ Run Workflow';
         if (runBtn) runBtn.title = zh ? '运行当前画布里的工作流' : 'Run the workflow from the current canvas';
         if (codeTitle) codeTitle.innerHTML = '📄 规则 YAML';
+        if (isMobile) {
+            orchCloseMobilePanels();
+        }
     }
 }
 

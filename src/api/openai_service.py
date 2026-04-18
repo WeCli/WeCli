@@ -79,7 +79,13 @@ def _get_agent_tool_whitelist(session_id: str) -> set[str] | None:
                 if agent_entry.get("session") != session_id:
                     continue
                 # 找到匹配的 agent
-                tools_cfg = agent_entry.get("tools")
+                meta = agent_entry.get("meta")
+                tools_cfg = None
+                if isinstance(meta, dict):
+                    tools_cfg = meta.get("tools")
+                if tools_cfg is None:
+                    # Backward compatibility for older flat entries.
+                    tools_cfg = agent_entry.get("tools")
                 if not isinstance(tools_cfg, dict) or not tools_cfg:
                     return None  # 该 agent 无 tools 配置 → 不限制
                 return {k for k, v in tools_cfg.items() if v}
