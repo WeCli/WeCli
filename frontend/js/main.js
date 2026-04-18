@@ -11536,7 +11536,7 @@ function showAddTeamMemberModal() {
                         </div>
                     </label>
                     <label style="font-size:11px;font-weight:600;color:#374151;">工具 (Tools)
-                        <div class="add-oasis-tools-actions" style="display:flex;gap:4px;margin:4px 0;">
+                        <div class="add-oasis-tools-actions" style="margin:4px 0;">
                             <button type="button" onclick="document.querySelectorAll('.add-oasis-tool-cb').forEach(c=>c.checked=true)" style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#f0fdf4;color:#16a34a;cursor:pointer;">全选</button>
                             <button type="button" onclick="document.querySelectorAll('.add-oasis-tool-cb').forEach(c=>c.checked=false)" style="font-size:10px;padding:2px 8px;border:1px solid #d1d5db;border-radius:4px;background:#fef2f2;color:#dc2626;cursor:pointer;">全不选</button>
                         </div>
@@ -12651,23 +12651,36 @@ async function showAgentConfigModal(type, globalName, name, tag, api_url, api_ke
     });
     
     // Load expert tags for agent persona binding
-    if (type === 'oasis' || type === 'external') {
+    if (normalizedType === 'oasis' || normalizedType === 'external') {
         try {
             const expertsUrl = currentGroupId
                 ? `/proxy_visual/experts?team=${encodeURIComponent(currentGroupId)}`
                 : '/proxy_visual/experts';
             const r = await fetch(expertsUrl);
             const experts = await r.json();
-            const tags = [...new Set(experts.map(e => e.tag).filter(Boolean))];
             const tagSelect = document.getElementById('config-agent-tag');
-            tagSelect.innerHTML = '<option value="">(无标签)</option>' +
-                tags.map(t => `<option value="${t}">${t}</option>`).join('');
-            tagSelect.value = tag || '';
+            const rows = ['<option value="">(无标签)</option>'];
+            const selectedTag = String(tag || '').trim();
+            const entries = Array.isArray(experts) ? experts : [];
+            for (const exp of entries) {
+                const tagValue = String((exp && exp.tag) || '').trim();
+                if (!tagValue) continue;
+                const displayName = String(exp.name_zh || exp.name_en || exp.name || '').trim();
+                const source = String(exp.source || '').trim();
+                const metaParts = [displayName, source].filter(Boolean);
+                const label = metaParts.length ? `${tagValue} · ${metaParts.join(' · ')}` : tagValue;
+                rows.push(`<option value="${escapeHtml(tagValue)}"${tagValue === selectedTag ? ' selected' : ''}>${escapeHtml(label)}</option>`);
+            }
+            if (selectedTag && !entries.some(exp => String((exp && exp.tag) || '').trim() === selectedTag)) {
+                rows.push(`<option value="${escapeHtml(selectedTag)}" selected>${escapeHtml(selectedTag)}</option>`);
+            }
+            tagSelect.innerHTML = rows.join('');
+            tagSelect.value = selectedTag;
         } catch (e) {
             console.warn('Failed to load expert tags', e);
         }
 
-        if (type === 'oasis') {
+        if (normalizedType === 'oasis') {
             // Setup drop zone for expert tags
             const dropZone = document.getElementById('config-tag-drop-zone');
             dropZone.addEventListener('dragover', (e) => {
