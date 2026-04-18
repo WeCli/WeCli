@@ -3705,12 +3705,17 @@ async function orchDoGenerateAgentYaml() {
             return;
         }
         if (res.agent_yaml) {
-            yamlEl.textContent = res.agent_yaml;
             if (mode === 'python') {
+                yamlEl.textContent = res.agent_explain || ((typeof currentLang !== 'undefined' && currentLang === 'zh-CN')
+                    ? '已生成 Python 工作流，说明缺失。'
+                    : 'Python workflow generated, explanation missing.');
                 const editor = orchPythonEditor();
                 if (editor) {
                     orchSnapshotPythonDraft(res.agent_yaml);
                     editor.value = res.agent_yaml;
+                }
+                if (res.agent_explain) {
+                    yamlEl.textContent = res.agent_explain;
                 }
                 let statusMsg = (typeof currentLang !== 'undefined' && currentLang === 'zh-CN')
                     ? '✅ 已生成 Python workflow'
@@ -3723,6 +3728,9 @@ async function orchDoGenerateAgentYaml() {
                 orchToast((typeof currentLang !== 'undefined' && currentLang === 'zh-CN') ? 'Python 工作流已生成' : 'Python workflow generated');
                 return;
             }
+            yamlEl.textContent = res.agent_explain || ((typeof currentLang !== 'undefined' && currentLang === 'zh-CN')
+                ? '已生成 YAML 工作流，说明缺失。'
+                : 'YAML workflow generated, explanation missing.');
             if (res.validation?.valid) {
                 let statusMsg = t('orch_yaml_valid', {steps: res.validation.steps, types: res.validation.step_types.join(', ')});
                 if (res.saved_file && !res.saved_file.startsWith('save_error')) {
@@ -4290,7 +4298,29 @@ async function orchRunWorkflow() {
             if (!saveResp.ok || saveData.error || !saveData.path) {
                 throw new Error(saveData.error || 'python save failed');
             }
-            body.python_file = saveData.path;
+            const runResp = await fetch('/proxy_visual/run-python-workflow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    python_file: saveData.path,
+                    question: question.trim(),
+                    team: orch.teamName || '',
+                }),
+            });
+            const runData = await runResp.json().catch(() => ({}));
+            if (!runResp.ok || runData.error) {
+                throw new Error(runData.error || 'python workflow start failed');
+            }
+            const runMsg = (typeof currentLang !== 'undefined' && currentLang === 'zh-CN')
+                ? `Python 工作流已启动 · run=${runData.run_id || 'unknown'}`
+                : `Python workflow started · run=${runData.run_id || 'unknown'}`;
+            orchToast(runMsg);
+            const statusEl = document.getElementById('orch-agent-status');
+            if (statusEl) {
+                statusEl.textContent = runMsg;
+                statusEl.style.cssText = 'color:#0f766e;background:#f0fdfa;border-color:#5eead4;';
+            }
+            return;
         } else {
             await orchUpdateYaml();
             const yaml = document.getElementById('orch-yaml-content').textContent || '';

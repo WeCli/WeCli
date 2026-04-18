@@ -11948,6 +11948,162 @@ function toggleOrchFocusMode() {
 
 let currentOrchMode = 'yaml'; // 'yaml' or 'python'
 
+function orchDefaultPythonScaffold() {
+    const teamName = (typeof orch !== 'undefined' && orch && orch.teamName) ? orch.teamName : '';
+    const teamHint = teamName || '<team-or-empty>';
+    return `import asyncio
+from pathlib import Path
+import sys
+
+# Make the project root importable even when this file lives under data/user_files/.../oasis/python/
+_HERE = Path(__file__).resolve()
+for _parent in [_HERE.parent, *_HERE.parents]:
+    if (_parent / "oasis").is_dir() and (_parent / "src").is_dir():
+        if str(_parent) not in sys.path:
+            sys.path.insert(0, str(_parent))
+        break
+
+from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli
+
+
+async def main(ctx: StandaloneWorkflowContext):
+    # This script can be launched directly:
+    #   python my_workflow.py --question "Do the work" --user-id xinyuan --team "${teamHint}"
+    #
+    # By default, the runtime auto-creates one OASIS topic before main(ctx) starts.
+    #   ctx.topic_id is usually already available
+    #   await ctx.publish(...) writes both local logs and topic posts
+    #
+    # Available through ctx:
+    #   ctx.question, ctx.user_id, ctx.team, ctx.topic_id, ctx.run_id
+    #   ctx.list_agents(), ctx.get_agent(), ctx.send_agent(...)
+    #   ctx.publish(...), ctx.set_result(...), ctx.set_conclusion(...)
+    #   ctx.create_empty_topic(...), ctx.publish_to_topic(...), ctx.conclude_topic(...)
+    # Notes:
+    #   ctx.list_agents() is synchronous: do not write await ctx.list_agents()
+    #   prefer unique agent ids over broad tags like "creative"
+    #   store reply.content in results, not the raw reply object
+    agents = [a for a in ctx.list_agents() if a.get("id")]
+    await ctx.publish(
+        f"python workflow started with {len(agents)} available agents in team '{ctx.team or 'default'}'",
+        author="workflowpy",
+    )
+
+    if not agents:
+        ctx.set_conclusion("No agents available.")
+        ctx.set_result({
+            "ok": False,
+            "question": ctx.question,
+            "team": ctx.team,
+            "error": "no agents available",
+        })
+        return
+
+    ordered_agents = sorted(
+        agents,
+        key=lambda a: (
+            str(a.get("kind", "")),
+            str(a.get("tag", "")),
+            str(a.get("name", "")),
+            str(a.get("id", "")),
+        ),
+    )
+    fanout_agents = ordered_agents[: min(4, len(ordered_agents))]
+
+    async def ask_agent(agent, prompt):
+        reply = await ctx.send_agent(agent["id"], prompt)
+        return {
+            "agent_id": agent["id"],
+            "agent_name": agent.get("name", agent["id"]),
+            "agent_tag": agent.get("tag", ""),
+            "ok": reply.ok,
+            "content": (reply.content or "").strip(),
+            "error": reply.error,
+        }
+
+    parallel_prompt = (
+        f"Task:\\n{ctx.question}\\n\\n"
+        "Please provide one concise, high-value response from your perspective."
+    )
+    parallel_results = await asyncio.gather(
+        *[ask_agent(agent, parallel_prompt) for agent in fanout_agents],
+        return_exceptions=True,
+    )
+
+    normalized_parallel = []
+    successful_parallel = []
+    for agent, item in zip(fanout_agents, parallel_results):
+        if isinstance(item, Exception):
+            entry = {
+                "agent_id": agent["id"],
+                "agent_name": agent.get("name", agent["id"]),
+                "agent_tag": agent.get("tag", ""),
+                "ok": False,
+                "content": "",
+                "error": str(item),
+            }
+        else:
+            entry = item
+        normalized_parallel.append(entry)
+        if entry["ok"]:
+            successful_parallel.append(entry)
+            await ctx.publish(entry["content"] or "(empty reply)", author=entry["agent_name"][:80])
+        else:
+            await ctx.publish(
+                f"FAILED: {entry['error'] or 'unknown error'}",
+                author=entry["agent_name"][:80],
+            )
+
+    transcript_lines = [
+        f"{item['agent_name']}: {item['content']}"
+        for item in successful_parallel
+        if item.get("content")
+    ]
+    synthesis = None
+    remaining_agents = ordered_agents[len(fanout_agents):]
+    if remaining_agents and transcript_lines:
+        synthesizer = remaining_agents[0]
+        sequential_prompt = (
+            f"Original task:\\n{ctx.question}\\n\\n"
+            "Earlier agent outputs:\\n"
+            + "\\n\\n".join(transcript_lines)
+            + "\\n\\nPlease synthesize the strongest points into one concise conclusion."
+        )
+        synthesis = await ask_agent(synthesizer, sequential_prompt)
+        if synthesis["ok"]:
+            await ctx.publish(
+                synthesis["content"] or "(empty synthesis)",
+                author=synthesis["agent_name"][:80],
+            )
+        else:
+            await ctx.publish(
+                f"SYNTHESIS FAILED: {synthesis['error'] or 'unknown error'}",
+                author=synthesis["agent_name"][:80],
+            )
+
+    success_count = sum(1 for item in normalized_parallel if item["ok"])
+    if synthesis and synthesis.get("ok") and synthesis.get("content"):
+        ctx.set_conclusion(synthesis["content"])
+    else:
+        ctx.set_conclusion(
+            f"Hybrid workflow completed: {success_count}/{len(fanout_agents)} parallel agents succeeded."
+        )
+
+    ctx.set_result({
+        "ok": True,
+        "question": ctx.question,
+        "team": ctx.team,
+        "parallel_agent_count": len(fanout_agents),
+        "parallel_results": normalized_parallel,
+        "synthesis": synthesis,
+    })
+
+
+if __name__ == "__main__":
+    raise SystemExit(run_cli(main))
+`;
+}
+
 function orchSetWorkflowMode(mode) {
     currentOrchMode = mode;
     const yamlBtn = document.getElementById('orch-mode-yaml-btn');
@@ -11971,6 +12127,7 @@ function orchSetWorkflowMode(mode) {
     const outputLabel = document.getElementById('orch-agent-output-label');
     const promptContent = document.getElementById('orch-prompt-content');
     const outputContent = document.getElementById('orch-agent-yaml');
+    const pythonEditor = document.getElementById('orch-python-editor');
     const zh = currentLang === 'zh-CN';
 
     if (mode === 'python') {
@@ -11988,15 +12145,18 @@ function orchSetWorkflowMode(mode) {
             : 'Example: write async workflowpy; prefer send_agent; include explicit review/retry flow.';
         if (statusEl) statusEl.textContent = zh ? '点击「🤖 AI优化工作流」自动生成 Python workflow' : 'Click "AI Optimize Workflow" to generate Python workflow';
         if (promptLabel) promptLabel.textContent = zh ? '📨 发送的代码指令' : '📨 Coding Prompt Sent';
-        if (outputLabel) outputLabel.textContent = zh ? '🤖 Agent Python' : '🤖 Agent Python';
+        if (outputLabel) outputLabel.textContent = zh ? '🤖 Agent Explain' : '🤖 Agent Explain';
         if (promptContent) promptContent.textContent = zh ? '点击 AI 后显示发送给 Agent 的 Python 指令' : 'Shows the Python prompt after AI generation';
-        if (outputContent) outputContent.textContent = zh ? '等待 Agent 生成 Python 代码' : 'Waiting for Agent Python';
+        if (outputContent) outputContent.textContent = zh ? '等待 Agent 输出工作流说明' : 'Waiting for workflow explanation';
         if (exportLabel) exportLabel.textContent = zh ? '📋 复制 Python' : '📋 Copy Python';
         if (downloadLabel) downloadLabel.textContent = zh ? '⬇️ 导出 Python' : '⬇️ Export Python';
         if (uploadLabel) uploadLabel.textContent = zh ? '⬆️ 导入 Python' : '⬆️ Import Python';
         if (runLabel) runLabel.textContent = zh ? '▶️ 运行工作流' : '▶️ Run Workflow';
         if (runBtn) runBtn.title = zh ? '运行当前编辑器里的工作流' : 'Run the workflow in the current editor';
         if (codeTitle) codeTitle.innerHTML = '🐍 Python 脚本';
+        if (pythonEditor && !String(pythonEditor.value || '').trim()) {
+            pythonEditor.value = orchDefaultPythonScaffold();
+        }
     } else {
         pythonBtn.classList.remove('active');
         yamlBtn.classList.add('active');
@@ -12012,9 +12172,9 @@ function orchSetWorkflowMode(mode) {
             : 'Example: reduce node count; keep reviewer loop; let planner draft first, then parallel execution.';
         if (statusEl) statusEl.textContent = zh ? '点击「🤖 AI编排」自动生成 YAML' : 'Click "AI Optimize Workflow" to generate YAML';
         if (promptLabel) promptLabel.textContent = zh ? '📨 发送的 Prompt' : '📨 Prompt Sent';
-        if (outputLabel) outputLabel.textContent = zh ? '🤖 Agent YAML' : '🤖 Agent YAML';
+        if (outputLabel) outputLabel.textContent = zh ? '🤖 Agent Explain' : '🤖 Agent Explain';
         if (promptContent) promptContent.textContent = zh ? '点击 AI编排 后显示' : 'Shown after AI Orch';
-        if (outputContent) outputContent.textContent = zh ? '等待 Agent 生成' : 'Waiting for Agent';
+        if (outputContent) outputContent.textContent = zh ? '等待 Agent 输出工作流说明' : 'Waiting for workflow explanation';
         if (exportLabel) exportLabel.textContent = zh ? '📋 复制工作流到粘贴板' : '📋 Copy Workflow to Clipboard';
         if (downloadLabel) downloadLabel.textContent = zh ? '⬇️ 导出工作流' : '⬇️ Export Workflow';
         if (uploadLabel) uploadLabel.textContent = zh ? '⬆️ 导入工作流' : '⬆️ Import Workflow';

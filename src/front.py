@@ -7,6 +7,7 @@ import os
 import json
 import re
 import subprocess
+import uuid
 from pathlib import Path
 
 from integrations.acpx_cli_tools import acpx_agent_command_names
@@ -3422,6 +3423,18 @@ def _extract_python_from_response(text: str) -> str:
     return (text or "").strip()
 
 
+def _extract_python_explain_from_response(text: str) -> str:
+    """Extract workflow explanation from LLM output."""
+    tagged = _extract_tagged_block(text, "WORKFLOWPY_EXPLAIN")
+    return tagged or ""
+
+
+def _extract_yaml_explain_from_response(text: str) -> str:
+    """Extract YAML workflow explanation from LLM output."""
+    tagged = _extract_tagged_block(text, "OASIS_EXPLAIN")
+    return tagged or ""
+
+
 def _yaml_dir(user_id: str, team: str = "") -> str:
     """Return the YAML workflow directory path for a user (team-scoped when team is provided)."""
     if team:
@@ -3450,6 +3463,49 @@ def _workflow_dir(user_id: str, team: str = "", mode: str = "yaml") -> str:
 
 def _workflow_ext(mode: str = "yaml") -> str:
     return ".py" if mode == "python" else ".yaml"
+
+
+def _spawn_standalone_python_workflow(
+    *,
+    user_id: str,
+    python_file: str,
+    question: str,
+    team: str = "",
+) -> dict[str, str | int]:
+    runs_dir = os.path.join(root_dir, "data", "python_workflow_runs")
+    os.makedirs(runs_dir, exist_ok=True)
+    run_id = uuid.uuid4().hex[:12]
+    log_path = os.path.join(runs_dir, f"{run_id}.log")
+    result_path = os.path.join(runs_dir, f"{run_id}.json")
+    cmd = [
+        _sys.executable,
+        python_file,
+        "--user-id",
+        user_id or "default",
+        "--question",
+        question or "",
+        "--result-file",
+        result_path,
+    ]
+    if team:
+        cmd.extend(["--team", team])
+
+    log_file = open(log_path, "a", encoding="utf-8")
+    proc = subprocess.Popen(
+        cmd,
+        cwd=root_dir,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    log_file.close()
+    return {
+        "run_id": run_id,
+        "pid": proc.pid,
+        "log_file": log_path,
+        "result_file": result_path,
+        "python_file": python_file,
+    }
 
 
 @app.route("/proxy_visual/experts", methods=["GET"])
@@ -3566,28 +3622,59 @@ def proxy_visual_agent_generate_yaml():
     try:
         if mode == "python":
             prompt = (
-                "You are writing a workflowpy Python script for OASIS.\n"
-                "Return the result in this exact format:\n"
+                "Write a self-bootstrapping standalone Python workflow script for ClawCross/OASIS.\n"
+                "Output exactly these two tagged blocks, in this order:\n"
+                "<WORKFLOWPY_EXPLAIN>\n"
+                "Short workflow explanation here.\n"
+                "</WORKFLOWPY_EXPLAIN>\n"
                 "<WORKFLOWPY_CODE>\n"
-                "# python code here\n"
+                "# code\n"
                 "</WORKFLOWPY_CODE>\n"
-                "Do not output anything before or after those tags.\n"
-                "This is a one-shot code generation request, not a chat session.\n"
-                "Reference behavior from docs/workflowpy.md and docs/oasis-reference.md.\n"
-                "The script runs inside workflowpy with these globals already available:\n"
-                "ctx, question, user_id, team, topic_id, list_agents, list_personas, get_agent, get_persona,\n"
-                "send_agent, send_persona, publish, set_conclusion, set_result.\n"
+                "No text before or after the tags.\n"
+                "Reference docs/workflowpy.md and docs/oasis-reference.md.\n"
+                "The script must run as:\n"
+                "python my_workflow.py --question '...' --user-id '...' --team '...'\n"
+                "Required structure:\n"
+                "- bootstrap sys.path by searching upward for the project root that contains both oasis/ and src/; do not search for oasis/python/\n"
+                "- from oasis.python_workflow_cli import StandaloneWorkflowContext, run_cli\n"
+                "- define async def main(ctx: StandaloneWorkflowContext)\n"
+                "- end with: if __name__ == '__main__': raise SystemExit(run_cli(main))\n"
+                "Use ctx for:\n"
+                "- ctx.question, ctx.user_id, ctx.team, ctx.topic_id, ctx.run_id\n"
+                "- ctx.list_agents(), ctx.list_personas(), ctx.get_agent(), ctx.get_persona()\n"
+                "- await ctx.send_agent(...), await ctx.send_persona(...), await ctx.publish(...)\n"
+                "- ctx.set_conclusion(...), ctx.set_result(...)\n"
+                "- await ctx.create_empty_topic(...), await ctx.publish_to_topic(...), await ctx.conclude_topic(...)\n"
                 "Rules:\n"
-                "- Write the file body as the async main script itself. Do NOT wrap it in run(ctx), main(), or if __name__ == '__main__'.\n"
-                "- Use async/await style.\n"
-                "- Do NOT import the injected workflowpy helpers above; they already exist in the runtime.\n"
-                "- Import Python standard-library or project modules only when the task truly needs them.\n"
-                "- Use the injected workflowpy helpers and plain Python control flow directly.\n"
-                "- Prefer clear, readable code over abstraction.\n"
-                "- If useful, publish intermediate progress messages with publish(...).\n"
-                "- Finish with set_conclusion(...) or set_result(...). A bare return is acceptable only if it is the natural final result.\n"
-                "- The code must be directly runnable when saved under oasis/python/.\n"
-                "- Do not include prose, markdown fences, or explanation.\n\n"
+                "- Use async/await.\n"
+                "- Keep the script directly executable with plain Python.\n"
+                "- Import extra modules only when needed.\n"
+                "- By default the runtime auto-creates an OASIS topic before main(ctx) starts, so ctx.topic_id is usually already set.\n"
+                "- ctx.publish(...) writes local logs and also mirrors the message into the auto-created topic when one exists.\n"
+                "- Only call ctx.create_empty_topic(...) yourself if you intentionally want extra topics beyond the default one.\n"
+                "- ctx.list_agents() and ctx.list_personas() are synchronous helpers; do not write await ctx.list_agents() or await ctx.list_personas().\n"
+                "- Do not assume tags like creative or critical are unique. Prefer selecting from ctx.list_agents() and then pass the chosen agent['id'] into ctx.send_agent(...).\n"
+                "- If you call ctx.get_agent(...), use a unique agent id when possible, not a broad role tag.\n"
+                "- If the task is 'ask a role/persona to respond' (for example creative, critical, entrepreneur), prefer await ctx.send_persona(persona_tag, prompt) instead of trying to find an agent with the same tag.\n"
+                "- Use send_agent(...) for existing concrete agents; use send_persona(...) for role-based one-off speaking.\n"
+                "- send_agent(...) and send_persona(...) return a SendToAgentResult object with fields like .ok, .content, .error, and .meta.\n"
+                "- Prefer attribute access such as reply.content or reply.ok. Do not treat the return value as a plain dict.\n"
+                "- send_agent(...) may use an existing session and therefore may have memory, but workflow-critical context should still be passed explicitly when a later step depends on earlier outputs.\n"
+                "- send_persona(...) should be treated as a lightweight role-based call; do not rely on implicit long-term memory there.\n"
+                "- A strong default pattern is: get ctx.list_agents() for the current team scope, run them sequentially, and splice prior outputs into the next prompt when later agents should see earlier results.\n"
+                "- For a 'team discussion' workflow, prefer serial execution over hidden concurrency unless the task clearly benefits from parallel fan-out.\n"
+                "- Another strong pattern is hybrid orchestration: fan out to several agents in parallel with asyncio.gather(...), publish or collect their replies, then use one later serial step to synthesize the combined results.\n"
+                "- For multi-round workflows, explicitly include the relevant prior outputs when building the next prompt.\n"
+                "- If round 2 depends on round 1, manually splice round-1 content into the round-2 prompt instead of relying on hidden session memory.\n"
+                "- Avoid fallback logic like 'pick the first agent'. If a required agent is missing, fail clearly with ctx.set_result(...) or raise a clear error.\n"
+                "- When storing send_agent/send_persona results, only keep JSON-serializable fields such as response.content, not the raw response object.\n"
+                "- ctx.set_conclusion(...) should be a short string summary. Put structured data into ctx.set_result(...).\n"
+                "- Finish with ctx.set_conclusion(...) or ctx.set_result(...), or return a natural final value.\n"
+                "- No prose, no markdown fences, no explanation.\n\n"
+                "For WORKFLOWPY_EXPLAIN:\n"
+                "- 3-6 short bullet lines.\n"
+                "- Summarize what the workflow does, whether it creates an OASIS topic, which agents/personas it uses, and the final output shape.\n"
+                "- Do not repeat the code.\n\n"
                 f"Task:\n{data.get('question') or 'Implement a useful workflowpy script'}\n"
             )
             if current_code:
@@ -3602,7 +3689,10 @@ def proxy_visual_agent_generate_yaml():
             base_prompt = _vis_build_llm_prompt(data) if _vis_build_llm_prompt else "Error: visual module unavailable"
             prompt = (
                 "You are designing a YAML workflow for the OASIS orchestration engine.\n"
-                "Return the result in this exact format:\n"
+                "Return exactly these two tagged blocks, in this order:\n"
+                "<OASIS_EXPLAIN>\n"
+                "Short workflow explanation here.\n"
+                "</OASIS_EXPLAIN>\n"
                 "<OASIS_YAML>\n"
                 "version: 2\n"
                 "...\n"
@@ -3624,6 +3714,10 @@ def proxy_visual_agent_generate_yaml():
                 "- Keep the workflow compact and practical.\n"
                 "- Preserve real branching, review loops, or selectors only when they add value.\n"
                 "- Avoid redundant nodes and decorative complexity.\n\n"
+                "For OASIS_EXPLAIN:\n"
+                "- 3-6 short bullet lines.\n"
+                "- Summarize what the workflow does, key stages/branches, which agents/personas are used, and the final output shape.\n"
+                "- Do not repeat the YAML.\n\n"
                 f"{base_prompt}"
             )
         if prompt_context:
@@ -3647,8 +3741,10 @@ def proxy_visual_agent_generate_yaml():
         if mode == "yaml":
             tagged_yaml = _extract_tagged_block(agent_reply, "OASIS_YAML")
             agent_yaml = tagged_yaml or (_vis_extract_yaml(agent_reply) if _vis_extract_yaml else agent_reply)
+            agent_explain = _extract_yaml_explain_from_response(agent_reply)
         else:
             agent_yaml = _extract_python_from_response(agent_reply)
+            agent_explain = _extract_python_explain_from_response(agent_reply)
         validation = (
             _vis_validate_yaml(agent_yaml) if (mode == "yaml" and _vis_validate_yaml)
             else {"valid": bool(str(agent_yaml).strip()), "steps": 0, "step_types": ["python"] if mode == "python" else []}
@@ -3679,7 +3775,7 @@ def proxy_visual_agent_generate_yaml():
             except Exception as save_err:
                 saved_path = f"save_error: {save_err}"
 
-        return jsonify({"prompt": prompt, "mode": mode, "agent_yaml": agent_yaml, "agent_reply_raw": agent_reply, "validation": validation, "saved_file": saved_path})
+        return jsonify({"prompt": prompt, "mode": mode, "agent_yaml": agent_yaml, "agent_explain": agent_explain, "agent_reply_raw": agent_reply, "validation": validation, "saved_file": saved_path})
 
     except ValueError as e:
         return jsonify({"prompt": "", "error": str(e), "agent_yaml": None}), 400
@@ -3734,6 +3830,34 @@ def proxy_visual_load_layouts():
     if mode == "python":
         return jsonify([f[:-3] for f in sorted(os.listdir(yd)) if f.endswith(".py")])
     return jsonify([f.replace('.yaml', '').replace('.yml', '') for f in sorted(os.listdir(yd)) if f.endswith((".yaml", ".yml"))])
+
+
+@app.route("/proxy_visual/run-python-workflow", methods=["POST"])
+def proxy_visual_run_python_workflow():
+    """Run a saved python workflow in standalone mode without auto-creating an OASIS topic."""
+    user_id = session.get("user_id", "")
+    data = request.get_json(silent=True) or {}
+    python_file = str(data.get("python_file") or "").strip()
+    question = str(data.get("question") or "").strip()
+    team = str(data.get("team") or "").strip()
+    if not python_file:
+        return jsonify({"error": "Missing python_file"}), 400
+    if not question:
+        return jsonify({"error": "Missing question"}), 400
+    try:
+        payload = _spawn_standalone_python_workflow(
+            user_id=user_id,
+            python_file=python_file,
+            question=question,
+            team=team,
+        )
+        return jsonify({
+            "started": True,
+            "mode": "standalone_python",
+            **payload,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/proxy_visual/load-layout/<name>", methods=["GET"])

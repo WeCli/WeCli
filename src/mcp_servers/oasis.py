@@ -22,6 +22,8 @@ Runs as a stdio MCP server, just like the other mcp_*.py tools.
 import json
 import os
 import re
+import subprocess
+import uuid
 
 import httpx
 import aiosqlite
@@ -71,6 +73,49 @@ def resolve_python_workflow_path(user_id: str, python_file: str, team: str = "")
         where = ", ".join(label for label, _ in matches)
         return None, f"找到多个同名 python workflow: {target_name}（{where}），请指定 team"
     return matches[0][1], None
+
+
+def _spawn_standalone_python_workflow(
+    *,
+    user_id: str,
+    python_file: str,
+    question: str,
+    team: str = "",
+) -> dict[str, str | int]:
+    runs_dir = os.path.join(_PROJECT_ROOT, "data", "python_workflow_runs")
+    os.makedirs(runs_dir, exist_ok=True)
+    run_id = uuid.uuid4().hex[:12]
+    log_path = os.path.join(runs_dir, f"{run_id}.log")
+    result_path = os.path.join(runs_dir, f"{run_id}.json")
+    cmd = [
+        _sys.executable,
+        python_file,
+        "--user-id",
+        user_id or _FALLBACK_USER,
+        "--question",
+        question or "",
+        "--result-file",
+        result_path,
+    ]
+    if team:
+        cmd.extend(["--team", team])
+
+    log_file = open(log_path, "a", encoding="utf-8")
+    proc = subprocess.Popen(
+        cmd,
+        cwd=_PROJECT_ROOT,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    log_file.close()
+    return {
+        "run_id": run_id,
+        "pid": proc.pid,
+        "log_file": log_path,
+        "result_file": result_path,
+        "python_file": python_file,
+    }
 
 # Checkpoint DB (same as agent.py / mcp_session.py)
 _DB_PATH = os.path.join(
@@ -387,7 +432,7 @@ async def start_new_oasis(
 
     Workflow has two modes:
       - YAML mode: current OASIS graph engine
-      - Python mode: provide python_file; script exports async run(ctx)
+      - Python mode: provide python_file; the script is launched in standalone mode with question/user/team injected.
 
     In YAML mode, expert pool is built entirely from schedule YAML expert names.
     Either schedule_file or schedule_yaml must be provided.
@@ -465,7 +510,8 @@ async def start_new_oasis(
             take priority over public/agency experts for tag→persona resolution.
 
     Returns:
-        The topic_id for later retrieval via check_oasis_discussion()
+        YAML mode returns a topic_id message.
+        Python mode returns a standalone run_id plus log/result file paths.
     """
     effective_user = username or _FALLBACK_USER
 
@@ -473,6 +519,32 @@ async def start_new_oasis(
         return "❌ 必须提供 python_file 或 schedule_yaml 或 schedule_file（至少一个）。"
 
     try:
+        if python_file:
+            if not os.path.isabs(python_file):
+                resolved_path, resolve_error = resolve_python_workflow_path(
+                    effective_user,
+                    python_file,
+                    team,
+                )
+                if resolve_error:
+                    return f"❌ {resolve_error}"
+                python_file = resolved_path or python_file
+            payload = await asyncio.to_thread(
+                _spawn_standalone_python_workflow,
+                user_id=effective_user,
+                python_file=python_file,
+                question=question,
+                team=team,
+            )
+            return (
+                f"🐍 Python 工作流已启动（standalone）\n"
+                f"任务: {question[:80]}\n"
+                f"Run ID: {payload['run_id']}\n"
+                f"PID: {payload['pid']}\n"
+                f"Log: {payload['log_file']}\n"
+                f"Result: {payload['result_file']}\n"
+            )
+
         async with httpx.AsyncClient(timeout=httpx.Timeout(timeout=300.0)) as client:
             body: dict = {
                 "question": question,
@@ -491,18 +563,7 @@ async def start_new_oasis(
             body["callback_url"] = f"http://127.0.0.1:{port}/system_trigger"
             body["callback_session_id"] = notify_session or "default"
 
-            if python_file:
-                if not os.path.isabs(python_file):
-                    resolved_path, resolve_error = resolve_python_workflow_path(
-                        effective_user,
-                        python_file,
-                        team,
-                    )
-                    if resolve_error:
-                        return f"❌ {resolve_error}"
-                    python_file = resolved_path or python_file
-                body["python_file"] = python_file
-            elif schedule_file:
+            if schedule_file:
                 if not os.path.isabs(schedule_file):
                     resolved_path, resolve_error = _resolve_workflow_path(
                         effective_user,
