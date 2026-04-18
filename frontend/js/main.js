@@ -9909,6 +9909,7 @@ async function openGroup(teamName) {
         '</span>' +
         '<span id="team-tab-actions-workflows" style="display:none;">' +
         '<button onclick="loadTeamWorkflows()" class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 px-2 py-1 rounded transition-colors" title="刷新工作流列表">🔄</button>' +
+        '<button onclick="showImportTeamWorkflowTemplateModal()" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded border border-blue-200" title="导入通用 Python 工作流模板">📥 导入模板</button>' +
         '<button onclick="newTeamWorkflowOnCanvas()" class="text-xs bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-1 rounded border border-purple-200" title="新建工作流（跳转画布）">➕ 创建工作流</button>' +
         '</span>' +
         '<span id="team-tab-actions-settings" style="display:none;"></span>' +
@@ -12916,6 +12917,70 @@ async function deleteTeamWorkflow(name, mode = 'yaml') {
         }
     } catch (err) {
         alert('删除失败: ' + err.message);
+    }
+}
+
+function showImportTeamWorkflowTemplateModal() {
+    if (!currentGroupId) {
+        alert('请先选择一个团队');
+        return;
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'orch-modal-overlay';
+    overlay.id = 'team-workflow-template-overlay';
+    overlay.innerHTML = `
+        <div class="orch-modal" style="width:min(720px, 92vw);max-width:92vw;">
+            <h3>📥 导入 Python 工作流模板</h3>
+            <div style="font-size:12px;color:#6b7280;margin-bottom:12px;">将通用 Python workflow 直接保存到当前 team，可稍后在编排页查看、运行或继续修改。</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;">
+                <div style="border:1px solid #dbeafe;border-radius:10px;padding:14px;background:#f8fbff;">
+                    <div style="font-size:14px;font-weight:700;color:#1d4ed8;">全串行</div>
+                    <div style="font-size:11px;color:#6b7280;margin-top:6px;line-height:1.6;">按当前 team/scope 下所有可用 agent 稳定排序，逐个串行执行。后一个 agent 会显式看到前面 agent 的输出。</div>
+                    <div style="margin-top:10px;font-size:11px;color:#374151;">文件名：<code>team_all_agents_sequential</code></div>
+                    <button onclick="importTeamWorkflowTemplate('sequential')" style="margin-top:12px;padding:7px 12px;border:none;border-radius:7px;background:#2563eb;color:white;cursor:pointer;font-size:12px;">导入全串行模板</button>
+                </div>
+                <div style="border:1px solid #d1fae5;border-radius:10px;padding:14px;background:#f7fffb;">
+                    <div style="font-size:14px;font-weight:700;color:#059669;">全并行</div>
+                    <div style="font-size:11px;color:#6b7280;margin-top:6px;line-height:1.6;">按当前 team/scope 下所有可用 agent 稳定排序，并行 fan-out，同步收集全部结果，再统一发到 topic。</div>
+                    <div style="margin-top:10px;font-size:11px;color:#374151;">文件名：<code>team_all_agents_parallel</code></div>
+                    <button onclick="importTeamWorkflowTemplate('parallel')" style="margin-top:12px;padding:7px 12px;border:none;border-radius:7px;background:#10b981;color:white;cursor:pointer;font-size:12px;">导入全并行模板</button>
+                </div>
+            </div>
+            <div class="orch-modal-btns" style="margin-top:14px;">
+                <button onclick="document.getElementById('team-workflow-template-overlay').remove()" style="padding:6px 14px;border-radius:6px;border:1px solid #d1d5db;background:white;color:#374151;cursor:pointer;font-size:12px;">关闭</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.remove();
+    });
+}
+
+async function importTeamWorkflowTemplate(kind) {
+    if (!currentGroupId) return;
+    const normalized = kind === 'parallel' ? 'parallel' : 'sequential';
+    try {
+        const resp = await fetch('/proxy_visual/import-python-template', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                template: normalized,
+                team: currentGroupId,
+            }),
+        });
+        const result = await resp.json().catch(() => ({}));
+        if (!resp.ok || !result.saved) {
+            throw new Error(result.error || '导入模板失败');
+        }
+        if (typeof orchToast === 'function') {
+            orchToast(`已导入 Python 模板：${result.file || normalized + '.py'}`);
+        }
+        const overlay = document.getElementById('team-workflow-template-overlay');
+        if (overlay) overlay.remove();
+        await loadTeamWorkflows();
+    } catch (err) {
+        alert('导入失败: ' + err.message);
     }
 }
 

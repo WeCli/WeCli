@@ -3818,6 +3818,40 @@ def proxy_visual_save_layout():
     return jsonify({"saved": True, "mode": mode, "file": os.path.basename(fpath), "path": fpath, "name": safe})
 
 
+@app.route("/proxy_visual/import-python-template", methods=["POST"])
+def proxy_visual_import_python_template():
+    user_id = session.get("user_id", "")
+    data = request.get_json(silent=True) or {}
+    template_name = str(data.get("template") or "").strip().lower()
+    team = str(data.get("team") or "").strip()
+    template_map = {
+        "sequential": "team_all_agents_sequential.py",
+        "parallel": "team_all_agents_parallel.py",
+    }
+    filename = template_map.get(template_name)
+    if not filename:
+        return jsonify({"error": "Unknown template"}), 400
+    template_path = os.path.join(root_dir, "oasis", "workflow_templates", filename)
+    if not os.path.isfile(template_path):
+        return jsonify({"error": "Template file not found"}), 404
+    with open(template_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    yd = _workflow_dir(user_id, team, "python")
+    os.makedirs(yd, exist_ok=True)
+    workflow_name = filename[:-3]
+    fpath = os.path.join(yd, filename)
+    with open(fpath, "w", encoding="utf-8") as f:
+        f.write(content if content.endswith("\n") else content + "\n")
+    return jsonify({
+        "saved": True,
+        "mode": "python",
+        "template": template_name,
+        "file": filename,
+        "path": fpath,
+        "name": workflow_name,
+    })
+
+
 @app.route("/proxy_visual/load-layouts", methods=["GET"])
 def proxy_visual_load_layouts():
     """List saved workflows for the selected mode (team-scoped)."""
