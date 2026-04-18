@@ -84,6 +84,14 @@ The workflow file does not need to live under the repository tree.
 python my_workflow.py --question "Do the work" --user-id xinyuan --team my-team
 ```
 
+If the script lives in any arbitrary folder and the imports are not already
+available, run it with an explicit import path:
+
+```bash
+CLAWCROSS_PYTHONPATH="/abs/path/to/ClawCross:/abs/path/to/ClawCross/src" \
+python /any/folder/my_workflow.py --question "Do the work" --user-id xinyuan --team my-team
+```
+
 Optional:
 
 - `--result-file /tmp/run.json`

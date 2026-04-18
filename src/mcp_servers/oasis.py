@@ -48,6 +48,34 @@ _WORKFLOW_IMPORT_PATHS = os.pathsep.join([_PROJECT_ROOT, os.path.join(_PROJECT_R
 _CONN_ERR = "❌ 无法连接 OASIS 论坛服务器。请确认 OASIS 服务已启动 (端口 51202)。"
 
 
+def _resolve_effective_user(username: str = "") -> str:
+    """Resolve the MCP user more robustly than the old agent_user-only fallback.
+
+    In production the MCP layer should auto-inject username. When that does not
+    happen, prefer obvious local user scopes so Python workflow discovery and
+    startup still behave like the rest of OASIS tooling.
+    """
+    explicit = str(username or "").strip()
+    if explicit:
+        return explicit
+
+    users_root = os.path.join(_PROJECT_ROOT, "data", "user_files")
+    candidates: list[str] = []
+    if os.path.isdir(users_root):
+        for entry in sorted(os.listdir(users_root)):
+            path = os.path.join(users_root, entry)
+            if os.path.isdir(path):
+                candidates.append(entry)
+
+    if "default" in candidates:
+        return "default"
+    if _FALLBACK_USER in candidates:
+        return _FALLBACK_USER
+    if len(candidates) == 1:
+        return candidates[0]
+    return _FALLBACK_USER
+
+
 def _workflow_python_dir(user_id: str, team: str = "") -> str:
     if team:
         return os.path.join(_PROJECT_ROOT, "data", "user_files", user_id, "teams", team, "oasis", "python")
@@ -243,7 +271,7 @@ async def list_oasis_experts(username: str = "") -> str:
     Returns:
         Formatted list of experts with their tags, personas, and source (public/custom)
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(
@@ -465,7 +493,7 @@ async def list_oasis_sessions(username: str = "") -> str:
     Returns:
         Formatted list of oasis sessions with tag, session_id and message count
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     # Prefer calling OASIS HTTP API so both MCP and curl can access sessions
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -535,6 +563,10 @@ async def start_new_oasis(
     Workflow has two modes:
       - YAML mode: current OASIS graph engine
       - Python mode: provide python_file; the script is launched in standalone mode with question/user/team injected.
+
+    Discovery helpers:
+      - Use list_oasis_workflows(...) to find saved YAML workflows.
+      - Use list_oasis_python_workflows(...) to find saved Python workflows.
 
     In YAML mode, expert pool is built entirely from schedule YAML expert names.
     Either schedule_file or schedule_yaml must be provided.
@@ -615,7 +647,7 @@ async def start_new_oasis(
         YAML mode returns a topic_id message.
         Python mode returns a standalone run_id plus log/result file paths.
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
 
     if not python_file and not schedule_yaml and not schedule_file:
         return "❌ 必须提供 python_file 或 schedule_yaml 或 schedule_file（至少一个）。"
@@ -717,7 +749,7 @@ async def check_oasis_discussion(topic_id: str, username: str = "") -> str:
     Returns:
         Formatted discussion status and recent posts
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(
@@ -777,7 +809,7 @@ async def cancel_oasis_discussion(topic_id: str, username: str = "") -> str:
     Returns:
         Cancellation result
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.delete(
@@ -813,7 +845,7 @@ async def list_oasis_topics(username: str = "") -> str:
     """
     try:
         async with httpx.AsyncClient(timeout=30) as client:
-            effective_user = username or _FALLBACK_USER
+            effective_user = _resolve_effective_user(username)
             resp = await client.get(
                 f"{OASIS_BASE_URL}/topics",
                 params={"user_id": effective_user},
@@ -926,7 +958,7 @@ async def set_oasis_workflow(
     Returns:
         Confirmation with the saved file path
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     # Proxy to OASIS HTTP API
     try:
         async with httpx.AsyncClient(timeout=30) as client:
@@ -969,8 +1001,9 @@ async def set_oasis_python_workflow(
 
     Python workflows are stored under data/user_files/{user}/oasis/python/
     (or teams/{team}/oasis/python/ when team is set).
+    Use list_oasis_python_workflows(...) to see saved Python workflows.
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     safe_name = "".join(c for c in str(name or "") if c.isalnum() or c in "-_ ").strip() or "untitled"
     if not python_code.strip():
         return "❌ python_code 不能为空"
@@ -1001,9 +1034,10 @@ async def list_oasis_workflows(username: str = "", team: str = "") -> str:
         team: Team name. When provided, lists workflows from the team directory.
 
     Returns:
-        List of saved workflow files with preview
+        List of saved YAML workflow files with preview.
+        For Python workflows, use list_oasis_python_workflows(...).
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     try:
         items: list[dict] = []
         for scope, team_name, yaml_dir in _iter_workflow_dirs(effective_user, team):
@@ -1040,6 +1074,7 @@ async def list_oasis_workflows(username: str = "", team: str = "") -> str:
         else:
             lines.append("\n💡 未指定 team，已展示个人目录和全部 team 的 workflows。")
         lines.append("💡 使用: start_new_oasis(schedule_file=\"文件名\", ...)")
+        lines.append("💡 Python workflows 请使用: list_oasis_python_workflows(...)")
         return "\n".join(lines)
     except Exception as e:
         return f"❌ 查询失败: {e}"
@@ -1054,7 +1089,7 @@ async def list_oasis_python_workflows(username: str = "", team: str = "") -> str
         username: (auto-injected) current user identity; do NOT set manually
         team: Team name. When provided, lists workflows from the team directory.
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     try:
         items: list[dict] = []
         for scope, team_name, py_dir in _iter_python_workflow_dirs(effective_user, team):
@@ -1103,7 +1138,7 @@ async def check_oasis_python_run(run_id: str, username: str = "") -> str:
         run_id: The run_id returned by start_new_oasis in Python mode
         username: (auto-injected) current user identity; do NOT set manually
     """
-    _ = username or _FALLBACK_USER
+    _ = _resolve_effective_user(username)
     data, err = _load_python_run_payload(run_id)
     if err:
         return f"❌ {err}"
@@ -1158,7 +1193,7 @@ async def list_oasis_python_runs(username: str = "", team: str = "") -> str:
         username: (auto-injected) current user identity; do NOT set manually
         team: Optional team filter
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     runs_dir = _python_runs_dir()
     if not os.path.isdir(runs_dir):
         return "📭 暂无 Python workflow 运行记录"
@@ -1214,7 +1249,7 @@ async def cancel_oasis_python_run(run_id: str, username: str = "") -> str:
         run_id: The run_id returned by start_new_oasis in Python mode
         username: (auto-injected) current user identity; do NOT set manually
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     data, err = _load_python_run_payload(run_id)
     if err:
         return f"❌ {err}"
@@ -1244,7 +1279,7 @@ async def list_oasis_agent_catalog(username: str = "", team: str = "") -> str:
     Includes temp experts, internal session agents, and external agents with
     their target id, tag, platform, connect_type, session default, and full persona.
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.get(
@@ -2320,7 +2355,7 @@ async def yaml_to_layout(
     Returns:
         Confirmation with generated layout summary
     """
-    effective_user = username or _FALLBACK_USER
+    effective_user = _resolve_effective_user(username)
 
     # Use OASIS HTTP API for layout generation
     try:
