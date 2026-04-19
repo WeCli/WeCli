@@ -56,6 +56,7 @@ from services.team_creator_service import (
     PRESET_POOL,
 )
 from services.team_preset_assets import install_team_preset, list_team_presets
+from services.team_snapshot_skills import add_user_skills_to_zip, restore_user_skills_from_team_dir
 
 # 加载 .env 配置
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -5734,6 +5735,10 @@ def download_team_snapshot():
             # Save cron jobs to zip: cron_jobs.json
             if cron_jobs_data:
                 zipf.writestr("cron_jobs.json", json.dumps(cron_jobs_data, ensure_ascii=False, indent=2))
+
+            # Add ClawCross user-managed skills used by internal agents.
+            if _inc("skills"):
+                add_user_skills_to_zip(zipf, user_id)
         
         zip_buffer.seek(0)
         
@@ -5802,10 +5807,13 @@ def upload_team_snapshot():
                 # Skip directories and absolute paths
                 if filename.endswith('/') or filename.startswith('/'):
                     continue
-                # Allow files inside skills/ directory (any file type)
+                # Allow files inside skills/ and clawcross_user_skills/ directories (any file type)
                 # For other files, allow team metadata plus workflow formats (json/yaml/python)
-                if not filename.startswith('skills/'):
-                    if not (filename.endswith(('.json', '.yaml', '.yml', '.py'))):
+                if not (filename.startswith('skills/') or filename.startswith('clawcross_user_skills/')):
+                    if not (
+                        filename.endswith(('.json', '.yaml', '.yml', '.py'))
+                        or filename == 'clawcross_skills_manifest.json'
+                    ):
                         return jsonify({"error": f"Invalid file type in zip: {filename}"}), 400
                 # Preserve relative directory structure from zip
                 target_path = os.path.join(team_dir, filename)
@@ -6035,6 +6043,8 @@ def upload_team_snapshot():
         # Clean up extracted skills directory from team folder (it was only temporary)
         if os.path.isdir(extracted_skills_dir):
             shutil.rmtree(extracted_skills_dir, ignore_errors=True)
+
+        skill_restore_result = restore_user_skills_from_team_dir(team_dir, user_id)
         
         # --- Restore cron jobs from cron_jobs.json ---
         cron_jobs_path = os.path.join(team_dir, "cron_jobs.json")
@@ -6065,6 +6075,8 @@ def upload_team_snapshot():
         
         msg_parts = [f"Team '{team}' snapshot uploaded"]
         msg_parts.append(f"{len(agents_data)} internal agents restored")
+        if skill_restore_result.get("restored_skill_dirs") or skill_restore_result.get("manifest_written"):
+            msg_parts.append(f"{skill_restore_result.get('restored_skill_dirs', 0)} managed skills restored")
         if openclaw_restored > 0 or openclaw_errors:
             msg_parts.append(f"{openclaw_restored} OpenClaw agents restored")
         if cron_restored_total > 0 or cron_errors:
@@ -6073,6 +6085,7 @@ def upload_team_snapshot():
         return jsonify({
             "success": True,
             "message": ", ".join(msg_parts),
+            "skill_restore": skill_restore_result,
             "openclaw_errors": openclaw_errors if openclaw_errors else None,
             "openclaw_restore_details": openclaw_restore_details if openclaw_restore_details else None,
             "cron_errors": cron_errors if cron_errors else None,

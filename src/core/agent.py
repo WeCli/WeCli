@@ -112,6 +112,8 @@ USER_INJECTED_TOOLS = {
     "list_files", "read_file", "write_file", "append_file", "delete_file",
     # Command execution tools
     "run_command", "run_python_code",
+    "start_background_command", "get_background_command_status",
+    "read_background_command_output", "cancel_background_command",
     # Alarm management tools
     "add_alarm", "list_alarms", "delete_alarm",
     # Telegram push notification tools
@@ -154,6 +156,10 @@ SESSION_INJECTED_TOOLS = {
     "delete_file": "session_id",
     "run_command": "session_id",
     "run_python_code": "session_id",
+    "start_background_command": "session_id",
+    "get_background_command_status": "session_id",
+    "read_background_command_output": "session_id",
+    "cancel_background_command": "session_id",
     "add_alarm": "session_id",
     "start_new_oasis": "notify_session",
     "get_current_session": "current_session_id",

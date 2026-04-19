@@ -185,6 +185,7 @@ class OpenAIChatService:
         last_user_msg = None
 
         trailing_tool_msgs = []
+        trailing_tool_assistant = None
         i = len(req.messages) - 1
         while i >= 0:
             msg = req.messages[i]
@@ -192,12 +193,40 @@ class OpenAIChatService:
                 trailing_tool_msgs.insert(0, msg)
                 i -= 1
             elif msg.role == "assistant" and msg.tool_calls and trailing_tool_msgs:
+                trailing_tool_assistant = msg
                 i -= 1
+                break
             else:
                 break
 
         if trailing_tool_msgs:
-            tool_result_messages = []
+            tool_result_messages: list[Any] = []
+            if trailing_tool_assistant and trailing_tool_assistant.tool_calls:
+                normalized_tool_calls = []
+                for tc in trailing_tool_assistant.tool_calls:
+                    if not isinstance(tc, dict):
+                        continue
+                    function = tc.get("function") or {}
+                    raw_args = function.get("arguments", {})
+                    parsed_args = raw_args
+                    if isinstance(raw_args, str):
+                        try:
+                            parsed_args = json.loads(raw_args)
+                        except Exception:
+                            parsed_args = {}
+                    normalized_tool_calls.append(
+                        {
+                            "id": tc.get("id", ""),
+                            "name": function.get("name", ""),
+                            "args": parsed_args if isinstance(parsed_args, dict) else {},
+                        }
+                    )
+                tool_result_messages.append(
+                    AIMessage(
+                        content=self.extract_text(trailing_tool_assistant.content),
+                        tool_calls=normalized_tool_calls,
+                    )
+                )
             for tmsg in trailing_tool_msgs:
                 tool_result_messages.append(
                     ToolMessage(
