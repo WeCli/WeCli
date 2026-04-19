@@ -56,7 +56,7 @@ from services.team_creator_service import (
     PRESET_POOL,
 )
 from services.team_preset_assets import install_team_preset, list_team_presets
-from services.team_snapshot_skills import add_user_skills_to_zip, restore_user_skills_from_team_dir
+from services.team_snapshot_skills import add_team_skills_to_zip, add_user_skills_to_zip, restore_skills_from_team_dir
 
 # 加载 .env 配置
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -4896,6 +4896,55 @@ def update_team_settings(team_name):
     return jsonify({"ok": True, "settings": settings})
 
 
+@app.route("/teams/<team_name>/skills", methods=["GET"])
+def get_team_skills(team_name):
+    """List team-scoped and shared managed skills for a team."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+    team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name)
+    if not os.path.exists(team_dir):
+        return jsonify({"error": "Team not found"}), 404
+
+    from webot.skills import list_skills
+
+    return jsonify({
+        "ok": True,
+        "team": team_name,
+        "skills": {
+            "team": list_skills(user_id, team=team_name),
+            "personal": list_skills(user_id),
+        },
+    })
+
+
+@app.route("/teams/<team_name>/skills/<skill_name>", methods=["GET"])
+def get_team_skill_detail(team_name, skill_name):
+    """Get a single team/shared managed skill detail including SKILL.md content."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+    team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name)
+    if not os.path.exists(team_dir):
+        return jsonify({"error": "Team not found"}), 404
+
+    scope = str(request.args.get("scope") or "team").strip().lower()
+    if scope not in {"team", "personal"}:
+        return jsonify({"error": "Invalid scope"}), 400
+
+    from webot.skills import get_skill
+
+    skill = get_skill(user_id, name=skill_name, team=team_name if scope == "team" else "")
+    if not skill:
+        return jsonify({"error": f"Skill '{skill_name}' not found"}), 404
+
+    return jsonify({"ok": True, "skill": skill})
+
+
 # ------------------------------------------------------------------
 # User-level external_agents.json  (data/user_files/<user>/external_agents.json)
 # Same entry shape as team external_agents.json; used for non-team Ext + fast contacts.
@@ -5423,7 +5472,7 @@ def preview_team_snapshot():
             pass
     result["sections"]["external_agents"] = {"count": len(external_agents_info), "items": external_agents_info}
 
-    # --- 4. skills (workspace + managed) for openclaw agents ---
+    # --- 4. skills (workspace + managed) for openclaw agents + ClawCross managed skills ---
     skills_info = []
     managed_skills_info = []  # [{"name": ..., "source": "managed"}]
     if isinstance(ext_data, list):
@@ -5473,6 +5522,20 @@ def preview_team_snapshot():
         "details": skills_info,
         "managed": managed_skills_info,
     }
+    try:
+        from webot.skills import list_skills as list_managed_skills
+
+        result["sections"]["skills"]["clawcross_personal"] = [
+            {"name": item.get("name", ""), "category": item.get("category", "")}
+            for item in list_managed_skills(user_id)
+        ]
+        result["sections"]["skills"]["clawcross_team"] = [
+            {"name": item.get("name", ""), "category": item.get("category", "")}
+            for item in list_managed_skills(user_id, team=team)
+        ]
+    except Exception:
+        result["sections"]["skills"]["clawcross_personal"] = []
+        result["sections"]["skills"]["clawcross_team"] = []
 
     # --- 5. cron jobs ---
     cron_info = {}
@@ -5567,6 +5630,27 @@ def download_team_snapshot():
                 if skill_name is None:
                     return True  # agent is selected, check skills individually
                 return skill_name in agent_val
+        return True
+
+    def _inc_managed_skill(scope: str, skill_name: str | None = None) -> bool:
+        if include is None:
+            return True
+        skills_val = include.get("skills", False)
+        if skills_val is True:
+            return True
+        if skills_val is False or not skills_val:
+            return False
+        if isinstance(skills_val, dict):
+            key = "_managed_team" if scope == "team" else "_managed_personal"
+            scope_val = skills_val.get(key, False)
+            if scope_val is True:
+                return True
+            if scope_val is False or not scope_val:
+                return False
+            if isinstance(scope_val, list):
+                if skill_name is None:
+                    return True
+                return skill_name in scope_val
         return True
 
     team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team)
@@ -5736,9 +5820,21 @@ def download_team_snapshot():
             if cron_jobs_data:
                 zipf.writestr("cron_jobs.json", json.dumps(cron_jobs_data, ensure_ascii=False, indent=2))
 
-            # Add ClawCross user-managed skills used by internal agents.
+            # Add ClawCross managed skills (personal + team scoped).
             if _inc("skills"):
-                add_user_skills_to_zip(zipf, user_id)
+                personal_names = None
+                team_names = None
+                if include is not None and isinstance(include.get("skills"), dict):
+                    skills_val = include.get("skills", {})
+                    personal_raw = skills_val.get("_managed_personal", False)
+                    team_raw = skills_val.get("_managed_team", False)
+                    personal_names = {str(item) for item in personal_raw} if isinstance(personal_raw, list) else None
+                    team_names = {str(item) for item in team_raw} if isinstance(team_raw, list) else None
+
+                if _inc_managed_skill("personal"):
+                    add_user_skills_to_zip(zipf, user_id, selected_names=personal_names)
+                if _inc_managed_skill("team"):
+                    add_team_skills_to_zip(zipf, user_id, team, selected_names=team_names)
         
         zip_buffer.seek(0)
         
@@ -5807,13 +5903,14 @@ def upload_team_snapshot():
                 # Skip directories and absolute paths
                 if filename.endswith('/') or filename.startswith('/'):
                     continue
-                # Allow files inside skills/ and clawcross_user_skills/ directories (any file type)
+                # Allow files inside skills/, clawcross_user_skills/, and clawcross_team_skills/ directories (any file type)
                 # For other files, allow team metadata plus workflow formats (json/yaml/python)
-                if not (filename.startswith('skills/') or filename.startswith('clawcross_user_skills/')):
-                    if not (
-                        filename.endswith(('.json', '.yaml', '.yml', '.py'))
-                        or filename == 'clawcross_skills_manifest.json'
-                    ):
+                if not (
+                    filename.startswith('skills/')
+                    or filename.startswith('clawcross_user_skills/')
+                    or filename.startswith('clawcross_team_skills/')
+                ):
+                    if not filename.endswith(('.json', '.yaml', '.yml', '.py')):
                         return jsonify({"error": f"Invalid file type in zip: {filename}"}), 400
                 # Preserve relative directory structure from zip
                 target_path = os.path.join(team_dir, filename)
@@ -6044,7 +6141,7 @@ def upload_team_snapshot():
         if os.path.isdir(extracted_skills_dir):
             shutil.rmtree(extracted_skills_dir, ignore_errors=True)
 
-        skill_restore_result = restore_user_skills_from_team_dir(team_dir, user_id)
+        skill_restore_result = restore_skills_from_team_dir(team_dir, user_id, team)
         
         # --- Restore cron jobs from cron_jobs.json ---
         cron_jobs_path = os.path.join(team_dir, "cron_jobs.json")
@@ -6075,8 +6172,12 @@ def upload_team_snapshot():
         
         msg_parts = [f"Team '{team}' snapshot uploaded"]
         msg_parts.append(f"{len(agents_data)} internal agents restored")
-        if skill_restore_result.get("restored_skill_dirs") or skill_restore_result.get("manifest_written"):
-            msg_parts.append(f"{skill_restore_result.get('restored_skill_dirs', 0)} managed skills restored")
+        restored_skills_total = (
+            int(skill_restore_result.get("restored_user_skill_dirs", 0) or 0)
+            + int(skill_restore_result.get("restored_team_skill_dirs", 0) or 0)
+        )
+        if restored_skills_total:
+            msg_parts.append(f"{restored_skills_total} managed skills restored")
         if openclaw_restored > 0 or openclaw_errors:
             msg_parts.append(f"{openclaw_restored} OpenClaw agents restored")
         if cron_restored_total > 0 or cron_errors:

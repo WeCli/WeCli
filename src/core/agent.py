@@ -201,6 +201,14 @@ SESSION_INJECTED_TOOLS = {
     "search_sessions": "session_id",
 }
 
+TEAM_INJECTED_TOOLS: frozenset[str] = frozenset({
+    "skill_manage",
+    "skill_view",
+    "skill_list",
+    "skill_evolution_report",
+    "skill_evolution_apply",
+})
+
 # Session-related tool args that must always match runtime session (model cannot override).
 SESSION_FORCE_INJECTED_TOOLS: frozenset[str] = frozenset({
     "send_to_group",
@@ -351,6 +359,10 @@ class UserAwareToolNode:
 
                 if tc["name"] in USER_INJECTED_TOOLS:
                     tc["args"]["username"] = user_id
+                if tc["name"] in TEAM_INJECTED_TOOLS and not tc["args"].get("team"):
+                    session_meta = self._find_internal_session_meta(user_id, session_id)
+                    if session_meta and session_meta.get("team"):
+                        tc["args"]["team"] = session_meta["team"]
                 # Auto-inject session-related args; SESSION_FORCE_INJECTED_TOOLS always overwrites model args.
                 if tc["name"] in SESSION_INJECTED_TOOLS:
                     param_name = SESSION_INJECTED_TOOLS[tc["name"]]
@@ -619,48 +631,50 @@ class TeamAgent:
         except FileNotFoundError:
             return ""
 
-    def _get_user_skills(self, user_id: str) -> str:
+    def _get_user_skills(self, user_id: str, team: str = "") -> str:
         """
-        从 data/user_files/{user_id}/skills_manifest.json 读取用户的 skill list，
+        从 webot.skills 读取用户的 managed skills，
         并返回格式化的 skill 信息字符串。
         即使没有 skill，也会返回位置信息。
         """
-        user_files_dir = self._prompts.get("_user_files_dir", "")
-        manifest_path = os.path.join(user_files_dir, user_id, "skills_manifest.json")
-        skills_dir = os.path.join(user_files_dir, user_id, "skills")
+        from webot.skills import list_skills
 
-        skills_manifest = []
-        try:
-            with open(manifest_path, "r", encoding="utf-8") as f:
-                raw = json.load(f)
-                # 兼容两种格式：直接列表 [...] 或 {"skills": [...]}
-                if isinstance(raw, list):
-                    skills_manifest = raw
-                elif isinstance(raw, dict):
-                    skills_manifest = raw.get("skills", [])
-        except (FileNotFoundError, json.JSONDecodeError):
-            pass
+        user_files_dir = self._prompts.get("_user_files_dir", "")
+        skills_dir = os.path.join(user_files_dir, user_id, "skills")
+        team_skills = list_skills(user_id, team=team) if team else []
+        personal_skills = list_skills(user_id)
 
         # 格式化 skill 信息（即使为空也返回位置信息）
         skill_lines = ["\n【用户技能列表】"]
-        skill_lines.append(f"技能清单文件位置: {manifest_path}")
         skill_lines.append(f"技能文件目录位置: {skills_dir}")
+        if team:
+            skill_lines.append(f"团队技能目录位置: {os.path.join(user_files_dir, user_id, 'teams', team, 'skills')}")
 
-        if skills_manifest:
-            skill_lines.append("可用技能：")
-            for skill in skills_manifest:
+        def _append_section(title: str, items: list[dict]) -> None:
+            if not items:
+                return
+            skill_lines.append(title)
+            for skill in items:
                 if not isinstance(skill, dict):
                     continue
                 skill_name = skill.get("name", "未命名技能")
                 skill_desc = skill.get("description", "无描述")
-                skill_file = skill.get("file", "")
+                skill_file = skill.get("path", "")
                 skill_lines.append(f"  - {skill_name}: {skill_desc}")
                 if skill_file:
-                    skill_lines.append(f"    文件: {os.path.join(skills_dir, skill_file)}")
-            skill_lines.append("如需使用某个技能，请使用文件管理工具读取对应的技能文件。")
+                    skill_lines.append(f"    文件: {skill_file}")
+
+        if team:
+            _append_section("团队技能：", team_skills)
+            _append_section("共享技能：", personal_skills)
+        elif personal_skills:
+            _append_section("可用技能：", personal_skills)
+
+        if team_skills or personal_skills:
+            skill_lines.append("如需使用某个技能，请优先使用 skill_view 查看完整内容。")
         else:
             skill_lines.append("当前暂无已注册的技能。")
-            skill_lines.append("如需添加技能，请在技能清单文件中添加技能信息。")
+            skill_lines.append("如需添加技能，请使用 skill_manage(action='create') 创建。")
 
         return "\n".join(skill_lines)
 
@@ -1231,6 +1245,9 @@ class TeamAgent:
         if not is_subagent and session_persona_prompt:
             base_prompt += f"\n{session_persona_prompt}\n"
 
+        session_meta = self._find_internal_session_meta(user_id, session_id or "") if (user_id and session_id) else None
+        session_team = (session_meta or {}).get("team", "")
+
         if (not is_subagent) or (subagent_profile and subagent_profile.include_user_profile):
             # 注入用户专属画像
             user_profile = self._get_user_profile(user_id)
@@ -1239,7 +1256,7 @@ class TeamAgent:
 
         if (not is_subagent) or (subagent_profile and subagent_profile.include_user_skills):
             # 注入用户技能列表（总是显示位置信息）
-            base_prompt += self._get_user_skills(user_id) + "\n"
+            base_prompt += self._get_user_skills(user_id, team=session_team) + "\n"
 
         # --- SOUL.md personality injection (new: ported from Hermes Agent) ---
         if not is_subagent:
@@ -1249,7 +1266,7 @@ class TeamAgent:
 
         # --- Self-evolution skills prompt injection (new: ported from Hermes Agent) ---
         if not is_subagent:
-            skills_prompt = build_skills_prompt(user_id)
+            skills_prompt = build_skills_prompt(user_id, team=session_team)
             if skills_prompt:
                 base_prompt += skills_prompt + "\n"
 

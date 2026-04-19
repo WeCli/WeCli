@@ -10017,7 +10017,7 @@ async function openGroup(teamName) {
         '<button id="team-tab-members" onclick="switchTeamTab(\'members\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #2563eb;background:#2563eb;color:white;">👥 成员</button>' +
         '<button id="team-tab-experts" onclick="switchTeamTab(\'experts\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #d1d5db;background:#f9fafb;color:#374151;">🧑‍💼 人设池</button>' +
         '<button id="team-tab-workflows" onclick="switchTeamTab(\'workflows\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #d1d5db;background:#f9fafb;color:#374151;">📂 工作流</button>' +
-        '<button id="team-tab-settings" onclick="switchTeamTab(\'settings\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #d1d5db;background:#f9fafb;color:#374151;">⚙️ 设置</button>' +
+        '<button id="team-tab-skills" onclick="switchTeamTab(\'skills\')" style="padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #d1d5db;background:#f9fafb;color:#374151;">🧩 Skill</button>' +
         '</div>' +
         '<div style="display:flex;gap:8px;align-items:center;">' +
         '<span id="team-tab-actions-members">' +
@@ -10033,7 +10033,9 @@ async function openGroup(teamName) {
         '<button onclick="showImportTeamWorkflowTemplateModal()" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1 rounded border border-blue-200" title="导入通用 Python 工作流模板">📥 导入模板</button>' +
         '<button onclick="newTeamWorkflowOnCanvas()" class="text-xs bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-1 rounded border border-purple-200" title="新建工作流（跳转画布）">➕ 创建工作流</button>' +
         '</span>' +
-        '<span id="team-tab-actions-settings" style="display:none;"></span>' +
+        '<span id="team-tab-actions-skills" style="display:none;">' +
+        '<button onclick="loadTeamSkills()" class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 px-2 py-1 rounded transition-colors" title="刷新 Skill 列表">🔄</button>' +
+        '</span>' +
         '<button onclick="toggleTeamMembersView()" class="text-gray-400 hover:text-gray-600 text-sm">&times;</button>' +
         '</div>' +
         '</div>' +
@@ -10080,16 +10082,23 @@ async function openGroup(teamName) {
         '</tbody>' +
         '</table>' +
         '</div>' +
-        '<div id="team-panel-settings" class="team-members-table-container" style="display:none;padding:16px;">' +
-        '<div style="max-width:480px;">' +
-        '<h4 style="font-size:14px;font-weight:600;color:#374151;margin-bottom:12px;">⚙️ 团队设置</h4>' +
-        '<div style="margin-bottom:16px;">' +
-        '<label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:4px;">Fallback Agent</label>' +
-        '<input id="team-settings-fallback-agent" type="text" placeholder="当 agent 恢复失败时的备用 agent 名称" style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;box-sizing:border-box;">' +
-        '<div style="font-size:11px;color:#6b7280;margin-top:4px;">设置后，当导入快照时 OpenClaw agent 恢复失败，会自动使用此 fallback agent</div>' +
+        '<div id="team-panel-skills" class="team-members-table-container" style="display:none;padding:0;">' +
+        '<div style="display:flex;min-height:420px;">' +
+        '<div style="width:280px;border-right:1px solid #e5e7eb;padding:12px;overflow:auto;">' +
+        '<div id="team-skills-list" style="display:flex;flex-direction:column;gap:8px;"></div>' +
         '</div>' +
-        '<button id="team-settings-save-btn" onclick="saveTeamSettings()" style="padding:8px 16px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">保存设置</button>' +
-        '<div id="team-settings-status" style="margin-top:8px;font-size:12px;"></div>' +
+        '<div style="flex:1;min-width:0;padding:16px;overflow:auto;">' +
+        '<div id="team-skill-view-empty" style="color:#9ca3af;font-size:12px;padding:20px 0;">请选择一个 Skill 查看 SKILL.md</div>' +
+        '<div id="team-skill-view" style="display:none;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;">' +
+        '<div>' +
+        '<div id="team-skill-view-name" style="font-size:16px;font-weight:700;color:#111827;"></div>' +
+        '<div id="team-skill-view-meta" style="font-size:11px;color:#6b7280;margin-top:4px;"></div>' +
+        '</div>' +
+        '</div>' +
+        '<pre id="team-skill-view-content" style="white-space:pre-wrap;word-break:break-word;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:12px;font-size:12px;line-height:1.6;color:#1f2937;overflow:auto;"></pre>' +
+        '</div>' +
+        '</div>' +
         '</div>' +
         '</div>' +
         '</div>';
@@ -10507,7 +10516,7 @@ async function loadTeamMembers() {
 
 // Store preview data for export
 let _exportPreviewData = null;
-let _exportSelectedSkills = new Set(); // Store selected skill IDs: "agent/skill" or "managed/skill"
+let _exportSelectedSkills = new Set(); // Store selected skill IDs: "agent/skill", "managed_personal/skill", or "managed_team/skill"
 
 /**
  * Toggle all skills based on the "select all" checkbox
@@ -10695,7 +10704,7 @@ function renderExportPreview(data) {
     }
     
     // Skills - Render by agent with individual checkboxes
-    const skills = sections.skills || { agents: [], details: [], managed: [] };
+    const skills = sections.skills || { agents: [], details: [], managed: [], clawcross_personal: [], clawcross_team: [] };
     let totalSkills = 0;
     const skillsListEl = document.getElementById('export-skills-list');
     let skillsHtml = '';
@@ -10728,12 +10737,54 @@ function renderExportPreview(data) {
         });
     }
     
-    // Managed skills section
+    // OpenClaw managed skills section
     if (skills.managed && skills.managed.length > 0) {
         totalSkills += skills.managed.length;
         skillsHtml += `<div class="mt-3 mb-1 font-medium text-gray-700 text-xs uppercase tracking-wide border-b border-gray-200 pb-1">${t('export_managed_skills')}</div>`;
         skills.managed.forEach(s => {
             const skillId = `managed/${s.name}`;
+            const isChecked = _exportSelectedSkills.has(skillId);
+            skillsHtml += `
+                <div class="flex items-center gap-2 py-0.5 hover:bg-gray-100 rounded">
+                    <input type="checkbox" id="skill-${escapeHtml(skillId.replace(/\//g, '-'))}" 
+                        class="export-skill-checkbox" 
+                        data-skill-id="${escapeHtml(skillId)}"
+                        ${isChecked ? 'checked' : ''}
+                        onchange="toggleSkill('${escapeHtml(skillId)}', this.checked)">
+                    <label for="skill-${escapeHtml(skillId.replace(/\//g, '-'))}" class="text-gray-700 cursor-pointer select-none text-sm flex-1">
+                        ${escapeHtml(s.name)}
+                    </label>
+                </div>`;
+        });
+    }
+
+    // ClawCross personal managed skills
+    if (skills.clawcross_personal && skills.clawcross_personal.length > 0) {
+        totalSkills += skills.clawcross_personal.length;
+        skillsHtml += `<div class="mt-3 mb-1 font-medium text-gray-700 text-xs uppercase tracking-wide border-b border-gray-200 pb-1">${t('export_managed_skills')} · Shared</div>`;
+        skills.clawcross_personal.forEach(s => {
+            const skillId = `managed_personal/${s.name}`;
+            const isChecked = _exportSelectedSkills.has(skillId);
+            skillsHtml += `
+                <div class="flex items-center gap-2 py-0.5 hover:bg-gray-100 rounded">
+                    <input type="checkbox" id="skill-${escapeHtml(skillId.replace(/\//g, '-'))}" 
+                        class="export-skill-checkbox" 
+                        data-skill-id="${escapeHtml(skillId)}"
+                        ${isChecked ? 'checked' : ''}
+                        onchange="toggleSkill('${escapeHtml(skillId)}', this.checked)">
+                    <label for="skill-${escapeHtml(skillId.replace(/\//g, '-'))}" class="text-gray-700 cursor-pointer select-none text-sm flex-1">
+                        ${escapeHtml(s.name)}
+                    </label>
+                </div>`;
+        });
+    }
+
+    // ClawCross team managed skills
+    if (skills.clawcross_team && skills.clawcross_team.length > 0) {
+        totalSkills += skills.clawcross_team.length;
+        skillsHtml += `<div class="mt-3 mb-1 font-medium text-gray-700 text-xs uppercase tracking-wide border-b border-gray-200 pb-1">${t('export_managed_skills')} · Team</div>`;
+        skills.clawcross_team.forEach(s => {
+            const skillId = `managed_team/${s.name}`;
             const isChecked = _exportSelectedSkills.has(skillId);
             skillsHtml += `
                 <div class="flex items-center gap-2 py-0.5 hover:bg-gray-100 rounded">
@@ -10822,10 +10873,12 @@ async function confirmExportTeam() {
     }
     
     // Handle granular skills selection - only if some skills are selected but not all
-    const skills = _exportPreviewData.sections?.skills || { details: [], managed: [] };
+    const skills = _exportPreviewData.sections?.skills || { details: [], managed: [], clawcross_personal: [], clawcross_team: [] };
     let allSkillsCount = 0;
     skills.details?.forEach(d => { if (d.skills) allSkillsCount += d.skills.length; });
     if (skills.managed) allSkillsCount += skills.managed.length;
+    if (skills.clawcross_personal) allSkillsCount += skills.clawcross_personal.length;
+    if (skills.clawcross_team) allSkillsCount += skills.clawcross_team.length;
     
     // If skills section is enabled but not all skills selected, use granular mode
     if (include.skills && _exportSelectedSkills.size > 0 && _exportSelectedSkills.size < allSkillsCount) {
@@ -10834,10 +10887,25 @@ async function confirmExportTeam() {
         _exportSelectedSkills.forEach(skillId => {
             const [agent, ...skillParts] = skillId.split('/');
             const skillName = skillParts.join('/'); // skill name might contain '/'
-            if (!granularSkills[agent]) {
-                granularSkills[agent] = [];
+            const targetKey = agent === 'managed_personal'
+                ? '_managed_personal'
+                : agent === 'managed_team'
+                    ? '_managed_team'
+                    : agent;
+            if (!granularSkills[targetKey]) {
+                granularSkills[targetKey] = [];
             }
-            granularSkills[agent].push(skillName);
+            if (agent === 'managed') {
+                if (!granularSkills[agent]) {
+                    granularSkills[agent] = [];
+                }
+                granularSkills[agent].push(skillName);
+                return;
+            }
+            if (!granularSkills[targetKey]) {
+                granularSkills[targetKey] = [];
+            }
+            granularSkills[targetKey].push(skillName);
         });
         include.skills = granularSkills;
     }
@@ -12837,30 +12905,30 @@ function switchTeamTab(tab) {
     const btnMembers = document.getElementById('team-tab-members');
     const btnExperts = document.getElementById('team-tab-experts');
     const btnWorkflows = document.getElementById('team-tab-workflows');
-    const btnSettings = document.getElementById('team-tab-settings');
+    const btnSkills = document.getElementById('team-tab-skills');
     const panelMembers = document.getElementById('team-panel-members');
     const panelExperts = document.getElementById('team-panel-experts');
     const panelWorkflows = document.getElementById('team-panel-workflows');
-    const panelSettings = document.getElementById('team-panel-settings');
+    const panelSkills = document.getElementById('team-panel-skills');
     const actionsMembers = document.getElementById('team-tab-actions-members');
     const actionsExperts = document.getElementById('team-tab-actions-experts');
     const actionsWorkflows = document.getElementById('team-tab-actions-workflows');
-    const actionsSettings = document.getElementById('team-tab-actions-settings');
+    const actionsSkills = document.getElementById('team-tab-actions-skills');
     if (!btnMembers || !btnExperts) return;
 
     // Reset all tabs to inactive
     const inactiveStyle = {background: '#f9fafb', color: '#374151', borderColor: '#d1d5db'};
-    [btnMembers, btnExperts, btnWorkflows, btnSettings].forEach(btn => {
+    [btnMembers, btnExperts, btnWorkflows, btnSkills].forEach(btn => {
         if (btn) { btn.style.background = inactiveStyle.background; btn.style.color = inactiveStyle.color; btn.style.borderColor = inactiveStyle.borderColor; }
     });
     if (panelMembers) panelMembers.style.display = 'none';
     if (panelExperts) panelExperts.style.display = 'none';
     if (panelWorkflows) panelWorkflows.style.display = 'none';
-    if (panelSettings) panelSettings.style.display = 'none';
+    if (panelSkills) panelSkills.style.display = 'none';
     if (actionsMembers) actionsMembers.style.display = 'none';
     if (actionsExperts) actionsExperts.style.display = 'none';
     if (actionsWorkflows) actionsWorkflows.style.display = 'none';
-    if (actionsSettings) actionsSettings.style.display = 'none';
+    if (actionsSkills) actionsSkills.style.display = 'none';
 
     if (tab === 'experts') {
         btnExperts.style.background = '#7c3aed'; btnExperts.style.color = 'white'; btnExperts.style.borderColor = '#7c3aed';
@@ -12872,11 +12940,11 @@ function switchTeamTab(tab) {
         if (panelWorkflows) panelWorkflows.style.display = '';
         if (actionsWorkflows) actionsWorkflows.style.display = '';
         loadTeamWorkflows();
-    } else if (tab === 'settings') {
-        if (btnSettings) { btnSettings.style.background = '#f59e0b'; btnSettings.style.color = 'white'; btnSettings.style.borderColor = '#f59e0b'; }
-        if (panelSettings) panelSettings.style.display = '';
-        if (actionsSettings) actionsSettings.style.display = '';
-        loadTeamSettings();
+    } else if (tab === 'skills') {
+        if (btnSkills) { btnSkills.style.background = '#f59e0b'; btnSkills.style.color = 'white'; btnSkills.style.borderColor = '#f59e0b'; }
+        if (panelSkills) panelSkills.style.display = '';
+        if (actionsSkills) actionsSkills.style.display = '';
+        loadTeamSkills();
     } else {
         btnMembers.style.background = '#2563eb'; btnMembers.style.color = 'white'; btnMembers.style.borderColor = '#2563eb';
         if (panelMembers) panelMembers.style.display = '';
@@ -12924,59 +12992,80 @@ async function loadTeamExperts() {
     }
 }
 
-// ── Load / Save Team Settings ──
-async function loadTeamSettings() {
+// ── Team Skills ──
+async function loadTeamSkills() {
     if (!currentGroupId) return;
-    const fallbackAgentInput = document.getElementById('team-settings-fallback-agent');
-    const statusEl = document.getElementById('team-settings-status');
-    if (!fallbackAgentInput) return;
-
-    fallbackAgentInput.value = '';
-    if (statusEl) statusEl.textContent = '加载中...';
+    const listEl = document.getElementById('team-skills-list');
+    const emptyEl = document.getElementById('team-skill-view-empty');
+    const viewEl = document.getElementById('team-skill-view');
+    if (!listEl) return;
+    listEl.innerHTML = '<div class="text-gray-400 text-xs">加载中...</div>';
+    if (emptyEl) emptyEl.style.display = '';
+    if (viewEl) viewEl.style.display = 'none';
 
     try {
-        const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/settings`, { cache: 'no-store' });
+        const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/skills`, { cache: 'no-store' });
         if (!resp.ok) {
-            if (statusEl) statusEl.textContent = '加载失败';
+            listEl.innerHTML = '<div class="text-red-400 text-xs">加载失败</div>';
             return;
         }
         const data = await resp.json();
-        const settings = data.settings || {};
-        fallbackAgentInput.value = settings.fallback_agent || '';
-        if (statusEl) statusEl.textContent = '';
+        const sections = data.skills || {};
+        const teamSkills = sections.team || [];
+        const personalSkills = sections.personal || [];
+        let html = '';
+        const renderSection = (title, items, scope, badgeColor) => {
+            if (!items.length) return;
+            html += `<div style="font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;margin:6px 0 4px;">${escapeHtml(title)}</div>`;
+            items.forEach(skill => {
+                const name = skill.name || '';
+                const category = skill.category ? ` · ${skill.category}` : '';
+                html += `
+                    <button onclick="loadTeamSkillDetail('${escapeHtml(name)}','${scope}')" style="width:100%;text-align:left;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:white;cursor:pointer;margin-bottom:6px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                            <span style="font-size:13px;font-weight:600;color:#111827;">${escapeHtml(name)}</span>
+                            <span style="font-size:10px;padding:2px 6px;border-radius:999px;background:${badgeColor};color:white;">${scope}</span>
+                        </div>
+                        <div style="font-size:11px;color:#6b7280;margin-top:4px;">${escapeHtml((skill.description || '') + category)}</div>
+                    </button>`;
+            });
+        };
+        renderSection('团队 Skill', teamSkills, 'team', '#f59e0b');
+        renderSection('共享 Skill', personalSkills, 'personal', '#6b7280');
+        listEl.innerHTML = html || '<div class="text-gray-400 text-xs">暂无 Skill</div>';
     } catch (e) {
-        if (statusEl) statusEl.textContent = '加载失败: ' + e.message;
+        listEl.innerHTML = '<div class="text-red-400 text-xs">加载失败: ' + escapeHtml(e.message) + '</div>';
     }
 }
 
-async function saveTeamSettings() {
+async function loadTeamSkillDetail(skillName, scope) {
     if (!currentGroupId) return;
-    const fallbackAgentInput = document.getElementById('team-settings-fallback-agent');
-    const statusEl = document.getElementById('team-settings-status');
-    const saveBtn = document.getElementById('team-settings-save-btn');
-    if (!fallbackAgentInput) return;
-
-    const fallback_agent = fallbackAgentInput.value.trim();
-
-    if (statusEl) statusEl.textContent = '保存中...';
-    if (saveBtn) saveBtn.disabled = true;
+    const emptyEl = document.getElementById('team-skill-view-empty');
+    const viewEl = document.getElementById('team-skill-view');
+    const nameEl = document.getElementById('team-skill-view-name');
+    const metaEl = document.getElementById('team-skill-view-meta');
+    const contentEl = document.getElementById('team-skill-view-content');
+    if (!contentEl) return;
+    if (emptyEl) emptyEl.style.display = 'none';
+    if (viewEl) viewEl.style.display = '';
+    if (nameEl) nameEl.textContent = skillName;
+    if (metaEl) metaEl.textContent = '加载中...';
+    contentEl.textContent = '';
 
     try {
-        const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/settings`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ fallback_agent }),
-        });
+        const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/skills/${encodeURIComponent(skillName)}?scope=${encodeURIComponent(scope)}`, { cache: 'no-store' });
         if (!resp.ok) {
-            const err = await resp.json();
-            throw new Error(err.error || '保存失败');
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.error || '加载失败');
         }
-        if (statusEl) statusEl.textContent = '✅ 保存成功';
-        setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+        const data = await resp.json();
+        const skill = data.skill || {};
+        if (nameEl) nameEl.textContent = skill.name || skillName;
+        if (metaEl) metaEl.textContent = `${scope === 'team' ? '团队' : '共享'} · ${skill.category || 'uncategorized'} · ${skill.path || ''}`;
+        contentEl.textContent = skill.content || '';
     } catch (e) {
-        if (statusEl) statusEl.textContent = '❌ 保存失败: ' + e.message;
-    } finally {
-        if (saveBtn) saveBtn.disabled = false;
+        if (metaEl) metaEl.textContent = '加载失败';
+        contentEl.textContent = String(e.message || e);
     }
 }
 
