@@ -255,9 +255,20 @@ class UserAwareToolNode:
     1. Reads thread_id from RunnableConfig, auto-injects as username for file/command tools
     2. Intercepts calls to disabled tools at runtime, returns error ToolMessage
     """
-    def __init__(self, tools, get_mcp_tools_fn):
+    def __init__(self, tools, get_mcp_tools_fn, find_internal_session_meta_fn=None):
         self.tool_node = ToolNode(tools)
         self._get_mcp_tools = get_mcp_tools_fn
+        self._find_internal_session_meta_fn = find_internal_session_meta_fn
+
+    def _resolve_internal_session_meta(self, user_id: str, session_id: str) -> dict | None:
+        resolver = self._find_internal_session_meta_fn
+        if resolver is None or not user_id or not session_id:
+            return None
+        try:
+            return resolver(user_id, session_id)
+        except Exception as exc:
+            print(f">>> [tools] ⚠️ resolve internal session meta failed: {exc}")
+            return None
 
     @staticmethod
     def _format_policy_block_message(
@@ -360,7 +371,7 @@ class UserAwareToolNode:
                 if tc["name"] in USER_INJECTED_TOOLS:
                     tc["args"]["username"] = user_id
                 if tc["name"] in TEAM_INJECTED_TOOLS and not tc["args"].get("team"):
-                    session_meta = self._find_internal_session_meta(user_id, session_id)
+                    session_meta = self._resolve_internal_session_meta(user_id, session_id)
                     if session_meta and session_meta.get("team"):
                         tc["args"]["team"] = session_meta["team"]
                 # Auto-inject session-related args; SESSION_FORCE_INJECTED_TOOLS always overwrites model args.
@@ -998,7 +1009,14 @@ class TeamAgent:
 
         workflow = StateGraph(AgentState)
         workflow.add_node("chatbot", self._call_model)
-        workflow.add_node("tools", UserAwareToolNode(self._mcp_tools, lambda: self._mcp_tools))
+        workflow.add_node(
+            "tools",
+            UserAwareToolNode(
+                self._mcp_tools,
+                lambda: self._mcp_tools,
+                find_internal_session_meta_fn=self._find_internal_session_meta,
+            ),
+        )
         workflow.add_edge(START, "chatbot")
         workflow.add_conditional_edges("chatbot", self._should_continue)
         workflow.add_edge("tools", "chatbot")
