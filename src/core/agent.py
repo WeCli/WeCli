@@ -11,7 +11,6 @@ from typing import Annotated, TypedDict, Optional
 # LangGraph related
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
-from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 # Model related
 from langchain_openai import ChatOpenAI
@@ -38,6 +37,7 @@ from webot.skills import build_skills_prompt
 from webot.soul import build_soul_prompt
 from webot.trajectory import save_trajectory
 from utils.context_references import expand_context_references
+from utils.routed_checkpoint_saver import ThreadRoutedAsyncSqliteSaver
 from services.smart_routing import resolve_turn_route
 from webot.permission_context import (
     create_or_reuse_permission_request,
@@ -938,7 +938,7 @@ class TeamAgent:
     async def startup(self):
         """Initialize MCP client, load tools, build LangGraph workflow."""
         # 1. Open checkpoint DB
-        self._memory_ctx = AsyncSqliteSaver.from_conn_string(self._db_path)
+        self._memory_ctx = ThreadRoutedAsyncSqliteSaver(self._db_path)
         self._memory = await self._memory_ctx.__aenter__()
 
         # 2. Start MCP servers
@@ -1045,6 +1045,15 @@ class TeamAgent:
                 await self._memory_ctx.__aexit__(None, None, None)
             except Exception:
                 pass
+
+    async def close_thread_checkpoint(self, thread_id: str) -> None:
+        """Close one thread-specific checkpoint handle so its shard can be deleted safely."""
+        if not self._memory_ctx:
+            return
+        try:
+            await self._memory_ctx.aclose_thread(thread_id)
+        except Exception as e:
+            logging.getLogger("agent").warning("close_thread_checkpoint failed for %s: %s", thread_id, e)
 
     async def purge_checkpoints(self, thread_id: str, keep: int = 1) -> int:
         """
