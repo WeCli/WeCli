@@ -11,7 +11,22 @@ if str(SRC_DIR) not in sys.path:
 
 from langchain_core.messages import AIMessage, ToolMessage
 
-from core.agent import UserAwareToolNode
+from core.agent import USER_INJECTED_TOOLS, UserAwareToolNode
+
+
+_WEBOT_RUNTIME_USER_TOOLS = {
+    "write_session_plan",
+    "read_session_plan",
+    "clear_session_plan",
+    "write_session_todos",
+    "read_session_todos",
+    "clear_session_todos",
+    "record_verification",
+    "list_verifications",
+    "run_verification",
+    "list_tool_approvals",
+    "resolve_tool_approval",
+}
 
 
 class _FakeToolNode:
@@ -29,6 +44,10 @@ def _passthrough_hook_outcome(*_call_args, args=None, **_kwargs):
 
 
 class UserAwareToolNodeTests(unittest.IsolatedAsyncioTestCase):
+    def test_webot_runtime_tools_are_in_user_injection_allowlist(self):
+        missing = _WEBOT_RUNTIME_USER_TOOLS.difference(USER_INJECTED_TOOLS)
+        self.assertEqual(missing, set())
+
     async def test_team_tools_auto_inject_username_and_team(self):
         node = UserAwareToolNode(
             [],
@@ -71,6 +90,52 @@ class UserAwareToolNodeTests(unittest.IsolatedAsyncioTestCase):
         injected_call = fake_tool_node.captured_state["messages"][-1].tool_calls[0]
         self.assertEqual(injected_call["args"]["username"], "alice")
         self.assertEqual(injected_call["args"]["team"], "alpha")
+
+    async def test_session_runtime_tools_auto_inject_username(self):
+        node = UserAwareToolNode([], lambda: [])
+        fake_tool_node = _FakeToolNode()
+        node.tool_node = fake_tool_node
+
+        state = {
+            "user_id": "alice",
+            "session_id": "sess-1",
+            "messages": [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {
+                            "name": "read_session_todos",
+                            "args": {"source_session": "exp_entrepreneur_mo0yixp1"},
+                            "id": "call_2",
+                            "type": "tool_call",
+                        }
+                    ],
+                )
+            ],
+        }
+
+        with patch("core.agent.get_session_mode", return_value={"mode": "default"}), patch(
+            "core.agent.resolve_permission_context",
+            return_value=type(
+                "Permission",
+                (),
+                {
+                    "allowed": True,
+                    "requires_approval": False,
+                    "reason": "",
+                    "matched_rule": None,
+                    "policy": {},
+                    "approval": None,
+                },
+            )(),
+        ), patch("core.agent.run_tool_policy_hooks", side_effect=_passthrough_hook_outcome):
+            result = await node(state, config={})
+
+        self.assertEqual(len(result["messages"]), 1)
+        self.assertEqual(result["messages"][0].content, "ok")
+        injected_call = fake_tool_node.captured_state["messages"][-1].tool_calls[0]
+        self.assertEqual(injected_call["args"]["username"], "alice")
+        self.assertEqual(injected_call["args"]["source_session"], "exp_entrepreneur_mo0yixp1")
 
 
 if __name__ == "__main__":
