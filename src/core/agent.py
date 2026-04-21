@@ -1708,6 +1708,69 @@ class TeamAgent:
     # Public interface: tools info
     # ------------------------------------------------------------------
     @staticmethod
+    def _tool_use_blocks_from_content(msg) -> list[dict]:
+        """Extract Anthropic/Claude-style tool_use blocks from message content."""
+        blocks = []
+        content = getattr(msg, "content", None)
+        if not isinstance(content, list):
+            return blocks
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "tool_use":
+                blocks.append(
+                    {
+                        "id": block.get("id", ""),
+                        "name": block.get("name", ""),
+                    }
+                )
+        return blocks
+
+    @classmethod
+    def _message_tool_calls(cls, msg) -> list[dict]:
+        """Return all OpenAI/LangChain and Claude-style tool calls on an AIMessage."""
+        tc_list: list = []
+        seen_ids: set[str] = set()
+        for tc in list(getattr(msg, "tool_calls", None) or []):
+            tid = (tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)) or ""
+            name = (tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)) or ""
+            rec = {"id": tid, "name": name}
+            if isinstance(tc, dict):
+                rec = {**tc, **rec}
+            tc_list.append(rec)
+            if tid:
+                seen_ids.add(tid)
+        for itc in getattr(msg, "invalid_tool_calls", None) or []:
+            tid = itc.get("id", "") if isinstance(itc, dict) else ""
+            rec = {"id": tid, "name": itc.get("name", ""), **itc} if isinstance(itc, dict) else {"id": "", "name": ""}
+            tc_list.append(rec)
+            if tid:
+                seen_ids.add(tid)
+        for rec in cls._tool_use_blocks_from_content(msg):
+            tid = rec.get("id", "")
+            if tid and tid not in seen_ids:
+                tc_list.append(rec)
+                seen_ids.add(tid)
+        return tc_list
+
+    @classmethod
+    def cancelled_tool_messages_for_last_ai(cls, last_msg) -> list[ToolMessage]:
+        """Build cancellation ToolMessages for OpenAI and Claude-style tool calls."""
+        if not isinstance(last_msg, AIMessage):
+            return []
+        messages: list[ToolMessage] = []
+        for tc in cls._message_tool_calls(last_msg):
+            tool_call_id = tc.get("id", "")
+            if not tool_call_id:
+                continue
+            messages.append(
+                ToolMessage(
+                    content="⚠️ 工具调用被用户终止",
+                    tool_call_id=tool_call_id,
+                    name=tc.get("name", "") or "",
+                )
+            )
+        return messages
+
+    @staticmethod
     def _sanitize_messages(messages: list, external_tool_names: set[str] | None = None) -> list:
         """
         清理消息列表，确保每条带 tool_calls 的 AI 消息后面都有对应的 ToolMessage。
@@ -1727,47 +1790,6 @@ class TeamAgent:
         if not external_tool_names:
             external_tool_names = set()
 
-        def _tool_use_blocks_from_content(msg) -> list[dict]:
-            blocks = []
-            content = getattr(msg, "content", None)
-            if not isinstance(content, list):
-                return blocks
-            for block in content:
-                if isinstance(block, dict) and block.get("type") == "tool_use":
-                    blocks.append(
-                        {
-                            "id": block.get("id", ""),
-                            "name": block.get("name", ""),
-                        }
-                    )
-            return blocks
-
-        def _get_all_tc(msg):
-            """AIMessage：tool_calls + invalid_tool_calls + content 内 tool_use 块（去重）"""
-            tc_list: list = []
-            seen_ids: set[str] = set()
-            for tc in list(getattr(msg, "tool_calls", None) or []):
-                tid = (tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)) or ""
-                name = (tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)) or ""
-                rec = {"id": tid, "name": name}
-                if isinstance(tc, dict):
-                    rec = {**tc, **rec}
-                tc_list.append(rec)
-                if tid:
-                    seen_ids.add(tid)
-            for itc in getattr(msg, "invalid_tool_calls", None) or []:
-                tid = itc.get("id", "") if isinstance(itc, dict) else ""
-                rec = {"id": tid, "name": itc.get("name", ""), **itc} if isinstance(itc, dict) else {"id": "", "name": ""}
-                tc_list.append(rec)
-                if tid:
-                    seen_ids.add(tid)
-            for rec in _tool_use_blocks_from_content(msg):
-                tid = rec.get("id", "")
-                if tid and tid not in seen_ids:
-                    tc_list.append(rec)
-                    seen_ids.add(tid)
-            return tc_list
-
         def _strip_ai_tool_blocks(msg: AIMessage) -> AIMessage:
             """移除 tool_calls / invalid 及 content 中的 tool_use 块，仅保留 thinking、text 等。"""
             content = getattr(msg, "content", None)
@@ -1776,11 +1798,17 @@ class TeamAgent:
                 content = kept if kept else "（工具调用序列异常，已省略未完成的工具块）"
             elif content is None or content == "":
                 content = "（工具调用序列异常，已清理）"
-            return AIMessage(
-                content=content,
-                tool_calls=[],
-                invalid_tool_calls=[],
-            )
+
+            kwargs = {
+                "content": content,
+                "tool_calls": [],
+                "invalid_tool_calls": [],
+            }
+            for attr in ("additional_kwargs", "response_metadata", "usage_metadata", "id", "name"):
+                value = getattr(msg, attr, None)
+                if value is not None:
+                    kwargs[attr] = value
+            return AIMessage(**kwargs)
 
         # 收集所有已存在的 tool_call_id 回复（用于末尾外部工具启发式）
         answered_ids = set()
@@ -1796,7 +1824,7 @@ class TeamAgent:
             last = clean[-1]
             if not isinstance(last, AIMessage):
                 break
-            all_tc = _get_all_tc(last)
+            all_tc = TeamAgent._message_tool_calls(last)
             if not all_tc:
                 break
             pending_ids = {tc["id"] for tc in all_tc if tc.get("id")}
@@ -1817,7 +1845,7 @@ class TeamAgent:
             if not isinstance(msg, AIMessage):
                 result.append(msg)
                 continue
-            all_tc = _get_all_tc(msg)
+            all_tc = TeamAgent._message_tool_calls(msg)
             if not all_tc:
                 result.append(msg)
                 continue
@@ -1855,7 +1883,35 @@ class TeamAgent:
                 )
             ]
 
-        return result
+        # --- 第四轮：清除仍然游离的 ToolMessage ---
+        # Claude/Anthropic 要求 tool_result 必须紧跟其 tool_use 所在 assistant 消息。
+        # 如果取消/清理只处理了 tool_calls 或 content.tool_use 的一边，可能留下不属于
+        # 前一条 AIMessage 工具调用批次的孤儿 ToolMessage；这些会触发 2013。
+        final: list = []
+        expected_tool_ids: set[str] = set()
+        for msg in result:
+            if isinstance(msg, AIMessage):
+                final.append(msg)
+                expected_tool_ids = {
+                    tc.get("id", "")
+                    for tc in TeamAgent._message_tool_calls(msg)
+                    if tc.get("id")
+                }
+                continue
+            if isinstance(msg, ToolMessage):
+                tid = getattr(msg, "tool_call_id", "") or ""
+                if not tid:
+                    final.append(msg)
+                elif tid in expected_tool_ids:
+                    final.append(msg)
+                    expected_tool_ids.discard(tid)
+                else:
+                    _log.warning("sanitize: 移除孤儿 ToolMessage, tool_call_id=%s", tid)
+                continue
+            final.append(msg)
+            expected_tool_ids = set()
+
+        return final
 
     @staticmethod
     def _strip_multimodal_parts(messages: list) -> list:

@@ -269,14 +269,8 @@ class OpenAIChatService:
             last_msgs = snapshot.values.get("messages", [])
             if last_msgs:
                 last_msg_item = last_msgs[-1]
-                if hasattr(last_msg_item, "tool_calls") and last_msg_item.tool_calls:
-                    tool_messages = [
-                        ToolMessage(
-                            content="⚠️ 工具调用被用户终止",
-                            tool_call_id=tc["id"],
-                        )
-                        for tc in last_msg_item.tool_calls
-                    ]
+                tool_messages = self.agent.cancelled_tool_messages_for_last_ai(last_msg_item)
+                if tool_messages:
                     await self.agent.agent_app.aupdate_state(config, {"messages": tool_messages})
         except Exception:
             pass
