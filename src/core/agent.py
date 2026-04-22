@@ -508,6 +508,7 @@ class UserAwareToolNode:
             try:
                 tool_result = await self.tool_node.ainvoke(modified_state, config)
             except Exception as exc:
+                error_text = str(exc).strip() or exc.__class__.__name__
                 for tc in allowed_calls:
                     meta = allowed_call_meta.get(tc["id"])
                     if meta is None:
@@ -521,9 +522,21 @@ class UserAwareToolNode:
                             session_id=session_id,
                             tool_name=tool_name,
                             args=tool_args,
-                            result=str(exc),
+                            result=error_text,
                         )
-                raise
+                    result_messages.append(
+                        ToolMessage(
+                            content=(
+                                f"工具调用失败: {tool_name}\n"
+                                f"错误: {error_text}\n"
+                                "这通常表示传入参数不符合工具定义，"
+                                "请检查必填字段、字段名和参数类型后重试。"
+                            ),
+                            tool_call_id=tc["id"],
+                            name=tool_name,
+                        )
+                    )
+                return {"messages": result_messages}
             tool_messages = tool_result.get("messages", [])
             result_messages.extend(tool_messages)
             for msg in tool_messages:
