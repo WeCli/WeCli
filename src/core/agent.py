@@ -35,6 +35,7 @@ from webot.context import (
 from webot.memory import ensure_memory_state
 from webot.skills import build_skills_prompt
 from webot.soul import build_soul_prompt
+from webot.workflow_prompt import build_team_workflow_prompt
 from webot.trajectory import save_trajectory
 from utils.context_references import expand_context_references
 from utils.routed_checkpoint_saver import ThreadRoutedAsyncSqliteSaver
@@ -1312,6 +1313,9 @@ class TeamAgent:
             skills_prompt = build_skills_prompt(user_id, team=session_team)
             if skills_prompt:
                 base_prompt += skills_prompt + "\n"
+            workflow_prompt = build_team_workflow_prompt(user_id, team=session_team)
+            if workflow_prompt:
+                base_prompt += workflow_prompt + "\n"
 
         runtime_plan = get_session_plan(user_id, session_id)
         runtime_todos = get_session_todos(user_id, session_id)
