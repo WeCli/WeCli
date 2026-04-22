@@ -104,6 +104,9 @@ PORT_AGENT = int(os.getenv("PORT_AGENT", "51200"))
 LOCAL_AGENT_CANCEL_URL = f"http://127.0.0.1:{PORT_AGENT}/cancel"
 LOCAL_LOGIN_URL = f"http://127.0.0.1:{PORT_AGENT}/login"
 LOCAL_TOOLS_URL = f"http://127.0.0.1:{PORT_AGENT}/tools"
+LOCAL_UPDATE_CHECK_URL = f"http://127.0.0.1:{PORT_AGENT}/update_check"
+LOCAL_UPDATE_START_URL = f"http://127.0.0.1:{PORT_AGENT}/update_start"
+LOCAL_UPDATE_STATUS_URL = f"http://127.0.0.1:{PORT_AGENT}/update_status"
 LOCAL_SESSIONS_URL = f"http://127.0.0.1:{PORT_AGENT}/sessions"
 LOCAL_SESSION_HISTORY_URL = f"http://127.0.0.1:{PORT_AGENT}/session_history"
 LOCAL_DELETE_SESSION_URL = f"http://127.0.0.1:{PORT_AGENT}/delete_session"
@@ -2048,6 +2051,53 @@ def proxy_restart_services():
         with open(restart_flag, "w") as f:
             f.write("restart")
         return jsonify({"status": "success", "message": "重启信号已发送"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/proxy_update_check", methods=["POST"])
+def proxy_update_check():
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "not logged in"}), 401
+    try:
+        data = request.get_json(silent=True) or {}
+        body = {
+            "user_id": user_id,
+            "refresh_remote": bool(data.get("refresh_remote", True)),
+        }
+        r = requests.post(LOCAL_UPDATE_CHECK_URL, json=body, headers=_internal_auth_headers(), timeout=45)
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/proxy_update_start", methods=["POST"])
+def proxy_update_start():
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "not logged in"}), 401
+    try:
+        body = {
+            "user_id": user_id,
+        }
+        r = requests.post(LOCAL_UPDATE_START_URL, json=body, headers=_internal_auth_headers(), timeout=20)
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/proxy_update_status", methods=["POST"])
+def proxy_update_status():
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "not logged in"}), 401
+    try:
+        body = {
+            "user_id": user_id,
+        }
+        r = requests.post(LOCAL_UPDATE_STATUS_URL, json=body, headers=_internal_auth_headers(), timeout=20)
+        return jsonify(r.json()), r.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
