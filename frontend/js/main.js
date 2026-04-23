@@ -3995,7 +3995,9 @@ async function switchToSession(sessionId, force = false, options = {}) {
 
     // 加载该会话的历史消息
     const chatBox = document.getElementById('chat-box');
-    chatBox.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">${t('history_loading_msg')}</div>`;
+    if (!quiet) {
+        chatBox.innerHTML = `<div class="text-xs text-gray-400 text-center py-4">${t('history_loading_msg')}</div>`;
+    }
 
     try {
         const resp = await fetch('/proxy_session_history', {
@@ -6962,7 +6964,9 @@ async function handleSend() {
             agentDiv.innerHTML = `<span class="text-gray-400">${t('no_response')}</span>`;
         }
 
-        if (sawToolActivity && _ocChatMode === 'internal' && currentSessionId) {
+        const hasRenderedToolIndicators = !!chatBox.querySelector('.stream-tool-indicator');
+        if ((sawToolActivity || hasRenderedToolIndicators) && _ocChatMode === 'internal' && currentSessionId) {
+            await new Promise((resolve) => setTimeout(resolve, 300));
             await switchToSession(currentSessionId, true, { quiet: true });
         }
 
