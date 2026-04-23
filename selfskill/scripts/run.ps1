@@ -827,6 +827,12 @@ switch ($Command) {
         }
 
         $code = Invoke-ClawcrossPython -Arguments (@("selfskill\scripts\configure.py") + $Rest)
+        if ($code -eq 0 -and $Rest.Count -gt 0 -and $Rest[0] -eq "--init") {
+            Write-Host ""
+            Write-Host "=== init completed, running OpenClaw check ==="
+            & $PSCommandPath check-openclaw
+            exit $LASTEXITCODE
+        }
         exit $code
     }
 

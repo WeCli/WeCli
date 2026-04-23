@@ -253,11 +253,17 @@ def _command_output(args):
         result = subprocess.run(
             args,
             capture_output=True,
-            text=True,
+            text=False,
             timeout=2,
             check=False,
         )
-        return result.returncode, result.stdout or ""
+        stdout_bytes = result.stdout or b""
+        for encoding in ("utf-8", "gbk", "cp936", "latin-1"):
+            try:
+                return result.returncode, stdout_bytes.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return result.returncode, stdout_bytes.decode("utf-8", errors="replace")
     except Exception:
         return -1, ""
 
