@@ -500,6 +500,7 @@ class DiscussionEngine:
                     tag=first,
                     platform=platform_name,
                     extra_headers=cfg.get("headers"),
+                    acp_options=cfg.get("acp") if isinstance(cfg.get("acp"), dict) else None,
                     oc_agent_name=oc_name,
                     team=self._team,
                 )

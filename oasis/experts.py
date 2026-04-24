@@ -51,7 +51,7 @@ _ACP_AVAILABLE = bool(shutil.which("acpx"))
 
 # 确保 src/ 在 import 路径中，以便导入 llm_factory
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
-from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt
+from integrations.acpx_adapter import AcpxError, acpx_options_from_agent, get_acpx_adapter, load_external_agent_system_prompt
 from integrations.agent_sender import SendToAgentRequest, send_to_agent
 from services.llm_factory import create_chat_model, extract_text
 
@@ -1223,6 +1223,7 @@ class ExternalExpert:
         tag: str = "",
         platform: str = "",
         extra_headers: dict[str, str] | None = None,
+        acp_options: dict[str, Any] | None = None,
         oc_agent_name: str = "",
         team: str = "",
     ):
@@ -1236,6 +1237,10 @@ class ExternalExpert:
         self.model = model
         self._team = team
         self._extra_headers = extra_headers or {}
+        self._acpx_policy = acpx_options_from_agent(
+            {"meta": {"acp": acp_options or {}}},
+            default_timeout_sec=int(timeout or 180),
+        )
         self._platform_lower = self.platform
         self._http_global_name = oc_agent_name
         self._drop_unknown_platform = not self._platform_lower
@@ -1361,7 +1366,7 @@ class ExternalExpert:
                     session=cli_session,
                     options={
                         "cwd": os.path.dirname(os.path.dirname(__file__)),
-                        "timeout_sec": 180,
+                        **self._acpx_policy,
                         "system_prompt": system_prompt,
                     },
                 )
@@ -1507,7 +1512,7 @@ class ExternalExpert:
                         session=acp_session,
                         options={
                             "cwd": os.path.dirname(os.path.dirname(__file__)),
-                            "timeout_sec": 180,
+                            **self._acpx_policy,
                             "system_prompt": _EXTERNAL_AGENT_SYSTEM_PROMPT
                             + "\n\n"
                             + _build_identity_prompt(self.title, self.persona),

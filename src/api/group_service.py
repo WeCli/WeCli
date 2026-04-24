@@ -39,7 +39,7 @@ from api.group_repository import (
 from api.group_models import Attachment, GroupCreateRequest, GroupAddMemberRequest, GroupMessageRequest, GroupUpdateRequest
 from utils.logging_utils import get_logger
 from utils.session_summary import first_human_title
-from integrations.acpx_adapter import AcpxError, get_acpx_adapter, load_external_agent_system_prompt
+from integrations.acpx_adapter import AcpxError, acpx_options_from_agent, get_acpx_adapter, load_external_agent_system_prompt
 from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
 from integrations.agent_sender import SendToAgentRequest, send_to_agent
 from integrations.external_persona import build_external_persona_prompt
@@ -297,6 +297,8 @@ def _parse_external_agents_file(path: str, *, owner_user_id: str = "", team: str
             if not isinstance(a, dict) or "name" not in a:
                 continue
             ext_config = a.get("config") or a.get("meta") or {}
+            if not isinstance(ext_config, dict):
+                ext_config = {}
             nm = a.get("name", "")
             gn = a.get("global_name", "")
             result.append({
@@ -313,6 +315,7 @@ def _parse_external_agents_file(path: str, *, owner_user_id: str = "", team: str
                 "api_url": ext_config.get("api_url", ""),
                 "api_key": ext_config.get("api_key", ""),
                 "model": ext_config.get("model", ""),
+                "meta": ext_config if isinstance(ext_config, dict) else {},
             })
         return result
     except Exception:
@@ -558,7 +561,7 @@ class GroupService:
                     session=acp_session,
                     options={
                         "cwd": _PROJECT_ROOT,
-                        "timeout_sec": 180,
+                        **acpx_options_from_agent(agent_info, default_timeout_sec=180),
                         "reset_session": bool(metadata and metadata.get("resetSession")),
                         "system_prompt": _external_agent_session_prompt(
                             agent_info,

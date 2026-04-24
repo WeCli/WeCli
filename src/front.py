@@ -4730,12 +4730,10 @@ def add_external_member(team_name):
             "tag": tag,
             "platform": platform,
             "global_name": global_name,
-            "meta": {
-                "api_url": api_url,
-                "api_key": api_key,
-                "model": model,
-                "headers": headers
-            }
+            "meta": _merge_external_agent_meta(
+                {"api_url": api_url, "api_key": api_key, "model": model, "headers": headers},
+                body,
+            )
         }
         agents.append(new_agent)
         
@@ -4859,18 +4857,9 @@ def update_external_member(team_name):
             found["global_name"] = new_gn
 
         # Update meta fields (only if provided)
-        meta = found.get("meta", {})
-        if "api_url" in body:
-            meta["api_url"] = body["api_url"]
-        if "api_key" in body:
-            meta["api_key"] = body["api_key"]
-        if "model" in body:
-            meta["model"] = body["model"]
-        if "headers" in body:
-            meta["headers"] = body["headers"]
+        meta = _merge_external_agent_meta(found.get("meta", {}), body)
         if "platform" in body:
             found["platform"] = str(body["platform"] or "").strip()
-        meta.pop("platform", None)
         if meta:
             found["meta"] = meta
         elif "meta" in found:
@@ -5091,6 +5080,27 @@ def _external_agent_response_view(agent: dict) -> dict:
     }
 
 
+def _merge_external_agent_meta(base: dict | None, body: dict) -> dict:
+    meta = dict(base or {})
+    incoming = body.get("meta")
+    if isinstance(incoming, dict):
+        for key, value in incoming.items():
+            if key != "platform":
+                meta[key] = value
+    for key in ("api_url", "api_key", "model", "headers"):
+        if key in body:
+            meta[key] = body[key]
+    acp_in = body.get("acp")
+    if isinstance(acp_in, dict):
+        current = dict(meta.get("acp") or {})
+        for key in ("timeout_sec", "ttl_sec", "approve_all", "non_interactive_permissions"):
+            if key in acp_in:
+                current[key] = acp_in[key]
+        meta["acp"] = current
+    meta.pop("platform", None)
+    return meta
+
+
 def _public_agents_save_raw(user_id: str, agents: list) -> None:
     p = _public_external_agents_user_path(user_id)
     os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -5133,12 +5143,10 @@ def public_external_agents():
                     "tag": tag,
                     "platform": platform,
                     "global_name": global_name,
-                    "meta": {
-                        "api_url": api_url,
-                        "api_key": api_key,
-                        "model": model,
-                        "headers": headers,
-                    },
+                    "meta": _merge_external_agent_meta(
+                        {"api_url": api_url, "api_key": api_key, "model": model, "headers": headers},
+                        body,
+                    ),
                 }
             else:
                 found = None
@@ -5154,16 +5162,7 @@ def public_external_agents():
                     found["tag"] = body["new_tag"]
                 if "platform" in body:
                     found["platform"] = str(body.get("platform") or "").strip()
-                meta = found.get("meta", {})
-                if "api_url" in body:
-                    meta["api_url"] = body["api_url"]
-                if "api_key" in body:
-                    meta["api_key"] = body["api_key"]
-                if "model" in body:
-                    meta["model"] = body["model"]
-                if "headers" in body:
-                    meta["headers"] = body["headers"]
-                meta.pop("platform", None)
+                meta = _merge_external_agent_meta(found.get("meta", {}), body)
                 if meta:
                     found["meta"] = meta
                 elif "meta" in found:
