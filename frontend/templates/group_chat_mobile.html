@@ -5012,6 +5012,8 @@ let mutedGroupIds = new Set();  // Track muted groups for list display
 let groups = [];
 let currentMembers = [];  // Store members for @ mention
 let senderNameMap = {};   // sender key -> display name 映射
+let __agentDetailRenderSeq = 0;
+const __personaByTagCache = new Map();
 let mentionState = {
   active: false,
   startIndex: -1,
@@ -10056,6 +10058,7 @@ function showAgentDetail(agentInfo) {
   if (!agentInfo || !agentInfo.name || !agentInfo.type) {
     toast(t('agent_info_incomplete')); return;
   }
+  const renderSeq = ++__agentDetailRenderSeq;
   const overlay = document.getElementById('agent-detail-overlay');
   const body = document.getElementById('agent-detail-body');
   const title = document.getElementById('agent-detail-title');
@@ -10067,10 +10070,54 @@ function showAgentDetail(agentInfo) {
 
   // 直接渲染基本信息，无需网络请求
   body.innerHTML = renderAgentBasicInfo(memberTitle, memberType, agentInfo);
+  enrichAgentDetailPersonaByTag(agentInfo, renderSeq);
 
   // Slide in
   overlay.style.display = 'flex';
   requestAnimationFrame(() => { overlay.classList.add('open'); });
+}
+
+function agentDetailPersonaTeam(agentInfo) {
+  const fromAgent = String((agentInfo && agentInfo.team) || '').trim();
+  if (fromAgent) return fromAgent;
+  const contactTeam = String(window.__currentAgentTeam || '').trim();
+  if (contactTeam) return contactTeam;
+  const groupTeam = String(currentTeamName || '').trim();
+  if (!groupTeam) return '';
+  return groupTeam.split('#')[0].trim();
+}
+
+async function lookupPersonaByTag(tag, team) {
+  const cleanTag = String(tag || '').trim();
+  if (!cleanTag) return null;
+  const cacheKey = `${team || ''}\x1f${cleanTag}`;
+  if (__personaByTagCache.has(cacheKey)) return __personaByTagCache.get(cacheKey);
+  const query = team ? `?team=${encodeURIComponent(team)}` : '';
+  const experts = await api('GET', `/proxy_visual/experts${query}`).catch(() => []);
+  const list = Array.isArray(experts) ? experts : [];
+  const found = list.find((exp) => String((exp && exp.tag) || '').trim() === cleanTag) || null;
+  __personaByTagCache.set(cacheKey, found);
+  return found;
+}
+
+async function enrichAgentDetailPersonaByTag(agentInfo, renderSeq) {
+  const tag = String((agentInfo && agentInfo.tag) || '').trim();
+  if (!tag || agentInfo.persona) return;
+  const team = agentDetailPersonaTeam(agentInfo);
+  const expert = await lookupPersonaByTag(tag, team);
+  if (!expert || __agentDetailRenderSeq !== renderSeq) return;
+  const persona = String(expert.persona || expert.description || '').trim();
+  if (!persona) return;
+  const body = document.getElementById('agent-detail-body');
+  const overlay = document.getElementById('agent-detail-overlay');
+  if (!body || !overlay || overlay.style.display === 'none') return;
+  const enriched = {
+    ...agentInfo,
+    persona,
+    persona_source_name: expert.name || expert.name_zh || expert.name_en || '',
+    persona_source: expert.source || '',
+  };
+  body.innerHTML = renderAgentBasicInfo(enriched.name, enriched.type, enriched);
 }
 
 function closeAgentDetail() {
@@ -10228,6 +10275,13 @@ function renderAgentBasicInfo(name, memberType, agentInfo) {
     html += `<div class="agent-detail-section">
       <div class="agent-detail-label">${t('expert_persona')}</div>
       <div class="agent-detail-value" style="font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:200px;overflow-y:auto;">${esc(agentInfo.persona)}</div>
+    </div>`;
+  }
+  if (memberType !== 'expert' && agentInfo.persona) {
+    const source = agentInfo.persona_source_name ? ` · ${agentInfo.persona_source_name}` : '';
+    html += `<div class="agent-detail-section">
+      <div class="agent-detail-label">${_currentLang === 'zh' ? 'Tag 人设' : 'Tag Persona'}${esc(source)}</div>
+      <div class="agent-detail-value" style="font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:220px;overflow-y:auto;">${esc(agentInfo.persona)}</div>
     </div>`;
   }
   // Show temperature for experts
