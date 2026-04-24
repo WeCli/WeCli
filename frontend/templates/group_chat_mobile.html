@@ -1439,6 +1439,16 @@
     background: #f8f8f8; padding: 10px 12px; border-radius: 8px;
     margin-top: 4px;
   }
+  .agent-detail-scroll-text {
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    max-height: min(420px, 45vh);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding-right: 4px;
+  }
   .agent-detail-tag {
     display: inline-block; padding: 2px 8px; border-radius: 4px;
     font-size: 12px; font-weight: 500; margin: 2px 4px 2px 0;
@@ -10274,14 +10284,14 @@ function renderAgentBasicInfo(name, memberType, agentInfo) {
   if (memberType === 'expert' && agentInfo.persona) {
     html += `<div class="agent-detail-section">
       <div class="agent-detail-label">${t('expert_persona')}</div>
-      <div class="agent-detail-value" style="font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:200px;overflow-y:auto;">${esc(agentInfo.persona)}</div>
+      <div class="agent-detail-value agent-detail-scroll-text">${esc(agentInfo.persona)}</div>
     </div>`;
   }
   if (memberType !== 'expert' && agentInfo.persona) {
     const source = agentInfo.persona_source_name ? ` · ${agentInfo.persona_source_name}` : '';
     html += `<div class="agent-detail-section">
       <div class="agent-detail-label">${_currentLang === 'zh' ? 'Tag 人设' : 'Tag Persona'}${esc(source)}</div>
-      <div class="agent-detail-value" style="font-size:13px;line-height:1.5;white-space:pre-wrap;max-height:220px;overflow-y:auto;">${esc(agentInfo.persona)}</div>
+      <div class="agent-detail-value agent-detail-scroll-text">${esc(agentInfo.persona)}</div>
     </div>`;
   }
   // Show temperature for experts
