@@ -8796,6 +8796,17 @@ function renderMembers(members) {
     const initial = getInitial(name);
     const isAgent = type !== 'owner';
     const removeBtn = isAgent ? `<button onclick="event.stopPropagation();removeMemberFromGroup('${globalId.replace(/'/g, "\\'")}','${name.replace(/'/g, "\\'")}')" style="background:none;border:none;color:var(--text-secondary);font-size:16px;padding:4px 8px;cursor:pointer;" title="${t('tip_remove')}">✕</button>` : '';
+    const detailInfo = JSON.stringify({
+      name,
+      type,
+      global_id: globalId,
+      tag,
+      short_name: shortName,
+      platform: m.platform || '',
+      platform_hint: m.platform || tag || '',
+      model: m.model || '',
+      meta: m.meta || {},
+    }).replace(/"/g, '&quot;');
 
     // 操作按钮：外部 agent 显示 /new, /reset(通过_meta), 和 /stop，内部 agent 显示 cancel
     let actionBtns = '';
@@ -8819,7 +8830,7 @@ function renderMembers(members) {
 
     return `
       <div class="member-item" onclick="insertMention('${globalId}', '${name.replace(/'/g, "\\'")}')">
-        <div class="member-avatar ${type} ${isAgent ? 'clickable' : ''}"${isAgent ? ` onclick="event.stopPropagation();showAgentDetail({name:'${name.replace(/'/g, "\\\\'")}',type:'${type}',global_id:'${globalId.replace(/'/g, "\\\\'")}',tag:'${(tag||'').replace(/'/g, "\\\\'")}',short_name:'${shortName.replace(/'/g, "\\\\'")}'})" title="${t('tip_view_detail')}"` : ''}>${esc(initial)}</div>
+        <div class="member-avatar ${type} ${isAgent ? 'clickable' : ''}"${isAgent ? ` onclick="event.stopPropagation();showAgentDetail(JSON.parse(this.dataset.info))" data-info="${detailInfo}" title="${t('tip_view_detail')}"` : ''}>${esc(initial)}</div>
         <div class="member-info" style="flex:1;">
           <div class="member-name">${esc(name)}</div>
           <div class="member-tag">${typeLabel} · ${tag ? esc(tag) + ' · ' : ''}${esc(globalId)}</div>
@@ -9980,8 +9991,6 @@ function resolveExternalPlatformKey(agentInfo, fallbackTool) {
     agentInfo.platform_hint,
     agentInfo.platform,
     fallbackTool,
-    agentInfo.global_id,
-    agentInfo.name,
   ];
   for (const item of candidates) {
     const key = normalizePlatformKey(item);
@@ -10033,7 +10042,10 @@ function showAgentDetailBySender(senderKey) {
     short_name: member.short_name || '',
     tag: member.tag || '',
     tracked: !!member.tracked,
-    platform_hint: member.platform || ''
+    platform: member.platform || '',
+    platform_hint: member.platform || member.tag || '',
+    model: member.model || '',
+    meta: member.meta || {}
   });
 }
 

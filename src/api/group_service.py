@@ -1023,10 +1023,17 @@ class GroupService:
             raise HTTPException(status_code=404, detail="群聊不存在")
 
         members = await list_group_members(self.group_db_path, group_id)
+        external_agents_map = build_external_agents_map_for_owner(str(group.get("owner") or ""))
         # title 直接用数据库里的 short_name，不需要再查 json
         for member in members:
             if member.get("is_agent"):
                 member["title"] = member.get("short_name") or member.get("global_id") or "未命名"
+                if (member.get("member_type") or "").strip() == "ext":
+                    ext_info = external_agents_map.get(str(member.get("global_id") or "").strip()) or {}
+                    meta = ext_info.get("meta") if isinstance(ext_info.get("meta"), dict) else {}
+                    member["platform"] = ext_info.get("platform", "") or member.get("tag", "")
+                    member["model"] = ext_info.get("model", "") or meta.get("model", "")
+                    member["meta"] = meta
             else:
                 member["title"] = member.get("user_id") or "群主"
 
