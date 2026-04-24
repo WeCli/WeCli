@@ -38,6 +38,7 @@ _TOOL_ACCESS_MODES: dict[str, ToolAccessMode] = {
     "grep_search": ToolAccessMode.READ_ONLY,
     "list_sessions": ToolAccessMode.READ_ONLY,
     "get_current_session": ToolAccessMode.READ_ONLY,
+    "get_current_time": ToolAccessMode.READ_ONLY,
     "list_alarms": ToolAccessMode.READ_ONLY,
     "get_telegram_status": ToolAccessMode.READ_ONLY,
     "list_oasis_topics": ToolAccessMode.READ_ONLY,

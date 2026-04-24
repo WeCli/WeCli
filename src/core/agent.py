@@ -119,7 +119,7 @@ USER_INJECTED_TOOLS = {
     "start_background_command", "get_background_command_status",
     "read_background_command_output", "cancel_background_command",
     # Alarm management tools
-    "add_alarm", "list_alarms", "delete_alarm",
+    "get_current_time", "add_alarm", "list_alarms", "delete_alarm",
     # Telegram push notification tools
     "set_telegram_chat_id", "send_telegram_message", "get_telegram_status", "remove_telegram_config",
     # OASIS forum tools

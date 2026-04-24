@@ -8,6 +8,7 @@ if _src_dir not in _sys.path:
 MCP 定时任务调度服务
 
 提供闹钟/定时任务管理工具：
+- get_current_time: 查询当前时间
 - add_alarm: 设置定时任务
 - list_alarms: 查询已设置的定时任务
 - delete_alarm: 删除指定的定时任务
@@ -16,6 +17,8 @@ MCP 定时任务调度服务
 from mcp.server.fastmcp import FastMCP
 import httpx
 import os
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from dotenv import load_dotenv
 
 # 初始化 MCP 服务
@@ -29,6 +32,32 @@ load_dotenv(dotenv_path=os.path.join(root_dir, "config", ".env"))
 # 调度器服务端口和地址
 PORT_SCHEDULER = int(os.getenv("PORT_SCHEDULER", "51201"))
 SCHEDULER_URL = f"http://127.0.0.1:{PORT_SCHEDULER}/tasks"
+
+@mcp.tool()
+async def get_current_time(timezone_name: str = "Asia/Shanghai") -> str:
+    """
+    查询当前时间。
+
+    :param timezone_name: IANA 时区名，例如 Asia/Shanghai、UTC、America/New_York。
+    :return: 当前时间、UTC 时间和 Unix 时间戳。
+    """
+    tz_name = (timezone_name or "Asia/Shanghai").strip()
+    try:
+        tz = timezone.utc if tz_name.upper() == "UTC" else ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        return f"❌ 未知时区: {tz_name}。请使用 IANA 时区名，例如 Asia/Shanghai 或 UTC。"
+
+    now = datetime.now(tz)
+    now_utc = now.astimezone(timezone.utc)
+    return (
+        "🕒 当前时间\n"
+        f"- timezone: {tz_name}\n"
+        f"- local: {now.strftime('%Y-%m-%d %H:%M:%S %Z%z')}\n"
+        f"- iso: {now.isoformat()}\n"
+        f"- utc: {now_utc.strftime('%Y-%m-%d %H:%M:%S UTC%z')}\n"
+        f"- unix: {int(now.timestamp())}"
+    )
+
 
 @mcp.tool()
 async def add_alarm(username: str, cron: str, text: str, session_id: str = "default") -> str:
