@@ -79,6 +79,7 @@ _TOOL_ACCESS_MODES: dict[str, ToolAccessMode] = {
     "delete_oasis_expert": ToolAccessMode.WRITE,
     "spawn_subagent": ToolAccessMode.WRITE,
     "cancel_subagent": ToolAccessMode.WRITE,
+    "delete_subagent": ToolAccessMode.WRITE,
     "add_alarm": ToolAccessMode.WRITE,
     "delete_alarm": ToolAccessMode.WRITE,
     "set_telegram_chat_id": ToolAccessMode.WRITE,
