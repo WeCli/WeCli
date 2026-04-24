@@ -1448,6 +1448,20 @@
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
     padding-right: 4px;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: #9ca3af #f1f5f9;
+  }
+  .agent-detail-scroll-text::-webkit-scrollbar {
+    width: 6px;
+  }
+  .agent-detail-scroll-text::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 999px;
+  }
+  .agent-detail-scroll-text::-webkit-scrollbar-thumb {
+    background: #9ca3af;
+    border-radius: 999px;
   }
   .agent-detail-tag {
     display: inline-block; padding: 2px 8px; border-radius: 4px;
