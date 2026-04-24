@@ -16,7 +16,7 @@ from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
 from utils.env_settings import read_env_all, write_env_settings
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
-from utils.cron_utils import get_agent_cron_jobs, restore_cron_jobs
+from utils.internal_alarm_utils import export_team_alarms, restore_team_alarms
 from services.llm_factory import create_chat_model, extract_text, infer_provider
 from routes.front_group_routes import register_group_routes
 from routes.front_oasis_routes import register_oasis_routes
@@ -112,6 +112,8 @@ LOCAL_SESSION_HISTORY_URL = f"http://127.0.0.1:{PORT_AGENT}/session_history"
 LOCAL_DELETE_SESSION_URL = f"http://127.0.0.1:{PORT_AGENT}/delete_session"
 LOCAL_TTS_URL = f"http://127.0.0.1:{PORT_AGENT}/tts"
 LOCAL_SESSION_STATUS_URL = f"http://127.0.0.1:{PORT_AGENT}/session_status"
+PORT_SCHEDULER = int(os.getenv("PORT_SCHEDULER", "51201"))
+SCHEDULER_TASKS_URL = f"http://127.0.0.1:{PORT_SCHEDULER}/tasks"
 # OpenAI 兼容端点
 LOCAL_OPENAI_COMPLETIONS_URL = f"http://127.0.0.1:{PORT_AGENT}/v1/chat/completions"
 INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN", "")
@@ -3011,6 +3013,46 @@ def _is_openclaw_external(agent: dict) -> bool:
     return _external_agent_platform(agent).lower() == "openclaw"
 
 
+def _team_alarm_export_maps(user_id: str, team: str) -> tuple[dict[str, str], dict[str, str]]:
+    internal_session_to_name: dict[str, str] = {}
+    for item in _ia_load(user_id, team):
+        session_id = str(item.get("session") or "").strip()
+        meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+        name = str(meta.get("name") or "").strip()
+        if session_id and name:
+            internal_session_to_name[session_id] = name
+
+    external_global_to_name: dict[str, str] = {}
+    for entry in _team_openclaw_agents_load(user_id, team):
+        if not isinstance(entry, dict):
+            continue
+        global_name = str(entry.get("global_name") or "").strip()
+        name = str(entry.get("name") or "").strip()
+        if global_name and name:
+            external_global_to_name[global_name] = name
+    return internal_session_to_name, external_global_to_name
+
+
+def _team_alarm_restore_maps(user_id: str, team: str) -> tuple[dict[str, str], dict[str, str]]:
+    internal_name_to_session: dict[str, str] = {}
+    for item in _ia_load(user_id, team):
+        session_id = str(item.get("session") or "").strip()
+        meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+        name = str(meta.get("name") or "").strip()
+        if session_id and name:
+            internal_name_to_session[name] = session_id
+
+    external_name_to_global: dict[str, str] = {}
+    for entry in _team_openclaw_agents_load(user_id, team):
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or "").strip()
+        global_name = str(entry.get("global_name") or "").strip()
+        if name and global_name:
+            external_name_to_global[name] = global_name
+    return internal_name_to_session, external_name_to_global
+
+
 @app.route("/team_openclaw_snapshot", methods=["GET"])
 def team_openclaw_snapshot_get():
     """Get the team's saved external agent list.
@@ -3030,7 +3072,7 @@ def team_openclaw_snapshot_export():
     """Export (save) an OpenClaw agent's full config into the team's external_agents.json.
     Body: { "team": "...", "agent_name": "real_agent_name (global_name)", "short_name": "display_name" }
     Fetches agent snapshot from oasis server and upserts into external_agents.json.
-    Also fetches and saves cron jobs for this agent.
+    Internal alarms are exported at team snapshot level, not inside OpenClaw agent snapshots.
     """
     user_id = session.get("user_id", "")
 
@@ -3055,12 +3097,6 @@ def team_openclaw_snapshot_export():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-    # Fetch cron jobs for this agent using cron_utils
-    cron_jobs, cron_error = get_agent_cron_jobs(agent_name)
-    if cron_error:
-        print(f"[Warning] Failed to fetch cron jobs for {agent_name}: {cron_error}")
-        cron_jobs = []
-
     # Save to team snapshot list
     data = _team_openclaw_agents_load(user_id, team)
     # Remove existing entry with same name if present, then append
@@ -3072,7 +3108,6 @@ def team_openclaw_snapshot_export():
         "global_name": agent_name,
         "config": snapshot.get("config", {}),
         "workspace_files": snapshot.get("workspace_files", {}),
-        "cron_jobs": cron_jobs,
     })
     _team_openclaw_agents_save(user_id, team, data)
 
@@ -3082,8 +3117,8 @@ def team_openclaw_snapshot_export():
         "short_name": short_name,
         "agent_name": agent_name,
         "file_count": file_count,
-        "cron_count": len(cron_jobs),
-        "message": f"Exported '{agent_name}' → team snapshot as '{short_name}' ({file_count} files, {len(cron_jobs)} cron jobs)",
+        "cron_count": 0,
+        "message": f"Exported '{agent_name}' → team snapshot as '{short_name}' ({file_count} files)",
     })
 
 
@@ -3095,7 +3130,7 @@ def team_openclaw_snapshot_sync_all():
     the source of truth for which agents belong to this team), fetches each
     agent's latest snapshot from the OASIS server using the 'global_name' field,
     and updates the JSON in-place.
-    Also fetches and updates cron jobs for each agent.
+    Internal alarms are handled by team snapshot export/import, not OpenClaw cron.
 
     Body: { "team": "team_name" }
     Returns: { ok, synced: int, agents: [...] }
@@ -3142,12 +3177,6 @@ def team_openclaw_snapshot_sync_all():
                 config.pop("channels", None)
                 config.pop("bindings", None)
                 
-                # Fetch cron jobs for this agent using cron_utils
-                cron_jobs, cron_error = get_agent_cron_jobs(agent_name)
-                if cron_error:
-                    print(f"[Warning] Failed to fetch cron jobs for {agent_name}: {cron_error}")
-                    cron_jobs = []
-                
                 new_openclaw.append({
                     "name": short_name,
                     "tag": "openclaw",
@@ -3155,7 +3184,6 @@ def team_openclaw_snapshot_sync_all():
                     "global_name": agent_name,
                     "config": config,
                     "workspace_files": snap.get("workspace_files", {}),
-                    "cron_jobs": cron_jobs,
                 })
             else:
                 errors.append(f"{agent_name}: {snap.get('error', 'unknown')}")
@@ -3232,23 +3260,6 @@ def team_openclaw_snapshot_restore():
             agent_snapshot["global_name"] = target_name
             _team_openclaw_agents_save(user_id, team, data)
             
-            # Restore cron jobs for this agent using cron_utils
-            cron_jobs = agent_snapshot.get("cron_jobs", [])
-            if cron_jobs:
-                t_cron = time.perf_counter()
-                cron_restored, cron_errors = restore_cron_jobs(cron_jobs, target_name)
-                result["client_cron_ms"] = round((time.perf_counter() - t_cron) * 1000, 2)
-                result["cron_restored"] = cron_restored
-                result["cron_total"] = len(cron_jobs)
-                if cron_errors:
-                    result["cron_errors"] = cron_errors
-                _logger_oc_restore.info(
-                    "[clawcross-restore] route=single agent=%s client_cron_ms=%s cron_restored=%s",
-                    target_name,
-                    result["client_cron_ms"],
-                    cron_restored,
-                )
-        
         return jsonify(result), r.status_code
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -3260,7 +3271,7 @@ def team_openclaw_snapshot_export_all():
     Body: { "team": "..." }
     Uses external_agents.json as the source of truth for which agents belong
     to this team, fetches each one's latest snapshot, and updates in-place.
-    Also fetches and saves cron jobs for each agent.
+    Internal alarms are handled by team snapshot export/import, not OpenClaw cron.
     """
     user_id = session.get("user_id", "")
 
@@ -3296,12 +3307,6 @@ def team_openclaw_snapshot_export_all():
             )
             snapshot = r.json()
             if snapshot.get("ok"):
-                # Fetch cron jobs for this agent using cron_utils
-                cron_jobs, cron_error = get_agent_cron_jobs(agent_name)
-                if cron_error:
-                    print(f"[Warning] Failed to fetch cron jobs for {agent_name}: {cron_error}")
-                    cron_jobs = []
-                
                 new_openclaw.append({
                     "name": short_name,
                     "tag": "openclaw",
@@ -3309,7 +3314,6 @@ def team_openclaw_snapshot_export_all():
                     "global_name": agent_name,
                     "config": snapshot.get("config", {}),
                     "workspace_files": snapshot.get("workspace_files", {}),
-                    "cron_jobs": cron_jobs,
                 })
                 exported += 1
             else:
@@ -3378,31 +3382,17 @@ def team_openclaw_snapshot_restore_all():
                 "oasis_timing_ms": result.get("restore_timing_ms"),
                 "errors": result.get("errors"),
             }
-            cron_ms = None
             if result.get("ok"):
                 restored += 1
                 # Update global_name in JSON to reflect the new agent name
                 entry["global_name"] = target_name
-                
-                # Restore cron jobs for this agent using cron_utils
-                cron_jobs = entry.get("cron_jobs", [])
-                if cron_jobs:
-                    t_cron = time.perf_counter()
-                    cron_restored, cron_errors = restore_cron_jobs(cron_jobs, target_name)
-                    cron_ms = round((time.perf_counter() - t_cron) * 1000, 2)
-                    result["cron_restored"] = cron_restored
-                    result["cron_total"] = len(cron_jobs)
-                    if cron_errors:
-                        result["cron_errors"] = cron_errors
             else:
                 errors.append(f"{target_name}: {result.get('errors', result.get('error', 'failed'))}")
-            row["client_cron_ms"] = cron_ms
             per_agent_restore.append(row)
             _logger_oc_restore.info(
-                "[clawcross-restore] route=restore_all agent=%s client_http_ms=%s client_cron_ms=%s oasis=%s ok=%s",
+                "[clawcross-restore] route=restore_all agent=%s client_http_ms=%s oasis=%s ok=%s",
                 target_name,
                 client_http_ms,
-                cron_ms,
                 result.get("restore_timing_ms"),
                 result.get("ok"),
             )
@@ -5650,24 +5640,25 @@ def preview_team_snapshot():
         result["sections"]["skills"]["clawcross_personal"] = []
         result["sections"]["skills"]["clawcross_team"] = []
 
-    # --- 5. cron jobs ---
+    # --- 5. internal scheduler alarms ---
+    internal_session_to_name, external_global_to_name = _team_alarm_export_maps(user_id, team)
+    alarm_items = export_team_alarms(
+        user_id=user_id,
+        team=team,
+        internal_session_to_name=internal_session_to_name,
+        external_global_to_name=external_global_to_name,
+    )
     cron_info = {}
-    if isinstance(ext_data, list):
-        for entry in ext_data:
-            if not _is_openclaw_external(entry):
-                continue
-            short_name = entry.get("name", "")
-            agent_name = entry.get("global_name", "") or short_name
-            cron_jobs, cron_error = get_agent_cron_jobs(agent_name)
-            if cron_error:
-                cron_info[short_name] = {"count": 0, "error": cron_error}
-            elif cron_jobs:
-                cron_info[short_name] = {
-                    "count": len(cron_jobs),
-                    "items": [{"name": j.get("name", "?"), "schedule": j.get("schedule", "")} for j in cron_jobs],
-                }
-            else:
-                cron_info[short_name] = {"count": 0}
+    for item in alarm_items:
+        target = item.get("target_name") or item.get("target_ref") or "unknown"
+        cron_info.setdefault(target, {"count": 0, "items": []})
+        cron_info[target]["count"] += 1
+        cron_info[target]["items"].append({
+            "name": item.get("task_id", ""),
+            "schedule": item.get("cron", ""),
+            "text": item.get("text", ""),
+            "target_type": item.get("target_type", "internal"),
+        })
     result["sections"]["cron"] = cron_info
 
     # --- 6. workflows (yaml + python files) ---
@@ -5851,12 +5842,11 @@ def download_team_snapshot():
                             rel_path = os.path.relpath(file_path, team_dir)
                             zipf.write(file_path, rel_path)
 
-            # --- Add skill folders and cron jobs for each openclaw agent ---
+            # --- Add skill folders for each OpenClaw agent, and team internal alarms ---
             ext_path = os.path.join(team_dir, "external_agents.json")
             managed_skills_added = False
-            cron_jobs_data = {}  # {short_name: [cron_jobs]}
 
-            if (_inc("skills") or _inc("cron")) and os.path.exists(ext_path):
+            if _inc("skills") and os.path.exists(ext_path):
                 try:
                     with open(ext_path, "r", encoding="utf-8") as f:
                         ext_data = json.load(f)
@@ -5923,19 +5913,17 @@ def download_team_snapshot():
 
                             except Exception:
                                 pass
-                        
-                        # 3. Fetch cron jobs for this agent using global_name as agentId
-                        if _inc("cron"):
-                            cron_jobs, cron_error = get_agent_cron_jobs(agent_name)
-                            if cron_error:
-                                print(f"[Warning] Failed to fetch cron jobs for {agent_name}: {cron_error}")
-                                cron_jobs = []
-                            if cron_jobs:
-                                cron_jobs_data[short_name] = cron_jobs
-            
-            # Save cron jobs to zip: cron_jobs.json
-            if cron_jobs_data:
-                zipf.writestr("cron_jobs.json", json.dumps(cron_jobs_data, ensure_ascii=False, indent=2))
+            # Save internal scheduler alarms to zip: cron_jobs.json
+            if _inc("cron"):
+                internal_session_to_name, external_global_to_name = _team_alarm_export_maps(user_id, team)
+                alarm_jobs_data = export_team_alarms(
+                    user_id=user_id,
+                    team=team,
+                    internal_session_to_name=internal_session_to_name,
+                    external_global_to_name=external_global_to_name,
+                )
+                if alarm_jobs_data:
+                    zipf.writestr("cron_jobs.json", json.dumps(alarm_jobs_data, ensure_ascii=False, indent=2))
 
             # Add ClawCross managed skills (personal + team scoped).
             if _inc("skills"):
@@ -6271,7 +6259,7 @@ def upload_team_snapshot():
 
         skill_restore_result = restore_skills_from_team_dir(skills_extract_root, user_id, team)
         
-        # --- Restore cron jobs from cron_jobs.json ---
+        # --- Restore internal scheduler alarms from cron_jobs.json ---
         cron_jobs_path = os.path.join(team_dir, "cron_jobs.json")
         cron_restored_total = 0
         cron_errors = []
@@ -6280,18 +6268,21 @@ def upload_team_snapshot():
             try:
                 with open(cron_jobs_path, "r", encoding="utf-8") as f:
                     cron_jobs_data = json.load(f)
-                
                 if isinstance(cron_jobs_data, dict):
-                    # cron_jobs_data format: {short_name: [cron_jobs]}
-                    for short_name, cron_jobs in cron_jobs_data.items():
-                        if not isinstance(cron_jobs, list) or not cron_jobs:
-                            continue
-                        # Use new global_name as target_agent
-                        target_name = team + "_" + short_name
-                        restored, errors = restore_cron_jobs(cron_jobs, target_name)
-                        cron_restored_total += restored
-                        if errors:
-                            cron_errors.extend([f"{short_name}: {e}" for e in errors])
+                    # Backward compatibility for old snapshots: skip OpenClaw cron dicts.
+                    cron_jobs_data = []
+                if isinstance(cron_jobs_data, list):
+                    internal_name_to_session, external_name_to_global = _team_alarm_restore_maps(user_id, team)
+                    restored, errors = restore_team_alarms(
+                        alarms=cron_jobs_data,
+                        user_id=user_id,
+                        team=team,
+                        internal_name_to_session=internal_name_to_session,
+                        external_name_to_global=external_name_to_global,
+                        scheduler_url=SCHEDULER_TASKS_URL,
+                    )
+                    cron_restored_total += restored
+                    cron_errors.extend(errors)
                 
                 # Clean up cron_jobs.json from team folder (it was only temporary)
                 os.unlink(cron_jobs_path)

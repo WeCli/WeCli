@@ -10,6 +10,8 @@
 import os
 import uuid
 import json
+import re
+import shutil
 from typing import List, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -20,6 +22,12 @@ from pydantic import BaseModel
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
 from dotenv import load_dotenv
+
+from api.external_agent_registry import build_external_agents_map_for_owner
+from integrations.acpx_adapter import acpx_options_from_agent, load_external_agent_system_prompt
+from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
+from integrations.agent_sender import SendToAgentRequest, send_to_agent
+from integrations.external_persona import build_external_persona_prompt
 
 # --- 路径配置 ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -60,6 +68,10 @@ class CronTask(BaseModel):
     cron: str  # 格式: "分 时 日 月 周"
     text: str
     session_id: str = "default"
+    target_type: str = "internal"  # internal | external
+    target_ref: str = ""           # external global_name
+    target_name: str = ""          # stable team display name
+    team: str = ""
 
 class TaskResponse(BaseModel):
     """任务响应模型"""
@@ -67,6 +79,11 @@ class TaskResponse(BaseModel):
     user_id: str
     cron: str
     text: str
+    session_id: str = "default"
+    target_type: str = "internal"
+    target_ref: str = ""
+    target_name: str = ""
+    team: str = ""
     next_run: Optional[str]
 
 # --- 全局调度器 ---
@@ -80,6 +97,9 @@ PORT_AGENT = int(os.getenv("PORT_AGENT", "51200"))
 AGENT_URL = f"http://127.0.0.1:{PORT_AGENT}/system_trigger"
 INTERNAL_TOKEN = os.getenv("INTERNAL_TOKEN", "")
 TINYFISH_MONITOR_JOB_ID = "__tinyfish_monitor__"
+_ACP_TOOL_NAMES: frozenset[str] = acpx_agent_tags_with_legacy()
+_AGENT_MODEL_RE = re.compile(r"^agent:[^:]+(?::(.+))?$")
+_DEFAULT_ACP_SESSION_SUFFIX = "clawcrosschat"
 
 
 def _parse_cron(cron_expr: str) -> list[str]:
@@ -87,6 +107,159 @@ def _parse_cron(cron_expr: str) -> list[str]:
     if len(parts) != 5:
         raise ValueError("Cron must have 5 fields: minute hour day month day_of_week")
     return parts
+
+
+def _target_type(info: dict) -> str:
+    value = str(info.get("target_type") or "internal").strip().lower()
+    return value if value in {"internal", "external"} else "internal"
+
+
+def _resolve_external_session_suffix(model: str) -> str:
+    m = _AGENT_MODEL_RE.match((model or "").strip())
+    if m and m.group(1):
+        return m.group(1)
+    return _DEFAULT_ACP_SESSION_SUFFIX
+
+
+def _normalize_chat_url(api_url: str) -> str:
+    url = (api_url or "").strip().rstrip("/")
+    if not url:
+        return ""
+    if url.endswith("/chat/completions"):
+        return url
+    if not url.endswith("/v1"):
+        url += "/v1"
+    return f"{url}/chat/completions"
+
+
+def _external_platform(agent_info: dict) -> str:
+    platform = str(agent_info.get("platform") or agent_info.get("tag") or "").strip().lower()
+    if platform in ("claude-code", "claudecode"):
+        return "claude"
+    if platform in ("gemini-cli", "geminicli"):
+        return "gemini"
+    return platform
+
+
+def _find_external_agent(user_id: str, target_ref: str, team: str = "") -> dict | None:
+    target_ref = str(target_ref or "").strip()
+    if not target_ref:
+        return None
+    candidates = build_external_agents_map_for_owner(user_id)
+    agent = candidates.get(target_ref)
+    if not agent:
+        return None
+    if team and str(agent.get("team") or "") not in {"", team}:
+        return None
+    return agent
+
+
+def _external_system_prompt(agent_info: dict) -> str:
+    parts = [
+        load_external_agent_system_prompt(root_dir),
+        build_external_persona_prompt(
+            str(agent_info.get("tag", "") or ""),
+            user_id=str(agent_info.get("owner_user_id", "") or ""),
+            team=str(agent_info.get("team", "") or ""),
+        ),
+    ]
+    return "\n\n".join(part for part in parts if part).strip()
+
+
+async def trigger_external_agent(info: dict):
+    user_id = str(info.get("user_id") or "")
+    target_ref = str(info.get("target_ref") or "").strip()
+    team = str(info.get("team") or "").strip()
+    agent_info = _find_external_agent(user_id, target_ref, team)
+    if not agent_info:
+        print(f"[{datetime.now()}] 外部闹钟触发失败: user={user_id}, target={target_ref}, team={team}, 未找到外部 agent")
+        return
+
+    platform = _external_platform(agent_info)
+    global_name = str(agent_info.get("global_name") or agent_info.get("global_id") or target_ref).strip()
+    suffix = _resolve_external_session_suffix(str(agent_info.get("model") or ""))
+    session_key = f"agent:{global_name}:{suffix}"
+    text = (
+        "[ClawCross 内部闹钟触发]\n"
+        f"team: {team or '-'}\n"
+        f"agent: {agent_info.get('name') or agent_info.get('short_name') or global_name}\n"
+        f"cron: {info.get('cron') or '-'}\n\n"
+        f"{info.get('text') or ''}"
+    )
+
+    api_url = str(agent_info.get("api_url") or "").strip()
+    api_key = str(agent_info.get("api_key") or "").strip()
+    if platform == "openclaw":
+        api_url = os.getenv("OPENCLAW_API_URL", "") or api_url
+        api_key = os.getenv("OPENCLAW_GATEWAY_TOKEN", "") or api_key
+
+    if platform == "openclaw" and api_url:
+        model = str(agent_info.get("model") or "").strip()
+        if not model.startswith("agent:"):
+            model = f"agent:{global_name}"
+        headers = {"x-openclaw-session-key": session_key}
+        result = await send_to_agent(SendToAgentRequest(
+            prompt=text,
+            connect_type="http",
+            platform=platform,
+            session=session_key,
+            options={
+                "api_url": _normalize_chat_url(api_url),
+                "api_key": api_key,
+                "headers": headers,
+                "body": {
+                    "model": model,
+                    "messages": [{"role": "user", "content": text}],
+                    "stream": False,
+                },
+                "timeout": 60,
+            },
+        ))
+        if result.ok:
+            print(f"[{datetime.now()}] 外部闹钟触发：user={user_id}, target={global_name}, backend=http")
+            return
+        print(f"[{datetime.now()}] 外部闹钟 HTTP 触发失败，尝试 ACP: {result.error}")
+
+    if platform in _ACP_TOOL_NAMES and shutil.which("acpx"):
+        result = await send_to_agent(SendToAgentRequest(
+            prompt=text,
+            connect_type="acp",
+            platform=platform,
+            session=session_key,
+            options={
+                "cwd": root_dir,
+                **acpx_options_from_agent(agent_info, default_timeout_sec=180),
+                "system_prompt": _external_system_prompt(agent_info),
+            },
+        ))
+        if result.ok:
+            print(f"[{datetime.now()}] 外部闹钟触发：user={user_id}, target={global_name}, backend=acp")
+            return
+        print(f"[{datetime.now()}] 外部闹钟 ACP 触发失败: {result.error}")
+        return
+
+    if api_url:
+        result = await send_to_agent(SendToAgentRequest(
+            prompt=text,
+            connect_type="http",
+            platform=platform,
+            session=session_key,
+            options={
+                "api_url": _normalize_chat_url(api_url),
+                "api_key": api_key,
+                "model": agent_info.get("model") or "gpt-3.5-turbo",
+                "system_prompt": _external_system_prompt(agent_info),
+                "timeout": 60,
+            },
+        ))
+        if result.ok:
+            print(f"[{datetime.now()}] 外部闹钟触发：user={user_id}, target={global_name}, backend=http")
+        else:
+            print(f"[{datetime.now()}] 外部闹钟 HTTP 触发失败: {result.error}")
+        return
+
+    print(f"[{datetime.now()}] 外部闹钟触发失败: target={global_name}, platform={platform}, 无可用传输")
+
 
 async def trigger_agent(user_id: str, text: str, session_id: str = "default"):
     """到达定时时间，向 Agent 发送 HTTP 请求。"""
@@ -101,6 +274,17 @@ async def trigger_agent(user_id: str, text: str, session_id: str = "default"):
         except Exception as e:
             print(f"[{datetime.now()}] 任务触发失败: {e}")
 
+
+async def trigger_alarm(info: dict):
+    if _target_type(info) == "external":
+        await trigger_external_agent(info)
+        return
+    await trigger_agent(
+        str(info.get("user_id") or ""),
+        str(info.get("text") or ""),
+        str(info.get("session_id") or "default"),
+    )
+
 def restore_tasks():
     """从 JSON 文件恢复所有定时任务到调度器。"""
     tasks = load_tasks()
@@ -113,10 +297,10 @@ def restore_tasks():
         try:
             c = _parse_cron(info["cron"])
             scheduler.add_job(
-                trigger_agent,
+                trigger_alarm,
                 'cron',
                 minute=c[0], hour=c[1], day=c[2], month=c[3], day_of_week=c[4],
-                args=[info["user_id"], info["text"], info.get("session_id", "default")],
+                args=[info],
                 id=task_id,
                 replace_existing=True
             )
@@ -183,41 +367,58 @@ async def add_task(task: CronTask):
     task_id = str(uuid.uuid4())[:8]
     try:
         c = _parse_cron(task.cron)
+        target_type = _target_type(task.model_dump())
+        if target_type == "external" and not task.target_ref:
+            raise ValueError("External alarm requires target_ref")
+        info = {
+            "user_id": task.user_id,
+            "cron": task.cron,
+            "text": task.text,
+            "session_id": task.session_id,
+            "target_type": target_type,
+            "target_ref": task.target_ref,
+            "target_name": task.target_name,
+            "team": task.team,
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
         scheduler.add_job(
-            trigger_agent,
+            trigger_alarm,
             'cron',
             minute=c[0], hour=c[1], day=c[2], month=c[3], day_of_week=c[4],
-            args=[task.user_id, task.text, task.session_id],
+            args=[info],
             id=task_id,
             replace_existing=True
         )
         # 持久化到 JSON
         tasks = load_tasks()
-        tasks[task_id] = {
-            "user_id": task.user_id,
-            "cron": task.cron,
-            "text": task.text,
-            "session_id": task.session_id,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+        tasks[task_id] = info
         save_tasks(tasks)
 
-        return {**task.model_dump(), "task_id": task_id, "next_run": "已激活"}
+        return {**info, "task_id": task_id, "next_run": "已激活"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Cron 格式错误: {e}")
 
 @app.get("/tasks")
 async def list_tasks():
     tasks = load_tasks()
-    return [
-        {
-            "task_id": j.id, 
-            "user_id": j.args[0], 
-            "text": j.args[1], 
-            "cron": tasks.get(j.id, {}).get("cron", str(j.trigger)),
-            "next_run": str(j.next_run_time)
-        } for j in scheduler.get_jobs() if j.id != TINYFISH_MONITOR_JOB_ID
-    ]
+    result = []
+    for task_id, info in tasks.items():
+        if not isinstance(info, dict):
+            continue
+        job = scheduler.get_job(task_id)
+        result.append({
+            "task_id": task_id,
+            "user_id": info.get("user_id", ""),
+            "text": info.get("text", ""),
+            "cron": info.get("cron", ""),
+            "session_id": info.get("session_id", "default"),
+            "target_type": _target_type(info),
+            "target_ref": info.get("target_ref", ""),
+            "target_name": info.get("target_name", ""),
+            "team": info.get("team", ""),
+            "next_run": str(job.next_run_time) if job else None,
+        })
+    return result
 
 @app.delete("/tasks/{task_id}")
 async def delete_task(task_id: str):
@@ -225,6 +426,11 @@ async def delete_task(task_id: str):
         scheduler.remove_job(task_id)
         # 从 JSON 中删除
         tasks = load_tasks()
+        tasks.pop(task_id, None)
+        save_tasks(tasks)
+        return {"status": "deleted"}
+    tasks = load_tasks()
+    if task_id in tasks:
         tasks.pop(task_id, None)
         save_tasks(tasks)
         return {"status": "deleted"}

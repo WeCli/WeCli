@@ -210,6 +210,7 @@ SESSION_INJECTED_TOOLS = {
 }
 
 TEAM_INJECTED_TOOLS: frozenset[str] = frozenset({
+    "add_alarm",
     "skill_manage",
     "skill_view",
     "skill_list",
