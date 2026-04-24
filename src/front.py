@@ -3586,6 +3586,8 @@ def proxy_visual_experts():
         params = {"user_id": user_id}
         if team:
             params["team"] = team
+        if str(request.args.get("full", "")).strip().lower() in {"1", "true", "yes", "on"}:
+            params["full"] = "1"
         r = requests.get(f"{OASIS_BASE_URL}/experts", params=params, timeout=5)
         if r.ok:
             all_experts = r.json().get("experts", [])

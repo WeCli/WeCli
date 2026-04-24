@@ -10123,7 +10123,9 @@ async function lookupPersonaByTag(tag, team) {
   if (!cleanTag) return null;
   const cacheKey = `${team || ''}\x1f${cleanTag}`;
   if (__personaByTagCache.has(cacheKey)) return __personaByTagCache.get(cacheKey);
-  const query = team ? `?team=${encodeURIComponent(team)}` : '';
+  const params = new URLSearchParams({ full: '1' });
+  if (team) params.set('team', team);
+  const query = `?${params.toString()}`;
   const experts = await api('GET', `/proxy_visual/experts${query}`).catch(() => []);
   const list = Array.isArray(experts) ? experts : [];
   const found = list.find((exp) => String((exp && exp.tag) || '').trim() === cleanTag) || null;
