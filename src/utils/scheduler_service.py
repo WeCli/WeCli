@@ -8,6 +8,7 @@
 """
 
 import os
+import sys
 import uuid
 import json
 import re
@@ -23,15 +24,19 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
 from dotenv import load_dotenv
 
+# --- 路径配置 ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+src_dir = os.path.dirname(current_dir)
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+
 from api.external_agent_registry import build_external_agents_map_for_owner
 from integrations.acpx_adapter import acpx_options_from_agent, load_external_agent_system_prompt
 from integrations.acpx_cli_tools import acpx_agent_tags_with_legacy
 from integrations.agent_sender import SendToAgentRequest, send_to_agent
 from integrations.external_persona import build_external_persona_prompt
 
-# --- 路径配置 ---
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TASKS_FILE = os.path.join(root_dir, "data", "timeset", "tasks.json")
 
 # 加载 .env 配置

@@ -3053,6 +3053,120 @@ def _team_alarm_restore_maps(user_id: str, team: str) -> tuple[dict[str, str], d
     return internal_name_to_session, external_name_to_global
 
 
+def _team_alarm_targets(user_id: str, team: str) -> list[dict[str, str]]:
+    targets: list[dict[str, str]] = []
+    for item in _ia_load(user_id, team):
+        session_id = str(item.get("session") or "").strip()
+        meta = item.get("meta") if isinstance(item.get("meta"), dict) else {}
+        name = str(meta.get("name") or "").strip()
+        if session_id and name:
+            targets.append({
+                "target_type": "internal",
+                "target_name": name,
+                "target_ref": session_id,
+                "label": f"{name} · internal",
+            })
+    for entry in _team_openclaw_agents_load(user_id, team):
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry.get("name") or "").strip()
+        global_name = str(entry.get("global_name") or "").strip()
+        platform = _external_agent_platform(entry) or str(entry.get("tag") or "external")
+        if name and global_name:
+            targets.append({
+                "target_type": "external",
+                "target_name": name,
+                "target_ref": global_name,
+                "label": f"{name} · {platform}",
+            })
+    return targets
+
+
+@app.route("/teams/<team_name>/alarms", methods=["GET", "POST"])
+def team_alarms(team_name):
+    user_id = session.get("user_id", "")
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+    team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name)
+    if not os.path.exists(team_dir):
+        return jsonify({"error": "Team not found"}), 404
+
+    if request.method == "GET":
+        internal_session_to_name, external_global_to_name = _team_alarm_export_maps(user_id, team_name)
+        alarms = export_team_alarms(
+            user_id=user_id,
+            team=team_name,
+            internal_session_to_name=internal_session_to_name,
+            external_global_to_name=external_global_to_name,
+        )
+        return jsonify({
+            "ok": True,
+            "team": team_name,
+            "alarms": alarms,
+            "targets": _team_alarm_targets(user_id, team_name),
+        })
+
+    body = request.get_json(force=True)
+    target_type = str(body.get("target_type") or "internal").strip().lower()
+    target_name = str(body.get("target_name") or "").strip()
+    cron = str(body.get("cron") or "").strip()
+    text = str(body.get("text") or "").strip()
+    if target_type not in {"internal", "external"}:
+        return jsonify({"error": "target_type must be internal or external"}), 400
+    if not target_name or not cron or not text:
+        return jsonify({"error": "target_name, cron and text are required"}), 400
+
+    internal_name_to_session, external_name_to_global = _team_alarm_restore_maps(user_id, team_name)
+    payload = {
+        "user_id": user_id,
+        "cron": cron,
+        "text": text,
+        "target_type": target_type,
+        "target_name": target_name,
+        "team": team_name,
+    }
+    if target_type == "external":
+        target_ref = external_name_to_global.get(target_name)
+        if not target_ref:
+            return jsonify({"error": f"External target not found: {target_name}"}), 404
+        payload["target_ref"] = target_ref
+        payload["session_id"] = f"ext:{target_ref}"
+    else:
+        session_id = internal_name_to_session.get(target_name)
+        if not session_id:
+            return jsonify({"error": f"Internal target not found: {target_name}"}), 404
+        payload["session_id"] = session_id
+
+    try:
+        resp = requests.post(SCHEDULER_TASKS_URL, json=payload, timeout=10)
+        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"error": resp.text}
+        return jsonify(data), resp.status_code
+    except Exception as e:
+        return jsonify({"error": f"Scheduler unavailable: {e}"}), 502
+
+
+@app.route("/teams/<team_name>/alarms/<task_id>", methods=["DELETE"])
+def delete_team_alarm(team_name, task_id):
+    user_id = session.get("user_id", "")
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+    internal_session_to_name, external_global_to_name = _team_alarm_export_maps(user_id, team_name)
+    alarms = export_team_alarms(
+        user_id=user_id,
+        team=team_name,
+        internal_session_to_name=internal_session_to_name,
+        external_global_to_name=external_global_to_name,
+    )
+    if not any(str(item.get("task_id") or "") == task_id for item in alarms):
+        return jsonify({"error": "Alarm not found in this team"}), 404
+    try:
+        resp = requests.delete(f"{SCHEDULER_TASKS_URL}/{task_id}", timeout=10)
+        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"status": resp.text}
+        return jsonify(data), resp.status_code
+    except Exception as e:
+        return jsonify({"error": f"Scheduler unavailable: {e}"}), 502
+
+
 @app.route("/team_openclaw_snapshot", methods=["GET"])
 def team_openclaw_snapshot_get():
     """Get the team's saved external agent list.
