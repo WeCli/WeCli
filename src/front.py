@@ -8,6 +8,9 @@ import json
 import re
 import subprocess
 import uuid
+import shutil
+import tempfile
+import zipfile
 from pathlib import Path
 
 from integrations.acpx_cli_tools import acpx_agent_command_names
@@ -5072,6 +5075,231 @@ def get_team_skills(team_name):
             "team": list_skills(user_id, team=team_name),
             "personal": list_skills(user_id),
         },
+    })
+
+
+def _safe_extract_skill_zip(zip_path: Path, target_dir: Path) -> None:
+    with zipfile.ZipFile(zip_path) as zf:
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            name = info.filename.replace("\\", "/")
+            if name.startswith("/") or ".." in Path(name).parts:
+                raise ValueError(f"Unsafe zip entry: {info.filename}")
+            if info.file_size > 5 * 1024 * 1024:
+                raise ValueError(f"Zip entry too large: {info.filename}")
+            target = target_dir / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(info) as src, target.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+
+def _copy_direct_skill_dirs(extracted_dir: Path, user_id: str, team_name: str) -> dict[str, Any]:
+    from webot.skills import _parse_frontmatter, _rebuild_index, _security_scan, _skills_dir, _team_skills_dir, _validate_name
+
+    candidates: list[Path] = []
+    root_skill = extracted_dir / "SKILL.md"
+    if root_skill.is_file():
+        candidates.append(extracted_dir)
+    for skill_md in extracted_dir.rglob("SKILL.md"):
+        if skill_md.parent == extracted_dir:
+            continue
+        if "__MACOSX" in skill_md.parts:
+            continue
+        candidates.append(skill_md.parent)
+
+    imported: list[str] = []
+    skipped: list[str] = []
+    target_root = _team_skills_dir(user_id, team_name) if team_name else _skills_dir(user_id)
+    seen: set[Path] = set()
+    for skill_dir in candidates:
+        resolved = skill_dir.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        skill_md = skill_dir / "SKILL.md"
+        try:
+            content = skill_md.read_text(encoding="utf-8")
+            if len(content.encode("utf-8")) > 100 * 1024:
+                skipped.append(f"{skill_dir.name}: SKILL.md too large")
+                continue
+            violations = _security_scan(content)
+            if violations:
+                skipped.append(f"{skill_dir.name}: security scan failed")
+                continue
+            meta, _body = _parse_frontmatter(content)
+            raw_name = str(meta.get("name") or skill_dir.name or "skill").strip().lower()
+            normalized = re.sub(r"[^a-z0-9._-]+", "-", raw_name).strip(".-_")[:64]
+            skill_name = _validate_name(normalized or "skill")
+        except Exception as exc:
+            skipped.append(f"{skill_dir.name}: {exc}")
+            continue
+
+        for support_file in skill_dir.rglob("*"):
+            if support_file.is_file() and support_file.stat().st_size > 5 * 1024 * 1024:
+                skipped.append(f"{skill_name}: file too large")
+                break
+        else:
+            target = target_root / skill_name
+            if target.exists():
+                shutil.rmtree(target, ignore_errors=True)
+            shutil.copytree(skill_dir, target)
+            imported.append(skill_name)
+
+    if imported:
+        _rebuild_index(user_id, team=team_name)
+    return {"imported": imported, "skipped": skipped}
+
+
+@app.route("/skills", methods=["GET"])
+def get_global_skills():
+    """List user-level shared managed skills."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    from webot.skills import list_skills
+
+    return jsonify({
+        "ok": True,
+        "skills": {
+            "personal": list_skills(user_id),
+        },
+    })
+
+
+@app.route("/skills/import-zip", methods=["POST"])
+def import_global_skill_zip():
+    """Import managed skills from a Skill ZIP into the user-level shared scope."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "file is required"}), 400
+    if not file.filename.lower().endswith(".zip"):
+        return jsonify({"error": "Only .zip files are supported"}), 400
+
+    with tempfile.TemporaryDirectory(prefix="clawcross_global_skill_zip_") as tmp:
+        tmp_dir = Path(tmp)
+        zip_path = tmp_dir / "skill.zip"
+        file.save(zip_path)
+        extract_dir = tmp_dir / "extracted"
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            _safe_extract_skill_zip(zip_path, extract_dir)
+            direct = _copy_direct_skill_dirs(extract_dir, user_id, "")
+        except zipfile.BadZipFile:
+            return jsonify({"error": "Invalid zip file"}), 400
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    if not direct.get("imported"):
+        return jsonify({"error": "No SKILL.md found in zip", "direct": direct}), 400
+
+    return jsonify({"ok": True, "direct": direct})
+
+
+@app.route("/skills/<skill_name>", methods=["GET"])
+def get_global_skill_detail(skill_name):
+    """Get a single user-level shared managed skill detail."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    from webot.skills import get_skill
+
+    skill = get_skill(user_id, name=skill_name)
+    if not skill:
+        return jsonify({"error": f"Skill '{skill_name}' not found"}), 404
+    return jsonify({"ok": True, "skill": skill})
+
+
+@app.route("/skills/<skill_name>", methods=["PUT"])
+def update_global_skill_detail(skill_name):
+    """Update a single user-level shared managed skill's SKILL.md content."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(force=True) or {}
+    content = str(body.get("content") or "")
+    if not content.strip():
+        return jsonify({"error": "content is required"}), 400
+
+    from webot.skills import edit_skill, get_skill
+
+    result = edit_skill(user_id, name=skill_name, content=content)
+    if not result.get("success"):
+        return jsonify({"error": result.get("error") or "Update failed"}), 400
+
+    return jsonify({"ok": True, "skill": get_skill(user_id, name=skill_name), "result": result})
+
+
+@app.route("/skills/<skill_name>", methods=["DELETE"])
+def delete_global_skill_detail(skill_name):
+    """Delete a user-level shared managed skill."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    from webot.skills import delete_skill
+
+    result = delete_skill(user_id, name=skill_name)
+    if not result.get("success"):
+        return jsonify({"error": result.get("error") or "Delete failed"}), 400
+    return jsonify({"ok": True, "result": result})
+
+
+@app.route("/teams/<team_name>/skills/import-zip", methods=["POST"])
+def import_team_skill_zip(team_name):
+    """Import managed skills from a Skill ZIP into the selected team."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+    if "/" in team_name or "\\" in team_name or team_name.startswith("."):
+        return jsonify({"error": "Invalid team name"}), 400
+    team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team_name)
+    if not os.path.exists(team_dir):
+        return jsonify({"error": "Team not found"}), 404
+
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "file is required"}), 400
+    if not file.filename.lower().endswith(".zip"):
+        return jsonify({"error": "Only .zip files are supported"}), 400
+
+    with tempfile.TemporaryDirectory(prefix="clawcross_skill_zip_") as tmp:
+        tmp_dir = Path(tmp)
+        zip_path = tmp_dir / "skill.zip"
+        file.save(zip_path)
+        extract_dir = tmp_dir / "extracted"
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            _safe_extract_skill_zip(zip_path, extract_dir)
+            direct = _copy_direct_skill_dirs(extract_dir, user_id, team_name)
+        except zipfile.BadZipFile:
+            return jsonify({"error": "Invalid zip file"}), 400
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+    imported_count = len(direct.get("imported") or [])
+    if imported_count == 0:
+        return jsonify({
+            "error": "No SKILL.md found in zip",
+            "direct": direct,
+        }), 400
+
+    return jsonify({
+        "ok": True,
+        "team": team_name,
+        "restored": {
+            "restored_user_skill_dirs": 0,
+            "restored_user_files": 0,
+            "restored_team_skill_dirs": 0,
+            "restored_team_files": 0,
+        },
+        "direct": direct,
     })
 
 

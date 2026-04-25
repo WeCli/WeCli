@@ -208,9 +208,9 @@ def _extract_selector_choice(content: str) -> int | None:
 
     解析 clawcross_type JSON：{"clawcross_type": "oasis choose", "choose": N, ...}
     读取 'choose' 字段，可以是：
-      - int：直接使用
+      - int：直接使用（当前提示词要求的标准格式）
       - str：如果为数字则转换为 int
-      - dict：读取 'option' 或 'choice' 键
+      - dict：兼容旧格式，只接受 option/choice 中的数字
 
     返回选择编号（int），如果未找到有效选择则返回 None。
     """
