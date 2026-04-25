@@ -131,6 +131,15 @@
     font-size: 12px;
     font-weight: 600;
   }
+  .header-btn.workflow-header-btn {
+    background: #e8eefc;
+    border: 1px solid #c7d7fb;
+    color: var(--primary);
+    font-weight: 700;
+  }
+  .header-btn.workflow-header-btn:active {
+    background: #dbe7ff;
+  }
   .header-back-btn {
     display: flex; align-items: center; justify-content: center;
     min-width: 40px; height: 36px; padding: 0 8px; border: none; background: none;
@@ -1733,12 +1742,12 @@
     margin-left: auto;
   }
   .oasis-header-btn {
-    width: 32px; height: 32px; border: none; background: none;
+    width: 32px; height: 32px; border: 1px solid #d6e2fb; background: #eef4ff;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 16px; color: var(--text-secondary);
+    cursor: pointer; font-size: 16px; color: var(--primary);
     border-radius: 50%;
   }
-  .oasis-header-btn:active { background: rgba(0,0,0,0.06); }
+  .oasis-header-btn:active { background: #dbe7ff; }
 
   .oasis-body {
     flex: 1; overflow-y: auto;
@@ -1890,12 +1899,15 @@
   .oasis-action-btn {
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px;
-    font-size: 11px; border: none; background: none; cursor: pointer;
+    font-size: 11px; border: 1px solid #d6e2fb; background: #eef4ff; cursor: pointer;
+    color: var(--primary);
     border-radius: 4px; opacity: 0; transition: opacity 0.2s;
   }
   .oasis-topic-item:active .oasis-action-btn { opacity: 0.7; }
   .oasis-action-btn:active { opacity: 1 !important; }
+  .oasis-btn-cancel { background: #fff7e6; border-color: #ffd591; color: #d48806; }
   .oasis-btn-cancel:active { background: #fef3c7; }
+  .oasis-btn-delete { background: #fff1f0; border-color: #ffccc7; color: #cf1322; }
   .oasis-btn-delete:active { background: #fee2e2; }
 
   /* Topic count badge */
@@ -1915,22 +1927,24 @@
   }
   .oasis-detail-action-btn {
     font-size: 12px; padding: 5px 12px; border-radius: 4px;
-    border: none; cursor: pointer;
-    background: var(--bg-card);
-    color: var(--text);
+    border: 1px solid #d6e2fb; cursor: pointer;
+    background: #eef4ff;
+    color: var(--primary);
     transition: background 0.15s; white-space: nowrap;
-  }
-  .oasis-detail-action-btn:active { background: #e5e5e5; }
-  .oasis-detail-action-btn.cancel { color: #e6a23c; }
-  .oasis-detail-action-btn.cancel:active { background: #fdf6ec; }
-  .oasis-detail-action-btn.delete { color: #f55; }
-  .oasis-detail-action-btn.delete:active { background: #fef2f2; }
-  .oasis-detail-action-btn.overview {
-    color: #07c160;
-    background: var(--bg-card);
     font-weight: 600;
   }
-  .oasis-detail-action-btn.overview:active { background: #e5e5e5; }
+  .oasis-detail-action-btn:active { background: #dbe7ff; }
+  .oasis-detail-action-btn.cancel { color: #d48806; background: #fff7e6; border-color: #ffd591; }
+  .oasis-detail-action-btn.cancel:active { background: #fdf6ec; }
+  .oasis-detail-action-btn.delete { color: #cf1322; background: #fff1f0; border-color: #ffccc7; }
+  .oasis-detail-action-btn.delete:active { background: #fef2f2; }
+  .oasis-detail-action-btn.overview {
+    color: #0b8f49;
+    background: #ecfdf3;
+    border-color: #bbf7d0;
+    font-weight: 600;
+  }
+  .oasis-detail-action-btn.overview:active { background: #dcfce7; }
 
   /* Conclusion collapse toggle */
   .oasis-conclusion-header {
@@ -2985,7 +2999,7 @@
           <span class="menu-label" data-i18n="create_new_group">创建新群聊</span>
         </button>
       </div>
-      <button class="header-btn with-label" onclick="toggleOasisSidebar()" data-i18n-title="tip_workflow" title="选择工作流">
+      <button class="header-btn with-label workflow-header-btn" onclick="toggleOasisSidebar()" data-i18n-title="tip_workflow" title="选择工作流">
         <span class="btn-label" data-i18n="workflow_short">工作流</span>
       </button>
     </div>
@@ -3013,7 +3027,7 @@
     </button>
     <div class="header-title" id="chat-title" data-i18n="header_agent_msg">Agent消息</div>
     <div style="display:flex;gap:2px;align-items:center;margin-left:auto;">
-      <button class="header-btn with-label" onclick="toggleOasisSidebar()" data-i18n-title="tip_workflow" title="选择工作流">
+      <button class="header-btn with-label workflow-header-btn" onclick="toggleOasisSidebar()" data-i18n-title="tip_workflow" title="选择工作流">
         <span class="btn-label" data-i18n="workflow_short">工作流</span>
       </button>
       <button class="header-btn" id="chat-more-btn" onclick="toggleChatActions()" data-i18n-title="tip_more" title="更多" style="font-size:20px;font-weight:700;min-width:36px;">⋮</button>

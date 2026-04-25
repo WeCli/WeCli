@@ -864,7 +864,8 @@ class GroupService:
             private_cli_hint = (f"cd {_PROJECT_ROOT} && "
                                 f"uv run scripts/cli.py groups private-send --group-id {group_id} --sender '{sender_display}' --message '你的回复内容'")
             mention_hint = (
-                "如果需要点名或转交给其他成员，请在回复内容里直接写 @成员显示名；"
+                "如果某段回复只需要特定成员处理，或需要转交给更合适的成员，请在回复内容里直接写 @对方名称。"
+                "被 @ 的消息只会唤醒并投递给目标成员，不会打扰全群；鼓励用这种方式高效交流。"
                 "不要写内部 global_id、session_id 或 tag#type#... 标识。"
             )
 
@@ -934,7 +935,7 @@ class GroupService:
                 group_trigger_suffix = ("\n\n如果需要回复，请使用 send_to_group 工具发送消息到群里：\n"
                                         f"  当前群主 owner=\"{owner_uid}\"；当前人类用户是「{owner_uid}」\n"
                                         f"  send_to_group(group_id=\"{group_id}\", content=\"你的回复内容\")\n"
-                                        "  如需点名或转交给其他成员，请在 content 中直接写 @成员显示名；不要写内部 global_id、session_id 或 tag#type#... 标识。\n"
+                                        "  如某段回复只需要特定成员处理，或需要转交给更合适的成员，请在 content 中直接写 @对方名称。被 @ 的消息只会唤醒并投递给目标成员，不会打扰全群；鼓励用这种方式高效交流。不要写内部 global_id、session_id 或 tag#type#... 标识。\n"
                                         "注意：username 和 source_session 会自动注入，不要手动设置。\n"
                                         "[end padding]\n[end padding]\n[end padding]")
                 private_trigger_suffix = ("\n\n如果需要回复，请使用 send_private_cli 工具发送私聊消息：\n"
