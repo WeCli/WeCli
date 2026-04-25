@@ -2732,6 +2732,136 @@
     font-size: 13px; color: var(--text-secondary); margin: 8px 16px 4px;
     padding: 10px 12px; background: var(--bg-card); border-radius: 8px;
   }
+  .mobile-update-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .mobile-update-empty {
+    padding: 18px 14px;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+    text-align: center;
+    background: var(--bg);
+  }
+  .mobile-update-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .mobile-update-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eef4ff;
+    color: var(--primary);
+    border: 1px solid #c7d7fb;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .mobile-update-branch {
+    min-width: 0;
+    color: var(--text-secondary);
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mobile-update-version-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .mobile-update-version-card {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #d6e2fb;
+    background: #f8fbff;
+  }
+  .mobile-update-version-card.remote {
+    border-color: #bbf7d0;
+    background: #f3fff7;
+  }
+  .mobile-update-version-label {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .mobile-update-version-hash {
+    margin-top: 6px;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 800;
+    line-height: 1.15;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    overflow-wrap: anywhere;
+  }
+  .mobile-update-version-subject {
+    margin-top: 4px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .mobile-update-message {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .mobile-update-message.warn {
+    background: #fff7e6;
+    color: #ad6800;
+  }
+  .mobile-update-message.good {
+    background: #ecfdf3;
+    color: #0b8f49;
+  }
+  .mobile-update-message.bad {
+    background: #fff1f0;
+    color: #cf1322;
+  }
+  .mobile-update-log-wrap {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg);
+  }
+  .mobile-update-log-wrap[hidden] {
+    display: none;
+  }
+  .mobile-update-log-wrap summary {
+    cursor: pointer;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+    user-select: none;
+  }
+  .mobile-update-log-wrap summary:active {
+    background: #ececec;
+  }
+  .mobile-update-log {
+    margin: 0;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    background: #111827;
+    color: #f9fafb;
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 260px;
+    overflow: auto;
+  }
   .settings-group { background: var(--bg-card); margin-bottom: 8px; }
   .settings-group-title {
     display: flex; align-items: center; justify-content: space-between;
@@ -3760,8 +3890,13 @@
       <div class="settings-hint" id="mobile-update-hint">检查远端 Git 更新，并在确认后拉取代码并重启服务。</div>
       <div class="settings-group">
         <div class="settings-group-body" style="padding-top:12px;">
-          <div id="mobile-update-summary" style="white-space:pre-wrap;font-size:13px;line-height:1.6;color:var(--text-secondary);">点击“检查更新”后显示版本信息。</div>
-          <pre id="mobile-update-log" style="display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:#111827;color:#f9fafb;font-size:11px;line-height:1.5;white-space:pre-wrap;word-break:break-word;"></pre>
+          <div id="mobile-update-summary" class="mobile-update-panel">
+            <div class="mobile-update-empty">点击“检查更新”后显示版本信息。</div>
+          </div>
+          <details id="mobile-update-log-wrap" class="mobile-update-log-wrap" hidden>
+            <summary id="mobile-update-log-title">更新日志</summary>
+            <pre id="mobile-update-log" class="mobile-update-log"></pre>
+          </details>
         </div>
       </div>
     </div>
@@ -5736,47 +5871,109 @@ function stopMobileUpdatePolling() {
   }
 }
 
+function mobileUpdateStatusLabel(status) {
+  const s = status || 'idle';
+  const zh = {
+    idle: '空闲',
+    queued: '已排队',
+    checking: '检查中',
+    updating: '更新中',
+    restarting: '重启中',
+    done: '已完成',
+    failed: '失败',
+  };
+  const en = {
+    idle: 'Idle',
+    queued: 'Queued',
+    checking: 'Checking',
+    updating: 'Updating',
+    restarting: 'Restarting',
+    done: 'Done',
+    failed: 'Failed',
+  };
+  const map = _currentLang === 'zh' ? zh : en;
+  return map[s] || s;
+}
+
 function renderMobileUpdateSummary(update) {
   const summaryEl = document.getElementById('mobile-update-summary');
   const logEl = document.getElementById('mobile-update-log');
+  const logWrap = document.getElementById('mobile-update-log-wrap');
+  const logTitle = document.getElementById('mobile-update-log-title');
   const startBtn = document.getElementById('mobile-update-start-btn');
   if (!summaryEl || !startBtn) return;
   if (!update) {
-    summaryEl.textContent = _currentLang === 'zh'
+    summaryEl.innerHTML = `<div class="mobile-update-empty">${escapeHtml(_currentLang === 'zh'
       ? '点击“检查更新”后显示版本信息。'
-      : 'Tap "Check Update" to load version info.';
+      : 'Tap "Check Update" to load version info.')}</div>`;
     startBtn.disabled = true;
     if (logEl) {
-      logEl.style.display = 'none';
       logEl.textContent = '';
+    }
+    if (logWrap) {
+      logWrap.hidden = true;
+      logWrap.open = false;
     }
     return;
   }
-  const lines = [
-    `${_currentLang === 'zh' ? '状态' : 'Status'}: ${update.status || 'idle'}`,
-    `${_currentLang === 'zh' ? '分支' : 'Branch'}: ${update.branch || 'unknown'}`,
-    `${_currentLang === 'zh' ? '当前版本' : 'Current'}: ${(update.current_short_commit || '-')}${update.current_subject ? ' (' + update.current_subject + ')' : ''}`,
-    `${_currentLang === 'zh' ? '远端版本' : 'Remote'}: ${(update.latest_short_commit || '-')}${update.latest_subject ? ' (' + update.latest_subject + ')' : ''}`,
-  ];
+  const status = update.status || 'idle';
+  const branch = update.branch || 'unknown';
+  const currentHash = update.current_short_commit || '-';
+  const remoteHash = update.latest_short_commit || '-';
+  let messageText = '';
+  let messageClass = '';
   if (update.dirty) {
-    lines.push(_currentLang === 'zh' ? '本地仓库有未提交改动，禁止自动更新。' : 'Local repo is dirty. Auto update is blocked.');
+    messageText = _currentLang === 'zh' ? '本地仓库有未提交改动，禁止自动更新。' : 'Local repo is dirty. Auto update is blocked.';
+    messageClass = 'warn';
   } else if (update.has_update) {
-    lines.push(_currentLang === 'zh' ? '检测到可用更新。' : 'Update available.');
+    messageText = _currentLang === 'zh' ? '检测到可用更新。' : 'Update available.';
+    messageClass = 'good';
   } else {
-    lines.push(_currentLang === 'zh' ? '当前已经是最新版本。' : 'Already up to date.');
+    messageText = _currentLang === 'zh' ? '当前已经是最新版本。' : 'Already up to date.';
+    messageClass = 'good';
   }
+  if (status === 'failed') messageClass = 'bad';
   if (update.message) {
-    lines.push('');
-    lines.push(update.message);
+    messageText += `\n${update.message}`;
   }
-  summaryEl.textContent = lines.join('\n');
+  summaryEl.innerHTML = `
+    <div class="mobile-update-status-row">
+      <span class="mobile-update-status">${escapeHtml(mobileUpdateStatusLabel(status))}</span>
+      <span class="mobile-update-branch">${escapeHtml(_currentLang === 'zh' ? '分支: ' : 'Branch: ')}${escapeHtml(branch)}</span>
+    </div>
+    <div class="mobile-update-version-grid">
+      <div class="mobile-update-version-card local">
+        <div class="mobile-update-version-label">${escapeHtml(_currentLang === 'zh' ? '本地版本' : 'Local Version')}</div>
+        <div class="mobile-update-version-hash">${escapeHtml(currentHash)}</div>
+        <div class="mobile-update-version-subject">${escapeHtml(update.current_subject || '-')}</div>
+      </div>
+      <div class="mobile-update-version-card remote">
+        <div class="mobile-update-version-label">${escapeHtml(_currentLang === 'zh' ? '远程版本' : 'Remote Version')}</div>
+        <div class="mobile-update-version-hash">${escapeHtml(remoteHash)}</div>
+        <div class="mobile-update-version-subject">${escapeHtml(update.latest_subject || '-')}</div>
+      </div>
+    </div>
+    <div class="mobile-update-message ${messageClass}">${escapeHtml(messageText)}</div>
+  `;
   startBtn.disabled = !Boolean(update.has_update) || Boolean(update.dirty) || ['queued', 'checking', 'updating', 'restarting'].includes(update.status);
   if (logEl && Array.isArray(update.log_tail) && update.log_tail.length) {
-    logEl.style.display = 'block';
     logEl.textContent = update.log_tail.join('\n');
+    if (logWrap) {
+      const wasHidden = logWrap.hidden;
+      logWrap.hidden = false;
+      if (wasHidden) logWrap.open = false;
+    }
+    if (logTitle) {
+      logTitle.textContent = _currentLang === 'zh'
+        ? `相关日志 (${update.log_tail.length})`
+        : `Related Logs (${update.log_tail.length})`;
+    }
   } else if (logEl) {
-    logEl.style.display = 'none';
     logEl.textContent = '';
+    if (logWrap) {
+      logWrap.hidden = true;
+      logWrap.open = false;
+    }
   }
 }
 
