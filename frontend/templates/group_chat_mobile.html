@@ -2965,6 +2965,51 @@
     color: #fff;
     font-size: 14px;
   }
+  .update-available-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    background: linear-gradient(90deg, #166534, #15803d);
+    color: #fff;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(21,128,61,0.18);
+  }
+  .update-available-banner.warn {
+    background: linear-gradient(90deg, #b45309, #d97706);
+    box-shadow: 0 2px 8px rgba(180,83,9,0.18);
+  }
+  .update-available-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .update-available-title {
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.25;
+  }
+  .update-available-text {
+    font-size: 11px;
+    opacity: 0.9;
+    line-height: 1.35;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .update-available-action {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.28);
+    font-size: 12px;
+    font-weight: 800;
+  }
   .settings-user-password-card {
     padding: 6px 0 2px;
   }
@@ -3016,6 +3061,9 @@
     }
     .local-password-banner-actions {
       align-self: flex-start;
+    }
+    .update-available-banner {
+      align-items: flex-start;
     }
   }
 
@@ -3106,6 +3154,13 @@
     <button id="local-password-banner-action" class="local-password-banner-btn" type="button" onclick="openSettingsToPassword()">去设置</button>
     <button class="local-password-banner-close" type="button" onclick="dismissLocalPasswordBanner(); event.stopPropagation();" aria-label="Close">✕</button>
   </div>
+</div>
+<div id="mobile-update-available-banner" class="top-inline-banner update-available-banner" onclick="openMobileUpdateModal()">
+  <div class="update-available-copy">
+    <div id="mobile-update-available-title" class="update-available-title">检测到可用更新</div>
+    <div id="mobile-update-available-text" class="update-available-text"></div>
+  </div>
+  <div id="mobile-update-available-action" class="update-available-action">查看</div>
 </div>
 
 <div class="app-container">
@@ -3385,7 +3440,7 @@
       <!-- Hub 导入展开区 -->
       <div id="contacts-hub-import-area" style="display:none;margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);">
         <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;" data-i18n="paste_hub_cmd">粘贴从 Hub 复制的下载命令：</div>
-        <textarea id="contacts-hub-curl-input" placeholder="curl -L 'https://clawcross.net/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
+        <textarea id="contacts-hub-curl-input" placeholder="curl -L 'https://clawhub.ai/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
         <div style="display:flex;gap:8px;margin-top:8px;">
           <button onclick="openClawcrossHub()" style="flex:1;padding:8px;background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
           <button onclick="importFromHubContacts()" style="flex:1;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="download_import">📥 下载并导入</button>
@@ -3491,6 +3546,16 @@
       </div>
     </div>
     <div class="discover-section">
+      <div class="discover-card" onclick="showMobileSkillManager()">
+        <div class="discover-card-icon">🧩</div>
+        <div class="discover-card-body">
+          <div class="discover-card-title">Skill 管理</div>
+          <div class="discover-card-desc">管理全局 Skill 和 Team Skill，导入 Skill ZIP</div>
+        </div>
+        <div class="discover-card-arrow">›</div>
+      </div>
+    </div>
+    <div class="discover-section">
       <div class="discover-card" onclick="showMobileAlarmManager()">
         <div class="discover-card-icon">⏰</div>
         <div class="discover-card-body">
@@ -3590,6 +3655,42 @@
       <button onclick="restartClawcross()" class="settings-btn settings-btn-restart" data-i18n="settings_restart">🔄 重启服务</button>
       <button onclick="closeSettings()" class="settings-btn settings-btn-cancel" data-i18n="cancel">取消</button>
       <button onclick="saveSettings()" class="settings-btn settings-btn-save" data-i18n="save">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ Mobile Skill Manager ═══════════════ -->
+<div class="drawer-overlay side-panel-overlay" id="mobile-skill-manager-overlay" onclick="if(event.target===this)closeMobileSkillManager()"></div>
+<div class="drawer side-drawer" id="mobile-skill-manager">
+  <div class="drawer-header">
+    <button class="drawer-header-back" onclick="closeMobileSkillManager()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="drawer-header-title">Skill 管理</span>
+  </div>
+  <div class="drawer-body" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button id="mobile-skill-scope-global" type="button" onclick="setMobileSkillScope('global')" style="padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary);color:#fff;font-size:13px;font-weight:700;">全局 Skill</button>
+      <button id="mobile-skill-scope-team" type="button" onclick="setMobileSkillScope('team')" style="padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:13px;font-weight:700;">Team Skill</button>
+    </div>
+    <select id="mobile-skill-team-select" onchange="loadMobileSkills()" style="display:none;width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:14px;"></select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <button type="button" onclick="openClawcrossHub()" style="padding:10px;border:1px solid var(--primary);border-radius:8px;background:var(--bg-card);color:var(--primary);font-size:13px;font-weight:700;">🌐 ClawHub</button>
+      <button type="button" onclick="document.getElementById('mobile-skill-zip-input').click()" style="padding:10px;border:1px solid #f59e0b;border-radius:8px;background:#fffbeb;color:#b45309;font-size:13px;font-weight:700;">📦 导入 ZIP</button>
+      <input type="file" id="mobile-skill-zip-input" accept=".zip" style="display:none;" onchange="importMobileManagedSkillZip(this)">
+    </div>
+    <div id="mobile-skill-manager-status" style="font-size:12px;color:var(--text-secondary);min-height:18px;"></div>
+    <div id="mobile-skill-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="mobile-skill-detail" style="display:none;border-top:1px solid var(--border);padding-top:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+        <div>
+          <div id="mobile-skill-detail-name" style="font-size:15px;font-weight:800;color:var(--text);"></div>
+          <div id="mobile-skill-detail-meta" style="font-size:11px;color:var(--text-secondary);margin-top:2px;"></div>
+        </div>
+        <button type="button" onclick="deleteMobileSkillDetail()" style="padding:6px 10px;border:1px solid #fecaca;border-radius:7px;background:#fee2e2;color:#b91c1c;font-size:12px;font-weight:700;">删除</button>
+      </div>
+      <textarea id="mobile-skill-detail-content" spellcheck="false" style="width:100%;min-height:260px;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:12px;line-height:1.55;font-family:monospace;resize:vertical;"></textarea>
+      <button type="button" onclick="saveMobileSkillDetail()" style="width:100%;margin-top:8px;padding:10px;border:none;border-radius:8px;background:var(--primary);color:#fff;font-size:14px;font-weight:800;">保存</button>
     </div>
   </div>
 </div>
@@ -3749,7 +3850,7 @@
         <!-- Hub 导入展开区 -->
         <div id="hub-import-area" style="display:none;margin-bottom:8px;padding:10px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--border);">
           <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;" data-i18n="paste_hub_cmd">粘贴从 Hub 复制的下载命令：</div>
-          <textarea id="hub-curl-input" placeholder="curl -L 'https://clawcross.net/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
+          <textarea id="hub-curl-input" placeholder="curl -L 'https://clawhub.ai/api/workflows/xxx/download' -o team_xxx.zip" style="width:100%;height:60px;padding:8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:monospace;background:var(--bg-card);color:var(--text);resize:none;"></textarea>
           <div style="display:flex;gap:8px;margin-top:8px;">
             <button onclick="openClawcrossHub()" style="flex:1;padding:8px;background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="go_to_hub">🌐 前往 Hub</button>
             <button onclick="importFromHub()" style="flex:1;padding:8px;background:var(--primary);color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;" data-i18n="download_import">📥 下载并导入</button>
@@ -5256,6 +5357,7 @@ function setLang(lang) {
   document.title = t('page_title');
   applyLangToDOM();
   updateLocalPasswordBanner();
+  if (mobileUpdateSnapshot) renderMobileUpdateBanner(mobileUpdateSnapshot);
   // Re-render dynamic areas that are currently visible
   if (groups && groups.length) renderGroupList(groups);
   if (document.getElementById('tab-profile').classList.contains('active')) loadProfile();
@@ -5367,6 +5469,7 @@ let currentGroupName = '';
 let currentTeamName = '';
 let currentTab = 'chats';
 let mobileUpdatePollTimer = null;
+let mobileUpdateSnapshot = null;
 let lastMsgId = 0;
 const renderedMsgIds = new Set();
 let pollTimer = null;
@@ -5895,6 +5998,31 @@ function mobileUpdateStatusLabel(status) {
   return map[s] || s;
 }
 
+function renderMobileUpdateBanner(update) {
+  mobileUpdateSnapshot = update || null;
+  const banner = document.getElementById('mobile-update-available-banner');
+  const titleEl = document.getElementById('mobile-update-available-title');
+  const textEl = document.getElementById('mobile-update-available-text');
+  const actionEl = document.getElementById('mobile-update-available-action');
+  if (!banner || !titleEl || !textEl || !actionEl) return;
+
+  if (!update || !update.has_update || update.status === 'done') {
+    banner.style.display = 'none';
+    return;
+  }
+
+  const zh = _currentLang === 'zh';
+  const currentHash = update.current_short_commit || '-';
+  const remoteHash = update.latest_short_commit || '-';
+  banner.classList.toggle('warn', Boolean(update.dirty));
+  banner.style.display = 'flex';
+  titleEl.textContent = update.dirty
+    ? (zh ? '检测到更新，但本地有未提交改动' : 'Update found, local changes block auto update')
+    : (zh ? '检测到可用更新' : 'Update available');
+  textEl.textContent = `${currentHash} → ${remoteHash}${update.latest_subject ? ' · ' + update.latest_subject : ''}`;
+  actionEl.textContent = zh ? '查看' : 'View';
+}
+
 function renderMobileUpdateSummary(update) {
   const summaryEl = document.getElementById('mobile-update-summary');
   const logEl = document.getElementById('mobile-update-log');
@@ -5916,6 +6044,7 @@ function renderMobileUpdateSummary(update) {
     }
     return;
   }
+  renderMobileUpdateBanner(update);
   const status = update.status || 'idle';
   const branch = update.branch || 'unknown';
   const currentHash = update.current_short_commit || '-';
@@ -6001,6 +6130,15 @@ async function checkMobileUpdate(refreshRemote) {
     toast((_currentLang === 'zh' ? '检查更新失败: ' : 'Check update failed: ') + e.message, 3500);
   } finally {
     if (checkBtn) checkBtn.disabled = false;
+  }
+}
+
+async function refreshMobileUpdateBanner() {
+  try {
+    const update = await mobileUpdateRequest('/proxy_update_status', {});
+    renderMobileUpdateBanner(update);
+  } catch (e) {
+    renderMobileUpdateBanner(null);
   }
 }
 
@@ -8223,6 +8361,25 @@ function handleInputKey(e) {
 }
 
 // ── Workflow functions ──
+function currentGroupBaseTeamName() {
+  const raw = String(currentTeamName || currentGroupName || '').trim();
+  if (!raw) return '';
+  const base = raw.split('#')[0].trim();
+  return base || raw;
+}
+
+function teamMemberGlobalId(member) {
+  if (!member || typeof member !== 'object') return '';
+  if (member.type === 'ext') return String(member.global_name || member.name || '').trim();
+  return String(member.session || member.global_name || member.global_id || '').trim();
+}
+
+function currentGroupMemberGlobalIds() {
+  return new Set((currentMembers || [])
+    .map(m => String(m.global_id || '').trim())
+    .filter(Boolean));
+}
+
 async function loadWorkflows() {
   // 并行加载公共 workflows 和 team 列表
   try {
@@ -8236,16 +8393,25 @@ async function loadWorkflows() {
     const teams = (teamsResp && teamsResp.teams) || [];
 
     // 并行加载各 team 的 workflows (YAML + Python)
+    const groupTeam = currentGroupBaseTeamName();
+    const groupMemberIds = currentGroupMemberGlobalIds();
     const teamResults = await Promise.all(teams.map(async (teamName) => {
       try {
-        const [yamlResp, pyResp] = await Promise.all([
+        const [yamlResp, pyResp, membersResp] = await Promise.all([
           api('GET', `/proxy_visual/load-layouts?team=${encodeURIComponent(teamName)}`),
           api('GET', `/proxy_visual/load-layouts?team=${encodeURIComponent(teamName)}&mode=python`),
+          api('GET', `/teams/${encodeURIComponent(teamName)}/members`).catch(() => ({ members: [] })),
         ]);
         const yamlLayouts = Array.isArray(yamlResp) ? yamlResp : [];
         const pyLayouts = Array.isArray(pyResp) ? pyResp : [];
-        return { team: teamName, yamlLayouts, pyLayouts };
-      } catch { return { team: teamName, yamlLayouts: [], pyLayouts: [] }; }
+        const teamMemberIds = new Set(((membersResp && membersResp.members) || [])
+          .map(teamMemberGlobalId)
+          .filter(Boolean));
+        let overlap = 0;
+        groupMemberIds.forEach(id => { if (teamMemberIds.has(id)) overlap++; });
+        const score = (teamName === groupTeam ? 1000 : 0) + overlap;
+        return { team: teamName, yamlLayouts, pyLayouts, score };
+      } catch { return { team: teamName, yamlLayouts: [], pyLayouts: [], score: teamName === groupTeam ? 1000 : 0 }; }
     }));
 
     // 构建分组 - 每个 layout 存储为 { name, mode }
@@ -8254,14 +8420,19 @@ async function loadWorkflows() {
       ...globalYamlLayouts.map(name => ({ name, mode: 'yaml' })),
       ...globalPyLayouts.map(name => ({ name, mode: 'python' })),
     ];
-    if (globalItems.length) workflowGroups.push({ group: t('wf_public'), team: '', items: globalItems });
-    teamResults.forEach(tr => {
+    const globalGroup = globalItems.length ? { group: t('wf_public'), team: '', items: globalItems, score: 0 } : null;
+    const teamGroups = teamResults.map(tr => {
       const items = [
         ...tr.yamlLayouts.map(name => ({ name, mode: 'yaml' })),
         ...tr.pyLayouts.map(name => ({ name, mode: 'python' })),
       ];
-      workflowGroups.push({ group: tr.team, team: tr.team, items });
+      return { group: tr.team, team: tr.team, items, score: tr.score || 0 };
     });
+    const hasPreferredTeam = teamGroups.some(g => g.score > 0);
+    teamGroups.sort((a, b) => (b.score - a.score) || String(a.group).localeCompare(String(b.group)));
+    workflowGroups = hasPreferredTeam
+      ? [...teamGroups.filter(g => g.score > 0), ...(globalGroup ? [globalGroup] : []), ...teamGroups.filter(g => g.score <= 0)]
+      : [...(globalGroup ? [globalGroup] : []), ...teamGroups];
     // 与桌面端一致：默认展开全部分组，否则列表项全部被 CSS 隐藏，看起来像「只有 team 标题没有工作流」
     workflowExpandedGroups = new Set(
       workflowGroups.map((g) => (g.team || '__public__'))
@@ -9238,7 +9409,7 @@ setInterval(() => {
 }, 10000);
 
 // ── ClawCross Studio ──
-    const TEAM_HUB_URL = 'https://clawcross.net';
+    const TEAM_HUB_URL = 'https://clawhub.ai';
 
 function buildClawcrossHubReturnUrl() {
   try {
@@ -9272,6 +9443,181 @@ function openClawcrossHub() {
 
 function openClawcrossCreator() {
   window.location.assign('/creator');
+}
+
+// ── Mobile Skill Manager ──
+let mobileSkillScope = 'global';
+let mobileSkillCurrentName = '';
+
+function mobileSkillStatus(text) {
+  const el = document.getElementById('mobile-skill-manager-status');
+  if (el) el.textContent = text || '';
+}
+
+async function showMobileSkillManager() {
+  document.getElementById('mobile-skill-manager').classList.add('show');
+  document.getElementById('mobile-skill-manager-overlay').classList.add('show');
+  await loadMobileSkillTeams();
+  setMobileSkillScope(mobileSkillScope || 'global');
+}
+
+function closeMobileSkillManager() {
+  document.getElementById('mobile-skill-manager').classList.remove('show');
+  document.getElementById('mobile-skill-manager-overlay').classList.remove('show');
+}
+
+async function loadMobileSkillTeams() {
+  const select = document.getElementById('mobile-skill-team-select');
+  if (!select) return;
+  try {
+    const data = await api('GET', '/teams');
+    const teams = data.teams || data || [];
+    select.innerHTML = teams.map(tm => `<option value="${esc(tm)}">${esc(tm)}</option>`).join('');
+  } catch (e) {
+    select.innerHTML = '';
+    mobileSkillStatus('加载团队失败: ' + e.message);
+  }
+}
+
+function setMobileSkillScope(scope) {
+  mobileSkillScope = scope === 'team' ? 'team' : 'global';
+  const globalBtn = document.getElementById('mobile-skill-scope-global');
+  const teamBtn = document.getElementById('mobile-skill-scope-team');
+  const teamSelect = document.getElementById('mobile-skill-team-select');
+  if (globalBtn && teamBtn) {
+    const active = 'padding:9px;border:1px solid var(--primary);border-radius:8px;background:var(--primary);color:#fff;font-size:13px;font-weight:700;';
+    const inactive = 'padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);font-size:13px;font-weight:700;';
+    globalBtn.style.cssText = mobileSkillScope === 'global' ? active : inactive;
+    teamBtn.style.cssText = mobileSkillScope === 'team' ? active : inactive;
+  }
+  if (teamSelect) teamSelect.style.display = mobileSkillScope === 'team' ? 'block' : 'none';
+  mobileSkillCurrentName = '';
+  const detail = document.getElementById('mobile-skill-detail');
+  if (detail) detail.style.display = 'none';
+  loadMobileSkills();
+}
+
+function mobileSkillBasePath() {
+  if (mobileSkillScope === 'global') return '/skills';
+  const team = document.getElementById('mobile-skill-team-select')?.value || '';
+  return team ? `/teams/${encodeURIComponent(team)}/skills` : '';
+}
+
+async function loadMobileSkills() {
+  const list = document.getElementById('mobile-skill-list');
+  if (!list) return;
+  const base = mobileSkillBasePath();
+  if (!base) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);">请选择团队</div>';
+    return;
+  }
+  list.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);">加载中...</div>';
+  mobileSkillStatus('');
+  try {
+    const data = await api('GET', base);
+    const skills = mobileSkillScope === 'global'
+      ? (data.skills?.personal || [])
+      : (data.skills?.team || []);
+    if (!skills.length) {
+      list.innerHTML = '<div style="font-size:12px;color:var(--text-secondary);">暂无 Skill</div>';
+      return;
+    }
+    list.innerHTML = skills.map(skill => {
+      const name = skill.name || '';
+      const desc = skill.description || '';
+      const category = skill.category ? ` · ${skill.category}` : '';
+      return `<button type="button" onclick="loadMobileSkillDetail('${esc(name)}')" style="text-align:left;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text);">
+        <div style="font-size:14px;font-weight:800;">${esc(name)}</div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:3px;line-height:1.4;">${esc(desc + category)}</div>
+      </button>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<div style="font-size:12px;color:#ef4444;">加载失败: ' + esc(e.message) + '</div>';
+  }
+}
+
+async function loadMobileSkillDetail(name) {
+  const base = mobileSkillBasePath();
+  if (!base || !name) return;
+  mobileSkillCurrentName = name;
+  mobileSkillStatus('加载中...');
+  try {
+    const suffix = mobileSkillScope === 'team' ? '?scope=team' : '';
+    const data = await api('GET', `${base}/${encodeURIComponent(name)}${suffix}`);
+    const skill = data.skill || {};
+    document.getElementById('mobile-skill-detail').style.display = 'block';
+    document.getElementById('mobile-skill-detail-name').textContent = skill.name || name;
+    document.getElementById('mobile-skill-detail-meta').textContent = `${mobileSkillScope === 'team' ? 'Team' : 'Global'} · ${skill.category || 'uncategorized'}`;
+    document.getElementById('mobile-skill-detail-content').value = skill.content || '';
+    mobileSkillStatus('');
+  } catch (e) {
+    mobileSkillStatus('加载失败: ' + e.message);
+  }
+}
+
+async function saveMobileSkillDetail() {
+  const base = mobileSkillBasePath();
+  if (!base || !mobileSkillCurrentName) return;
+  const content = document.getElementById('mobile-skill-detail-content')?.value || '';
+  mobileSkillStatus('保存中...');
+  try {
+    const suffix = mobileSkillScope === 'team' ? '?scope=team' : '';
+    await api('PUT', `${base}/${encodeURIComponent(mobileSkillCurrentName)}${suffix}`, { content });
+    mobileSkillStatus('已保存');
+    await loadMobileSkills();
+  } catch (e) {
+    mobileSkillStatus('保存失败: ' + e.message);
+  }
+}
+
+async function deleteMobileSkillDetail() {
+  const base = mobileSkillBasePath();
+  if (!base || !mobileSkillCurrentName) return;
+  if (!confirm(`删除 Skill「${mobileSkillCurrentName}」？`)) return;
+  mobileSkillStatus('删除中...');
+  try {
+    const suffix = mobileSkillScope === 'team' ? '?scope=team' : '';
+    await api('DELETE', `${base}/${encodeURIComponent(mobileSkillCurrentName)}${suffix}`);
+    mobileSkillCurrentName = '';
+    document.getElementById('mobile-skill-detail').style.display = 'none';
+    mobileSkillStatus('已删除');
+    await loadMobileSkills();
+  } catch (e) {
+    mobileSkillStatus('删除失败: ' + e.message);
+  }
+}
+
+async function importMobileManagedSkillZip(input) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const base = mobileSkillBasePath();
+  if (!base) {
+    input.value = '';
+    toast('请选择团队');
+    return;
+  }
+  const label = mobileSkillScope === 'team'
+    ? `团队「${document.getElementById('mobile-skill-team-select')?.value || ''}」`
+    : '全局 Skill';
+  if (!confirm(`导入 Skill ZIP 到${label}？`)) {
+    input.value = '';
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', file);
+  mobileSkillStatus('正在导入...');
+  try {
+    const resp = await fetch(`${base}/import-zip`, { method: 'POST', body: formData });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data.ok) throw new Error(data.error || t('unknown_error'));
+    const count = data.direct?.imported?.length || 0;
+    mobileSkillStatus(`导入成功：${count} 个 Skill`);
+    await loadMobileSkills();
+  } catch (e) {
+    mobileSkillStatus('导入失败: ' + e.message);
+  } finally {
+    input.value = '';
+  }
 }
 
 // ── Polling ──
@@ -14512,6 +14858,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {}
 
     updateLocalPasswordBanner();
+    refreshMobileUpdateBanner();
 
     document.addEventListener('click', (e) => {
       const popup = document.getElementById('mention-popup');

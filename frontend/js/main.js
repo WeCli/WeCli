@@ -10323,6 +10323,9 @@ async function openGroup(teamName) {
         '</span>' +
         '<span id="team-tab-actions-skills" style="display:none;">' +
         '<button onclick="loadTeamSkills()" class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 px-2 py-1 rounded transition-colors" title="刷新 Skill 列表">🔄</button>' +
+        '<button onclick="openTeamSkillHub()" class="text-xs bg-amber-50 text-amber-700 hover:bg-amber-100 px-3 py-1 rounded border border-amber-200" title="前往 ClawHub 查找 Skill">🌐 ClawHub</button>' +
+        '<button onclick="document.getElementById(\'team-skill-zip-input\').click()" class="text-xs bg-orange-50 text-orange-700 hover:bg-orange-100 px-3 py-1 rounded border border-orange-200" title="导入 Skill ZIP">📦 导入 Skill ZIP</button>' +
+        '<input id="team-skill-zip-input" type="file" accept=".zip" style="display:none;" onchange="importTeamSkillZip(this)">' +
         '</span>' +
         '<button onclick="toggleTeamMembersView()" class="text-gray-400 hover:text-gray-600 text-sm">&times;</button>' +
         '</div>' +
@@ -11322,7 +11325,7 @@ async function uploadTeam(input) {
 }
 
 // ── Import team dropdown & Hub import ──
-const TEAM_HUB_URL = 'https://clawcross.net';
+const TEAM_HUB_URL = 'https://clawhub.ai';
 
 function _buildClawCrossHubReturnUrl() {
     try {
@@ -13537,6 +13540,41 @@ async function loadTeamExperts() {
 }
 
 // ── Team Skills ──
+function openTeamSkillHub() {
+    const popup = window.open(_buildClawCrossHubUrl(), '_blank');
+    if (!popup) {
+        window.location.assign(_buildClawCrossHubUrl());
+    }
+}
+
+async function importTeamSkillZip(input) {
+    if (!currentGroupId || !input?.files?.[0]) return;
+    const file = input.files[0];
+    if (!confirm(`导入 Skill ZIP 到团队「${currentGroupId}」？`)) {
+        input.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+        const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/skills/import-zip`, {
+            method: 'POST',
+            body: formData,
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.ok) throw new Error(data.error || '导入失败');
+        const imported = data.direct?.imported?.length || 0;
+        const restored = (data.restored?.restored_team_skill_dirs || 0) + (data.restored?.restored_user_skill_dirs || 0);
+        alert(`导入成功：${imported + restored} 个 Skill`);
+        await loadTeamSkills();
+    } catch (e) {
+        alert('导入失败: ' + String(e.message || e));
+    } finally {
+        input.value = '';
+    }
+}
+
 async function loadTeamSkills() {
     if (!currentGroupId) return;
     const listEl = document.getElementById('team-skills-list');
