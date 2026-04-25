@@ -55,6 +55,29 @@ def _workflow_names(team_root: Path) -> tuple[list[str], list[str]]:
     return yaml_names, python_names
 
 
+def _team_skill_names(user_id: str, team: str) -> list[str]:
+    try:
+        from webot.skills import list_skills
+    except Exception:
+        try:
+            from src.webot.skills import list_skills
+        except Exception:
+            return []
+
+    names: list[str] = []
+    try:
+        skills = list_skills(user_id, team=team)
+    except Exception:
+        return []
+    for item in skills:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
 def build_team_workflow_prompt(user_id: str, *, team: str = "") -> str:
     """Build a compact current-team context block for system prompt injection.
 
@@ -67,6 +90,7 @@ def build_team_workflow_prompt(user_id: str, *, team: str = "") -> str:
 
     member_names = _team_member_names(team_root)
     yaml_names, python_names = _workflow_names(team_root)
+    skill_names = _team_skill_names(user_id, team)
 
     lines = [
         "\n【当前 Team 信息】",
@@ -88,4 +112,10 @@ def build_team_workflow_prompt(user_id: str, *, team: str = "") -> str:
             lines.extend(f"    - {name}" for name in python_names)
     else:
         lines.append("工作流 name: 暂无")
+
+    if skill_names:
+        lines.append("Skill name:")
+        lines.extend(f"  - {name}" for name in skill_names)
+    else:
+        lines.append("Skill name: 暂无")
     return "\n".join(lines)
