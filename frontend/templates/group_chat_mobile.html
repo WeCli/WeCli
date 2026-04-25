@@ -1239,6 +1239,66 @@
   .create-menu-item + .create-menu-item { border-top: 1px solid var(--border); }
   .create-menu-item .menu-icon { font-size: 18px; flex-shrink: 0; }
   .create-menu-item .menu-label { flex: 1; }
+  .mobile-alarm-preview {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .mobile-alarm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mobile-alarm-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-card);
+  }
+  .mobile-alarm-main {
+    min-width: 0;
+    flex: 1;
+  }
+  .mobile-alarm-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mobile-alarm-meta {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    word-break: break-word;
+  }
+  .mobile-alarm-text {
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .mobile-alarm-delete {
+    border: none;
+    background: #fef2f2;
+    color: #dc2626;
+    border-radius: 8px;
+    padding: 6px 9px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .mobile-alarm-empty {
+    padding: 18px 10px;
+    color: var(--text-secondary);
+    font-size: 13px;
+    text-align: center;
+  }
 
   .side-panel-overlay.drawer-overlay {
     background: rgba(0,0,0,0.2);
@@ -3281,6 +3341,16 @@
       </div>
     </div>
     <div class="discover-section">
+      <div class="discover-card" onclick="showMobileAlarmManager()">
+        <div class="discover-card-icon">⏰</div>
+        <div class="discover-card-body">
+          <div class="discover-card-title" data-i18n="mobile_alarm_manager">定时任务</div>
+          <div class="discover-card-desc" data-i18n="mobile_alarm_manager_desc">管理 public agent 的闹钟提醒</div>
+        </div>
+        <div class="discover-card-arrow">›</div>
+      </div>
+    </div>
+    <div class="discover-section">
       <div class="discover-card" onclick="openClawcrossCreator()">
         <div class="discover-card-icon">🛠️</div>
         <div class="discover-card-body">
@@ -3419,6 +3489,72 @@
       </div>
       <div id="create-agent-panel-ext" style="display:none;"></div>
       <div id="create-agent-panel-oc" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ Mobile Alarm Manager ═══════════════ -->
+<div class="drawer-overlay side-panel-overlay" id="mobile-alarm-overlay" onclick="if(event.target===this)closeMobileAlarmManager()"></div>
+<div class="drawer side-drawer" id="mobile-alarm-modal">
+  <div class="drawer-header">
+    <button class="drawer-header-back" onclick="closeMobileAlarmManager()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="drawer-header-title" data-i18n="mobile_alarm_manager">定时任务</span>
+    <button class="header-btn" onclick="loadMobileAlarms()">↻</button>
+  </div>
+  <div class="drawer-body">
+      <div class="side-panel-form">
+      <div class="side-panel-section">
+        <div class="side-panel-field">
+          <label class="side-panel-label" data-i18n="mobile_alarm_scope">范围</label>
+          <select id="mobile-alarm-scope" class="side-panel-input" onchange="loadMobileAlarms()">
+            <option value="__public__" data-i18n="public_agent">公共 Agent</option>
+          </select>
+        </div>
+        <div class="side-panel-field">
+          <label class="side-panel-label" data-i18n="mobile_alarm_target">目标 agent</label>
+          <select id="mobile-alarm-target" class="side-panel-input"></select>
+        </div>
+        <div class="side-panel-field">
+          <label class="side-panel-label" data-i18n="mobile_alarm_repeat">时间</label>
+          <select id="mobile-alarm-repeat" class="side-panel-input" onchange="updateMobileAlarmControls()">
+            <option value="once" data-i18n="mobile_alarm_once">只响一次</option>
+            <option value="daily" data-i18n="mobile_alarm_daily">每天</option>
+            <option value="weekdays" data-i18n="mobile_alarm_weekdays">工作日</option>
+            <option value="weekends" data-i18n="mobile_alarm_weekends">周末</option>
+            <option value="weekly" data-i18n="mobile_alarm_weekly">每周</option>
+            <option value="monthly" data-i18n="mobile_alarm_monthly">每月</option>
+            <option value="custom" data-i18n="mobile_alarm_custom">自定义 cron</option>
+          </select>
+        </div>
+        <div class="side-panel-field" id="mobile-alarm-once-row">
+          <input id="mobile-alarm-once-at" type="datetime-local" class="side-panel-input" onchange="updateMobileAlarmControls()">
+        </div>
+        <div class="side-panel-field" id="mobile-alarm-time-row">
+          <input id="mobile-alarm-time" type="time" class="side-panel-input" value="09:00" onchange="updateMobileAlarmControls()">
+        </div>
+        <div class="side-panel-field" id="mobile-alarm-weekday-row" style="display:none;">
+          <select id="mobile-alarm-weekday" class="side-panel-input" onchange="updateMobileAlarmControls()">
+            <option value="1">周一</option><option value="2">周二</option><option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="0">周日</option>
+          </select>
+        </div>
+        <div class="side-panel-field" id="mobile-alarm-monthday-row" style="display:none;">
+          <select id="mobile-alarm-monthday" class="side-panel-input" onchange="updateMobileAlarmControls()"></select>
+        </div>
+        <div class="side-panel-field" id="mobile-alarm-cron-row" style="display:none;">
+          <input id="mobile-alarm-custom-cron" class="side-panel-input" placeholder="0 9 * * *" oninput="updateMobileAlarmControls()">
+        </div>
+        <div class="side-panel-field">
+          <textarea id="mobile-alarm-text" class="side-panel-input" rows="3" data-i18n="mobile_alarm_text_placeholder" placeholder="到点发送给 agent 的任务内容"></textarea>
+        </div>
+        <div id="mobile-alarm-preview" class="mobile-alarm-preview"></div>
+        <button class="side-panel-primary-btn" onclick="submitMobileAlarm()" data-i18n="mobile_alarm_add">添加闹钟</button>
+      </div>
+      <div class="side-panel-section">
+        <div class="side-panel-label" style="margin-bottom:10px;" data-i18n="mobile_alarm_existing">已有闹钟</div>
+        <div id="mobile-alarm-list" class="mobile-alarm-list"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -3714,6 +3850,29 @@ const I18N = {
     discover_hub_desc: '浏览社区分享的团队配置',
     team_creator: 'Team Creator',
     discover_creator_desc: '创建并发布新的团队页面',
+    mobile_alarm_manager: '定时任务',
+    mobile_alarm_manager_desc: '管理 public / Team agent 的闹钟提醒',
+    mobile_alarm_scope: '范围',
+    mobile_alarm_target: '目标 agent',
+    mobile_alarm_repeat: '时间',
+    mobile_alarm_once: '只响一次',
+    mobile_alarm_daily: '每天',
+    mobile_alarm_weekdays: '工作日',
+    mobile_alarm_weekends: '周末',
+    mobile_alarm_weekly: '每周',
+    mobile_alarm_monthly: '每月',
+    mobile_alarm_custom: '自定义 cron',
+    mobile_alarm_text_placeholder: '到点发送给 agent 的任务内容',
+    mobile_alarm_add: '添加闹钟',
+    mobile_alarm_existing: '已有闹钟',
+    mobile_alarm_empty: '暂无定时任务',
+    mobile_alarm_no_targets: '暂无可用 agent',
+    mobile_alarm_fill_required: '请选择目标，并设置时间和任务内容',
+    mobile_alarm_created: '闹钟已添加',
+    mobile_alarm_create_failed: '创建闹钟失败',
+    mobile_alarm_delete_confirm: '删除这个闹钟？',
+    mobile_alarm_deleted: '闹钟已删除',
+    mobile_alarm_delete_failed: '删除闹钟失败',
     tab_profile: '个人',
 
     // ── Common ──
@@ -4319,6 +4478,29 @@ const I18N = {
     discover_hub_desc: 'Browse community-shared team configs',
     team_creator: 'Team Creator',
     discover_creator_desc: 'Create and publish new team pages',
+    mobile_alarm_manager: 'Scheduled Tasks',
+    mobile_alarm_manager_desc: 'Manage alarms for public / Team agents',
+    mobile_alarm_scope: 'Scope',
+    mobile_alarm_target: 'Target agent',
+    mobile_alarm_repeat: 'Time',
+    mobile_alarm_once: 'Once',
+    mobile_alarm_daily: 'Daily',
+    mobile_alarm_weekdays: 'Weekdays',
+    mobile_alarm_weekends: 'Weekends',
+    mobile_alarm_weekly: 'Weekly',
+    mobile_alarm_monthly: 'Monthly',
+    mobile_alarm_custom: 'Custom cron',
+    mobile_alarm_text_placeholder: 'Task content to send when time is up',
+    mobile_alarm_add: 'Add Alarm',
+    mobile_alarm_existing: 'Existing alarms',
+    mobile_alarm_empty: 'No scheduled tasks',
+    mobile_alarm_no_targets: 'No available agents',
+    mobile_alarm_fill_required: 'Select a target, schedule time, and task content',
+    mobile_alarm_created: 'Alarm added',
+    mobile_alarm_create_failed: 'Failed to create alarm',
+    mobile_alarm_delete_confirm: 'Delete this alarm?',
+    mobile_alarm_deleted: 'Alarm deleted',
+    mobile_alarm_delete_failed: 'Failed to delete alarm',
     tab_profile: 'Me',
 
     back: 'Back',
@@ -5306,6 +5488,201 @@ function toast(msg, duration = 2000) {
   el.classList.add('show');
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+let mobileAlarmTargets = [];
+let mobileAlarmTeamsLoaded = false;
+
+function mobileAlarmPad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function mobileAlarmTimeParts() {
+  const raw = (document.getElementById('mobile-alarm-time')?.value || '09:00').trim();
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  const hour = match ? Math.max(0, Math.min(23, parseInt(match[1], 10) || 0)) : 9;
+  const minute = match ? Math.max(0, Math.min(59, parseInt(match[2], 10) || 0)) : 0;
+  return { hour: String(hour), minute: String(minute), label: `${mobileAlarmPad2(hour)}:${mobileAlarmPad2(minute)}` };
+}
+
+function mobileAlarmCronToHuman(cron) {
+  const parts = String(cron || '').trim().split(/\s+/);
+  if (parts.length !== 5) return cron || '-';
+  const [minute, hour, day, month, weekday] = parts;
+  const time = /^\d+$/.test(hour) && /^\d+$/.test(minute)
+    ? `${mobileAlarmPad2(parseInt(hour, 10))}:${mobileAlarmPad2(parseInt(minute, 10))}`
+    : `${hour}:${minute}`;
+  if (day === '*' && month === '*' && weekday === '*') return `${t('mobile_alarm_daily')} ${time}`;
+  if (day === '*' && month === '*' && weekday === '1-5') return `${t('mobile_alarm_weekdays')} ${time}`;
+  if (day === '*' && month === '*' && (weekday === '0,6' || weekday === '6,0')) return `${t('mobile_alarm_weekends')} ${time}`;
+  const names = { '0': '周日', '1': '周一', '2': '周二', '3': '周三', '4': '周四', '5': '周五', '6': '周六', '7': '周日' };
+  if (day === '*' && month === '*' && names[weekday]) return `每周${names[weekday].replace('周', '')} ${time}`;
+  if (/^\d+$/.test(day) && month === '*' && weekday === '*') return `每月 ${day} 日 ${time}`;
+  return cron || '-';
+}
+
+function mobileAlarmOnceToHuman(runAt) {
+  const value = String(runAt || '').trim();
+  if (!value) return t('mobile_alarm_once');
+  const [datePart, timePart = ''] = value.split('T');
+  return `${t('mobile_alarm_once')} ${datePart} ${timePart.slice(0, 5)}`.trim();
+}
+
+function buildMobileAlarmSchedule() {
+  const repeat = document.getElementById('mobile-alarm-repeat')?.value || 'once';
+  if (repeat === 'once') {
+    return { schedule_type: 'once', run_at: (document.getElementById('mobile-alarm-once-at')?.value || '').trim(), cron: '' };
+  }
+  if (repeat === 'custom') {
+    return { schedule_type: 'cron', run_at: '', cron: (document.getElementById('mobile-alarm-custom-cron')?.value || '').trim() };
+  }
+  const { hour, minute } = mobileAlarmTimeParts();
+  if (repeat === 'weekdays') return { schedule_type: 'cron', run_at: '', cron: `${minute} ${hour} * * 1-5` };
+  if (repeat === 'weekends') return { schedule_type: 'cron', run_at: '', cron: `${minute} ${hour} * * 0,6` };
+  if (repeat === 'weekly') return { schedule_type: 'cron', run_at: '', cron: `${minute} ${hour} * * ${document.getElementById('mobile-alarm-weekday')?.value || '1'}` };
+  if (repeat === 'monthly') return { schedule_type: 'cron', run_at: '', cron: `${minute} ${hour} ${document.getElementById('mobile-alarm-monthday')?.value || '1'} * *` };
+  return { schedule_type: 'cron', run_at: '', cron: `${minute} ${hour} * * *` };
+}
+
+function updateMobileAlarmControls() {
+  const repeat = document.getElementById('mobile-alarm-repeat')?.value || 'once';
+  const onceInput = document.getElementById('mobile-alarm-once-at');
+  if (onceInput && repeat === 'once' && !onceInput.value) {
+    const next = new Date();
+    next.setMinutes(next.getMinutes() + 30);
+    next.setSeconds(0, 0);
+    onceInput.value = `${next.getFullYear()}-${mobileAlarmPad2(next.getMonth() + 1)}-${mobileAlarmPad2(next.getDate())}T${mobileAlarmPad2(next.getHours())}:${mobileAlarmPad2(next.getMinutes())}`;
+  }
+  const rows = {
+    once: document.getElementById('mobile-alarm-once-row'),
+    time: document.getElementById('mobile-alarm-time-row'),
+    weekday: document.getElementById('mobile-alarm-weekday-row'),
+    monthday: document.getElementById('mobile-alarm-monthday-row'),
+    cron: document.getElementById('mobile-alarm-cron-row'),
+  };
+  if (rows.once) rows.once.style.display = repeat === 'once' ? '' : 'none';
+  if (rows.time) rows.time.style.display = repeat === 'once' || repeat === 'custom' ? 'none' : '';
+  if (rows.weekday) rows.weekday.style.display = repeat === 'weekly' ? '' : 'none';
+  if (rows.monthday) rows.monthday.style.display = repeat === 'monthly' ? '' : 'none';
+  if (rows.cron) rows.cron.style.display = repeat === 'custom' ? '' : 'none';
+  const schedule = buildMobileAlarmSchedule();
+  const preview = document.getElementById('mobile-alarm-preview');
+  if (preview) {
+    preview.textContent = repeat === 'once'
+      ? mobileAlarmOnceToHuman(schedule.run_at)
+      : (repeat === 'custom' ? (schedule.cron || t('mobile_alarm_custom')) : mobileAlarmCronToHuman(schedule.cron));
+  }
+}
+
+function renderMobileAlarmTargets() {
+  const select = document.getElementById('mobile-alarm-target');
+  if (!select) return;
+  select.innerHTML = mobileAlarmTargets.length
+    ? mobileAlarmTargets.map((target, index) => `<option value="${index}">${escapeHtml(target.label || target.target_name)}</option>`).join('')
+    : `<option value="">${escapeHtml(t('mobile_alarm_no_targets'))}</option>`;
+}
+
+async function loadMobileAlarmScopes() {
+  const select = document.getElementById('mobile-alarm-scope');
+  if (!select || mobileAlarmTeamsLoaded) return;
+  try {
+    const data = await api('GET', '/teams');
+    const teams = Array.isArray(data) ? data : (data.teams || []);
+    const current = select.value || '__public__';
+    select.innerHTML = `<option value="__public__">${escapeHtml(t('public_agent'))}</option>` +
+      teams.map(team => `<option value="${escapeHtml(team)}">${escapeHtml(team)}</option>`).join('');
+    if ([...select.options].some(opt => opt.value === current)) select.value = current;
+    mobileAlarmTeamsLoaded = true;
+  } catch (_e) {
+    mobileAlarmTeamsLoaded = true;
+  }
+}
+
+function renderMobileAlarms(alarms) {
+  const list = document.getElementById('mobile-alarm-list');
+  if (!list) return;
+  if (!alarms || !alarms.length) {
+    list.innerHTML = `<div class="mobile-alarm-empty">${escapeHtml(t('mobile_alarm_empty'))}</div>`;
+    return;
+  }
+  list.innerHTML = alarms.map((alarm) => {
+    const scheduleType = alarm.schedule_type || 'cron';
+    const label = scheduleType === 'once' ? mobileAlarmOnceToHuman(alarm.run_at || '') : mobileAlarmCronToHuman(alarm.cron || '');
+    const raw = scheduleType === 'once' ? (alarm.run_at || '') : (alarm.cron || '');
+    return `
+      <div class="mobile-alarm-item">
+        <div class="mobile-alarm-main">
+          <div class="mobile-alarm-title">${escapeHtml(alarm.target_name || alarm.target_ref || '-')}</div>
+          <div class="mobile-alarm-meta">${escapeHtml(label)} · ${escapeHtml(raw)}</div>
+          <div class="mobile-alarm-text">${escapeHtml(alarm.text || '')}</div>
+        </div>
+        <button class="mobile-alarm-delete" onclick="deleteMobileAlarm('${escapeHtml(alarm.task_id || '')}')">删除</button>
+      </div>`;
+  }).join('');
+}
+
+async function loadMobileAlarms() {
+  const list = document.getElementById('mobile-alarm-list');
+  if (list) list.innerHTML = `<div class="mobile-alarm-empty">${escapeHtml(t('loading'))}</div>`;
+  try {
+    await loadMobileAlarmScopes();
+    const scope = document.getElementById('mobile-alarm-scope')?.value || '__public__';
+    const data = await api('GET', `/mobile_alarms?team=${encodeURIComponent(scope)}`);
+    mobileAlarmTargets = data.targets || [];
+    renderMobileAlarmTargets();
+    renderMobileAlarms(data.alarms || []);
+    updateMobileAlarmControls();
+  } catch (e) {
+    if (list) list.innerHTML = `<div class="mobile-alarm-empty">${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+function showMobileAlarmManager() {
+  const monthday = document.getElementById('mobile-alarm-monthday');
+  if (monthday && !monthday.options.length) {
+    monthday.innerHTML = Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}">每月 ${i + 1} 日</option>`).join('');
+  }
+  document.getElementById('mobile-alarm-modal')?.classList.add('show');
+  document.getElementById('mobile-alarm-overlay')?.classList.add('show');
+  updateMobileAlarmControls();
+  loadMobileAlarms();
+}
+
+function closeMobileAlarmManager() {
+  document.getElementById('mobile-alarm-modal')?.classList.remove('show');
+  document.getElementById('mobile-alarm-overlay')?.classList.remove('show');
+}
+
+async function submitMobileAlarm() {
+  const targetIndex = Number(document.getElementById('mobile-alarm-target')?.value ?? -1);
+  const target = Number.isInteger(targetIndex) ? mobileAlarmTargets[targetIndex] : null;
+  const schedule = buildMobileAlarmSchedule();
+  const text = (document.getElementById('mobile-alarm-text')?.value || '').trim();
+  if (!target?.target_name || !text || (schedule.schedule_type === 'once' && !schedule.run_at) || (schedule.schedule_type === 'cron' && !schedule.cron)) {
+    toast(t('mobile_alarm_fill_required'));
+    return;
+  }
+  try {
+    const scope = document.getElementById('mobile-alarm-scope')?.value || '__public__';
+    await api('POST', '/mobile_alarms', { team: scope, target_type: target.target_type, target_name: target.target_name, ...schedule, text });
+    document.getElementById('mobile-alarm-text').value = '';
+    toast(t('mobile_alarm_created'));
+    await loadMobileAlarms();
+  } catch (e) {
+    toast(`${t('mobile_alarm_create_failed')}: ${e.message}`);
+  }
+}
+
+async function deleteMobileAlarm(taskId) {
+  if (!taskId || !confirm(t('mobile_alarm_delete_confirm'))) return;
+  try {
+    const scope = document.getElementById('mobile-alarm-scope')?.value || '__public__';
+    await api('DELETE', `/mobile_alarms/${encodeURIComponent(taskId)}?team=${encodeURIComponent(scope)}`);
+    toast(t('mobile_alarm_deleted'));
+    await loadMobileAlarms();
+  } catch (e) {
+    toast(`${t('mobile_alarm_delete_failed')}: ${e.message}`);
+  }
 }
 
 function openMobileUpdateModal() {

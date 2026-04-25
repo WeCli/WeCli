@@ -167,12 +167,15 @@ def _external_platform(agent_info: dict) -> str:
 
 def _find_external_agent(user_id: str, target_ref: str, team: str = "") -> dict | None:
     target_ref = str(target_ref or "").strip()
+    team = str(team or "").strip()
     if not target_ref:
         return None
     candidates = build_external_agents_map_for_owner(user_id)
     agent = candidates.get(target_ref)
     if not agent:
         return None
+    if team == "__public__":
+        return agent if not str(agent.get("team") or "").strip() else None
     if team and str(agent.get("team") or "") not in {"", team}:
         return None
     return agent
@@ -185,7 +188,11 @@ def _find_external_agent_by_name(user_id: str, target_name: str, team: str = "")
         return None
     matches = []
     for agent in build_external_agents_map_for_owner(user_id).values():
-        if team and str(agent.get("team") or "") != team:
+        agent_team = str(agent.get("team") or "").strip()
+        if team == "__public__":
+            if agent_team:
+                continue
+        elif team and agent_team != team:
             continue
         names = {
             str(agent.get("name") or "").strip(),

@@ -5308,6 +5308,167 @@ def public_external_agents():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/mobile_alarms", methods=["GET", "POST"])
+def mobile_alarms():
+    """Mobile message-center alarm manager for public or team agents."""
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "not logged in"}), 401
+
+    if request.method == "GET":
+        team = str(request.args.get("team") or "__public__").strip() or "__public__"
+        try:
+            resp = requests.get(SCHEDULER_TASKS_URL, timeout=10)
+            tasks = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else []
+            if not isinstance(tasks, list):
+                tasks = []
+        except Exception as e:
+            return jsonify({"error": f"Scheduler unavailable: {e}"}), 502
+
+        if team != "__public__":
+            team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team)
+            if not os.path.exists(team_dir):
+                return jsonify({"error": "Team not found"}), 404
+            internal_session_to_name, external_global_to_name = _team_alarm_export_maps(user_id, team)
+            return jsonify({
+                "ok": True,
+                "team": team,
+                "alarms": export_team_alarms(
+                    user_id=user_id,
+                    team=team,
+                    internal_session_to_name=internal_session_to_name,
+                    external_global_to_name=external_global_to_name,
+                ),
+                "targets": _team_alarm_targets(user_id, team),
+            })
+
+        public_names = {
+            str(a.get("name") or "").strip()
+            for a in _public_agents_load_raw(user_id)
+            if isinstance(a, dict) and str(a.get("name") or "").strip()
+        }
+        alarms = []
+        for item in tasks:
+            if not isinstance(item, dict) or str(item.get("user_id") or "") != user_id:
+                continue
+            target_type = str(item.get("target_type") or "internal").strip().lower()
+            target_name = str(item.get("target_name") or "").strip()
+            team = str(item.get("team") or "").strip()
+            if target_type == "external" and (team == "__public__" or (not team and target_name in public_names)):
+                alarms.append(item)
+        targets = []
+        for agent in _public_agents_load_raw(user_id):
+            if not isinstance(agent, dict):
+                continue
+            name = str(agent.get("name") or "").strip()
+            if not name:
+                continue
+            platform = _external_agent_platform(agent) or str(agent.get("tag") or "external")
+            targets.append({
+                "target_type": "external",
+                "target_name": name,
+                "label": f"{name} · {platform}",
+            })
+        return jsonify({"ok": True, "alarms": alarms, "targets": targets})
+
+    body = request.get_json(force=True)
+    team = str(body.get("team") or "__public__").strip() or "__public__"
+    target_type = str(body.get("target_type") or "external").strip().lower()
+    target_name = str(body.get("target_name") or "").strip()
+    schedule_type = str(body.get("schedule_type") or "cron").strip().lower()
+    cron = str(body.get("cron") or "").strip()
+    run_at = str(body.get("run_at") or "").strip()
+    text = str(body.get("text") or "").strip()
+    if target_type not in {"internal", "external"}:
+        return jsonify({"error": "target_type must be internal or external"}), 400
+    if schedule_type not in {"cron", "once"}:
+        return jsonify({"error": "schedule_type must be cron or once"}), 400
+    if not target_name or not text or (schedule_type == "cron" and not cron) or (schedule_type == "once" and not run_at):
+        return jsonify({"error": "target_name, schedule and text are required"}), 400
+
+    if team != "__public__":
+        team_dir = os.path.join(root_dir, "data", "user_files", user_id, "teams", team)
+        if not os.path.exists(team_dir):
+            return jsonify({"error": "Team not found"}), 404
+        internal_name_to_session, external_name_to_global = _team_alarm_restore_maps(user_id, team)
+        payload = {
+            "user_id": user_id,
+            "cron": cron,
+            "schedule_type": schedule_type,
+            "run_at": run_at,
+            "text": text,
+            "target_type": target_type,
+            "target_name": target_name,
+            "team": team,
+        }
+        if target_type == "external":
+            if target_name not in external_name_to_global:
+                return jsonify({"error": f"External target not found: {target_name}"}), 404
+            payload["session_id"] = f"ext:{target_name}"
+        else:
+            session_id = internal_name_to_session.get(target_name)
+            if not session_id:
+                return jsonify({"error": f"Internal target not found: {target_name}"}), 404
+            payload["session_id"] = session_id
+        try:
+            resp = requests.post(SCHEDULER_TASKS_URL, json=payload, timeout=10)
+            data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"error": resp.text}
+            return jsonify(data), resp.status_code
+        except Exception as e:
+            return jsonify({"error": f"Scheduler unavailable: {e}"}), 502
+
+    public_names = {
+        str(a.get("name") or "").strip()
+        for a in _public_agents_load_raw(user_id)
+        if isinstance(a, dict) and str(a.get("name") or "").strip()
+    }
+    if target_name not in public_names:
+        return jsonify({"error": f"Public agent not found: {target_name}"}), 404
+    payload = {
+        "user_id": user_id,
+        "cron": cron,
+        "schedule_type": schedule_type,
+        "run_at": run_at,
+        "text": text,
+        "target_type": "external",
+        "target_name": target_name,
+        "team": "__public__",
+        "session_id": f"ext:{target_name}",
+    }
+    try:
+        resp = requests.post(SCHEDULER_TASKS_URL, json=payload, timeout=10)
+        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"error": resp.text}
+        return jsonify(data), resp.status_code
+    except Exception as e:
+        return jsonify({"error": f"Scheduler unavailable: {e}"}), 502
+
+
+@app.route("/mobile_alarms/<task_id>", methods=["DELETE"])
+def delete_mobile_alarm(task_id):
+    user_id = session.get("user_id", "")
+    if not user_id:
+        return jsonify({"error": "not logged in"}), 401
+    team = str(request.args.get("team") or "__public__").strip() or "__public__"
+    try:
+        resp = requests.get(SCHEDULER_TASKS_URL, timeout=10)
+        tasks = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else []
+        if not isinstance(tasks, list):
+            tasks = []
+        target = next((t for t in tasks if isinstance(t, dict) and str(t.get("task_id") or "") == task_id), None)
+        if not target:
+            return jsonify({"error": "Alarm not found"}), 404
+        if str(target.get("user_id") or "") != user_id:
+            return jsonify({"error": "Forbidden"}), 403
+        expected_team = "__public__" if team == "__public__" else team
+        if str(target.get("team") or "").strip() != expected_team:
+            return jsonify({"error": "Alarm scope mismatch"}), 403
+        resp = requests.delete(f"{SCHEDULER_TASKS_URL}/{task_id}", timeout=10)
+        data = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {"error": resp.text}
+        return jsonify(data), resp.status_code
+    except Exception as e:
+        return jsonify({"error": f"Scheduler unavailable: {e}"}), 502
+
+
 # ------------------------------------------------------------------
 # Team-specific expert CRUD  (stored in {team_dir}/oasis_experts.json)
 # ------------------------------------------------------------------
