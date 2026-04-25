@@ -10371,14 +10371,32 @@ async function openGroup(teamName) {
         '</table>' +
         '</div>' +
         '<div id="team-panel-alarms" class="team-members-table-container" style="display:none;padding:12px;">' +
-        '<form id="team-alarm-form" onsubmit="createTeamAlarm(event)" style="display:grid;grid-template-columns:1.1fr 1fr 2fr auto;gap:8px;align-items:center;margin-bottom:12px;">' +
-        '<select id="team-alarm-target" style="border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;"></select>' +
-        '<input id="team-alarm-cron" placeholder="0 9 * * *" style="border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;">' +
-        '<input id="team-alarm-text" placeholder="到点发送给该 agent 的任务内容" style="border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;">' +
+        '<form id="team-alarm-form" onsubmit="createTeamAlarm(event)" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;align-items:center;margin-bottom:6px;">' +
+        '<select id="team-alarm-target" title="目标" style="border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;min-width:0;"></select>' +
+        '<select id="team-alarm-repeat" title="重复" onchange="updateTeamAlarmScheduleControls()" style="border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;min-width:0;">' +
+        '<option value="once">只响一次</option>' +
+        '<option value="daily">每天</option>' +
+        '<option value="weekdays">工作日</option>' +
+        '<option value="weekends">周末</option>' +
+        '<option value="weekly">每周</option>' +
+        '<option value="monthly">每月</option>' +
+        '<option value="custom">自定义</option>' +
+        '</select>' +
+        '<input id="team-alarm-once-at" type="datetime-local" title="触发时间" onchange="updateTeamAlarmScheduleControls()" style="display:none;border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-size:12px;min-width:0;">' +
+        '<input id="team-alarm-time" type="time" value="09:00" title="时间" onchange="updateTeamAlarmScheduleControls()" style="border:1px solid #d1d5db;border-radius:6px;padding:6px 8px;font-size:12px;min-width:0;">' +
+        '<select id="team-alarm-weekday" title="星期" onchange="updateTeamAlarmScheduleControls()" style="display:none;border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;min-width:0;">' +
+        '<option value="1">周一</option><option value="2">周二</option><option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="0">周日</option>' +
+        '</select>' +
+        '<select id="team-alarm-monthday" title="日期" onchange="updateTeamAlarmScheduleControls()" style="display:none;border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;min-width:0;">' +
+        Array.from({length:31}, (_, i) => `<option value="${i + 1}">每月 ${i + 1} 日</option>`).join('') +
+        '</select>' +
+        '<input id="team-alarm-custom-cron" placeholder="0 9 * * *" oninput="updateTeamAlarmScheduleControls()" style="display:none;border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;min-width:0;">' +
+        '<input id="team-alarm-text" placeholder="到点发送给该 agent 的任务内容" style="border:1px solid #d1d5db;border-radius:6px;padding:7px 8px;font-size:12px;min-width:0;">' +
         '<button type="submit" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-2 rounded border border-blue-200">添加</button>' +
         '</form>' +
+        '<div id="team-alarm-schedule-preview" class="text-xs text-gray-500" style="margin:0 0 12px 2px;"></div>' +
         '<table class="team-members-table">' +
-        '<thead><tr><th class="text-left">目标</th><th class="text-left">类型</th><th class="text-left">Cron</th><th class="text-left">内容</th><th class="text-right">操作</th></tr></thead>' +
+        '<thead><tr><th class="text-left">目标</th><th class="text-left">类型</th><th class="text-left">时间</th><th class="text-left">内容</th><th class="text-right">操作</th></tr></thead>' +
         '<tbody id="team-alarms-table-body"></tbody>' +
         '</table>' +
         '</div>' +
@@ -13273,6 +13291,117 @@ function switchTeamTab(tab) {
 // ── Team Alarms ──
 let _teamAlarmTargets = [];
 
+function _teamAlarmPad2(value) {
+    return String(value).padStart(2, '0');
+}
+
+function _teamAlarmTimeParts() {
+    const timeInput = document.getElementById('team-alarm-time');
+    const raw = (timeInput?.value || '09:00').trim();
+    const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+    if (!match) return { hour: '9', minute: '0', label: '09:00' };
+    const hourNum = Math.max(0, Math.min(23, parseInt(match[1], 10) || 0));
+    const minuteNum = Math.max(0, Math.min(59, parseInt(match[2], 10) || 0));
+    return {
+        hour: String(hourNum),
+        minute: String(minuteNum),
+        label: `${_teamAlarmPad2(hourNum)}:${_teamAlarmPad2(minuteNum)}`,
+    };
+}
+
+function buildTeamAlarmCronFromControls() {
+    const repeat = document.getElementById('team-alarm-repeat')?.value || 'daily';
+    if (repeat === 'once') {
+        return '';
+    }
+    if (repeat === 'custom') {
+        return (document.getElementById('team-alarm-custom-cron')?.value || '').trim();
+    }
+    const { hour, minute } = _teamAlarmTimeParts();
+    if (repeat === 'weekdays') return `${minute} ${hour} * * 1-5`;
+    if (repeat === 'weekends') return `${minute} ${hour} * * 0,6`;
+    if (repeat === 'weekly') {
+        const dow = document.getElementById('team-alarm-weekday')?.value || '1';
+        return `${minute} ${hour} * * ${dow}`;
+    }
+    if (repeat === 'monthly') {
+        const dom = document.getElementById('team-alarm-monthday')?.value || '1';
+        return `${minute} ${hour} ${dom} * *`;
+    }
+    return `${minute} ${hour} * * *`;
+}
+
+function buildTeamAlarmScheduleFromControls() {
+    const repeat = document.getElementById('team-alarm-repeat')?.value || 'daily';
+    if (repeat === 'once') {
+        return {
+            schedule_type: 'once',
+            run_at: (document.getElementById('team-alarm-once-at')?.value || '').trim(),
+            cron: '',
+        };
+    }
+    return {
+        schedule_type: 'cron',
+        run_at: '',
+        cron: buildTeamAlarmCronFromControls(),
+    };
+}
+
+function teamAlarmOnceToHuman(runAt) {
+    const value = String(runAt || '').trim();
+    if (!value) return '只响一次';
+    const [datePart, timePart = ''] = value.split('T');
+    return `只响一次 ${datePart} ${timePart.slice(0, 5)}`.trim();
+}
+
+function teamAlarmCronToHuman(cron) {
+    const parts = String(cron || '').trim().split(/\s+/);
+    if (parts.length !== 5) return cron || '-';
+    const [minute, hour, day, month, weekday] = parts;
+    const simpleTime = /^\d+$/.test(hour) && /^\d+$/.test(minute)
+        ? `${_teamAlarmPad2(parseInt(hour, 10))}:${_teamAlarmPad2(parseInt(minute, 10))}`
+        : `${hour}:${minute}`;
+    if (day === '*' && month === '*' && weekday === '*') return `每天 ${simpleTime}`;
+    if (day === '*' && month === '*' && weekday === '1-5') return `工作日 ${simpleTime}`;
+    if (day === '*' && month === '*' && (weekday === '0,6' || weekday === '6,0')) return `周末 ${simpleTime}`;
+    const weekdayNames = { '0': '周日', '1': '周一', '2': '周二', '3': '周三', '4': '周四', '5': '周五', '6': '周六', '7': '周日' };
+    if (day === '*' && month === '*' && weekdayNames[weekday]) return `每周${weekdayNames[weekday].replace('周', '')} ${simpleTime}`;
+    if (/^\d+$/.test(day) && month === '*' && weekday === '*') return `每月 ${day} 日 ${simpleTime}`;
+    return cron || '-';
+}
+
+function updateTeamAlarmScheduleControls() {
+    const repeat = document.getElementById('team-alarm-repeat')?.value || 'daily';
+    const onceInput = document.getElementById('team-alarm-once-at');
+    const timeInput = document.getElementById('team-alarm-time');
+    const weekdaySelect = document.getElementById('team-alarm-weekday');
+    const monthdaySelect = document.getElementById('team-alarm-monthday');
+    const customCronInput = document.getElementById('team-alarm-custom-cron');
+    const preview = document.getElementById('team-alarm-schedule-preview');
+
+    if (onceInput) {
+        onceInput.style.display = repeat === 'once' ? '' : 'none';
+        if (repeat === 'once' && !onceInput.value) {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() + 30);
+            now.setSeconds(0, 0);
+            onceInput.value = `${now.getFullYear()}-${_teamAlarmPad2(now.getMonth() + 1)}-${_teamAlarmPad2(now.getDate())}T${_teamAlarmPad2(now.getHours())}:${_teamAlarmPad2(now.getMinutes())}`;
+        }
+    }
+    if (timeInput) timeInput.style.display = repeat === 'custom' || repeat === 'once' ? 'none' : '';
+    if (weekdaySelect) weekdaySelect.style.display = repeat === 'weekly' ? '' : 'none';
+    if (monthdaySelect) monthdaySelect.style.display = repeat === 'monthly' ? '' : 'none';
+    if (customCronInput) customCronInput.style.display = repeat === 'custom' ? '' : 'none';
+
+    const schedule = buildTeamAlarmScheduleFromControls();
+    if (preview) {
+        const label = repeat === 'custom'
+            ? (schedule.cron ? `自定义：${schedule.cron}` : '自定义 cron')
+            : (repeat === 'once' ? teamAlarmOnceToHuman(schedule.run_at) : teamAlarmCronToHuman(schedule.cron));
+        preview.textContent = label;
+    }
+}
+
 async function loadTeamAlarms() {
     if (!currentGroupId) return;
     const tbody = document.getElementById('team-alarms-table-body');
@@ -13287,9 +13416,10 @@ async function loadTeamAlarms() {
         _teamAlarmTargets = data.targets || [];
         if (targetSelect) {
             targetSelect.innerHTML = _teamAlarmTargets.length
-                ? _teamAlarmTargets.map(t => `<option value="${escapeHtml(t.target_type)}|${escapeHtml(t.target_name)}">${escapeHtml(t.label || t.target_name)}</option>`).join('')
+                ? _teamAlarmTargets.map((t, index) => `<option value="${index}">${escapeHtml(t.label || t.target_name)}</option>`).join('')
                 : '<option value="">暂无可用目标</option>';
         }
+        updateTeamAlarmScheduleControls();
 
         const alarms = data.alarms || [];
         if (!alarms.length) {
@@ -13301,12 +13431,16 @@ async function loadTeamAlarms() {
             const targetName = escapeHtml(a.target_name || a.target_ref || '-');
             const targetType = escapeHtml(a.target_type || 'internal');
             const cron = escapeHtml(a.cron || '');
+            const scheduleType = a.schedule_type || 'cron';
+            const runAt = a.run_at || '';
+            const scheduleLabel = escapeHtml(scheduleType === 'once' ? teamAlarmOnceToHuman(a.run_at || '') : teamAlarmCronToHuman(a.cron || ''));
+            const scheduleRaw = escapeHtml(scheduleType === 'once' ? runAt : (a.cron || ''));
             const text = escapeHtml(a.text || '');
             return `
                 <tr>
                     <td class="font-medium text-gray-800">${targetName}</td>
                     <td class="font-mono text-xs text-gray-500">${targetType}</td>
-                    <td class="font-mono text-xs text-gray-700">${cron}</td>
+                    <td><div class="text-xs text-gray-800">${scheduleLabel}</div><div class="font-mono text-[11px] text-gray-400">${scheduleRaw}</div></td>
                     <td style="max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${text}">${text}</td>
                     <td style="text-align:right;white-space:nowrap;">
                         <button onclick="deleteTeamAlarm('${taskId}')" class="text-red-500 hover:text-red-700 text-xs px-2 py-1 rounded hover:bg-red-50" title="删除">🗑️ 删除</button>
@@ -13322,22 +13456,22 @@ async function createTeamAlarm(event) {
     if (event) event.preventDefault();
     if (!currentGroupId) return;
     const targetSelect = document.getElementById('team-alarm-target');
-    const cronInput = document.getElementById('team-alarm-cron');
     const textInput = document.getElementById('team-alarm-text');
-    const rawTarget = targetSelect?.value || '';
-    const [targetType, ...nameParts] = rawTarget.split('|');
-    const targetName = nameParts.join('|');
-    const cron = (cronInput?.value || '').trim();
+    const targetIndex = Number(targetSelect?.value ?? -1);
+    const target = Number.isInteger(targetIndex) ? _teamAlarmTargets[targetIndex] : null;
+    const targetType = target?.target_type || '';
+    const targetName = target?.target_name || '';
+    const schedule = buildTeamAlarmScheduleFromControls();
     const text = (textInput?.value || '').trim();
-    if (!targetType || !targetName || !cron || !text) {
-        alert('请选择目标，并填写 cron 和任务内容');
+    if (!targetType || !targetName || !text || (schedule.schedule_type === 'cron' && !schedule.cron) || (schedule.schedule_type === 'once' && !schedule.run_at)) {
+        alert('请选择目标，并设置时间和任务内容');
         return;
     }
     try {
         const resp = await fetch(`/teams/${encodeURIComponent(currentGroupId)}/alarms`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target_type: targetType, target_name: targetName, cron, text }),
+            body: JSON.stringify({ target_type: targetType, target_name: targetName, ...schedule, text }),
         });
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(data.error || data.detail || '创建失败');

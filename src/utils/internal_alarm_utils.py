@@ -54,6 +54,8 @@ def export_team_alarms(
         item = {
             "task_id": task_id,
             "cron": raw.get("cron", ""),
+            "schedule_type": raw.get("schedule_type", "cron"),
+            "run_at": raw.get("run_at", ""),
             "text": raw.get("text", ""),
             "target_type": target_type,
             "created_at": raw.get("created_at", ""),
@@ -67,7 +69,6 @@ def export_team_alarms(
                 continue
             item.update({
                 "target_name": target_name,
-                "target_ref": target_ref,
                 "team": team,
             })
         else:
@@ -103,21 +104,30 @@ def restore_team_alarms(
         payload = {
             "user_id": user_id,
             "cron": str(alarm.get("cron") or "").strip(),
+            "schedule_type": str(alarm.get("schedule_type") or "cron").strip(),
+            "run_at": str(alarm.get("run_at") or "").strip(),
             "text": str(alarm.get("text") or ""),
             "target_type": target_type,
             "target_name": target_name,
             "team": team,
         }
-        if not payload["cron"]:
+        if payload["schedule_type"] == "once":
+            if not payload["run_at"]:
+                errors.append(f"{target_name or 'unknown'}: missing run_at")
+                continue
+        elif not payload["cron"]:
             errors.append(f"{target_name or 'unknown'}: missing cron")
             continue
         if target_type == "external":
             target_ref = external_name_to_global.get(target_name) or str(alarm.get("target_ref") or "").strip()
-            if not target_ref:
+            if target_name and target_name not in external_name_to_global:
+                errors.append(f"{target_name}: target external agent not found")
+                continue
+            if not target_name and not target_ref:
                 errors.append(f"{target_name or 'external'}: target external agent not found")
                 continue
-            payload["target_ref"] = target_ref
-            payload["session_id"] = f"ext:{target_ref}"
+            payload["target_ref"] = ""
+            payload["session_id"] = f"ext:{target_name or target_ref}"
         else:
             session_id = internal_name_to_session.get(target_name)
             if not session_id:
@@ -135,4 +145,3 @@ def restore_team_alarms(
         except Exception as e:
             errors.append(f"{target_name or _schedule_label(payload)}: {e}")
     return restored, errors
-

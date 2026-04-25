@@ -70,13 +70,15 @@ def save_tasks(tasks: dict):
 class CronTask(BaseModel):
     """Cron 定时任务模型"""
     user_id: str
-    cron: str  # 格式: "分 时 日 月 周"
+    cron: str = ""  # 格式: "分 时 日 月 周"
     text: str
     session_id: str = "default"
     target_type: str = "internal"  # internal | external
     target_ref: str = ""           # external global_name
     target_name: str = ""          # stable team display name
     team: str = ""
+    schedule_type: str = "cron"    # cron | once
+    run_at: str = ""               # once: ISO/local datetime, e.g. 2026-04-25T09:00
 
 class TaskResponse(BaseModel):
     """任务响应模型"""
@@ -89,6 +91,8 @@ class TaskResponse(BaseModel):
     target_ref: str = ""
     target_name: str = ""
     team: str = ""
+    schedule_type: str = "cron"
+    run_at: str = ""
     next_run: Optional[str]
 
 # --- 全局调度器 ---
@@ -112,6 +116,21 @@ def _parse_cron(cron_expr: str) -> list[str]:
     if len(parts) != 5:
         raise ValueError("Cron must have 5 fields: minute hour day month day_of_week")
     return parts
+
+
+def _schedule_type(info: dict) -> str:
+    value = str(info.get("schedule_type") or "cron").strip().lower()
+    return "once" if value in {"once", "at", "date"} else "cron"
+
+
+def _parse_run_at(run_at: str) -> datetime:
+    value = str(run_at or "").strip()
+    if not value:
+        raise ValueError("run_at is required for one-time alarm")
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as e:
+        raise ValueError("run_at must be ISO datetime, e.g. 2026-04-25T09:00") from e
 
 
 def _target_type(info: dict) -> str:
@@ -159,6 +178,24 @@ def _find_external_agent(user_id: str, target_ref: str, team: str = "") -> dict 
     return agent
 
 
+def _find_external_agent_by_name(user_id: str, target_name: str, team: str = "") -> dict | None:
+    target_name = str(target_name or "").strip()
+    team = str(team or "").strip()
+    if not target_name:
+        return None
+    matches = []
+    for agent in build_external_agents_map_for_owner(user_id).values():
+        if team and str(agent.get("team") or "") != team:
+            continue
+        names = {
+            str(agent.get("name") or "").strip(),
+            str(agent.get("short_name") or "").strip(),
+        }
+        if target_name in names:
+            matches.append(agent)
+    return matches[0] if len(matches) == 1 else None
+
+
 def _external_system_prompt(agent_info: dict) -> str:
     parts = [
         load_external_agent_system_prompt(root_dir),
@@ -174,21 +211,23 @@ def _external_system_prompt(agent_info: dict) -> str:
 async def trigger_external_agent(info: dict):
     user_id = str(info.get("user_id") or "")
     target_ref = str(info.get("target_ref") or "").strip()
+    target_name = str(info.get("target_name") or "").strip()
     team = str(info.get("team") or "").strip()
-    agent_info = _find_external_agent(user_id, target_ref, team)
+    agent_info = _find_external_agent_by_name(user_id, target_name, team) or _find_external_agent(user_id, target_ref, team)
     if not agent_info:
-        print(f"[{datetime.now()}] 外部闹钟触发失败: user={user_id}, target={target_ref}, team={team}, 未找到外部 agent")
+        print(f"[{datetime.now()}] 外部闹钟触发失败: user={user_id}, target={target_name or target_ref}, team={team}, 未找到外部 agent")
         return
 
     platform = _external_platform(agent_info)
     global_name = str(agent_info.get("global_name") or agent_info.get("global_id") or target_ref).strip()
     suffix = _resolve_external_session_suffix(str(agent_info.get("model") or ""))
     session_key = f"agent:{global_name}:{suffix}"
+    schedule_label = info.get("run_at") if _schedule_type(info) == "once" else info.get("cron")
     text = (
         "[ClawCross 内部闹钟触发]\n"
         f"team: {team or '-'}\n"
         f"agent: {agent_info.get('name') or agent_info.get('short_name') or global_name}\n"
-        f"cron: {info.get('cron') or '-'}\n\n"
+        f"schedule: {info.get('schedule_type') or 'cron'}:{schedule_label or '-'}\n\n"
         f"{info.get('text') or ''}"
     )
 
@@ -290,6 +329,38 @@ async def trigger_alarm(info: dict):
         str(info.get("session_id") or "default"),
     )
 
+
+async def trigger_once_alarm(task_id: str, info: dict):
+    await trigger_alarm(info)
+    tasks = load_tasks()
+    if task_id in tasks:
+        tasks.pop(task_id, None)
+        save_tasks(tasks)
+
+
+def _add_alarm_job(task_id: str, info: dict):
+    if _schedule_type(info) == "once":
+        scheduler.add_job(
+            trigger_once_alarm,
+            'date',
+            run_date=_parse_run_at(str(info.get("run_at") or "")),
+            args=[task_id, info],
+            id=task_id,
+            replace_existing=True,
+        )
+        return
+
+    c = _parse_cron(str(info.get("cron") or ""))
+    scheduler.add_job(
+        trigger_alarm,
+        'cron',
+        minute=c[0], hour=c[1], day=c[2], month=c[3], day_of_week=c[4],
+        args=[info],
+        id=task_id,
+        replace_existing=True
+    )
+
+
 def restore_tasks():
     """从 JSON 文件恢复所有定时任务到调度器。"""
     tasks = load_tasks()
@@ -300,17 +371,10 @@ def restore_tasks():
     restored = 0
     for task_id, info in tasks.items():
         try:
-            c = _parse_cron(info["cron"])
-            scheduler.add_job(
-                trigger_alarm,
-                'cron',
-                minute=c[0], hour=c[1], day=c[2], month=c[3], day_of_week=c[4],
-                args=[info],
-                id=task_id,
-                replace_existing=True
-            )
+            _add_alarm_job(task_id, info)
             restored += 1
-            print(f"   - [ID: {task_id}] 用户: {info['user_id']}, cron: {info['cron']}, session: {info.get('session_id', 'default')}, 内容: {info['text']}")
+            schedule_label = info.get("run_at") if _schedule_type(info) == "once" else info.get("cron")
+            print(f"   - [ID: {task_id}] 用户: {info['user_id']}, {info.get('schedule_type', 'cron')}: {schedule_label}, session: {info.get('session_id', 'default')}, 内容: {info['text']}")
         except Exception as e:
             print(f"   ⚠️ 恢复任务 {task_id} 失败: {e}")
 
@@ -371,10 +435,15 @@ app = FastAPI(title="WeBot Scheduler", lifespan=lifespan)
 async def add_task(task: CronTask):
     task_id = str(uuid.uuid4())[:8]
     try:
-        c = _parse_cron(task.cron)
-        target_type = _target_type(task.model_dump())
-        if target_type == "external" and not task.target_ref:
-            raise ValueError("External alarm requires target_ref")
+        task_data = task.model_dump()
+        schedule_type = _schedule_type(task_data)
+        if schedule_type == "once":
+            _parse_run_at(task.run_at)
+        else:
+            _parse_cron(task.cron)
+        target_type = _target_type(task_data)
+        if target_type == "external" and not (task.target_name and task.team) and not task.target_ref:
+            raise ValueError("External alarm requires target_name and team")
         info = {
             "user_id": task.user_id,
             "cron": task.cron,
@@ -384,16 +453,11 @@ async def add_task(task: CronTask):
             "target_ref": task.target_ref,
             "target_name": task.target_name,
             "team": task.team,
+            "schedule_type": schedule_type,
+            "run_at": task.run_at,
             "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
-        scheduler.add_job(
-            trigger_alarm,
-            'cron',
-            minute=c[0], hour=c[1], day=c[2], month=c[3], day_of_week=c[4],
-            args=[info],
-            id=task_id,
-            replace_existing=True
-        )
+        _add_alarm_job(task_id, info)
         # 持久化到 JSON
         tasks = load_tasks()
         tasks[task_id] = info
@@ -401,7 +465,7 @@ async def add_task(task: CronTask):
 
         return {**info, "task_id": task_id, "next_run": "已激活"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Cron 格式错误: {e}")
+        raise HTTPException(status_code=400, detail=f"定时规则错误: {e}")
 
 @app.get("/tasks")
 async def list_tasks():
@@ -421,6 +485,8 @@ async def list_tasks():
             "target_ref": info.get("target_ref", ""),
             "target_name": info.get("target_name", ""),
             "team": info.get("team", ""),
+            "schedule_type": _schedule_type(info),
+            "run_at": info.get("run_at", ""),
             "next_run": str(job.next_run_time) if job else None,
         })
     return result

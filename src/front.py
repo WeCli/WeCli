@@ -3109,28 +3109,32 @@ def team_alarms(team_name):
     body = request.get_json(force=True)
     target_type = str(body.get("target_type") or "internal").strip().lower()
     target_name = str(body.get("target_name") or "").strip()
+    schedule_type = str(body.get("schedule_type") or "cron").strip().lower()
     cron = str(body.get("cron") or "").strip()
+    run_at = str(body.get("run_at") or "").strip()
     text = str(body.get("text") or "").strip()
     if target_type not in {"internal", "external"}:
         return jsonify({"error": "target_type must be internal or external"}), 400
-    if not target_name or not cron or not text:
-        return jsonify({"error": "target_name, cron and text are required"}), 400
+    if schedule_type not in {"cron", "once"}:
+        return jsonify({"error": "schedule_type must be cron or once"}), 400
+    if not target_name or not text or (schedule_type == "cron" and not cron) or (schedule_type == "once" and not run_at):
+        return jsonify({"error": "target_name, schedule and text are required"}), 400
 
     internal_name_to_session, external_name_to_global = _team_alarm_restore_maps(user_id, team_name)
     payload = {
         "user_id": user_id,
         "cron": cron,
+        "schedule_type": schedule_type,
+        "run_at": run_at,
         "text": text,
         "target_type": target_type,
         "target_name": target_name,
         "team": team_name,
     }
     if target_type == "external":
-        target_ref = external_name_to_global.get(target_name)
-        if not target_ref:
+        if target_name not in external_name_to_global:
             return jsonify({"error": f"External target not found: {target_name}"}), 404
-        payload["target_ref"] = target_ref
-        payload["session_id"] = f"ext:{target_ref}"
+        payload["session_id"] = f"ext:{target_name}"
     else:
         session_id = internal_name_to_session.get(target_name)
         if not session_id:
@@ -5769,7 +5773,8 @@ def preview_team_snapshot():
         cron_info[target]["count"] += 1
         cron_info[target]["items"].append({
             "name": item.get("task_id", ""),
-            "schedule": item.get("cron", ""),
+            "schedule": item.get("run_at", "") if item.get("schedule_type") == "once" else item.get("cron", ""),
+            "schedule_type": item.get("schedule_type", "cron"),
             "text": item.get("text", ""),
             "target_type": item.get("target_type", "internal"),
         })

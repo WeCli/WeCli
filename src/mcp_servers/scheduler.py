@@ -69,18 +69,22 @@ async def add_alarm(
     target_ref: str = "",
     target_name: str = "",
     team: str = "",
+    schedule_type: str = "cron",
+    run_at: str = "",
 ) -> str:
     """
     为用户设置一个定时任务（闹钟）。
 
     :param username: 用户唯一标识符（系统自动注入，无需手动传递）
-    :param cron: Cron 表达式 (分 时 日 月 周)，例如 "0 1 * * *" 代表凌晨1点
+    :param cron: Cron 表达式 (分 时 日 月 周)，例如 "0 1 * * *" 代表凌晨1点。schedule_type=once 时可留空。
     :param text: 到点时需要执行的指令内容
     :param session_id: 会话ID（系统自动注入，无需手动传递）
     :param target_type: 目标类型，internal 或 external。默认 internal。
-    :param target_ref: 外部 agent 的 global_name；target_type=external 时必填。
-    :param target_name: 目标在 team 中的显示名，用于导入导出时重建引用。
-    :param team: 所属 team 名称，用于外部 agent 查找和 team snapshot 导入导出。
+    :param target_ref: 外部 agent 的旧运行时 global_name，通常不用传；仅作为兼容 fallback。
+    :param target_name: 目标在 team 中的显示名。target_type=external 时优先使用它解析当前 agent，便于迁移。
+    :param team: 所属 team 名称。target_type=external 时应传入，用于迁移后重新解析 agent。
+    :param schedule_type: cron 或 once。once 表示一次性闹钟。
+    :param run_at: 一次性闹钟触发时间，ISO/local datetime，例如 2026-04-25T09:00。
     :return: 操作结果的描述信息
     """
     async with httpx.AsyncClient() as client:
@@ -94,6 +98,8 @@ async def add_alarm(
                 "target_ref": target_ref,
                 "target_name": target_name,
                 "team": team,
+                "schedule_type": schedule_type,
+                "run_at": run_at,
             }
             resp = await client.post(SCHEDULER_URL, json=payload, timeout=10.0)
             if resp.status_code == 200:
@@ -124,7 +130,9 @@ async def list_alarms(username: str) -> str:
             for task in user_tasks:
                 target = task.get("target_name") or task.get("target_ref") or task.get("session_id") or "default"
                 target_type = task.get("target_type") or "internal"
-                result += f"- [ID: {task['task_id']}] 目标: {target_type}:{target}, 规则: {task['cron']}, 内容: {task['text']}\n"
+                schedule_type = task.get("schedule_type") or "cron"
+                schedule = task.get("run_at") if schedule_type == "once" else task.get("cron")
+                result += f"- [ID: {task['task_id']}] 目标: {target_type}:{target}, 规则: {schedule_type}:{schedule}, 内容: {task['text']}\n"
             return result
         except Exception as e:
             return f"⚠️ 读取列表失败: {str(e)}"
