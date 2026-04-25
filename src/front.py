@@ -920,8 +920,9 @@ def team_creator_build():
         update_job(job.job_id, owner_id=owner_id, status="running", error="")
         if roles_data and isinstance(roles_data, list):
             # Direct role input
-            extracted_roles_payload = _normalize_role_records(roles_data)
-            team_config = build_from_roles(roles_data, team_name, task)
+            normalized_roles = _normalize_role_records(roles_data)
+            extracted_roles_payload = normalized_roles
+            team_config = build_from_roles(normalized_roles, team_name, task)
         elif extraction_results and isinstance(extraction_results, list):
             # Parse from TinyFish extraction results
             roles = parse_extracted_roles(extraction_results)
