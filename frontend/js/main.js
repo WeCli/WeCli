@@ -10166,6 +10166,7 @@ function getGroupSenderTitle(sender) {
 // === @ Mention 功能 ===
 let mentionSelectedIds = [];  // 被 @ 选中的 agent session_id 列表
 let currentGroupMembers = []; // 当前群的 agent 成员缓存
+let currentGroupMuteAllAgents = false;
 
 function onGroupInputChange(_e) {
     const input = document.getElementById('group-input');
@@ -10645,6 +10646,13 @@ async function sendGroupMessage() {
             body: JSON.stringify(body)
         });
         const result = await resp.json();
+        if (!resp.ok) {
+            throw new Error(result.error || result.detail || '发送失败');
+        }
+        if (result.muted) {
+            orchToast(result.message || '该成员已被禁言');
+            return;
+        }
         const realId = result.id || (groupLastMsgId + 1);
         // Immediately show in UI with real server ID
         appendGroupMessages([{
@@ -10655,23 +10663,79 @@ async function sendGroupMessage() {
         }]);
     } catch (e) {
         console.error('Failed to send group message:', e);
+        orchToast(e.message || '发送失败');
+        input.value = text;
     }
 }
 
 function renderGroupMembers(members) {
     const container = document.getElementById('group-current-members');
-    container.innerHTML = members.map(m => {
+    const muteAllBar = `
+        <div style="display:flex;justify-content:flex-end;padding:0 0 10px 0;">
+            <button onclick="toggleGroupMuteAllMembers()" style="padding:6px 10px;border-radius:999px;border:1px solid ${currentGroupMuteAllAgents ? '#86efac' : '#fdba74'};background:${currentGroupMuteAllAgents ? '#f0fdf4' : '#fff7ed'};color:${currentGroupMuteAllAgents ? '#166534' : '#c2410c'};font-size:12px;font-weight:700;">
+                ${currentGroupMuteAllAgents ? '解除全员禁言' : '全员禁言'}
+            </button>
+        </div>`;
+    container.innerHTML = muteAllBar + members.map(m => {
         const badge = m.is_agent
             ? `<span class="member-badge badge-agent">${t('group_agent')}</span>`
             : `<span class="member-badge badge-owner">${t('group_owner')}</span>`;
-        let displayName = m.is_agent && m.title ? m.title : (m.user_id + (m.session_id !== 'default' ? '#' + m.session_id : ''));
+        let displayName = m.is_agent && m.title ? m.title : (m.user_id || m.global_id || '');
         if (displayName.length > 7) displayName = displayName.slice(0, 7) + '…';
+        const muteBtn = m.is_agent
+            ? `<button onclick="toggleGroupMemberMute('${escapeHtml(m.global_id || '')}', ${m.muted ? 'false' : 'true'}, '${escapeHtml(m.title || displayName)}')" style="margin-left:auto;padding:4px 8px;border-radius:999px;border:1px solid ${m.muted ? '#86efac' : '#fdba74'};background:${m.muted ? '#f0fdf4' : '#fff7ed'};color:${m.muted ? '#166534' : '#c2410c'};font-size:12px;">${m.muted ? '解除禁言' : '禁言'}</button>`
+            : '';
         return `
-            <div class="member-item">
-                <span class="member-name" title="${escapeHtml(m.user_id + '#' + m.session_id)}">${escapeHtml(displayName)}</span>
+            <div class="member-item" style="display:flex;align-items:center;gap:8px;">
+                <span class="member-name" title="${escapeHtml(m.global_id || m.user_id || '')}">${escapeHtml(displayName)}</span>
                 ${badge}
+                ${m.muted ? '<span class="member-badge" style="background:#fef3c7;color:#92400e;">已禁言</span>' : ''}
+                ${muteBtn}
             </div>`;
     }).join('');
+}
+
+async function toggleGroupMemberMute(globalId, muted, name) {
+    if (!currentGroupId || !globalId) return;
+    try {
+        const resp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}/members/mute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ global_id: globalId, muted })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.error || data.detail || '操作失败');
+        await refreshCurrentGroupMembers();
+        orchToast(`${name}${muted ? ' 已禁言' : ' 已解除禁言'}`);
+    } catch (e) {
+        orchToast((muted ? '禁言失败: ' : '解除禁言失败: ') + e.message);
+    }
+}
+
+async function toggleGroupMuteAllMembers() {
+    if (!currentGroupId) return;
+    const muted = !currentGroupMuteAllAgents;
+    try {
+        const resp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}/mute_all`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ muted })
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.error || data.detail || '操作失败');
+        await refreshCurrentGroupMembers();
+        orchToast(muted ? '已开启全员禁言' : '已解除全员禁言');
+    } catch (e) {
+        orchToast((muted ? '全员禁言失败: ' : '解除全员禁言失败: ') + e.message);
+    }
+}
+
+async function refreshCurrentGroupMembers() {
+    if (!currentGroupId) return;
+    const resp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}`);
+    const detail = await resp.json();
+    currentGroupMuteAllAgents = !!detail.mute_all_agents;
+    renderGroupMembers(detail.members || []);
 }
 
 let groupMemberPanelOpen = false;
@@ -10699,6 +10763,7 @@ async function loadAvailableSessions() {
         // Get current members to mark them
         const detailResp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}`);
         const detail = await detailResp.json();
+        currentGroupMuteAllAgents = !!detail.mute_all_agents;
         const memberSet = new Set((detail.members || []).map(m => m.user_id + '#' + m.session_id));
 
         if (sessions.length === 0) {
@@ -10740,6 +10805,7 @@ async function toggleGroupAgent(sessionId, add) {
         // Refresh member list
         const resp = await fetch(`/proxy_groups/${encodeURIComponent(currentGroupId)}`);
         const detail = await resp.json();
+        currentGroupMuteAllAgents = !!detail.mute_all_agents;
         renderGroupMembers(detail.members || []);
     } catch (e) {
         console.error('Failed to toggle group agent:', e);
