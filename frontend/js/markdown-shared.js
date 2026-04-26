@@ -81,6 +81,58 @@
         });
     }
 
+    function renderCodeBlockPathLines(codeElement) {
+        if (!codeElement || codeElement.dataset.localFileCodeBlock === '1') return false;
+        const rawText = String(codeElement.textContent || '').replace(/\r\n/g, '\n');
+        if (!rawText.trim()) return false;
+
+        const lines = rawText.split('\n');
+        let foundPath = false;
+        let allNonEmptyArePaths = true;
+        const fragment = document.createDocumentFragment();
+
+        lines.forEach((line, index) => {
+            const trimmed = line.trim();
+            if (!trimmed) {
+                fragment.appendChild(document.createTextNode(''));
+            } else {
+                const previewUrl = buildLocalFilePreviewUrl(trimmed);
+                if (previewUrl) {
+                    foundPath = true;
+                    const anchor = document.createElement('a');
+                    anchor.href = previewUrl;
+                    anchor.target = '_blank';
+                    anchor.rel = 'noopener noreferrer';
+                    anchor.dataset.localFileLink = '1';
+                    anchor.className = 'cc-local-file-link cc-local-file-link-block';
+                    anchor.textContent = trimmed;
+                    fragment.appendChild(anchor);
+                } else {
+                    allNonEmptyArePaths = false;
+                    fragment.appendChild(document.createTextNode(line));
+                }
+            }
+
+            if (index < lines.length - 1) {
+                fragment.appendChild(document.createElement('br'));
+            }
+        });
+
+        if (!foundPath || !allNonEmptyArePaths) return false;
+        codeElement.innerHTML = '';
+        codeElement.appendChild(fragment);
+        codeElement.dataset.localFileCodeBlock = '1';
+        codeElement.parentElement && codeElement.parentElement.classList.add('cc-local-file-code-block');
+        return true;
+    }
+
+    function linkifyLocalFileCodeBlocks(root) {
+        if (!root || typeof document === 'undefined') return;
+        root.querySelectorAll('pre code, code').forEach((codeElement) => {
+            renderCodeBlockPathLines(codeElement);
+        });
+    }
+
     function ensureLocalPreviewOverlay() {
         if (typeof document === 'undefined') return null;
         let overlay = document.getElementById(LOCAL_PREVIEW_OVERLAY_ID);
@@ -279,9 +331,11 @@
 
     function highlight(root) {
         linkifyLocalFileText(root);
+        linkifyLocalFileCodeBlocks(root);
         rewriteLocalFileLinks(root);
         if (!root || typeof global.hljs === 'undefined') return;
         root.querySelectorAll('pre code').forEach((block) => {
+            if (block.dataset.localFileCodeBlock === '1') return;
             try {
                 global.hljs.highlightElement(block);
             } catch (_) {
@@ -303,6 +357,7 @@
         configure: configureMarked,
         escapeHtml,
         linkifyLocalFileText,
+        linkifyLocalFileCodeBlocks,
         normalizeEscapedNewlines,
         openLocalPreviewOverlay,
         parseLocalReference,
