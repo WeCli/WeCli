@@ -119,6 +119,96 @@
     color: #1e40af;
 }
 
+body.cc-local-file-preview-open {
+    overflow: hidden;
+}
+
+.cc-local-file-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 120000;
+    display: none;
+}
+
+.cc-local-file-preview-overlay.show {
+    display: block;
+}
+
+.cc-local-file-preview-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.68);
+    backdrop-filter: blur(2px);
+}
+
+.cc-local-file-preview-panel {
+    position: absolute;
+    inset: 24px;
+    display: flex;
+    flex-direction: column;
+    background: #0b1020;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+}
+
+.cc-local-file-preview-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #111827;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.cc-local-file-preview-title {
+    min-width: 0;
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cc-local-file-preview-close {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e5e7eb;
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.cc-local-file-preview-close:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.cc-local-file-preview-frame {
+    width: 100%;
+    height: 100%;
+    flex: 1 1 auto;
+    border: none;
+    background: #020617;
+}
+
+@media (max-width: 640px) {
+    .cc-local-file-preview-panel {
+        inset: 0;
+        border-radius: 0;
+        border: none;
+    }
+    .cc-local-file-preview-header {
+        padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    }
+}
+
 .msg-bubble.markdown-body.tc-markdown,
 .message-agent.markdown-body.tc-markdown,
 .group-msg-content.markdown-body.tc-markdown,

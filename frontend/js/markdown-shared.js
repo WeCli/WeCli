@@ -1,6 +1,7 @@
 (function(global) {
     const ABSOLUTE_FILE_PATH_PATTERN = /(?:^|[\s(（\[{"'`])((?:\/[^\s<>"'`)\]）}]+)+\.[A-Za-z0-9_-]+(?::\d+(?::\d+)?)?)/g;
     const LOCAL_PREVIEW_ROUTE_PATTERN = /^\/local-file-(?:view|raw)(?:[/?#]|$)/;
+    const LOCAL_PREVIEW_OVERLAY_ID = 'cc-local-file-preview-overlay';
 
     function parseLocalReference(rawValue) {
         const raw = String(rawValue || '').trim();
@@ -77,6 +78,80 @@
             anchor.setAttribute('rel', 'noopener noreferrer');
             anchor.dataset.localFileLink = '1';
             anchor.classList.add('cc-local-file-link');
+        });
+    }
+
+    function ensureLocalPreviewOverlay() {
+        if (typeof document === 'undefined') return null;
+        let overlay = document.getElementById(LOCAL_PREVIEW_OVERLAY_ID);
+        if (overlay) return overlay;
+
+        overlay = document.createElement('div');
+        overlay.id = LOCAL_PREVIEW_OVERLAY_ID;
+        overlay.className = 'cc-local-file-preview-overlay';
+        overlay.innerHTML = [
+            '<div class="cc-local-file-preview-backdrop" data-close="1"></div>',
+            '<div class="cc-local-file-preview-panel" role="dialog" aria-modal="true" aria-label="Local file preview">',
+            '  <div class="cc-local-file-preview-header">',
+            '    <div class="cc-local-file-preview-title">文件预览</div>',
+            '    <button type="button" class="cc-local-file-preview-close" aria-label="Close preview" data-close="1">✕</button>',
+            '  </div>',
+            '  <iframe class="cc-local-file-preview-frame" title="Local file preview"></iframe>',
+            ' </div>'
+        ].join('');
+        document.body.appendChild(overlay);
+
+        overlay.addEventListener('click', (event) => {
+            const target = event.target;
+            if (target && target.getAttribute && target.getAttribute('data-close') === '1') {
+                closeLocalPreviewOverlay();
+            }
+        });
+
+        return overlay;
+    }
+
+    function openLocalPreviewOverlay(url, title) {
+        const overlay = ensureLocalPreviewOverlay();
+        if (!overlay) return false;
+        const frame = overlay.querySelector('.cc-local-file-preview-frame');
+        const titleEl = overlay.querySelector('.cc-local-file-preview-title');
+        if (!frame || !titleEl) return false;
+        frame.src = String(url || '');
+        titleEl.textContent = title || '文件预览';
+        overlay.classList.add('show');
+        document.body.classList.add('cc-local-file-preview-open');
+        return true;
+    }
+
+    function closeLocalPreviewOverlay() {
+        if (typeof document === 'undefined') return;
+        const overlay = document.getElementById(LOCAL_PREVIEW_OVERLAY_ID);
+        if (!overlay) return;
+        const frame = overlay.querySelector('.cc-local-file-preview-frame');
+        overlay.classList.remove('show');
+        document.body.classList.remove('cc-local-file-preview-open');
+        if (frame) {
+            setTimeout(() => {
+                if (!overlay.classList.contains('show')) frame.src = 'about:blank';
+            }, 120);
+        }
+    }
+
+    function bindLocalPreviewClicks() {
+        if (typeof document === 'undefined' || document.__ccLocalPreviewBound) return;
+        document.__ccLocalPreviewBound = true;
+        document.addEventListener('click', (event) => {
+            const anchor = event.target && event.target.closest ? event.target.closest('a.cc-local-file-link') : null;
+            if (!anchor) return;
+            const href = anchor.getAttribute('href') || '';
+            if (!LOCAL_PREVIEW_ROUTE_PATTERN.test(href)) return;
+            event.preventDefault();
+            const title = anchor.textContent ? String(anchor.textContent).trim() : '文件预览';
+            openLocalPreviewOverlay(href, title);
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeLocalPreviewOverlay();
         });
     }
 
@@ -224,10 +299,12 @@
 
     global.ClawcrossMarkdown = {
         buildLocalFilePreviewUrl,
+        closeLocalPreviewOverlay,
         configure: configureMarked,
         escapeHtml,
         linkifyLocalFileText,
         normalizeEscapedNewlines,
+        openLocalPreviewOverlay,
         parseLocalReference,
         render,
         highlight,
@@ -236,4 +313,5 @@
     };
 
     configureMarked();
+    bindLocalPreviewClicks();
 })(window);
