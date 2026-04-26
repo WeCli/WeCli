@@ -1,7 +1,26 @@
 (function(global) {
-    const ABSOLUTE_FILE_PATH_PATTERN = /(?:^|[\s(（\[{"'`])((?:\/[^\s<>"'`)\]）}]+)+\.[A-Za-z0-9_-]+(?::\d+(?::\d+)?)?)/g;
+    const ABSOLUTE_FILE_PATH_PATTERN = /((?:\/[^\s<>"'`)\]）}]+)+\.[A-Za-z0-9_-]+(?::\d+(?::\d+)?)?)/g;
     const LOCAL_PREVIEW_ROUTE_PATTERN = /^\/local-file-(?:view|raw)(?:[/?#]|$)/;
     const LOCAL_PREVIEW_OVERLAY_ID = 'cc-local-file-preview-overlay';
+
+    function isAbsoluteLocalReference(rawValue) {
+        const raw = String(rawValue || '').trim();
+        if (!raw) return false;
+        let candidate = raw;
+        if (candidate.startsWith('file://')) {
+            candidate = candidate.replace(/^file:\/\//i, '');
+        }
+        const lineColMatch = candidate.match(/^(.*?):(\d+)(?::(\d+))?$/);
+        if (lineColMatch) {
+            candidate = lineColMatch[1];
+        }
+        const hashIndex = candidate.indexOf('#');
+        if (hashIndex >= 0) {
+            candidate = candidate.slice(0, hashIndex);
+        }
+        const normalizedPath = candidate.replace(/\\/g, '/');
+        return normalizedPath.startsWith('/') || /^[A-Za-z]:\//.test(normalizedPath);
+    }
 
     function parseLocalReference(rawValue) {
         const raw = String(rawValue || '').trim();
@@ -88,7 +107,6 @@
 
         const lines = rawText.split('\n');
         let foundPath = false;
-        let allNonEmptyArePaths = true;
         const fragment = document.createDocumentFragment();
 
         lines.forEach((line, index) => {
@@ -96,7 +114,7 @@
             if (!trimmed) {
                 fragment.appendChild(document.createTextNode(''));
             } else {
-                const previewUrl = buildLocalFilePreviewUrl(trimmed);
+                const previewUrl = isAbsoluteLocalReference(trimmed) ? buildLocalFilePreviewUrl(trimmed) : null;
                 if (previewUrl) {
                     foundPath = true;
                     const anchor = document.createElement('a');
@@ -108,7 +126,6 @@
                     anchor.textContent = trimmed;
                     fragment.appendChild(anchor);
                 } else {
-                    allNonEmptyArePaths = false;
                     fragment.appendChild(document.createTextNode(line));
                 }
             }
@@ -118,7 +135,7 @@
             }
         });
 
-        if (!foundPath || !allNonEmptyArePaths) return false;
+        if (!foundPath) return false;
         codeElement.innerHTML = '';
         codeElement.appendChild(fragment);
         codeElement.dataset.localFileCodeBlock = '1';
@@ -240,10 +257,8 @@
             const fragment = document.createDocumentFragment();
 
             while ((match = ABSOLUTE_FILE_PATH_PATTERN.exec(text)) !== null) {
-                const fullMatch = match[0];
                 const pathText = match[1];
-                const leadLength = fullMatch.length - pathText.length;
-                const matchStart = match.index + leadLength;
+                const matchStart = match.index;
 
                 if (matchStart > lastIndex) {
                     fragment.appendChild(document.createTextNode(text.slice(lastIndex, matchStart)));
