@@ -90,6 +90,35 @@
     height: auto;
 }
 
+.tc-markdown a.cc-local-file-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    margin: 0.08em 0;
+    padding: 0.18em 0.5em;
+    border-radius: 0.55em;
+    background: rgba(37, 99, 235, 0.12);
+    border: 1px solid rgba(37, 99, 235, 0.28);
+    color: #1d4ed8;
+    text-decoration: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.94em;
+    line-height: 1.45;
+    word-break: break-all;
+}
+
+.tc-markdown a.cc-local-file-link::before {
+    content: "📂";
+    flex: 0 0 auto;
+    opacity: 0.95;
+}
+
+.tc-markdown a.cc-local-file-link:hover {
+    background: rgba(37, 99, 235, 0.18);
+    border-color: rgba(37, 99, 235, 0.4);
+    color: #1e40af;
+}
+
 .msg-bubble.markdown-body.tc-markdown,
 .message-agent.markdown-body.tc-markdown,
 .group-msg-content.markdown-body.tc-markdown,

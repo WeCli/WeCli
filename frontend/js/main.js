@@ -1667,6 +1667,9 @@ function renderMarkdown(content) {
 }
 
 function highlightMarkdownIn(root) {
+    if (window.ClawcrossMarkdown && typeof window.ClawcrossMarkdown.rewriteLocalFileLinks === 'function') {
+        window.ClawcrossMarkdown.rewriteLocalFileLinks(root);
+    }
     if (window.ClawcrossMarkdown) {
         window.ClawcrossMarkdown.highlight(root);
         return;
